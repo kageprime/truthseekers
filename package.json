@@ -1,0 +1,32 @@
+{
+  "name": "encarta-me",
+  "private": true,
+  "workspaces": [
+    "packages/core",
+    "packages/storage",
+    "packages/server",
+    "packages/cli",
+    "packages/web"
+  ],
+  "scripts": {
+    "build:core": "tsc --build packages/core",
+    "build:storage": "tsc --build packages/storage",
+    "build:server": "tsc --build packages/server",
+    "build:cli": "tsc --build packages/cli",
+    "build": "tsc --build packages/core packages/storage packages/server packages/cli",
+    "build:web": "cd packages/web && npm run build",
+    "typecheck": "tsc --build packages/core packages/storage packages/server packages/cli",
+    "seed": "node packages/cli/dist/seed.js",
+    "generate": "node packages/cli/dist/generate.js",
+    "dev": "concurrently \"node packages/server/dist/index.js\" \"cd packages/web && npm run dev\"",
+    "clean": "rm -rf packages/*/dist packages/*/.next node_modules"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "autoprefixer": "^10.5.0",
+    "concurrently": "^9.0.0",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^5.7.0"
+  }
+}
