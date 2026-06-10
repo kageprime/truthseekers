@@ -7,6 +7,7 @@ import MermaidDiagram from "../../components/MermaidDiagram";
 import InteractiveTimeline from "../../components/InteractiveTimeline";
 import GenerationBar from "../../components/GenerationBar";
 import QueueIndicator from "../../components/QueueIndicator";
+import { SkeletonImage, BlankSlateImage, BlankSlateMedia, FigureImage } from "../../components/MediaImage";
 
 interface Article {
   slug: string;
@@ -31,6 +32,7 @@ interface MediaItem {
   id: string;
   caption: string;
   src?: string;
+  source?: string;
   code?: string;
   prompt?: string;
 }
@@ -55,13 +57,52 @@ interface Citation {
 }
 
 function mdToHTML(md: string): string {
-  return md
+  let html = md;
+
+  // Tables — match header row + separator + body rows
+  html = html.replace(
+    /(\|[^\n]+\|\n\|[-:| ]+\|\n)((?:\|[^\n]+\|\n?)*)/g,
+    (_, headerSep, body) => {
+      const headerRow = headerSep.split("\n")[0];
+      const headers = headerRow.split("|").filter((c: string) => c.trim()).map((c: string) => c.trim());
+      const bodyRows = body.trim().split("\n").filter(Boolean);
+
+      const thead = `<thead><tr>${headers.map((h: string) => `<th style="padding:0.5rem 0.75rem;border:2px solid #1c1917;background:#fef3c7;text-align:left;font-family:'Press Start 2P',monospace;font-size:0.65rem;">${h}</th>`).join("")}</tr></thead>`;
+      const tbody = `<tbody>${bodyRows.map((row: string) => {
+        const cells = row.split("|").filter((c: string) => c.trim()).map((c: string) => c.trim());
+        return `<tr>${cells.map((c: string) => `<td style="padding:0.4rem 0.75rem;border:1.5px solid #ddd;font-size:0.9rem;">${c}</td>`).join("")}</tr>`;
+      }).join("")}</tbody>`;
+
+      return `<table style="width:100%;border-collapse:collapse;border:3px solid #1c1917;margin:1rem 0;box-shadow:4px 4px 0 rgba(28,25,23,0.1);"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+    }
+  );
+
+  // Blockquotes
+  html = html.replace(/^> (.+)$/gm, '<blockquote style="border-left:4px solid var(--orange);padding:0.75rem 1rem;margin:1rem 0;background:var(--cream);font-style:italic;">$1</blockquote>');
+
+  // Unordered lists
+  html = html.replace(/^(\- .+(?:\n\- .+)*)/gm, (match: string) => {
+    const items = match.split("\n").map((l: string) => `<li>${l.replace(/^\- /, "")}</li>`).join("");
+    return `<ul style="padding-left:1.5rem;margin:0.5rem 0;">${items}</ul>`;
+  });
+
+  // Code blocks (inline)
+  html = html.replace(/`([^`]+)`/g, '<code style="background:#f0f0f0;padding:0.15rem 0.4rem;border-radius:3px;font-size:0.9em;border:1px solid #ddd;">$1</code>');
+
+  // Bold, italic, links
+  html = html
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-    .replace(/^### (.+)$/gm, '<h3 style="font-weight:700;font-size:1.1rem;margin-top:1.25rem;margin-bottom:0.5rem;">$1</h3>')
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/^(.+)$/gm, "<p>$1</p>");
+    .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+  // Headings
+  html = html.replace(/^### (.+)$/gm, '<h3 style="font-weight:700;font-size:1.1rem;margin-top:1.25rem;margin-bottom:0.5rem;">$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2 style="font-weight:800;font-size:1.3rem;margin-top:1.5rem;margin-bottom:0.5rem;border-bottom:2px solid #e0e0e0;padding-bottom:0.25rem;">$1</h2>');
+
+  // Paragraphs — avoid wrapping already-converted elements
+  html = "<p>" + html.replace(/\n\n+/g, "</p><p>") + "</p>";
+
+  return html;
 }
 
 export default function ArticlePage() {
@@ -326,32 +367,20 @@ export default function ArticlePage() {
                 style={{ color: "#222" }}
                 dangerouslySetInnerHTML={{ __html: mdToHTML(section.content) }}
               />
-              {section.media?.length > 0 && (
+              {section.media && section.media.length > 0 ? (
                 <div className="mt-4 space-y-2">
                   {section.media.map((m, mi) => {
                     if (m.type === "diagram" && m.code) {
                       return <MermaidDiagram key={m.id || `media-${mi}`} code={m.code} caption={m.caption} />;
                     }
                     if (m.type === "image") {
-                      return (
-                        <div key={m.id || `media-${mi}`} className="pixel-card-sm p-3" style={{ background: palette.bg }}>
-                          <span className="pixel text-[9px] text-[#888]">IMAGE</span>
-                          <div className="h-32 flex items-center justify-center text-4xl bg-white/50 my-2 border border-dashed border-black/20">
-                            {m.src ? (
-                              <img src={m.src} alt={m.caption} className="max-h-full object-contain" />
-                            ) : (
-                              <span className="text-2xl opacity-50">🖼️</span>
-                            )}
-                          </div>
-                          <p className="text-sm">{m.caption}</p>
-                          {m.prompt && (
-                            <details className="mt-1">
-                              <summary className="text-xs cursor-pointer text-[#888]">image prompt</summary>
-                              <p className="text-xs mt-1 p-2 bg-white border">{m.prompt}</p>
-                            </details>
-                          )}
-                        </div>
-                      );
+                      if (m.src) {
+                        return <FigureImage key={m.id || `media-${mi}`} src={m.src} caption={m.caption} source={m.source} />;
+                      }
+                      if (m.prompt) {
+                        return <SkeletonImage key={m.id || `media-${mi}`} caption={m.caption} />;
+                      }
+                      return <BlankSlateImage key={m.id || `media-${mi}`} caption={m.caption} prompt={m.prompt} />;
                     }
                     if (m.type === "threed") {
                       return (
@@ -380,6 +409,8 @@ export default function ArticlePage() {
                     );
                   })}
                 </div>
+              ) : (
+                <BlankSlateMedia />
               )}
             </div>
           );

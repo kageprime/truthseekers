@@ -12,9 +12,12 @@ export interface CrossReference {
 }
 
 export interface TimelineEvent {
+  id?: string;
   year: number;
   event: string;
   description: string;
+  image?: string;
+  causes?: string[];
 }
 
 export interface ThreeDScene {
@@ -28,6 +31,7 @@ export interface MediaItem {
   id: string;
   caption: string;
   src?: string;
+  source?: string;
   code?: string;
   prompt?: string;
 }

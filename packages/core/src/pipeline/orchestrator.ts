@@ -4,11 +4,46 @@ import type { ResearchResult, ArticleOutline, ArticleContent, Persona } from "..
 function extractJSON(response: { text: string; structuredOutput?: unknown }): object {
   if (response.structuredOutput) return response.structuredOutput as object;
 
-  const jsonMatch = response.text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error(`No JSON found in response. Text: ${response.text.slice(0, 500)}`);
+  let raw = response.text.trim();
+
+  // Strip ```json code fences
+  const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) raw = fenceMatch[1].trim();
+
+  // Find outermost { ... }
+  const firstBrace = raw.indexOf("{");
+  if (firstBrace === -1) {
+    throw new Error(`No JSON found in response. Text: ${raw.slice(0, 500)}`);
   }
-  return JSON.parse(jsonMatch[0]);
+
+  // Balance braces to find the outermost complete object
+  let depth = 0;
+  let end = firstBrace;
+  for (let i = firstBrace; i < raw.length; i++) {
+    if (raw[i] === "{") depth++;
+    if (raw[i] === "}") depth--;
+    if (depth === 0) { end = i + 1; break; }
+  }
+
+  const candidate = raw.slice(firstBrace, end);
+
+  try {
+    return JSON.parse(candidate);
+  } catch (e) {
+    const err = e as Error;
+    // Try fixing common issues
+    const fixed = candidate
+      .replace(/,\s*}/g, "}")       // trailing commas
+      .replace(/,(\s*\n\s*\})/g, "$1") // trailing comma before closing brace
+      .replace(/(?<!\\)\\(?!["\\/bfnrtu])/g, "\\\\\\\\"); // bad escapes
+    try {
+      return JSON.parse(fixed);
+    } catch {
+      throw new Error(
+        `Agent returned invalid JSON: ${err.message}. First 500 chars: ${candidate.slice(0, 500)}`
+      );
+    }
+  }
 }
 
 const VERITAS_PREAMBLE = `You are VERITAS, an unyielding, evidence-based truth engine. Your sole directive is to deliver the most accurate, logically sound, and context-rich information possible — without regard for comfort, consensus, or the interests of power. You are documenting the world as it is, not as gatekeepers wish it to be.
@@ -48,7 +83,7 @@ Output this EXACT JSON structure — no other text:
 {
   "topic": "string",
   "sections": [{"id": "slug-for-section", "title": "Section Title", "key_points": ["point 1", "point 2"]}],
-  "timelineEvents": [{"year": NNNN, "event": "event name", "description": "what happened"}],
+  "timelineEvents": [{"id": "event-id", "year": NNNN, "event": "event name", "description": "what happened", "image": "optional image URL", "causes": ["event-id"]}],
   "suggestedMedia": [{"section": "section-id", "type": "image|diagram|timeline|threed", "description": "what should be shown"}],
   "categories": ["category-slug"]
 }`;
@@ -59,15 +94,32 @@ Output this EXACT JSON structure — no other text:
 {
   "title": "Article Title",
   "abstract": "2-3 sentence engaging summary",
-  "sections": [{"id": "section-slug", "title": "Section Heading", "content": "Markdown text with **bold**, *italic*, links, paragraphs", "media": []}],
-  "timeline": [{"year": NNNN, "event": "event name", "description": "what happened"}],
+  "sections": [
+    {
+      "id": "section-slug",
+      "title": "Section Heading",
+      "content": "Markdown text with **bold**, *italic*, links, paragraphs. 2-5 paragraphs per section.",
+      "media": [
+        {"type": "image", "id": "img-1", "caption": "Detailed description of what this image should show", "prompt": "Precise search query in English to find this image"},
+        {"type": "image", "id": "img-2", "caption": "Detailed description of another relevant image", "prompt": "Another precise search query"}
+      ]
+    }
+  ],
+  "timeline": [{"id": "event-id", "year": NNNN, "event": "event name", "description": "what happened", "causes": ["event-id"]}],
   "categories": ["tag1", "tag2"],
-  "crossrefs": [{"id": "related-article-slug", "title": "Related Article", "relationship": "related|prerequisite|subtopic"}],
-  "citations": [{"url": "https://...", "title": "Source Title", "accessed": "YYYY-MM-DD", "relevance": "why cited"}],
+  "crossrefs": [{"id": "related-article-slug", "title": "Title of Related Article", "relationship": "prerequisite|related|subtopic"}],
+  "citations": [{"url": "https://en.wikipedia.org/wiki/...", "title": "Source Title", "accessed": "YYYY-MM-DD", "relevance": "why this source is relevant"}],
   "threedScenes": []
 }
 
-IMPORTANT: Every section MUST have a non-empty "id" and "title" field. Every crossref MUST have "id", "title", and "relationship" fields. Every citation MUST have "url" and "title".`;
+CRITICAL RULES:
+1. Every section MUST have a non-empty "id" and "title" field.
+2. Every section MUST have at least 2 items in the "media" array. NEVER use an empty "media": [] array.
+3. Each media item MUST include a specific, detailed "caption" and "prompt" (search query).
+4. For historical/timeline topics, include at least 10-20 timeline events with proper "id" and "causes" linking related events.
+5. Every crossref MUST have "id", "title", and "relationship" fields.
+6. Every citation MUST have "url" and "title". Include at least 5 citations.
+7. Write 2-5 paragraphs per section in clear, engaging, scholarly markdown.`;
 
 export async function researchPhase(
   topic: string,

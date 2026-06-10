@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Script from "next/script";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Encarta-NG — The Living Encyclopedia",
@@ -129,6 +129,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             0%, 100% { transform: translateY(0px); }
             50% { transform: translateY(-8px); }
           }
+          @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+          }
           @keyframes spin {
             to { transform: rotate(360deg); }
           }
@@ -177,7 +181,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
         `}</style>
         {children}
-        <Script src="https://cdn.tailwindcss.com" strategy="beforeInteractive" />
       </body>
     </html>
   );
