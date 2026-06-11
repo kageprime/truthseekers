@@ -1,19 +1,37 @@
-import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk";
+import { createOpencode, type OpencodeClient } from "@opencode-ai/sdk";
+import fs from "node:fs";
+import path from "node:path";
 
-const OPENCODE_URL = process.env.OPENCODE_SERVER_URL || "http://localhost:4096";
+let clientPromise: Promise<OpencodeClient> | null = null;
 
-let client: OpencodeClient | null = null;
+function loadConfig(): Record<string, unknown> {
+  try {
+    const configPath = path.join(process.cwd(), "opencode.json");
+    if (fs.existsSync(configPath)) {
+      return JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    }
+  } catch { /* ignore */ }
+  return {};
+}
 
-export function getClient(): OpencodeClient {
-  if (!client) {
-    client = createOpencodeClient({ baseUrl: OPENCODE_URL });
-    console.log(`OpenCode client connected to ${OPENCODE_URL}`);
+async function initClient(): Promise<OpencodeClient> {
+  const config = loadConfig();
+  const port = parseInt(process.env.OPENCODE_SERVER_PORT || "4096", 10);
+  console.log(`Starting embedded OpenCode server on port ${port}...`);
+  const result = await createOpencode({ hostname: "127.0.0.1", port, config });
+  console.log(`Embedded OpenCode server ready at ${result.server.url}`);
+  return result.client;
+}
+
+export async function getClient(): Promise<OpencodeClient> {
+  if (!clientPromise) {
+    clientPromise = initClient();
   }
-  return client;
+  return clientPromise;
 }
 
 export async function createSession(title: string): Promise<string> {
-  const c = getClient();
+  const c = await getClient();
   const result = await c.session.create({ body: { title } });
   if (result.error) {
     const err = result.error as Record<string, unknown>;
@@ -23,7 +41,7 @@ export async function createSession(title: string): Promise<string> {
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  const c = getClient();
+  const c = await getClient();
   await c.session.delete({ path: { id: sessionId } });
 }
 
@@ -40,7 +58,7 @@ export async function sendPrompt(
     noReply?: boolean;
   }
 ): Promise<PromptResult> {
-  const c = getClient();
+  const c = await getClient();
   const body: Record<string, unknown> = {
     parts: [{ type: "text", text }],
   };
@@ -69,7 +87,7 @@ export async function sendPrompt(
 }
 
 export async function getSessionMessages(sessionId: string) {
-  const c = getClient();
+  const c = await getClient();
   const result = await c.session.messages({ path: { id: sessionId } });
   if (result.error) {
     const err = result.error as Record<string, unknown>;

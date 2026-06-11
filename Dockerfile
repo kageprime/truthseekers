@@ -4,11 +4,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g opencode-ai
-
 WORKDIR /app
 
-# Deps layer for caching
+# Deps layer (cached)
 COPY package.json package-lock.json ./
 COPY packages/core/package.json packages/core/
 COPY packages/storage/package.json packages/storage/
@@ -20,11 +18,11 @@ RUN npm install --legacy-peer-deps
 # Source
 COPY . .
 
-# Build
+# Build backend + web
 RUN npm run build
 RUN cd packages/web && NODE_ENV=production npx next build || NODE_ENV=production npx next build
 
-# Data + git
+# Data dirs
 RUN mkdir -p /app/data/encyclopedia /app/content \
     && cd /app/data/encyclopedia && git init
 
