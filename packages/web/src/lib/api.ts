@@ -6,6 +6,7 @@ interface ArticleSummary {
   abstract: string;
   metadata: { status: string; version: number; updated: string };
   categories: string[];
+  thumbnail?: string;
 }
 
 interface Article extends ArticleSummary {
@@ -35,9 +36,13 @@ interface MediaItem {
 }
 
 interface TimelineEvent {
+  id?: string;
   year: number;
   event: string;
   description: string;
+  image?: string;
+  causes?: string[];
+  category?: string;
 }
 
 interface CrossReference {

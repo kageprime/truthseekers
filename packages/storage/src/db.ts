@@ -221,10 +221,10 @@ export function getArticleStatus(slug: string): "draft" | "published" | "error" 
 export function listArticles(
   limit = 50,
   offset = 0
-): Pick<Article, "slug" | "title" | "abstract" | "metadata" | "categories">[] {
+): (Pick<Article, "slug" | "title" | "abstract" | "metadata" | "categories"> & { thumbnail?: string })[] {
   if (!db) return [];
   const stmt = db.prepare(
-    `SELECT slug, title, abstract, metadata_json, categories_json
+    `SELECT slug, title, abstract, content_json, metadata_json, categories_json
      FROM articles
      WHERE status = 'published'
      ORDER BY updated DESC
@@ -232,15 +232,24 @@ export function listArticles(
   );
   stmt.bind([limit, offset]);
 
-  const results: Pick<Article, "slug" | "title" | "abstract" | "metadata" | "categories">[] = [];
+  const results: (Pick<Article, "slug" | "title" | "abstract" | "metadata" | "categories"> & { thumbnail?: string })[] = [];
   while (stmt.step()) {
     const row = stmt.getAsObject();
+    let thumbnail: string | undefined;
+    try {
+      const content = JSON.parse(row.content_json as string) as ArticleContent;
+      for (const sec of content.sections) {
+        const img = sec.media.find((m) => m.type === "image" && m.src);
+        if (img) { thumbnail = img.src; break; }
+      }
+    } catch { /* no thumbnail */ }
     results.push({
       slug: row.slug as string,
       title: row.title as string,
       abstract: row.abstract as string,
       metadata: JSON.parse(row.metadata_json as string) as ArticleMetadata,
       categories: JSON.parse(row.categories_json as string) as string[],
+      thumbnail,
     });
   }
   stmt.free();

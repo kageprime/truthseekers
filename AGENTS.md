@@ -1,4 +1,4 @@
-# Encarta-Me
+# Truthseekers
 
 An LLM-powered interactive encyclopedia SDK — build your own AI agent-driven knowledge base.
 
@@ -23,7 +23,7 @@ An LLM-powered interactive encyclopedia SDK — build your own AI agent-driven k
 
 ## B2B SDK Positioning
 
-Encarta-Me is an SDK for building AI-powered encyclopedias. Third parties integrate the SDK to create their own agentic knowledge bases. The web app and API server are reference implementations showing what the SDK can do.
+Truthseekers is an SDK for building AI-powered encyclopedias. Third parties integrate the SDK to create their own agentic knowledge bases. The web app and API server are reference implementations showing what the SDK can do.
 
 ## Deployment Architecture
 

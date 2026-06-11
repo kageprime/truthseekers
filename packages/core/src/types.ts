@@ -18,6 +18,7 @@ export interface TimelineEvent {
   description: string;
   image?: string;
   causes?: string[];
+  category?: string;
 }
 
 export interface ThreeDScene {

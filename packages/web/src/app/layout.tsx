@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Encarta-NG — The Living Encyclopedia",
+  title: "Truthseekers — The Living Encyclopedia",
   description: "An LLM-powered interactive encyclopedia. Research, write, verify — all by AI agents.",
 };
 

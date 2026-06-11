@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import GenerationBar, { type GeneratingEntry, phasePercent, phaseLabel } from "../components/GenerationBar";
+import { useEffect, useState } from "react";
+import GenerationBar, { type GeneratingEntry } from "../components/GenerationBar";
+import TruthseekersLogo from "../components/TruthseekersLogo";
+import QueueIndicator from "../components/QueueIndicator";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
 
@@ -48,7 +50,6 @@ function jobToEntry(job: QueueJob): GeneratingEntry {
 export default function QueuePage() {
   const [data, setData] = useState<QueueData | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const [expandedJob, setExpandedJob] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,19 +69,16 @@ export default function QueuePage() {
 
   if (!data) {
     return (
-      <div>
-        <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-3" style={{ background: "rgba(255,250,240,0.85)", backdropFilter: "blur(12px)", borderBottom: "3px solid var(--ink)" }}>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 flex items-center justify-center text-[10px] text-white border-2 border-black shadow-[3px_3px_0_#1c1917]"
-              style={{ background: "var(--orange)", fontFamily: "'Press Start 2P', monospace" }}>E-N</div>
-            <a href="/" className="font-bold hidden sm:block hover:text-[#ea580c]" style={{ textDecoration: "none", color: "inherit" }}>Encarta-NG</a>
-          </div>
-          <a href="/" className="pixel-btn bg-[var(--ink)] text-white text-[9px] py-2">← HOME</a>
+      <div className="min-h-screen flex flex-col bg-[#fffaf0]">
+        <nav className="flex items-center justify-between px-6 py-4 border-b border-[#dfe1e5]">
+          <TruthseekersLogo />
         </nav>
-        <main className="max-w-4xl mx-auto px-6 py-20 text-center">
-          <div className="inline-block w-12 h-12 border-4 border-[#e0e0e0] border-t-[#1c1917] rounded-full"
-            style={{ animation: "spin 0.8s linear infinite" }} />
-          <p className="mt-4 text-[#888]">Connecting to queue...</p>
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="inline-block w-8 h-8 border-4 border-[#e0e0e0] border-t-[#1a1a1a] rounded-full"
+              style={{ animation: "spin 0.8s linear infinite" }} />
+            <p className="mt-4 text-[#5f6368]">Connecting to queue...</p>
+          </div>
         </main>
       </div>
     );
@@ -93,59 +91,59 @@ export default function QueuePage() {
   const doneCount = data.jobs.filter((j) => j.status === "done").length;
 
   return (
-    <div>
-      {/* NAV */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-3" style={{ background: "rgba(255,250,240,0.85)", backdropFilter: "blur(12px)", borderBottom: "3px solid var(--ink)" }}>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 flex items-center justify-center text-[10px] text-white border-2 border-black shadow-[3px_3px_0_#1c1917]"
-            style={{ background: "var(--orange)", fontFamily: "'Press Start 2P', monospace" }}>E-N</div>
-          <a href="/" className="font-bold hidden sm:block hover:text-[#ea580c]" style={{ textDecoration: "none", color: "inherit" }}>Encarta-NG</a>
+    <div className="min-h-screen flex flex-col bg-[#fffaf0]">
+      {/* Nav */}
+      <nav className="flex items-center justify-between px-6 py-4 border-b border-[#dfe1e5]">
+        <TruthseekersLogo />
+        <div className="flex items-center gap-6 text-sm text-[#5f6368]">
+          <a href="/" className="hover:text-[#1a1a1a] hover:underline">Home</a>
+          <a href="/article/new" className="hover:text-[#1a1a1a] hover:underline">New Article</a>
+          <QueueIndicator />
         </div>
-        <a href="/" className="pixel-btn bg-[var(--ink)] text-white text-[9px] py-2">← HOME</a>
       </nav>
 
-      <main className="max-w-5xl mx-auto px-6 py-10">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="pixel text-xl" style={{ color: "var(--ink)" }}>QUEUE MANAGER</h1>
-            <p className="text-sm text-[#888] mt-1">Monitor and manage all generation jobs</p>
+            <h1 className="text-2xl font-bold text-[#1a1a1a]">Queue Manager</h1>
+            <p className="text-sm text-[#5f6368] mt-1">Monitor and manage all generation jobs</p>
           </div>
-          <div className="flex gap-4 text-xs">
-            <span style={{ color: "var(--orange)" }}>{data.stats.active}/{data.stats.maxConcurrent} active</span>
-            <span style={{ color: "var(--blue)" }}>{data.stats.queued}/{data.stats.maxQueue} queued</span>
+          <div className="flex gap-4 text-sm">
+            <span className="text-[#ea580c] font-medium">{data.stats.active}/{data.stats.maxConcurrent} active</span>
+            <span className="text-[#0c4a6e] font-medium">{data.stats.queued}/{data.stats.maxQueue} queued</span>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          <div className="pixel-card-sm p-4 text-center bg-white">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="p-4 rounded-lg border border-[#dfe1e5] text-center bg-white hover:shadow-sm transition-shadow">
             <div className="text-3xl mb-1">⚡</div>
-            <div className="pixel text-2xl" style={{ color: "var(--orange)" }}>{data.stats.active}</div>
-            <div className="text-[10px] text-[#888] mt-1">ACTIVE</div>
+            <div className="text-2xl font-bold text-[#ea580c]">{data.stats.active}</div>
+            <div className="text-xs text-[#5f6368] mt-1 uppercase tracking-wide">Active</div>
           </div>
-          <div className="pixel-card-sm p-4 text-center bg-white">
+          <div className="p-4 rounded-lg border border-[#dfe1e5] text-center bg-white hover:shadow-sm transition-shadow">
             <div className="text-3xl mb-1">⏳</div>
-            <div className="pixel text-2xl" style={{ color: "var(--blue)" }}>{data.stats.queued}</div>
-            <div className="text-[10px] text-[#888] mt-1">QUEUED</div>
+            <div className="text-2xl font-bold text-[#0c4a6e]">{data.stats.queued}</div>
+            <div className="text-xs text-[#5f6368] mt-1 uppercase tracking-wide">Queued</div>
           </div>
-          <div className="pixel-card-sm p-4 text-center bg-white">
+          <div className="p-4 rounded-lg border border-[#dfe1e5] text-center bg-white hover:shadow-sm transition-shadow">
             <div className="text-3xl mb-1">✅</div>
-            <div className="pixel text-2xl" style={{ color: "var(--green)" }}>{doneCount}</div>
-            <div className="text-[10px] text-[#888] mt-1">DONE</div>
+            <div className="text-2xl font-bold text-[#22c55e]">{doneCount}</div>
+            <div className="text-xs text-[#5f6368] mt-1 uppercase tracking-wide">Done</div>
           </div>
-          <div className="pixel-card-sm p-4 text-center bg-white">
+          <div className="p-4 rounded-lg border border-[#dfe1e5] text-center bg-white hover:shadow-sm transition-shadow">
             <div className="text-3xl mb-1">❌</div>
-            <div className="pixel text-2xl" style={{ color: "var(--red)" }}>{errorJobs.length}</div>
-            <div className="text-[10px] text-[#888] mt-1">ERRORS</div>
+            <div className="text-2xl font-bold text-[#dc2626]">{errorJobs.length}</div>
+            <div className="text-xs text-[#5f6368] mt-1 uppercase tracking-wide">Errors</div>
           </div>
         </div>
 
-        {/* Active Jobs — inline GenerationBar */}
+        {/* Active Jobs */}
         <div className="mb-8">
-          <div className="pixel-section-header bg-[#ea580c] text-white mb-4">ACTIVE</div>
+          <h2 className="text-sm font-semibold text-[#1a1a1a] mb-4 pb-2 border-b border-[#dfe1e5]">Active</h2>
           {activeJobs.length === 0 ? (
-            <p className="text-sm text-[#aaa] p-4">No active jobs. Submit one from the home page or CLI.</p>
+            <p className="text-sm text-[#9aa0a6] py-4">No active jobs. Submit one from the home page or CLI.</p>
           ) : (
             <div className="space-y-2">
               {activeJobs.map((job) => (
@@ -166,16 +164,16 @@ export default function QueuePage() {
 
         {/* Queued Jobs */}
         <div className="mb-8">
-          <div className="pixel-section-header bg-[#0c4a6e] text-white mb-4">QUEUED</div>
+          <h2 className="text-sm font-semibold text-[#1a1a1a] mb-4 pb-2 border-b border-[#dfe1e5]">Queued</h2>
           {queuedJobs.length === 0 ? (
-            <p className="text-sm text-[#aaa] p-4">No queued jobs.</p>
+            <p className="text-sm text-[#9aa0a6] py-4">No queued jobs.</p>
           ) : (
-            <div className="grid md:grid-cols-2 gap-2">
+            <div className="grid md:grid-cols-2 gap-3">
               {queuedJobs.map((job) => (
-                <div key={job.slug} className="pixel-card-sm p-3 bg-white flex items-center gap-3">
-                  <span>⏳</span>
-                  <span className="text-sm font-medium truncate flex-1">{job.title || job.slug}</span>
-                  <span className="text-[10px] text-[#aaa]">{timeAgo(job.createdAt)}</span>
+                <div key={job.slug} className="flex items-center gap-3 p-3 rounded-lg border border-[#dfe1e5] bg-white hover:bg-[#f8f9fa] transition-colors">
+                  <span className="text-lg">⏳</span>
+                  <span className="text-sm font-medium truncate flex-1 text-[#1a1a1a]">{job.title || job.slug}</span>
+                  <span className="text-xs text-[#9aa0a6]">{timeAgo(job.createdAt)}</span>
                 </div>
               ))}
             </div>
@@ -185,7 +183,7 @@ export default function QueuePage() {
         {/* Error Jobs */}
         {errorJobs.length > 0 && (
           <div className="mb-8">
-            <div className="pixel-section-header bg-[#dc2626] text-white mb-4">ERRORS</div>
+            <h2 className="text-sm font-semibold text-[#dc2626] mb-4 pb-2 border-b border-[#dfe1e5]">Errors</h2>
             <div className="space-y-2">
               {errorJobs.map((job) => (
                 <GenerationBar
@@ -209,21 +207,22 @@ export default function QueuePage() {
           </div>
         )}
 
-        {/* Queue Config Info */}
-        <div className="pixel-card p-6 mt-12" style={{ background: "var(--cream)" }}>
-          <h3 className="pixel text-[10px] mb-4" style={{ color: "var(--ink)" }}>CONFIGURATION</h3>
-          <div className="grid sm:grid-cols-2 gap-4 text-sm">
-            <div><span className="text-[#888]">Max concurrent:</span><span className="ml-2 font-bold">{data.stats.maxConcurrent}</span></div>
-            <div><span className="text-[#888]">Max queue size:</span><span className="ml-2 font-bold">{data.stats.maxQueue}</span></div>
-            <div><span className="text-[#888]">Set via env:</span><span className="ml-2 font-mono text-xs">ENCARTA_MAX_CONCURRENT</span></div>
-            <div><span className="text-[#888]">Set via env:</span><span className="ml-2 font-mono text-xs">ENCARTA_MAX_QUEUE</span></div>
+        {/* Queue Config */}
+        <div className="mt-12 p-6 rounded-lg border border-[#dfe1e5] bg-[#f8f9fa]">
+          <h3 className="text-xs font-semibold text-[#1a1a1a] mb-4 uppercase tracking-wide">Configuration</h3>
+          <div className="grid sm:grid-cols-2 gap-4 text-sm text-[#5f6368]">
+            <div>Max concurrent: <span className="font-bold text-[#1a1a1a]">{data.stats.maxConcurrent}</span></div>
+            <div>Max queue size: <span className="font-bold text-[#1a1a1a]">{data.stats.maxQueue}</span></div>
+            <div>Set via env: <span className="font-mono text-xs">ENCARTA_MAX_CONCURRENT</span></div>
+            <div>Set via env: <span className="font-mono text-xs">ENCARTA_MAX_QUEUE</span></div>
           </div>
         </div>
       </main>
 
-      <footer className="border-t-4 border-black py-8" style={{ background: "var(--ink)", color: "var(--cream)" }}>
-        <div className="max-w-5xl mx-auto px-6 text-center">
-          <p className="pixel text-[10px] opacity-60">ENCARTA-NG</p>
+      <footer className="border-t border-[#dadce0] py-4 px-6">
+        <div className="max-w-5xl mx-auto flex items-center justify-between text-sm text-[#5f6368]">
+          <span className="font-medium text-[#1a1a1a]">Truthseekers</span>
+          <span className="text-xs">AI-powered encyclopedia</span>
         </div>
       </footer>
     </div>

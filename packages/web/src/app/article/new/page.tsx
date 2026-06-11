@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { generateArticle } from "@/lib/api";
+import TruthseekersLogo from "../../components/TruthseekersLogo";
 
 export default function NewArticlePage() {
   const [slug, setSlug] = useState("");
@@ -21,71 +22,61 @@ export default function NewArticlePage() {
   }
 
   return (
-    <div>
-      {/* NAV */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-3 border-b-3 border-black"
-        style={{ background: "rgba(255,250,240,0.85)", backdropFilter: "blur(12px)", borderBottom: "3px solid var(--ink)" }}>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 flex items-center justify-center text-[10px] text-white border-2 border-black shadow-[3px_3px_0_#1c1917]"
-            style={{ background: "var(--orange)", fontFamily: "'Press Start 2P', monospace" }}>
-            E-N
-          </div>
-          <a href="/" className="font-bold hidden sm:block hover:text-[#ea580c]" style={{ textDecoration: "none", color: "inherit" }}>
-            Encarta-NG
-          </a>
+    <div className="min-h-screen flex flex-col bg-[#fffaf0]">
+      {/* Nav */}
+      <nav className="flex items-center justify-between px-6 py-4 border-b border-[#dfe1e5]">
+        <TruthseekersLogo />
+        <div className="flex items-center gap-6 text-sm text-[#5f6368]">
+          <a href="/" className="hover:text-[#1a1a1a] hover:underline">Home</a>
+          <a href="/queue" className="hover:text-[#1a1a1a] hover:underline">Queue</a>
         </div>
       </nav>
 
-      <main className="max-w-2xl mx-auto px-6 py-16">
-        <div className="pixel-card p-8 md:p-10 bg-white">
-          <div className="flex items-center gap-4 mb-8">
-            <span className="text-5xl float-anim">✨</span>
-            <div>
-              <h1 className="pixel text-lg" style={{ color: "var(--ink)" }}>GENERATE ARTICLE</h1>
-              <div className="h-1 w-16 mt-2" style={{ background: "var(--orange)" }} />
-            </div>
+      <main className="flex-1 flex items-center justify-center px-6 py-12">
+        <div className="w-full max-w-xl">
+          <div className="text-center mb-10">
+            <h1 className="text-3xl font-bold text-[#1a1a1a] mb-2">Generate Article</h1>
+            <p className="text-[#5f6368]">Enter a topic. The AI will research, outline, and write a full article.</p>
           </div>
 
-          <p className="text-[#666] mb-8 leading-relaxed">
-            Enter a topic below. The AI agent will research the web, create an outline, write a full article,
-            and store it — all automatically. Takes 30–90 seconds.
-          </p>
-
-          <form onSubmit={handleSubmit}>
-            <label className="pixel text-[10px] text-[#888] block mb-3">TOPIC SLUG</label>
-            <input
-              type="text"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              placeholder="quantum-computing"
-              className="pixel-input mb-4"
-              autoFocus
-            />
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-[#1a1a1a] mb-2">Topic Slug</label>
+              <input
+                type="text"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                placeholder="quantum-computing"
+                className="w-full px-4 py-3 rounded-lg border border-[#dfe1e5] focus:border-[#4285f4] focus:ring-2 focus:ring-[#4285f4]/20 outline-none transition-all text-[#1a1a1a] placeholder-[#9aa0a6]"
+                autoFocus
+              />
+            </div>
 
             <button
               type="submit"
               disabled={!slug.trim() || !!status}
-              className="pixel-btn bg-[#ea580c] text-white w-full text-sm py-3"
+              className="w-full px-6 py-3 bg-[#ea580c] hover:bg-[#d9530b] text-white font-medium rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {status ? "GENERATING..." : "GENERATE ARTICLE"}
+              {status ? "Generating..." : "Generate Article"}
             </button>
           </form>
 
-          <div className="mt-8 p-5 border-3 border-black" style={{ background: "var(--cream)" }}>
-            <p className="pixel text-[10px] mb-3" style={{ color: "var(--ink)" }}>TIPS</p>
-            <ul className="space-y-2 text-sm text-[#555]">
-              <li>• Use hyphens for multi-word: <code className="pixel-tag">machine-learning</code></li>
-              <li>• Be specific: prefer <code className="pixel-tag">quantum-entanglement</code> over <code className="pixel-tag">physics</code></li>
-              <li>• Research phase uses live web search for accuracy</li>
-              <li>• Generated articles are stored in SQLite + versioned in Git</li>
+          <div className="mt-8 p-5 rounded-lg border border-[#dfe1e5] bg-[#f8f9fa]">
+            <h3 className="text-xs font-semibold text-[#1a1a1a] mb-3 uppercase tracking-wide">Tips</h3>
+            <ul className="space-y-2 text-sm text-[#5f6368]">
+              <li>• Use hyphens for multi-word: <code className="px-2 py-0.5 bg-white rounded text-xs border border-[#dfe1e5]">machine-learning</code></li>
+              <li>• Be specific: prefer <code className="px-2 py-0.5 bg-white rounded text-xs border border-[#dfe1e5]">quantum-entanglement</code> over <code className="px-2 py-0.5 bg-white rounded text-xs border border-[#dfe1e5]">physics</code></li>
+              <li>• Research phase uses web search for primary sources</li>
+              <li>• Articles stored in SQLite + versioned in Git</li>
             </ul>
           </div>
         </div>
       </main>
 
-      <footer className="border-t-4 border-black py-8" style={{ background: "var(--ink)", color: "var(--cream)" }}>
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <p className="pixel text-[10px] opacity-60">ENCARTA-NG</p>
+      <footer className="border-t border-[#dadce0] py-4 px-6">
+        <div className="max-w-5xl mx-auto flex items-center justify-between text-sm text-[#5f6368]">
+          <span className="font-medium text-[#1a1a1a]">Truthseekers</span>
+          <span className="text-xs">AI-powered encyclopedia</span>
         </div>
       </footer>
     </div>

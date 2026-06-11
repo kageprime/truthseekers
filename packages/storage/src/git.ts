@@ -39,7 +39,7 @@ export async function commitArticle(article: Article): Promise<string> {
     dir: REPO_PATH,
     message: `v${article.metadata.version}: ${article.title}`,
     author: {
-      name: "Encarta-NG Agent",
+      name: "Truthseekers Agent",
       email: "agent@encarta.local",
     },
   });

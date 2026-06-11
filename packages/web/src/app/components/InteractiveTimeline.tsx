@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface TimelineEvent {
   id?: string;
@@ -9,12 +9,43 @@ interface TimelineEvent {
   description: string;
   image?: string;
   causes?: string[];
+  category?: string;
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  war: "#dc2626",
+  discovery: "#22c55e",
+  politics: "#0c4a6e",
+  culture: "#a21caf",
+  science: "#0284c7",
+  disaster: "#f59e0b",
+  technology: "#ea580c",
+  biography: "#ec4899",
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  war: "War",
+  discovery: "Discovery",
+  politics: "Politics",
+  culture: "Culture",
+  science: "Science",
+  disaster: "Disaster",
+  technology: "Technology",
+  biography: "Biography",
+};
+
+function catColor(cat?: string): string {
+  return cat ? CATEGORY_COLORS[cat] ?? "#888" : "#888";
 }
 
 export default function InteractiveTimeline({ events }: { events: TimelineEvent[] }) {
   const sorted = [...events].sort((a, b) => a.year - b.year);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [scrubX, setScrubX] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const uid = useRef(`tl-${Math.random().toString(36).slice(2, 8)}`).current;
 
   if (sorted.length === 0) return null;
 
@@ -26,83 +57,149 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
     return ((year - minYear) / range) * 100;
   }
 
-  // Build causality edges for active event
+  const yearGroups = new Map<number, number[]>();
+  sorted.forEach((ev, i) => {
+    const arr = yearGroups.get(ev.year) || [];
+    arr.push(i);
+    yearGroups.set(ev.year, arr);
+  });
+
+  function findClosest(year: number): number | null {
+    let closest = 0;
+    let minDist = Infinity;
+    sorted.forEach((ev, i) => {
+      const dist = Math.abs(ev.year - year);
+      if (dist < minDist) { minDist = dist; closest = i; }
+    });
+    return minDist < range * 0.15 ? closest : null;
+  }
+
+  function scrubFrom(clientX: number, rect: DOMRect) {
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    setScrubX(Math.max(0, Math.min(100, x)));
+    const year = minYear + (x / 100) * range;
+    setActiveIdx(findClosest(year));
+  }
+
+  // Auto-advance
+  useEffect(() => {
+    if (!playing) return;
+    const interval = setInterval(() => {
+      setActiveIdx((prev) => {
+        if (prev === null) return 0;
+        return (prev + 1) % sorted.length;
+      });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [playing, sorted.length]);
+
+  // Sync scrub handle position when playing
+  useEffect(() => {
+    if (playing && activeIdx !== null) {
+      setScrubX(yearToX(sorted[activeIdx].year));
+    }
+  }, [activeIdx, playing, sorted]);
+
+  // Scroll list to active event
+  useEffect(() => {
+    if (activeIdx === null || !listRef.current) return;
+    const child = listRef.current.children[activeIdx] as HTMLElement | undefined;
+    child?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [activeIdx]);
+
+  // Causality edges
   const activeEvent = activeIdx !== null ? sorted[activeIdx] : null;
-  const causeEdges: { from: number; to: number; fromIdx: number; toIdx: number }[] = [];
+  const causeEdges: { from: number; to: number }[] = [];
   if (activeEvent?.causes) {
     for (const causeId of activeEvent.causes) {
       const causeIdx = sorted.findIndex((e) => e.id === causeId || e.event === causeId);
       if (causeIdx >= 0) {
-        causeEdges.push({
-          from: yearToX(sorted[causeIdx].year),
-          to: yearToX(activeEvent.year),
-          fromIdx: causeIdx,
-          toIdx: activeIdx!,
-        });
+        causeEdges.push({ from: yearToX(sorted[causeIdx].year), to: yearToX(activeEvent.year) });
       }
     }
   }
 
-  return (
-    <div className="pixel-card p-6 my-4" style={{ background: "var(--ice)" }}>
+  const usedCats = [...new Set(sorted.map((e) => e.category).filter(Boolean))] as string[];
+
+  function togglePlay() {
+    setPlaying((p) => !p);
+    if (!playing && activeIdx === null) {
+      setActiveIdx(0);
+      setScrubX(0);
+    }
+  }
+
+  function selectIdx(i: number) {
+    setActiveIdx(i);
+    setScrubX(yearToX(sorted[i].year));
+    setPlaying(false);
+  }
+
+  const track = (
+    <>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
         <span className="text-3xl">⏳</span>
         <div>
           <h3 className="pixel text-sm" style={{ color: "var(--ink)" }}>TIMELINE</h3>
           <div className="h-1 w-12 mt-1" style={{ background: "var(--blue)" }} />
         </div>
-        <span className="ml-auto text-xs text-[#888]">
-          {minYear} – {maxYear}
-        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={togglePlay}
+            className="w-7 h-7 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#1c1917] hover:shadow-[3px_3px_0_#1c1917] active:shadow-[1px_1px_0_#1c1917] transition-all text-xs"
+            aria-label={playing ? "Pause" : "Play"}
+          >
+            {playing ? (
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
+            ) : (
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21" /></svg>
+            )}
+          </button>
+          <button
+            onClick={() => setFullscreen((f) => !f)}
+            className="w-7 h-7 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#1c1917] hover:shadow-[3px_3px_0_#1c1917] active:shadow-[1px_1px_0_#1c1917] transition-all text-xs"
+            aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"}
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+              {fullscreen
+                ? <><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3" /></>
+                : <><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" /></>}
+            </svg>
+          </button>
+          <span className="text-xs text-[#888] ml-1 whitespace-nowrap">{minYear} – {maxYear}</span>
+        </div>
       </div>
 
-      {/* Scrubber bar + SVG causality overlay */}
+      {/* Category legend */}
+      {usedCats.length > 1 && (
+        <div className="flex flex-wrap gap-3 mb-3 text-[10px]">
+          {usedCats.map((cat) => (
+            <span key={cat} className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full border border-black" style={{ background: catColor(cat) }} />
+              {CATEGORY_LABELS[cat] ?? cat}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Scrubber */}
       <div
         className="relative h-14 cursor-pointer select-none mb-3"
-        onMouseMove={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          const x = ((e.clientX - rect.left) / rect.width) * 100;
-          setScrubX(Math.max(0, Math.min(100, x)));
-          const year = minYear + (x / 100) * range;
-          let closest = 0;
-          let minDist = Infinity;
-          sorted.forEach((ev, i) => {
-            const dist = Math.abs(ev.year - year);
-            if (dist < minDist) { minDist = dist; closest = i; }
-          });
-          if (minDist < range * 0.15) {
-            setActiveIdx(closest);
-          } else {
-            setActiveIdx(null);
-          }
-        }}
-        onMouseLeave={() => { setActiveIdx(null); setScrubX(0); }}
-        onClick={() => {
-          if (activeIdx !== null) {
-            const next = (activeIdx + 1) % sorted.length;
-            setActiveIdx(next);
-          }
-        }}
+        onMouseMove={(e) => { if (!playing) scrubFrom(e.clientX, e.currentTarget.getBoundingClientRect()); }}
+        onMouseLeave={() => { if (!playing) { setActiveIdx(null); setScrubX(0); } }}
+        onClick={(e) => { if (!playing) scrubFrom(e.clientX, e.currentTarget.getBoundingClientRect()); }}
       >
-        {/* SVG causality arrows */}
+        {/* Causality arrows */}
         {causeEdges.length > 0 && (
           <svg className="absolute inset-0 w-full h-full pointer-events-none z-20">
             {causeEdges.map((edge, i) => (
-              <line
-                key={i}
-                x1={`${edge.from}%`}
-                y1="50%"
-                x2={`${edge.to}%`}
-                y2="50%"
-                stroke="var(--orange)"
-                strokeWidth="2"
-                strokeDasharray="4 2"
-                markerEnd="url(#arrowhead)"
-              />
+              <line key={i} x1={`${edge.from}%`} y1="50%" x2={`${edge.to}%`} y2="50%"
+                stroke="var(--orange)" strokeWidth="2" strokeDasharray="4 2"
+                markerEnd={`url(#arrow-${uid})`} />
             ))}
             <defs>
-              <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+              <marker id={`arrow-${uid}`} markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
                 <polygon points="0 0, 6 2, 0 4" fill="var(--orange)" />
               </marker>
             </defs>
@@ -110,75 +207,44 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
         )}
 
         {/* Track line */}
-        <div
-          className="absolute top-1/2 left-0 right-0 h-2 -translate-y-1/2 border-2 border-black"
-          style={{ background: "var(--blue)", opacity: 0.15 }}
-        />
-
-        {/* Filled portion */}
-        <div
-          className="absolute top-1/2 left-0 h-2 -translate-y-1/2 transition-all duration-150"
-          style={{ width: `${scrubX}%`, background: "var(--blue)", opacity: 0.4 }}
-        />
+        <div className="absolute top-1/2 left-0 right-0 h-2 -translate-y-1/2 border-2 border-black rounded-full"
+          style={{ background: "var(--blue)", opacity: 0.15 }} />
+        <div className="absolute top-1/2 left-0 h-2 -translate-y-1/2 transition-all duration-150 rounded-full"
+          style={{ width: `${scrubX}%`, background: "var(--blue)", opacity: 0.4 }} />
 
         {/* Scrub handle */}
         <div
-          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 border-2 border-black bg-white shadow-[2px_2px_0_#1c1917] transition-all duration-100 pointer-events-none"
-          style={{ left: `${scrubX}%` }}
+          className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 border-2 border-black shadow-[2px_2px_0_#1c1917] transition-all duration-100 pointer-events-none z-30 ${playing ? "animate-pulse" : ""}`}
+          style={{ left: `${scrubX}%`, background: activeIdx !== null ? catColor(sorted[activeIdx]?.category) : "white" }}
         />
 
-        {/* Event dots — same-year events get a joint indicator */}
-        {(() => {
-          const yearGroups = new Map<number, number[]>();
-          sorted.forEach((ev, i) => {
-            const arr = yearGroups.get(ev.year) || [];
-            arr.push(i);
-            yearGroups.set(ev.year, arr);
-          });
-
-          return sorted
-            .filter((_, i) => {
-              const group = yearGroups.get(sorted[i].year)!;
-              return group[0] === i;
-            })
-            .map((ev) => {
-              const group = yearGroups.get(ev.year)!;
-              const groupCount = group.length;
-              const x = yearToX(ev.year);
-              const isActive = activeIdx !== null && group.includes(activeIdx);
-
-              return (
-                <div
-                  key={ev.year}
-                  className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-black rounded-full cursor-pointer transition-all duration-150 z-10"
-                  style={{
-                    left: `${x}%`,
-                    width: groupCount > 1 ? 18 : 12,
-                    height: groupCount > 1 ? 18 : 12,
-                    background: isActive ? "var(--orange)" : "white",
-                    boxShadow: isActive ? "2px 2px 0 #1c1917" : "none",
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isActive) {
-                      const currentInGroup = activeIdx !== null ? group.indexOf(activeIdx) : -1;
-                      const nextInGroup = (currentInGroup + 1) % groupCount;
-                      setActiveIdx(group[nextInGroup]);
-                    } else {
-                      setActiveIdx(group[0]);
-                    }
-                  }}
-                  title={groupCount > 1 ? `${groupCount} events in ${ev.year}` : String(ev.year)}
-                >
-                  {groupCount > 1 && (
-                    <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold" style={{ color: "var(--ink)" }}>
-                      {groupCount}
-                    </span>
-                  )}
-                </div>
-              );
-            });
-        })()}
+        {/* Event dots */}
+        {sorted.filter((_, i) => { const g = yearGroups.get(sorted[i].year)!; return g[0] === i; }).map((ev) => {
+          const g = yearGroups.get(ev.year)!;
+          const n = g.length;
+          const x = yearToX(ev.year);
+          const isActive = activeIdx !== null && g.includes(activeIdx);
+          return (
+            <div key={ev.year}
+              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-black rounded-full cursor-pointer transition-all duration-150 z-10"
+              style={{
+                left: `${x}%`, width: n > 1 ? 18 : 12, height: n > 1 ? 18 : 12,
+                background: isActive ? catColor(ev.category) : "white",
+                boxShadow: isActive ? "2px 2px 0 #1c1917" : "none",
+                borderColor: isActive ? catColor(ev.category) : "black",
+              }}
+              onClick={(e) => {
+                e.stopPropagation(); setPlaying(false);
+                if (isActive) {
+                  const cur = activeIdx !== null ? g.indexOf(activeIdx) : -1;
+                  setActiveIdx(g[(cur + 1) % n]);
+                } else { setActiveIdx(g[0]); }
+              }}
+              title={n > 1 ? `${n} events in ${ev.year}` : String(ev.year)}>
+              {n > 1 && <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold" style={{ color: "var(--ink)" }}>{n}</span>}
+            </div>
+          );
+        })}
       </div>
 
       {/* Year labels */}
@@ -186,27 +252,22 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
         {(() => {
           const seen: number[] = [];
           const MIN_GAP_PCT = 8;
-
           return sorted.map((ev, i) => {
             const x = yearToX(ev.year);
             const overlaps = seen.some((sx) => Math.abs(x - sx) < MIN_GAP_PCT);
             if (!overlaps || activeIdx === i) seen.push(x);
             const hidden = overlaps && activeIdx !== i;
-
             return (
-              <div
-                key={i}
+              <div key={i}
                 className="absolute pixel text-[8px] transition-all duration-150"
                 style={{
-                  left: `${x}%`,
-                  transform: "translateX(-50%)",
+                  left: `${x}%`, transform: "translateX(-50%)",
                   top: hidden ? "8px" : (i % 2 === 0 ? "0px" : "16px"),
                   color: activeIdx === i ? "var(--ink)" : hidden ? "transparent" : "#aaa",
                   fontWeight: activeIdx === i ? 700 : 400,
                   opacity: hidden ? 0 : 1,
                   pointerEvents: hidden ? "none" : "auto",
-                }}
-              >
+                }}>
                 {ev.year}
               </div>
             );
@@ -214,51 +275,57 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
         })()}
       </div>
 
-      {/* Active event detail */}
-      {activeIdx !== null && (
-        <div
-          className="mt-4 p-4 border-3 border-black bg-white transition-all duration-200"
-          style={{ boxShadow: "4px 4px 0 var(--blue)" }}
-        >
-          <div className="flex items-start gap-3 mb-2">
-            <span className="pixel text-lg font-bold shrink-0" style={{ color: "var(--blue)" }}>
-              {sorted[activeIdx].year}
-            </span>
-            <div>
-              <strong className="text-lg">{sorted[activeIdx].event}</strong>
-              {sorted[activeIdx].description && (
-                <p className="text-sm text-[#555] leading-relaxed mt-1">
-                  {sorted[activeIdx].description}
-                </p>
-              )}
+      {/* Event list */}
+      <div ref={listRef} className={`overflow-y-auto space-y-1 ${fullscreen ? "max-h-none" : "max-h-48"}`} style={{ scrollBehavior: "smooth" }}>
+        {sorted.map((ev, i) => {
+          const isActive = activeIdx === i;
+          return (
+            <div key={i} onClick={() => selectIdx(i)}
+              className={`flex items-start gap-3 p-3 border-2 border-black cursor-pointer transition-all duration-100 ${
+                isActive ? "bg-white shadow-[3px_3px_0_#1c1917]" : "bg-white/70 hover:bg-white hover:shadow-[2px_2px_0_#1c1917]"
+              }`}
+              style={{ borderLeftColor: catColor(ev.category), borderLeftWidth: 4 }}>
+              <span className="pixel text-xs font-bold shrink-0 mt-0.5 whitespace-nowrap" style={{ color: catColor(ev.category) }}>
+                {ev.year}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <strong className="text-sm leading-snug">{ev.event}</strong>
+                  {ev.category && (
+                    <span className="text-[9px] px-1.5 py-0.5 border border-black font-medium shrink-0"
+                      style={{ background: `${catColor(ev.category)}20`, color: catColor(ev.category) }}>
+                      {CATEGORY_LABELS[ev.category] ?? ev.category}
+                    </span>
+                  )}
+                </div>
+                {ev.description && (
+                  <p className={`text-xs text-[#555] leading-relaxed mt-0.5 ${isActive ? "" : "line-clamp-2"}`}>
+                    {ev.description}
+                  </p>
+                )}
+              </div>
             </div>
+          );
+        })}
+      </div>
+    </>
+  );
+
+  if (fullscreen) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-2 md:p-6">
+        <div className="pixel-card p-5 md:p-6 w-full max-w-4xl max-h-[95vh] flex flex-col bg-white overflow-hidden">
+          <div className="flex-1 overflow-y-auto" style={{ scrollBehavior: "smooth" }}>
+            {track}
           </div>
-
-          {/* Event image */}
-          {sorted[activeIdx].image && (
-            <div className="mt-3">
-              <img
-                src={sorted[activeIdx].image}
-                alt={sorted[activeIdx].event}
-                className="max-w-full max-h-48 object-contain border-2 border-black"
-                loading="lazy"
-              />
-            </div>
-          )}
-
-          {/* Causality indicator */}
-          {sorted[activeIdx].causes && sorted[activeIdx].causes.length > 0 && (
-            <div className="mt-3 pt-3 border-t-2 border-dashed border-[#e0e0e0]">
-              <p className="text-xs text-[#888] mb-1">
-                Connected to: {sorted[activeIdx].causes!.map((cid) => {
-                  const linked = sorted.find((e) => e.id === cid || e.event === cid);
-                  return linked ? `${linked.event} (${linked.year})` : cid;
-                }).join(", ")}
-              </p>
-            </div>
-          )}
         </div>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="pixel-card p-6 my-4" style={{ background: "var(--ice)" }}>
+      {track}
     </div>
   );
 }

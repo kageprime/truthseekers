@@ -8,6 +8,7 @@ import InteractiveTimeline from "../../components/InteractiveTimeline";
 import GenerationBar from "../../components/GenerationBar";
 import QueueIndicator from "../../components/QueueIndicator";
 import { SkeletonImage, BlankSlateImage, BlankSlateMedia, FigureImage } from "../../components/MediaImage";
+import TruthseekersLogo from "../../components/TruthseekersLogo";
 
 interface Article {
   slug: string;
@@ -180,9 +181,14 @@ export default function ArticlePage() {
   // Loading
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-20 text-center">
-        <div className="inline-block w-12 h-12 border-4 border-[#e0e0e0] border-t-[#1c1917] rounded-full"
-          style={{ animation: "spin 0.8s linear infinite" }} />
+      <div className="min-h-screen flex flex-col bg-white">
+        <nav className="flex items-center justify-between px-6 py-4 border-b border-[#dfe1e5]">
+          <TruthseekersLogo />
+        </nav>
+        <main className="flex-1 flex items-center justify-center">
+          <div className="inline-block w-8 h-8 border-4 border-[#e0e0e0] border-t-[#1a1a1a] rounded-full"
+            style={{ animation: "spin 0.8s linear infinite" }} />
+        </main>
       </div>
     );
   }
@@ -190,57 +196,45 @@ export default function ArticlePage() {
   // Not generated yet
   if (!article && !generating) {
     return (
-      <div>
-        {/* NAV */}
-        <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-3 border-b-3 border-black"
-          style={{ background: "rgba(255,250,240,0.85)", backdropFilter: "blur(12px)", borderBottom: "3px solid var(--ink)" }}>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 flex items-center justify-center text-[10px] text-white border-2 border-black shadow-[3px_3px_0_#1c1917]"
-              style={{ background: "var(--orange)", fontFamily: "'Press Start 2P', monospace" }}>
-              E-N
-            </div>
-            <a href="/" className="font-bold hidden sm:block hover:text-[#ea580c]" style={{ textDecoration: "none", color: "inherit" }}>
-              Encarta-NG
-            </a>
+      <div className="min-h-screen flex flex-col bg-white">
+        <nav className="flex items-center justify-between px-6 py-4 border-b border-[#dfe1e5]">
+          <TruthseekersLogo />
+          <div className="flex items-center gap-6 text-sm text-[#5f6368]">
+            <a href="/" className="hover:text-[#1a1a1a] hover:underline">Home</a>
+            <a href="/queue" className="hover:text-[#1a1a1a] hover:underline">Queue</a>
           </div>
-          <a href="/" className="pixel-btn bg-[var(--ink)] text-white text-[9px] py-2">
-            ← HOME
-          </a>
         </nav>
 
-        <main className="max-w-xl mx-auto px-6 py-16 text-center">
-          <div className="pixel-card p-10 md:p-14" style={{ background: "var(--cream)" }}>
-            <div className="text-6xl mb-8 float-anim">📖</div>
-
-            <h1 className="pixel text-sm mb-2" style={{ color: "var(--ink)" }}>
-              {slug.replace(/-/g, " ").toUpperCase()}
+        <main className="flex-1 flex items-center justify-center px-6 py-16">
+          <div className="w-full max-w-lg text-center">
+            <div className="text-6xl mb-6">📖</div>
+            <h1 className="text-xl font-bold text-[#1a1a1a] mb-2">
+              {slug.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
             </h1>
-            <p className="text-xs text-[#aaa] mb-6">TOPIC NOT YET GENERATED</p>
-
-            <div className="w-16 h-1 mx-auto mb-6" style={{ background: "var(--orange)" }} />
-
-            <p className="text-sm text-[#555] leading-relaxed mb-8">
-              The AI agent will research the web, outline the content,
-              <br />write a full article, and verify all citations.
-              <br />Takes about 60 seconds.
+            <p className="text-sm text-[#9aa0a6] mb-6">Topic not yet generated</p>
+            <p className="text-sm text-[#5f6368] leading-relaxed mb-8">
+              The AI agent will research the web, outline the content, write a full article, and verify all citations.
             </p>
-
             <button
               onClick={handleGenerate}
-              className="pixel-btn bg-[#ea580c] text-white w-full text-sm py-4"
-              style={{ fontSize: "0.85rem" }}
+              className="px-8 py-3 bg-[#ea580c] hover:bg-[#d9530b] text-white font-medium rounded-lg transition-all"
             >
-              ⚡ GENERATE ENCYCLOPEDIA ARTICLE
+              ⚡ Generate Encyclopedia Article
             </button>
-          </div>
-
-          <div className="mt-8">
-            <a href="/" className="text-sm text-[#888] hover:text-[#ea580c] underline underline-offset-4"
-              style={{ textDecorationColor: "var(--orange)" }}>
-              ← BACK TO HOME
-            </a>
+            <div className="mt-6">
+              <a href="/" className="text-sm text-[#5f6368] hover:text-[#ea580c] hover:underline">
+                ← Back to home
+              </a>
+            </div>
           </div>
         </main>
+
+        <footer className="border-t border-[#dadce0] py-4 px-6">
+          <div className="max-w-5xl mx-auto flex items-center justify-between text-sm text-[#5f6368]">
+            <span className="font-medium text-[#1a1a1a]">Truthseekers</span>
+            <span className="text-xs">AI-powered encyclopedia</span>
+          </div>
+        </footer>
       </div>
     );
   }
@@ -256,35 +250,35 @@ export default function ArticlePage() {
     };
 
     return (
-      <div>
-        {/* NAV */}
-        <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-3 border-b-3 border-black"
-          style={{ background: "rgba(255,250,240,0.85)", backdropFilter: "blur(12px)", borderBottom: "3px solid var(--ink)" }}>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 flex items-center justify-center text-[10px] text-white border-2 border-black shadow-[3px_3px_0_#1c1917]"
-              style={{ background: "var(--orange)", fontFamily: "'Press Start 2P', monospace" }}>
-              E-N
-            </div>
-            <a href="/" className="font-bold hidden sm:block hover:text-[#ea580c]" style={{ textDecoration: "none", color: "inherit" }}>
-              Encarta-NG
-            </a>
+      <div className="min-h-screen flex flex-col bg-white">
+        <nav className="flex items-center justify-between px-6 py-4 border-b border-[#dfe1e5]">
+          <TruthseekersLogo />
+          <div className="flex items-center gap-6 text-sm text-[#5f6368]">
+            <a href="/" className="hover:text-[#1a1a1a] hover:underline">Home</a>
+            <a href="/queue" className="hover:text-[#1a1a1a] hover:underline">Queue</a>
           </div>
-          <a href="/" className="pixel-btn bg-[var(--ink)] text-white text-[9px] py-2">
-            ← HOME
-          </a>
         </nav>
 
-        <main className="max-w-2xl mx-auto px-6 pt-12 pb-20">
-          <h1 className="pixel text-lg mb-8 text-center" style={{ textTransform: "capitalize" }}>
-            {slug.replace(/-/g, " ")}
-          </h1>
-          <GenerationBar
-            entry={progressEntry}
-            onRetry={() => handleGenerate()}
-            onDismiss={() => { /* noop */ }}
-            showWatchLive={false}
-          />
+        <main className="flex-1 flex items-center justify-center px-6 py-12">
+          <div className="w-full max-w-lg">
+            <h1 className="text-xl font-bold text-center text-[#1a1a1a] mb-8 capitalize">
+              {slug.replace(/-/g, " ")}
+            </h1>
+            <GenerationBar
+              entry={progressEntry}
+              onRetry={() => handleGenerate()}
+              onDismiss={() => { /* noop */ }}
+              showWatchLive={false}
+            />
+          </div>
         </main>
+
+        <footer className="border-t border-[#dadce0] py-4 px-6">
+          <div className="max-w-5xl mx-auto flex items-center justify-between text-sm text-[#5f6368]">
+            <span className="font-medium text-[#1a1a1a]">Truthseekers</span>
+            <span className="text-xs">AI-powered encyclopedia</span>
+          </div>
+        </footer>
       </div>
     );
   }
@@ -305,29 +299,23 @@ export default function ArticlePage() {
   return (
     <div>
       {/* NAV */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-3 border-b-3 border-black"
-        style={{ background: "rgba(255,250,240,0.85)", backdropFilter: "blur(12px)", borderBottom: "3px solid var(--ink)" }}>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 flex items-center justify-center text-[10px] text-white border-2 border-black shadow-[3px_3px_0_#1c1917]"
-            style={{ background: "var(--orange)", fontFamily: "'Press Start 2P', monospace" }}>
-            E-N
-          </div>
-          <a href="/" className="font-bold hidden sm:block hover:text-[#ea580c]" style={{ textDecoration: "none", color: "inherit" }}>
-            Encarta-NG
-          </a>
-        </div>
-        <div className="flex items-center gap-3">
-          <a href="/queue" className="text-sm font-semibold hover:text-[#ea580c]">Queue</a>
+      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 border-b border-[#dfe1e5] bg-white/90 backdrop-blur-sm">
+        <TruthseekersLogo />
+        <div className="flex items-center gap-6">
+          <a href="/queue" className="text-sm text-[#5f6368] hover:text-[#1a1a1a] hover:underline">Queue</a>
           <QueueIndicator />
-          <span className="text-xs text-[#888]">v{article.metadata.version}</span>
-          <button onClick={handleRefresh} disabled={generating} className="pixel-btn bg-[#f59e0b] text-black"
-            style={generating ? { opacity: 0.5, cursor: "not-allowed" } : undefined}>
-            {generating ? "REFRESHING..." : "REFRESH"}
+          <span className="text-xs text-[#9aa0a6]">v{article.metadata.version}</span>
+          <button
+            onClick={handleRefresh}
+            disabled={generating}
+            className="px-3 py-1.5 text-sm bg-[#f59e0b] hover:bg-[#e08e0a] text-[#1a1a1a] rounded-md transition-colors disabled:opacity-50"
+          >
+            {generating ? "Refreshing..." : "Refresh"}
           </button>
         </div>
       </nav>
 
-      <article className="max-w-4xl mx-auto px-6 py-10 prose">
+      <article className="max-w-6xl mx-auto px-6 py-10 prose">
         {/* Title Card */}
         <div className="pixel-card p-8 md:p-10 mb-10 bg-white">
           <h1 className="pixel text-xl md:text-2xl mb-4 leading-snug" style={{ color: "var(--ink)" }}>
@@ -475,10 +463,10 @@ export default function ArticlePage() {
       </article>
 
       {/* FOOTER */}
-      <footer className="border-t-4 border-black py-8" style={{ background: "var(--ink)", color: "var(--cream)" }}>
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <p className="pixel text-[10px] opacity-60">ENCARTA-NG</p>
-          <p className="mt-2 text-sm opacity-70">AI-powered encyclopedia · Built with OpenCode SDK</p>
+      <footer className="border-t border-[#dadce0] py-6 bg-white">
+        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between text-sm text-[#5f6368]">
+          <span className="font-medium text-[#1a1a1a]">Truthseekers</span>
+          <span className="text-xs">AI-powered encyclopedia · Built with OpenCode SDK</span>
         </div>
       </footer>
     </div>

@@ -251,7 +251,7 @@ const PORT = parseInt(process.env.PORT || "4097", 10);
 if (process.argv[1]?.includes("index") || process.argv[1]?.includes("server")) {
   try {
     serve({ fetch: app.fetch, port: PORT });
-    console.log(`Encarta-Me API server running on port ${PORT}`);
+    console.log(`Truthseekers API server running on port ${PORT}`);
     console.log(`Auth: ${process.env.ENCARTA_API_KEYS ? "enabled" : "disabled"}`);
   } catch (err) {
     console.error("Failed to start server:", err);
