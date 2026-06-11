@@ -11,9 +11,10 @@ primary_region = "ams"
   ENCARTA_MAX_QUEUE = "25"
   RATE_LIMIT = "20"
   NODE_ENV = "production"
+  CORS_ORIGIN = "https://truthseeker-web.vercel.app"
 
 [[services]]
-  internal_port = 3000
+  internal_port = 4097
   protocol = "tcp"
   processes = ["app"]
 

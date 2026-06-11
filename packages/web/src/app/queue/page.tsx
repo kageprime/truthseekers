@@ -3,8 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import GenerationBar, { type GeneratingEntry, phasePercent, phaseLabel } from "../components/GenerationBar";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
-const BASE = process.env.NODE_ENV === "production" ? "/api" : API_URL;
+const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
 
 interface QueueJob {
   slug: string;

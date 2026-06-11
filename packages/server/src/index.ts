@@ -177,12 +177,18 @@ app.get("/articles/:slug/graph", (c) => {
 
 // Queue status
 app.get("/queue", (c) => {
-  return c.json({ jobs: queue.getAllJobs(), stats: queue.getStats() });
+  try {
+    return c.json({ jobs: queue.getAllJobs(), stats: queue.getStats() });
+  } catch (err) {
+    return c.json(sanitizeError(err), 500);
+  }
 });
+
+let dbReady = false;
 
 // Health check
 app.get("/health", (c) => {
-  return c.json({ status: "ok", version: "0.1.0" });
+  return c.json({ status: "ok", dbReady, version: "0.1.0" });
 });
 
 async function processArticle(slug: string, meta?: Record<string, string>): Promise<void> {
@@ -231,19 +237,24 @@ queue.setProcessor(processArticle);
 const PORT = parseInt(process.env.PORT || "4097", 10);
 
 if (process.argv[1]?.includes("index") || process.argv[1]?.includes("server")) {
-  initDb().then(() => {
-    try {
-      serve({ fetch: app.fetch, port: PORT });
-      console.log(`Encarta-Me API server running on http://localhost:${PORT}`);
-      console.log(`Auth: ${process.env.ENCARTA_API_KEYS ? "enabled" : "disabled"}`);
-    } catch (err) {
-      console.error("Failed to start server:", err);
-      process.exit(1);
-    }
-  }).catch((err) => {
-    console.error("Failed to initialize DB:", err);
+  try {
+    serve({ fetch: app.fetch, port: PORT });
+    console.log(`Encarta-Me API server running on port ${PORT}`);
+    console.log(`Auth: ${process.env.ENCARTA_API_KEYS ? "enabled" : "disabled"}`);
+  } catch (err) {
+    console.error("Failed to start server:", err);
     process.exit(1);
-  });
+  }
+
+  initDb()
+    .then(() => {
+      dbReady = true;
+      console.log("Database initialized successfully");
+    })
+    .catch((err) => {
+      console.error("Failed to initialize DB:", err);
+      // Keep running — endpoints will return empty until DB is ready
+    });
 }
 
 export default app;

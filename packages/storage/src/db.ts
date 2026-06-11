@@ -1,6 +1,7 @@
 import initSqlJs, { type Database as SqlJsDatabase } from "sql.js";
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import type { Article, ArticleContent, ArticleMetadata } from "@encarta/core";
 
 const DB_PATH = process.env.ENCARTA_DB_PATH || path.join(process.cwd(), "encarta.db");
@@ -35,7 +36,13 @@ export async function getDb(): Promise<SqlJsDatabase> {
 }
 
 async function init(): Promise<SqlJsDatabase> {
-  const SQL = await initSqlJs();
+  const require = createRequire(import.meta.url);
+  const sqlJsPath = require.resolve("sql.js");
+  const sqlJsDir = path.dirname(sqlJsPath);
+
+  const SQL = await initSqlJs({
+    locateFile: (file) => path.join(sqlJsDir, file),
+  });
 
   let data: Uint8Array | null = null;
   try {

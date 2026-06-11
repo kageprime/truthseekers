@@ -1,6 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
-// In production (Fly.io), use relative /api prefix for Next.js proxy rewrites
-const BASE = process.env.NODE_ENV === "production" ? "/api" : API_URL;
+const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
 
 interface ArticleSummary {
   slug: string;

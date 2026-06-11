@@ -8,7 +8,8 @@ An LLM-powered interactive encyclopedia SDK — build your own AI agent-driven k
 - Agent loop via `@opencode-ai/sdk` (OpenCode server)
 - TypeScript throughout
 - SQLite for serving, git for version history
-- Next.js web frontend
+- Next.js web frontend (deployed to Vercel)
+- Hono API server (deployed to Fly.io)
 
 ## Packages
 
@@ -23,6 +24,12 @@ An LLM-powered interactive encyclopedia SDK — build your own AI agent-driven k
 ## B2B SDK Positioning
 
 Encarta-Me is an SDK for building AI-powered encyclopedias. Third parties integrate the SDK to create their own agentic knowledge bases. The web app and API server are reference implementations showing what the SDK can do.
+
+## Deployment Architecture
+
+- **API (Fly.io):** `truthseeker` — Hono API server on port 4097, SQLite DB on persistent volume
+- **Web (Vercel):** `truthseeker-web` — Next.js static app, calls API via `NEXT_PUBLIC_API_URL`
+- **CORS:** API locked to `https://truthseeker-web.vercel.app` (update to `terranet.tech` when domain ready)
 
 ## Concurrency
 
@@ -40,7 +47,7 @@ Encarta-Me is an SDK for building AI-powered encyclopedias. Third parties integr
 - Sanitized error responses
 - Configurable CORS per tenant
 
-## Quick Start
+## Quick Start (Local)
 
 ```bash
 npm install
@@ -52,6 +59,8 @@ npm run dev
 - `FIRECRAWL_API_KEY` — for web search during research
 - `OPENAI_API_KEY` — for DALL-E image generation (Milestone 3)
 - `OPENCODE_SERVER_URL` — OpenCode server URL (default: http://localhost:4096)
+- `NEXT_PUBLIC_API_URL` — API URL for frontend (default: http://localhost:4097)
+- `CORS_ORIGIN` — Allowed origin for API CORS (e.g., https://truthseeker-web.vercel.app)
 
 ## Data Flow
 
