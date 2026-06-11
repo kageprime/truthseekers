@@ -35,7 +35,7 @@ export default function NewArticlePage() {
       <main className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-xl">
           <div className="text-center mb-10">
-            <h1 className="text-3xl font-bold text-[#1a1a1a] mb-2">Generate Article</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1a1a] mb-2">Generate Article</h1>
             <p className="text-[#5f6368]">Enter a topic. The AI will research, outline, and write a full article.</p>
           </div>
 
@@ -47,7 +47,7 @@ export default function NewArticlePage() {
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
                 placeholder="quantum-computing"
-                className="w-full px-4 py-3 rounded-lg border border-[#dfe1e5] focus:border-[#4285f4] focus:ring-2 focus:ring-[#4285f4]/20 outline-none transition-all text-[#1a1a1a] placeholder-[#9aa0a6]"
+                className="w-full px-4 py-4 sm:py-3 rounded-lg border border-[#dfe1e5] focus:border-[#4285f4] focus:ring-2 focus:ring-[#4285f4]/20 outline-none transition-all text-[#1a1a1a] placeholder-[#9aa0a6]"
                 autoFocus
               />
             </div>
@@ -55,7 +55,7 @@ export default function NewArticlePage() {
             <button
               type="submit"
               disabled={!slug.trim() || !!status}
-              className="w-full px-6 py-3 bg-[#ea580c] hover:bg-[#d9530b] text-white font-medium rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full px-6 py-4 sm:py-3 bg-[#ea580c] hover:bg-[#d9530b] text-white font-medium rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {status ? "Generating..." : "Generate Article"}
             </button>

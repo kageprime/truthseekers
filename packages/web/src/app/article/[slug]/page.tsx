@@ -181,7 +181,7 @@ export default function ArticlePage() {
   // Loading
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col bg-white">
+      <div className="min-h-screen flex flex-col bg-[#fffaf0]">
         <nav className="flex items-center justify-between px-6 py-4 border-b border-[#dfe1e5]">
           <TruthseekersLogo />
         </nav>
@@ -196,7 +196,7 @@ export default function ArticlePage() {
   // Not generated yet
   if (!article && !generating) {
     return (
-      <div className="min-h-screen flex flex-col bg-white">
+      <div className="min-h-screen flex flex-col bg-[#fffaf0]">
         <nav className="flex items-center justify-between px-6 py-4 border-b border-[#dfe1e5]">
           <TruthseekersLogo />
           <div className="flex items-center gap-6 text-sm text-[#5f6368]">
@@ -250,7 +250,7 @@ export default function ArticlePage() {
     };
 
     return (
-      <div className="min-h-screen flex flex-col bg-white">
+      <div className="min-h-screen flex flex-col bg-[#fffaf0]">
         <nav className="flex items-center justify-between px-6 py-4 border-b border-[#dfe1e5]">
           <TruthseekersLogo />
           <div className="flex items-center gap-6 text-sm text-[#5f6368]">
@@ -301,10 +301,10 @@ export default function ArticlePage() {
       {/* NAV */}
       <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 border-b border-[#dfe1e5] bg-white/90 backdrop-blur-sm">
         <TruthseekersLogo />
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
           <a href="/queue" className="text-sm text-[#5f6368] hover:text-[#1a1a1a] hover:underline">Queue</a>
           <QueueIndicator />
-          <span className="text-xs text-[#9aa0a6]">v{article.metadata.version}</span>
+          <span className="hidden sm:inline text-xs text-[#9aa0a6]">v{article.metadata.version}</span>
           <button
             onClick={handleRefresh}
             disabled={generating}
@@ -317,7 +317,7 @@ export default function ArticlePage() {
 
       <article className="max-w-6xl mx-auto px-6 py-10 prose">
         {/* Title Card */}
-        <div className="pixel-card p-8 md:p-10 mb-10 bg-white">
+        <div className="pixel-card p-4 sm:p-8 md:p-10 mb-10 bg-white">
           <h1 className="pixel text-xl md:text-2xl mb-4 leading-snug" style={{ color: "var(--ink)" }}>
             {article.title}
           </h1>
@@ -337,7 +337,7 @@ export default function ArticlePage() {
         {article.sections.map((section, i) => {
           const palette = sectionColors[i % sectionColors.length];
           return (
-            <div key={section.id || i} className="pixel-card p-6 md:p-8 mb-6 bg-white">
+            <div key={section.id || i} className="pixel-card p-4 sm:p-6 md:p-8 mb-6 bg-white">
               <div className="flex items-start gap-4 mb-5">
                 <div className="w-12 h-12 flex items-center justify-center text-xl border-3 border-black shrink-0"
                   style={{ background: palette.bg }}>
@@ -351,7 +351,7 @@ export default function ArticlePage() {
                 </div>
               </div>
               <div
-                className="leading-relaxed text-[1.05rem]"
+                className="leading-relaxed text-[1.05rem] overflow-x-auto break-words"
                 style={{ color: "#222" }}
                 dangerouslySetInnerHTML={{ __html: mdToHTML(section.content) }}
               />
@@ -411,7 +411,7 @@ export default function ArticlePage() {
 
         {/* Sources */}
         {article.citations.length > 0 && (
-          <div className="pixel-card p-6 md:p-8 mb-6 bg-white">
+          <div className="pixel-card p-4 sm:p-6 md:p-8 mb-6 bg-white">
             <div className="flex items-center gap-4 mb-6">
               <span className="text-4xl">📚</span>
               <div>
@@ -423,8 +423,8 @@ export default function ArticlePage() {
               {article.citations.map((cite, i) => (
                 <li key={i} className="flex gap-3 items-start">
                   <span className="pixel text-xs text-[#888] shrink-0 mt-0.5">[{i + 1}]</span>
-                  <div>
-                    <a href={cite.url} target="_blank" rel="noopener" className="font-semibold hover:text-[#ea580c]"
+                  <div className="min-w-0">
+                    <a href={cite.url} target="_blank" rel="noopener" className="font-semibold hover:text-[#ea580c] break-all"
                       style={{ color: "var(--ink)", textDecoration: "underline", textUnderlineOffset: "3px" }}>
                       {cite.title}
                     </a>
@@ -440,7 +440,7 @@ export default function ArticlePage() {
 
         {/* See Also */}
         {article.crossrefs.length > 0 && (
-          <div className="pixel-card p-6 md:p-8 mb-6" style={{ background: "#fae8ff" }}>
+          <div className="pixel-card p-4 sm:p-6 md:p-8 mb-6" style={{ background: "#fae8ff" }}>
             <div className="flex items-center gap-4 mb-6">
               <span className="text-4xl">🔗</span>
               <div>
@@ -451,7 +451,7 @@ export default function ArticlePage() {
             <div className="flex flex-wrap gap-3">
               {article.crossrefs.map((ref, i) => (
                 <a key={ref.id || i} href={`/article/${ref.id}`}
-                  className="pixel-card-sm px-4 py-2"
+                  className="pixel-card-sm px-4 py-3 sm:py-2"
                   style={{ background: "white", textDecoration: "none", color: "var(--ink)", fontSize: "0.9rem" }}>
                   <span className="text-xs text-[#888] mr-2">[{ref.relationship}]</span>
                   {ref.title}
@@ -464,7 +464,7 @@ export default function ArticlePage() {
 
       {/* FOOTER */}
       <footer className="border-t border-[#dadce0] py-6 bg-white">
-        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between text-sm text-[#5f6368]">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between text-sm text-[#5f6368] gap-1">
           <span className="font-medium text-[#1a1a1a]">Truthseekers</span>
           <span className="text-xs">AI-powered encyclopedia · Built with OpenCode SDK</span>
         </div>

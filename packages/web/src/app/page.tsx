@@ -156,7 +156,7 @@ export default function HomePage() {
       {/* Minimal top nav */}
       <nav className="flex items-center justify-between px-6 py-4">
         <TruthseekersLogo />
-        <div className="flex items-center gap-6 text-sm text-[#5f6368]">
+        <div className="flex items-center gap-3 sm:gap-6 text-sm text-[#5f6368]">
           <a href="/article/new" className="hover:text-[#1a1a1a] hover:underline transition-colors">New Article</a>
           <a href="/queue" className="hover:text-[#1a1a1a] hover:underline transition-colors">Queue</a>
           <QueueIndicator />
@@ -167,13 +167,13 @@ export default function HomePage() {
       {!showResults && (
         <header className="relative overflow-hidden bg-gradient-to-b from-[#0c4a6e] via-[#0284c7] to-[#7dd3fc]">
           <div className="relative z-10 py-16 md:py-20 text-center">
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white mb-2 drop-shadow-lg">
+            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tighter text-white mb-2 drop-shadow-lg">
               Truthseekers
             </h1>
             <p className="text-lg text-[#e0f2fe] tracking-wide font-medium">The Living Encyclopedia</p>
           </div>
           <div className="absolute bottom-0 left-0 right-0 h-16 md:h-24 overflow-hidden pointer-events-none">
-            <svg className="absolute bottom-0 w-[200%] h-full" viewBox="0 0 1200 120" preserveAspectRatio="none" style={{ animation: "wave 12s linear infinite" }}>
+            <svg className="absolute bottom-0 w-[200%] h-full wave-anim" viewBox="0 0 1200 120" preserveAspectRatio="none">
               <path d="M0,60 C200,100 400,20 600,60 C800,100 1000,20 1200,60 L1200,120 L0,120 Z" fill="#fffaf0" />
             </svg>
           </div>
@@ -213,10 +213,10 @@ export default function HomePage() {
             </div>
 
             {/* Buttons */}
-            <div className="flex justify-center gap-3 mt-6">
+            <div className="flex flex-col sm:flex-row justify-center gap-3 mt-6">
               <button
                 type="submit"
-                className="px-6 py-2.5 bg-[#f8f9fa] hover:bg-[#f1f3f4] text-[#3c4043] text-sm rounded-md border border-transparent hover:border-[#dadce0] transition-all"
+                className="px-6 py-3.5 sm:py-2.5 bg-[#f8f9fa] hover:bg-[#f1f3f4] text-[#3c4043] text-sm rounded-md border border-transparent hover:border-[#dadce0] transition-all"
               >
                 Search Articles
               </button>
@@ -224,7 +224,7 @@ export default function HomePage() {
                 type="button"
                 onClick={handleGenerate}
                 disabled={!query.trim()}
-                className="px-6 py-2.5 bg-[#ea580c] hover:bg-[#d9530b] text-white text-sm rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-6 py-3.5 sm:py-2.5 bg-[#ea580c] hover:bg-[#d9530b] text-white text-sm rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 ⚡ Generate Article
               </button>
@@ -339,7 +339,7 @@ export default function HomePage() {
                 </svg>
               </button>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {articles.slice(0, 6).map((article) => (
                 <a
                   key={article.slug}
@@ -375,7 +375,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t border-[#dadce0] py-4 px-6">
-        <div className="max-w-5xl mx-auto flex items-center justify-between text-sm text-[#5f6368]">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between text-sm text-[#5f6368]">
           <div className="flex items-center gap-4">
             <span className="font-medium text-[#1a1a1a]">Truthseekers</span>
             <span className="text-xs">AI-powered encyclopedia</span>

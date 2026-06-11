@@ -140,6 +140,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             0% { transform: translateX(0); }
             100% { transform: translateX(-50%); }
           }
+          @media (max-width: 639px) {
+            .wave-anim { animation: wave 24s linear infinite; }
+          }
+          @media (min-width: 640px) {
+            .wave-anim { animation: wave 12s linear infinite; }
+          }
           .float-anim { animation: float 4s ease-in-out infinite; }
           .line-clamp-3 {
             display: -webkit-box;

@@ -95,7 +95,7 @@ export default function QueuePage() {
       {/* Nav */}
       <nav className="flex items-center justify-between px-6 py-4 border-b border-[#dfe1e5]">
         <TruthseekersLogo />
-        <div className="flex items-center gap-6 text-sm text-[#5f6368]">
+        <div className="flex items-center gap-3 sm:gap-6 text-sm text-[#5f6368]">
           <a href="/" className="hover:text-[#1a1a1a] hover:underline">Home</a>
           <a href="/article/new" className="hover:text-[#1a1a1a] hover:underline">New Article</a>
           <QueueIndicator />
@@ -104,7 +104,7 @@ export default function QueuePage() {
 
       <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-10">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-2">
           <div>
             <h1 className="text-2xl font-bold text-[#1a1a1a]">Queue Manager</h1>
             <p className="text-sm text-[#5f6368] mt-1">Monitor and manage all generation jobs</p>
@@ -116,7 +116,7 @@ export default function QueuePage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="p-4 rounded-lg border border-[#dfe1e5] text-center bg-white hover:shadow-sm transition-shadow">
             <div className="text-3xl mb-1">⚡</div>
             <div className="text-2xl font-bold text-[#ea580c]">{data.stats.active}</div>

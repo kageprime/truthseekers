@@ -67,7 +67,7 @@ export default function QueueIndicator() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="pixel text-[9px] px-3 py-2 border-2 border-black shadow-[2px_2px_0_#1c1917] relative"
+        className="pixel text-[9px] px-3 py-3 sm:py-2 min-h-[44px] border-2 border-black shadow-[2px_2px_0_#1c1917] relative"
         style={{ background: total > 0 ? "var(--orange)" : "white", color: total > 0 ? "white" : "var(--ink)" }}
       >
         {total > 0 ? `⚡ ${total}` : "QUEUE"}
@@ -75,15 +75,15 @@ export default function QueueIndicator() {
 
       {open && (
         <div
-          className="absolute right-0 top-full mt-2 w-72 z-50"
+          className="absolute right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 top-full mt-2 w-[calc(100vw-32px)] sm:w-72 z-50"
           style={{ filter: "drop-shadow(4px 4px 0 rgba(28,25,23,0.15))" }}
         >
           <div className="pixel-card p-3 bg-white max-h-80 overflow-y-auto">
             <div className="flex items-center justify-between mb-2">
-              <span className="pixel text-[9px]" style={{ color: "var(--ink)" }}>
+              <span className="pixel text-xs sm:text-[9px]" style={{ color: "var(--ink)" }}>
                 GENERATION QUEUE
               </span>
-              <span className="text-[10px] text-[#888]">
+              <span className="text-xs sm:text-[10px] text-[#888]">
                 {data?.stats?.active ?? 0}/{data?.stats?.maxConcurrent ?? 3} active
               </span>
             </div>
@@ -103,13 +103,13 @@ export default function QueueIndicator() {
                       {job.status === "queued" ? "⏳" : job.status === "researching" ? "🔬" : job.status === "writing" ? "✍️" : job.status === "storing" ? "💾" : "⚡"}
                     </span>
                     <span className="text-xs font-medium truncate flex-1">{job.title || job.slug}</span>
-                    <span className="pixel text-[7px] text-[#888] uppercase">{job.status}</span>
+                    <span className="pixel text-[9px] sm:text-[7px] text-[#888] uppercase">{job.status}</span>
                   </a>
                 ))}
               </div>
             )}
 
-            <div className="mt-2 pt-2 border-t border-dashed border-[#ddd] text-[9px] text-[#888] text-center">
+            <div className="mt-2 pt-2 border-t border-dashed border-[#ddd] text-xs sm:text-[9px] text-[#888] text-center">
               Click a job to watch it live
             </div>
           </div>

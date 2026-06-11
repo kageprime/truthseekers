@@ -51,7 +51,7 @@ export default function MermaidDiagram({ code, caption }: { code: string; captio
           {state === "error" && (
             <button
               onClick={() => { setState("edit"); setEditCode(code.trim()); }}
-              className="pixel text-[8px] border border-black px-1 cursor-pointer bg-white"
+              className="pixel text-[8px] border border-black px-1 py-1 min-h-[44px] sm:min-h-0 cursor-pointer bg-white"
             >
               EDIT
             </button>
@@ -59,7 +59,7 @@ export default function MermaidDiagram({ code, caption }: { code: string; captio
           {state === "rendered" && (
             <button
               onClick={() => setZoomed(!zoomed)}
-              className="pixel text-[8px] border border-black px-1 cursor-pointer bg-white"
+              className="pixel text-[8px] border border-black px-1 py-1 min-h-[44px] sm:min-h-0 cursor-pointer bg-white"
             >
               {zoomed ? "−" : "+"}
             </button>
@@ -98,10 +98,10 @@ export default function MermaidDiagram({ code, caption }: { code: string; captio
             style={{ outline: "none" }}
           />
           <div className="flex gap-2">
-            <button onClick={handleEditSubmit} className="pixel text-[9px] bg-[var(--orange)] text-white px-3 py-1 border border-black">
+            <button onClick={handleEditSubmit} className="pixel text-[9px] bg-[var(--orange)] text-white px-3 py-3 sm:py-1 min-h-[44px] border border-black">
               RENDER
             </button>
-            <button onClick={() => setState("error")} className="pixel text-[9px] border border-black px-3 py-1 bg-white">
+            <button onClick={() => setState("error")} className="pixel text-[9px] border border-black px-3 py-3 sm:py-1 min-h-[44px] bg-white">
               CANCEL
             </button>
           </div>
@@ -114,7 +114,7 @@ export default function MermaidDiagram({ code, caption }: { code: string; captio
           className="flex justify-center p-3 bg-white overflow-auto"
           style={{
             minHeight: 60,
-            maxHeight: zoomed ? "none" : 400,
+            maxHeight: zoomed ? "none" : "min(400px, 60vh)",
             transition: "max-height 0.3s",
             border: "1px solid #eee",
           }}

@@ -18,7 +18,7 @@ export function SkeletonImage({ caption }: { caption?: string }) {
         <span className="text-3xl opacity-40 relative z-10">🖼️</span>
       </div>
       {caption && <p className="text-sm text-[#666]">{caption}</p>}
-      <p className="text-[10px] text-[#aaa] mt-1">Image resolving...</p>
+      <p className="text-xs sm:text-[10px] text-[#aaa] mt-1">Image resolving...</p>
     </div>
   );
 }
@@ -33,7 +33,7 @@ export function BlankSlateImage({ caption, prompt }: { caption?: string; prompt?
       {caption && <p className="text-sm font-medium">{caption}</p>}
       {prompt && (
         <details className="mt-1">
-          <summary className="text-[10px] cursor-pointer text-[#888]">Search prompt</summary>
+          <summary className="text-xs sm:text-[10px] cursor-pointer text-[#888]">Search prompt</summary>
           <p className="text-xs mt-1 p-2 bg-white border">{prompt}</p>
         </details>
       )}
@@ -49,7 +49,7 @@ export function BlankSlateMedia() {
         <span className="text-2xl opacity-40">📊</span>
         <span className="text-2xl opacity-40">🧊</span>
       </div>
-      <p className="text-[10px] text-[#aaa] text-center mt-1">Media suggestions pending</p>
+      <p className="text-xs sm:text-[10px] text-[#aaa] text-center mt-1">Media suggestions pending</p>
     </div>
   );
 }

@@ -137,7 +137,7 @@ export default function GenerationBar({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
             <span className="font-bold text-sm truncate">{entry.title}</span>
-            <span className="pixel text-[9px] shrink-0 ml-2" style={{ color: barColor }}>
+            <span className="pixel text-xs sm:text-[9px] shrink-0 ml-2" style={{ color: barColor }}>
               {label} {!isDone && !isError ? `${displayPct}%` : ""}
             </span>
           </div>
@@ -158,7 +158,7 @@ export default function GenerationBar({
         {isDone && (
           <a
             href={`/article/${entry.slug}`}
-            className="pixel text-[8px] bg-[var(--green)] text-white px-2 py-1 border border-black shrink-0"
+            className="pixel text-[8px] bg-[var(--green)] text-white px-2 py-3 sm:py-1 min-h-[44px] border border-black shrink-0"
             style={{ textDecoration: "none" }}
           >
             VIEW
@@ -167,14 +167,14 @@ export default function GenerationBar({
         {isError && (
           <button
             onClick={(e) => { e.stopPropagation(); onRetry(entry.slug); }}
-            className="pixel text-[8px] bg-[var(--red)] text-white px-2 py-1 border border-black shrink-0"
+            className="pixel text-[8px] bg-[var(--red)] text-white px-2 py-3 sm:py-1 min-h-[44px] border border-black shrink-0"
           >
             RETRY
           </button>
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onDismiss(entry.slug); }}
-          className="pixel text-[8px] text-[#aaa] px-1 border border-[#ccc] shrink-0 hover:bg-[#fee]"
+          className="pixel text-[8px] text-[#aaa] px-1 w-10 h-10 sm:w-auto sm:h-auto border border-[#ccc] shrink-0 hover:bg-[#fee] flex items-center justify-center"
           title="Dismiss"
         >
           ✕
@@ -216,7 +216,7 @@ export default function GenerationBar({
             <div className="mt-3 flex gap-2">
               <a
                 href={`/article/${entry.slug}`}
-                className="pixel text-[8px] bg-[var(--blue)] text-white px-3 py-1 border border-black"
+                className="pixel text-[8px] bg-[var(--blue)] text-white px-3 py-3 sm:py-1 min-h-[44px] border border-black"
                 style={{ textDecoration: "none" }}
               >
                 WATCH LIVE →
@@ -232,7 +232,7 @@ export default function GenerationBar({
           <p className="text-xs text-[var(--red)] mb-2">{entry.error}</p>
           <button
             onClick={() => onRetry(entry.slug)}
-            className="pixel text-[9px] bg-[var(--orange)] text-white px-3 py-1 border border-black"
+            className="pixel text-[9px] bg-[var(--orange)] text-white px-3 py-3 sm:py-1 min-h-[44px] border border-black"
           >
             RETRY GENERATION
           </button>

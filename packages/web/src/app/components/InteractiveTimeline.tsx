@@ -147,7 +147,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={togglePlay}
-            className="w-7 h-7 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#1c1917] hover:shadow-[3px_3px_0_#1c1917] active:shadow-[1px_1px_0_#1c1917] transition-all text-xs"
+            className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#1c1917] hover:shadow-[3px_3px_0_#1c1917] active:shadow-[1px_1px_0_#1c1917] transition-all text-xs"
             aria-label={playing ? "Pause" : "Play"}
           >
             {playing ? (
@@ -158,7 +158,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
           </button>
           <button
             onClick={() => setFullscreen((f) => !f)}
-            className="w-7 h-7 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#1c1917] hover:shadow-[3px_3px_0_#1c1917] active:shadow-[1px_1px_0_#1c1917] transition-all text-xs"
+            className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#1c1917] hover:shadow-[3px_3px_0_#1c1917] active:shadow-[1px_1px_0_#1c1917] transition-all text-xs"
             aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"}
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
@@ -173,7 +173,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
 
       {/* Category legend */}
       {usedCats.length > 1 && (
-        <div className="flex flex-wrap gap-3 mb-3 text-[10px]">
+        <div className="flex flex-wrap gap-3 mb-3 text-xs sm:text-[10px]">
           {usedCats.map((cat) => (
             <span key={cat} className="flex items-center gap-1">
               <span className="w-2.5 h-2.5 rounded-full border border-black" style={{ background: catColor(cat) }} />
@@ -259,7 +259,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
             const hidden = overlaps && activeIdx !== i;
             return (
               <div key={i}
-                className="absolute pixel text-[8px] transition-all duration-150"
+                className="absolute pixel text-xs sm:text-[8px] transition-all duration-150"
                 style={{
                   left: `${x}%`, transform: "translateX(-50%)",
                   top: hidden ? "8px" : (i % 2 === 0 ? "0px" : "16px"),
@@ -276,7 +276,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
       </div>
 
       {/* Event list */}
-      <div ref={listRef} className={`overflow-y-auto space-y-1 ${fullscreen ? "max-h-none" : "max-h-48"}`} style={{ scrollBehavior: "smooth" }}>
+      <div ref={listRef} className={`overflow-y-auto space-y-1 ${fullscreen ? "max-h-none" : "max-h-64 sm:max-h-48"}`} style={{ scrollBehavior: "smooth" }}>
         {sorted.map((ev, i) => {
           const isActive = activeIdx === i;
           return (
@@ -292,7 +292,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
                 <div className="flex items-center gap-2 flex-wrap">
                   <strong className="text-sm leading-snug">{ev.event}</strong>
                   {ev.category && (
-                    <span className="text-[9px] px-1.5 py-0.5 border border-black font-medium shrink-0"
+                    <span className="text-xs sm:text-[9px] px-1.5 py-0.5 border border-black font-medium shrink-0"
                       style={{ background: `${catColor(ev.category)}20`, color: catColor(ev.category) }}>
                       {CATEGORY_LABELS[ev.category] ?? ev.category}
                     </span>
@@ -324,7 +324,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
   }
 
   return (
-    <div className="pixel-card p-6 my-4" style={{ background: "var(--ice)" }}>
+    <div className="pixel-card p-3 sm:p-6 my-4" style={{ background: "var(--ice)" }}>
       {track}
     </div>
   );
