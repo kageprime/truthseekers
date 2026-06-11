@@ -18,8 +18,8 @@ RUN npm install --legacy-peer-deps
 # Source
 COPY . .
 
-# Build backend + web
-RUN npm run build
+# Build backend packages (force rebuild since tsbuildinfo has host paths)
+RUN npx tsc --build --force packages/core packages/storage packages/server packages/cli
 RUN cd packages/web && NODE_ENV=production npx next build || NODE_ENV=production npx next build
 
 # Data dirs
