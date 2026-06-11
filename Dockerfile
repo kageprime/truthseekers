@@ -23,6 +23,10 @@ RUN npx tsc --build --force packages/core packages/storage packages/server
 RUN mkdir -p /app/data/encyclopedia \
     && cd /app/data/encyclopedia && git init
 
+# Seed database — copy local db into container
+COPY data/seed.db /app/seed.db
+
 EXPOSE 4097
 
-CMD ["node", "packages/server/dist/index.js"]
+# Seed DB if missing, then start server
+CMD ["sh", "-c", "if [ ! -f /data/encarta.db ]; then cp /app/seed.db /data/encarta.db; echo 'Seeded database from local copy'; fi; node packages/server/dist/index.js"]
