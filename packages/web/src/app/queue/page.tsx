@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import GenerationBar, { type GeneratingEntry, phasePercent, phaseLabel } from "../components/GenerationBar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
+const BASE = process.env.NODE_ENV === "production" ? "/api" : API_URL;
 
 interface QueueJob {
   slug: string;
@@ -54,7 +55,7 @@ export default function QueuePage() {
     let cancelled = false;
     async function poll() {
       try {
-        const res = await fetch(`${API_URL}/queue`);
+        const res = await fetch(`${BASE}/queue`);
         if (!cancelled && res.ok) {
           const json: QueueData = await res.json();
           setData(json);
@@ -193,7 +194,7 @@ export default function QueuePage() {
                   entry={jobToEntry(job)}
                   showWatchLive={false}
                   onRetry={() => {
-                    fetch(`${API_URL}/articles/${job.slug}/generate`, {
+                    fetch(`${BASE}/articles/${job.slug}/generate`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ persona: "veritas" }),

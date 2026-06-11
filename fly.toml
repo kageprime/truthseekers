@@ -1,0 +1,39 @@
+app = "truthseeker"
+primary_region = "ams"
+
+[build]
+
+[env]
+  PORT = "4097"
+  OPENCODE_SERVER_URL = "http://localhost:4096"
+  ENCARTA_DB_PATH = "/data/encarta.db"
+  ENCARTA_REPO_PATH = "/data/encyclopedia"
+  ENCARTA_VECTOR_PATH = "/data/encarta_vectors.db"
+  ENCARTA_MAX_CONCURRENT = "2"
+  ENCARTA_MAX_QUEUE = "50"
+  RATE_LIMIT = "30"
+  NODE_ENV = "production"
+  NEXT_PUBLIC_API_URL = "https://truthseeker.fly.dev/api"
+
+[[services]]
+  internal_port = 3000
+  protocol = "tcp"
+  processes = ["app"]
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+[mounts]
+  source = "encarta_data"
+  destination = "/data"
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 2

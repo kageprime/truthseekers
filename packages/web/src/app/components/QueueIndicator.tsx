@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
+const BASE = typeof window !== "undefined" && process.env.NODE_ENV === "production" ? "/api" : API_URL;
 
 interface QueueJob {
   slug: string;
@@ -34,7 +35,7 @@ export default function QueueIndicator() {
     let cancelled = false;
     async function poll() {
       try {
-        const res = await fetch(`${API_URL}/queue`, { cache: "no-store" });
+        const res = await fetch(`${BASE}/queue`, { cache: "no-store" });
         if (!res.ok || cancelled) return;
         const json = await res.json();
         if (!cancelled) setData(json);

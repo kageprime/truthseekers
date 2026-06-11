@@ -1,4 +1,6 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
+// In production (Fly.io), use relative /api prefix for Next.js proxy rewrites
+const BASE = process.env.NODE_ENV === "production" ? "/api" : API_URL;
 
 interface ArticleSummary {
   slug: string;
@@ -29,6 +31,7 @@ interface MediaItem {
   id: string;
   caption: string;
   src?: string;
+  source?: string;
   code?: string;
   prompt?: string;
 }
@@ -74,7 +77,7 @@ interface JobInfo {
 }
 
 export async function fetchArticles(limit = 50, offset = 0): Promise<ArticleSummary[]> {
-  const res = await fetch(`${API_URL}/articles?limit=${limit}&offset=${offset}`, {
+  const res = await fetch(`${BASE}/articles?limit=${limit}&offset=${offset}`, {
     cache: "no-store",
   });
   if (!res.ok) return [];
@@ -82,7 +85,7 @@ export async function fetchArticles(limit = 50, offset = 0): Promise<ArticleSumm
 }
 
 export async function searchArticles(query: string): Promise<ArticleSummary[]> {
-  const res = await fetch(`${API_URL}/articles/search?q=${encodeURIComponent(query)}`, {
+  const res = await fetch(`${BASE}/articles/search?q=${encodeURIComponent(query)}`, {
     cache: "no-store",
   });
   if (!res.ok) return [];
@@ -90,19 +93,19 @@ export async function searchArticles(query: string): Promise<ArticleSummary[]> {
 }
 
 export async function fetchArticle(slug: string): Promise<Article | null> {
-  const res = await fetch(`${API_URL}/articles/${slug}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/articles/${slug}`, { cache: "no-store" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function fetchArticleStatus(slug: string): Promise<JobInfo | { status: string } | null> {
-  const res = await fetch(`${API_URL}/articles/${slug}/status`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/articles/${slug}/status`, { cache: "no-store" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function generateArticle(slug: string, persona?: string): Promise<{ status: string; persona?: string }> {
-  const res = await fetch(`${API_URL}/articles/${slug}/generate`, {
+  const res = await fetch(`${BASE}/articles/${slug}/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ persona: persona || "veritas" }),
@@ -111,10 +114,10 @@ export async function generateArticle(slug: string, persona?: string): Promise<{
 }
 
 export async function refreshArticle(slug: string): Promise<{ status: string }> {
-  const res = await fetch(`${API_URL}/articles/${slug}/refresh`, { method: "POST" });
+  const res = await fetch(`${BASE}/articles/${slug}/refresh`, { method: "POST" });
   return res.json();
 }
 
 export function progressUrl(slug: string): string {
-  return `${API_URL}/articles/${slug}/progress`;
+  return `${BASE}/articles/${slug}/progress`;
 }
