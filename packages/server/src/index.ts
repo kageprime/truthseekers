@@ -25,8 +25,20 @@ import {
 
 const app = new Hono();
 
+// Parse allowed origins from CORS_ORIGIN env var (comma-separated)
+const allowedOrigins = (process.env.CORS_ORIGIN || "*")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 // Global middleware
-app.use("*", cors({ origin: process.env.CORS_ORIGIN || "*" }));
+app.use("*", cors({
+  origin: (origin) => {
+    if (allowedOrigins.includes("*")) return origin;
+    if (allowedOrigins.includes(origin)) return origin;
+    return null;
+  },
+}));
 app.use("*", rateLimitMiddleware);
 app.use("*", authMiddleware);
 

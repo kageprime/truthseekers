@@ -11,7 +11,7 @@ primary_region = "ams"
   ENCARTA_MAX_QUEUE = "25"
   RATE_LIMIT = "20"
   NODE_ENV = "production"
-  CORS_ORIGIN = "https://truthseeker-web.vercel.app"
+  CORS_ORIGIN = "https://www.terranet.tech,https://truthopedia-web.vercel.app"
 
 [[services]]
   internal_port = 4097
