@@ -6,5 +6,6 @@ dist
 *.db-shm
 content/*
 data/*
+!data/seed.db
 .git
 .env
