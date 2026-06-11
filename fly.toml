@@ -8,12 +8,10 @@ primary_region = "ams"
   OPENCODE_SERVER_URL = "http://localhost:4096"
   ENCARTA_DB_PATH = "/data/encarta.db"
   ENCARTA_REPO_PATH = "/data/encyclopedia"
-  ENCARTA_VECTOR_PATH = "/data/encarta_vectors.db"
-  ENCARTA_MAX_CONCURRENT = "2"
-  ENCARTA_MAX_QUEUE = "50"
-  RATE_LIMIT = "30"
+  ENCARTA_MAX_CONCURRENT = "1"
+  ENCARTA_MAX_QUEUE = "25"
+  RATE_LIMIT = "20"
   NODE_ENV = "production"
-  NEXT_PUBLIC_API_URL = "https://truthseeker.fly.dev/api"
 
 [[services]]
   internal_port = 3000
@@ -34,6 +32,6 @@ primary_region = "ams"
   destination = "/data"
 
 [[vm]]
-  memory = "1gb"
+  memory = "2gb"
   cpu_kind = "shared"
   cpus = 2

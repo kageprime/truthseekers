@@ -1,15 +1,14 @@
 FROM node:22-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates git python3 make g++ \
+    curl ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install OpenCode CLI globally
 RUN npm install -g opencode-ai
 
 WORKDIR /app
 
-# Install deps (leverage layer caching)
+# Deps layer for caching
 COPY package.json package-lock.json ./
 COPY packages/core/package.json packages/core/
 COPY packages/storage/package.json packages/storage/
@@ -18,19 +17,18 @@ COPY packages/cli/package.json packages/cli/
 COPY packages/web/package.json packages/web/
 RUN npm install --legacy-peer-deps
 
-# Copy source
+# Source
 COPY . .
 
-# Build all packages
+# Build
 RUN npm run build
+RUN cd packages/web && NODE_ENV=production npx next build || NODE_ENV=production npx next build
 
-# Build Next.js for production
-RUN cd packages/web && npx next build
+# Data + git
+RUN mkdir -p /app/data/encyclopedia /app/content \
+    && cd /app/data/encyclopedia && git init
 
-# Create data directories
-RUN mkdir -p /app/data/encyclopedia /app/content
+EXPOSE 3000
 
-EXPOSE 4097 3000
-
-# Start OpenCode server in background, then Encarta API, then Next.js
-CMD ["sh", "-c", "opencode serve --port 4096 & sleep 5 && node packages/server/dist/index.js & sleep 3 && cd packages/web && npx next start -p 3000"]
+COPY start.sh /app/start.sh
+CMD ["sh", "/app/start.sh"]
