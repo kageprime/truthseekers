@@ -41,7 +41,7 @@ async function init(): Promise<SqlJsDatabase> {
   const sqlJsDir = path.dirname(sqlJsPath);
 
   const SQL = await initSqlJs({
-    locateFile: (file) => path.join(sqlJsDir, file),
+    locateFile: (file: string) => path.join(sqlJsDir, file),
   });
 
   let data: Uint8Array | null = null;
