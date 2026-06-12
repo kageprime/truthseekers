@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import ProcessViewer from "./ProcessViewer";
+import type { AgentEvent } from "./ProcessViewer";
 
 export interface GeneratingEntry {
   slug: string;
   title: string;
   phase: string;
   error?: string;
+  agentEvents?: AgentEvent[];
 }
 
 interface PhaseInfo {
@@ -18,10 +21,20 @@ interface PhaseInfo {
 
 const PHASE_CHECKPOINTS: Record<string, number> = {
   queued: 5,
-  researching: 25,
-  outline: 45,
-  write: 70,
-  storing: 90,
+  starting: 5,
+  research: 20,
+  researching: 20,
+  outline: 40,
+  write: 60,
+  writing: 60,
+  verify: 75,
+  verifying: 75,
+  correcting: 80,
+  "generate-media": 90,
+  media: 90,
+  "generating-images": 93,
+  store: 95,
+  storing: 95,
   complete: 100,
   done: 100,
   error: 0,
@@ -34,25 +47,26 @@ export function phasePercent(phase: string): number {
 export function phaseLabel(phase: string): string {
   const m: Record<string, string> = {
     queued: "QUEUED", researching: "RESEARCHING", outline: "OUTLINING",
-    write: "WRITING", storing: "STORING", complete: "DONE", done: "DONE",
+    write: "WRITING", verifying: "VERIFYING", correcting: "CORRECTING",
+    media: "GENERATING MEDIA", storing: "STORING", complete: "DONE", done: "DONE",
     error: "ERROR",
   };
   return m[phase] ?? phase.toUpperCase();
 }
 
 function buildPhaseTimeline(currentPhase: string): PhaseInfo[] {
-  const phases = ["queued", "researching", "outline", "write", "storing", "done"];
+  const phases = ["queued", "researching", "outline", "write", "verifying", "media", "storing", "done"];
   const currentIdx = phases.indexOf(currentPhase);
   return phases.map((p, i) => ({
     phase: p,
     label: phaseLabel(p),
-    time: currentIdx >= i ? "—" : "",
+    time: currentIdx >= i ? "✓" : "",
     completed: currentIdx > i,
   }));
 }
 
 function nextCheckpoint(current: string): number {
-  const order = ["queued", "researching", "outline", "write", "storing"];
+  const order = ["queued", "researching", "outline", "write", "verifying", "media", "storing"];
   const idx = order.indexOf(current);
   if (idx < 0 || idx >= order.length - 1) return 99;
   return PHASE_CHECKPOINTS[order[idx + 1]];
@@ -222,6 +236,11 @@ export default function GenerationBar({
                 WATCH LIVE →
               </a>
             </div>
+          )}
+
+          {/* Agent activity stream */}
+          {entry.agentEvents && entry.agentEvents.length > 0 && (
+            <ProcessViewer events={entry.agentEvents} />
           )}
         </div>
       )}

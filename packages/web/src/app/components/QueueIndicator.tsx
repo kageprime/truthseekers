@@ -32,20 +32,30 @@ export default function QueueIndicator() {
 
   useEffect(() => {
     let cancelled = false;
+    let backoff = 5000;
+    let timer: ReturnType<typeof setTimeout>;
+
     async function poll() {
+      if (cancelled) return;
       try {
         const res = await fetch(`${BASE}/queue`, { cache: "no-store" });
-        if (!res.ok || cancelled) return;
-        const json = await res.json();
-        if (!cancelled) setData(json);
+        if (res.status === 429) {
+          backoff = Math.min(backoff * 2, 30000);
+        } else {
+          backoff = 5000;
+          if (res.ok && !cancelled) {
+            const json = await res.json();
+            if (!cancelled) setData(json);
+          }
+        }
       } catch {
         // server not available
       }
+      timer = setTimeout(poll, backoff);
     }
 
     poll();
-    const interval = setInterval(poll, 3000);
-    return () => { cancelled = true; clearInterval(interval); };
+    return () => { cancelled = true; clearTimeout(timer); };
   }, []);
 
   useEffect(() => {
@@ -60,7 +70,7 @@ export default function QueueIndicator() {
 
   const total = (data?.stats?.active ?? 0) + (data?.stats?.queued ?? 0);
   const activeJobs = data?.jobs.filter((j) =>
-    ["queued", "researching", "writing", "storing"].includes(j.status)
+    ["queued", "researching", "writing", "verifying", "media", "storing"].includes(j.status)
   ) ?? [];
 
   return (
@@ -100,7 +110,7 @@ export default function QueueIndicator() {
                     style={{ textDecoration: "none", color: "inherit" }}
                   >
                     <span className="text-xs">
-                      {job.status === "queued" ? "⏳" : job.status === "researching" ? "🔬" : job.status === "writing" ? "✍️" : job.status === "storing" ? "💾" : "⚡"}
+                      {job.status === "queued" ? "⏳" : job.status === "researching" ? "🔬" : job.status === "writing" ? "✍️" : job.status === "verifying" ? "🔍" : job.status === "media" ? "🎨" : job.status === "storing" ? "💾" : "⚡"}
                     </span>
                     <span className="text-xs font-medium truncate flex-1">{job.title || job.slug}</span>
                     <span className="pixel text-[9px] sm:text-[7px] text-[#888] uppercase">{job.status}</span>

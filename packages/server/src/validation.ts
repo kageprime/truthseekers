@@ -30,3 +30,13 @@ export const generateBodySchema = z.object({
 export const authHeaderSchema = z.object({
   "x-api-key": z.string().min(1).optional(),
 });
+
+export const mapListQuerySchema = z.object({
+  limit: z.coerce.number().min(1).max(200).optional().default(50),
+  offset: z.coerce.number().min(0).optional().default(0),
+});
+
+export const mapSearchQuerySchema = z.object({
+  q: z.string().min(1).max(500),
+  limit: z.coerce.number().min(1).max(200).optional().default(20),
+});

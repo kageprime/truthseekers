@@ -1,8 +1,8 @@
 export interface Citation {
   url: string;
   title: string;
-  accessed: string;
-  relevance: string;
+  accessed?: string;
+  relevance?: string;
 }
 
 export interface CrossReference {
@@ -25,6 +25,53 @@ export interface ThreeDScene {
   id: string;
   code: string;
   description: string;
+}
+
+export interface ThreeDBuilding {
+  id: string;
+  lat: number;
+  lng: number;
+  width: number;
+  depth: number;
+  height: number;
+  color: string;
+  label?: string;
+  type: "temple" | "forum" | "wall" | "aqueduct" | "house" | "palace" | "other";
+}
+
+export interface ThreeDModel {
+  id: string;
+  lat: number;
+  lng: number;
+  src: string;
+  scale: number;
+  rotation: number;
+  label: string;
+  caption?: string;
+}
+
+export interface ThreeDAnnotation {
+  lat: number;
+  lng: number;
+  label: string;
+  description: string;
+  articleSlug?: string;
+}
+
+export interface ThreeDMapScene {
+  id: string;
+  title: string;
+  centerLat: number;
+  centerLng: number;
+  zoom: number;
+  terrain: {
+    type: "flat" | "hills" | "mountain";
+    color?: string;
+    heightScale?: number;
+  };
+  buildings?: ThreeDBuilding[];
+  models?: ThreeDModel[];
+  annotations?: ThreeDAnnotation[];
 }
 
 export interface MediaItem {
@@ -87,10 +134,17 @@ export interface ArticleMetadata {
   created: string;
   updated: string;
   status: "draft" | "published" | "error";
-  freshness: string;
+  freshness?: string;
 }
 
-export type JobStatus = "queued" | "researching" | "writing" | "verifying" | "media" | "storing" | "done" | "error";
+export type JobStatus = "queued" | "researching" | "writing" | "verifying" | "media" | "storing" | "done" | "error" | "removed";
+
+export interface AgentEvent {
+  type: "tool_use" | "tool_result" | "text" | "status" | "error";
+  data: unknown;
+  timestamp: number;
+  label?: string;
+}
 
 export interface JobInfo {
   slug: string;
@@ -99,6 +153,7 @@ export interface JobInfo {
   phase: string;
   createdAt: string;
   error?: string;
+  agentEvents?: AgentEvent[];
 }
 
 export interface PageView {
@@ -107,3 +162,78 @@ export interface PageView {
 }
 
 export type Persona = "veritas" | "pliny";
+
+export interface MapMarker {
+  lat: number;
+  lng: number;
+  title: string;
+  description?: string;
+  type?: "city" | "battle" | "site" | "museum" | "other";
+}
+
+export interface MapLayer {
+  id: string;
+  label: string;
+  year?: number;
+  geoJson: object;
+  visible?: boolean;
+}
+
+export interface MapEntry {
+  slug: string;
+  title: string;
+  subtitle?: string;
+  description: string;
+  content: string;
+  image?: string;
+  region?: string;
+  era?: string;
+  type: "static" | "interactive";
+  externalUrl?: string;
+  centerLat?: number;
+  centerLng?: number;
+  zoom?: number;
+  geoJson?: object;
+  markers?: MapMarker[];
+  layers?: MapLayer[];
+  timeline?: TimelineEvent[];
+  threedScene?: ThreeDMapScene;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VerificationIssue {
+  section: string;
+  type: "factual" | "logical" | "citation" | "contradiction";
+  description: string;
+  suggestion: string;
+}
+
+export interface VerificationCorrection {
+  section: string;
+  original: string;
+  corrected: string;
+  reason: string;
+}
+
+export interface VerificationResult {
+  verified: boolean;
+  issues: VerificationIssue[];
+  corrections: VerificationCorrection[];
+  confidenceScore: number;
+  summary: string;
+}
+
+export interface MediaGenerationItem {
+  sectionId: string;
+  mediaId: string;
+  type: "image" | "diagram" | "threed" | "map3d";
+  caption: string;
+  prompt: string;
+  status: "generated" | "skipped";
+  src: string;
+}
+
+export interface MediaGenerationResult {
+  mediaItems: MediaGenerationItem[];
+}

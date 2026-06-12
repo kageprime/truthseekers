@@ -31,10 +31,25 @@ Truthseekers is an SDK for building AI-powered encyclopedias. Third parties inte
 - **Web (Vercel):** `truthseeker-web` — Next.js static app, calls API via `NEXT_PUBLIC_API_URL`
 - **CORS:** API locked to `https://truthseeker-web.vercel.app` (update to `terranet.tech` when domain ready)
 
+## Pipeline Phases
+
+The agent pipeline has 8 sequential phases, each streaming real-time event data:
+
+| Phase | Duration | Purpose |
+|-------|----------|---------|
+| Research | 30-90s | Web search, fact extraction |
+| Outline | 15-30s | Structure sections, categories |
+| Write | 60-120s | Full article generation |
+| Verify | 15-30s | Cross-check citations, flag issues |
+| Correct | 15-30s | Apply fixes if confidence < 80% |
+| Media | 20-40s | DALL-E prompts, diagram code |
+| Images | 10-30s | Generate DALL-E images (if required) |
+| Store | 2-5s | Persist to SQLite + git commit |
+
 ## Concurrency
 
-- SQLite-backed persistent job queue (survives restarts)
-- Worker pool for parallel article generation
+- In-memory job queue (survives restarts via SQLite backup)
+- Worker pool for parallel article generation (max 3 concurrent)
 - Session pool limits (max 5 concurrent OpenCode sessions)
 - SSE connection cap (100 concurrent)
 
@@ -66,6 +81,27 @@ npm run dev
 
 1. User requests article via web UI or CLI
 2. Request enters async queue
-3. Agent pipeline (Research → Write → Store) runs per article
+3. Agent pipeline (Research → Outline → Write → Verify → Correct → Media → 3D Model → Store) runs per article
 4. Article stored in SQLite + committed to git
-5. Web UI polls/SSE for progress, serves article when ready
+5. Web UI SSE streams both phase progress & real-time agent activity (tool calls, search results, text deltas)
+
+## Streaming Transparency
+
+Each pipeline phase streams granular agent activity to the frontend in real-time:
+
+- **Server side:** `sendPromptStream` in `agent.ts` uses `promptAsync` + `/session/{id}/events` SSE to capture tool calls, search results, and text deltas. Falls back to message polling if SSE unavailable.
+- **Queue bridge:** `emitAgentEvent()` / `subscribeAgentEvents()` pass events through the queue's subscriber system.
+- **Frontend:** `ProcessViewer` component renders a live, auto-scrolling panel showing tool use cards, result snippets, and text deltas per phase.
+- **SSE events:** Endpoint `/articles/:slug/progress` emits both `progress` (phase changes) and `agent_event` (granular tool activity) events.
+
+## Frontend Components
+
+- **PageLayout** — universal layout with SharedHeader + footer (all pages)
+- **SharedHeader** — search, generate button, nav links
+- **GenerationBar** — expandable progress bar with phase timeline + `ProcessViewer`
+- **ProcessViewer** — collapsible panel showing live tool_use, tool_result, text, and status events
+- **CardSkeleton/CardGridSkeleton** — shimmer loading skeletons
+- **ThreeDMapViewer** — React Three Fiber 3D map viewer (terrain, buildings, annotations)
+- **MapViewer** — Leaflet-based 2D interactive map
+- **InteractiveTimeline** — timeline visualization component
+- **MermaidDiagram** — Mermaid.js diagram renderer

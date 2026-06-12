@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { generateArticle } from "@/lib/api";
-import TruthseekersLogo from "../../components/TruthseekersLogo";
+import PageLayout from "../../components/PageLayout";
 
 export default function NewArticlePage() {
   const [slug, setSlug] = useState("");
@@ -22,16 +22,7 @@ export default function NewArticlePage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#fffaf0]">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-[#dfe1e5]">
-        <TruthseekersLogo />
-        <div className="flex items-center gap-6 text-sm text-[#5f6368]">
-          <a href="/" className="hover:text-[#1a1a1a] hover:underline">Home</a>
-          <a href="/queue" className="hover:text-[#1a1a1a] hover:underline">Queue</a>
-        </div>
-      </nav>
-
+    <PageLayout>
       <main className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-xl">
           <div className="text-center mb-10">
@@ -72,13 +63,6 @@ export default function NewArticlePage() {
           </div>
         </div>
       </main>
-
-      <footer className="border-t border-[#dadce0] py-4 px-6">
-        <div className="max-w-5xl mx-auto flex items-center justify-between text-sm text-[#5f6368]">
-          <span className="font-medium text-[#1a1a1a]">Truthseekers</span>
-          <span className="text-xs">AI-powered encyclopedia</span>
-        </div>
-      </footer>
-    </div>
+    </PageLayout>
   );
 }

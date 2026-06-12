@@ -1,6 +1,7 @@
-import type { JobInfo, JobStatus } from "./types.js";
+import type { JobInfo, JobStatus, AgentEvent } from "./types.js";
 
 type JobCallback = (slug: string, status: JobStatus, info: Partial<JobInfo>) => void;
+type AgentEventCallback = (slug: string, event: AgentEvent) => void;
 
 type JobMeta = Record<string, string>;
 
@@ -21,6 +22,7 @@ class AsyncQueue {
   private queue: QueueJob[] = [];
   private active = new Set<string>();
   private subscribers: Map<string, JobCallback[]> = new Map();
+  private agentEventSubscribers: Map<string, AgentEventCallback[]> = new Map();
   private processor: ((slug: string, meta?: JobMeta) => Promise<void>) | null = null;
 
   setProcessor(fn: (slug: string, meta?: JobMeta) => Promise<void>): void {
@@ -43,6 +45,7 @@ class AsyncQueue {
         existing.error = undefined;
         existing.meta = meta;
         this.notify(slug, "queued", {});
+        this.tick();
       }
       return { ok: true };
     }
@@ -86,7 +89,7 @@ class AsyncQueue {
   }
 
   private getNextPendingJob(): QueueJob | null {
-    return this.queue.find((j) => j.status === "queued" || j.status === "error") ?? null;
+    return this.queue.find((j) => j.status === "queued") ?? null;
   }
 
   updateJob(slug: string, status: JobStatus, info: Partial<JobInfo>): void {
@@ -96,7 +99,11 @@ class AsyncQueue {
       if (info.phase) job.phase = info.phase;
       if (info.error) job.error = info.error;
     }
-    this.notify(slug, status, info);
+    try {
+      this.notify(slug, status, info);
+    } catch {
+      // notify failures (e.g. closed SSE streams) must not break queue state
+    }
   }
 
   subscribe(slug: string, callback: JobCallback): () => void {
@@ -106,6 +113,30 @@ class AsyncQueue {
     this.subscribers.get(slug)!.push(callback);
     return () => {
       const callbacks = this.subscribers.get(slug);
+      if (callbacks) {
+        const idx = callbacks.indexOf(callback);
+        if (idx >= 0) callbacks.splice(idx, 1);
+      }
+    };
+  }
+
+  emitAgentEvent(slug: string, event: AgentEvent): void {
+    const callbacks = [
+      ...(this.agentEventSubscribers.get(slug) ?? []),
+      ...(this.agentEventSubscribers.get("__all__") ?? []),
+    ];
+    for (const cb of callbacks) {
+      try { cb(slug, event); } catch { /* ignore subscriber errors */ }
+    }
+  }
+
+  subscribeAgentEvents(slug: string, callback: AgentEventCallback): () => void {
+    if (!this.agentEventSubscribers.has(slug)) {
+      this.agentEventSubscribers.set(slug, []);
+    }
+    this.agentEventSubscribers.get(slug)!.push(callback);
+    return () => {
+      const callbacks = this.agentEventSubscribers.get(slug);
       if (callbacks) {
         const idx = callbacks.indexOf(callback);
         if (idx >= 0) callbacks.splice(idx, 1);
@@ -176,6 +207,15 @@ class AsyncQueue {
       });
       this.tick();
     }
+  }
+
+  deleteJob(slug: string): boolean {
+    const idx = this.queue.findIndex((j) => j.slug === slug);
+    if (idx === -1) return false;
+    this.queue.splice(idx, 1);
+    this.active.delete(slug);
+    this.notify(slug, "removed", {});
+    return true;
   }
 
   getStats(): { queued: number; active: number; maxConcurrent: number; maxQueue: number } {

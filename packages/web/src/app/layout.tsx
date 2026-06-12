@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 export const metadata: Metadata = {
   title: "Truthseekers — The Living Encyclopedia",
@@ -186,7 +187,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             background: var(--cream);
           }
         `}</style>
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
       </body>
     </html>
   );

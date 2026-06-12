@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { serve } from "@hono/node-server";
+import { createHash } from "node:crypto";
 import {
   searchArticles,
   getArticle,
@@ -12,6 +13,13 @@ import {
   upsertArticle,
   commitArticle,
   initDb,
+  listMaps,
+  listInteractiveMaps,
+  searchMaps,
+  getMap,
+  trackArticleView,
+  getArticleViewCount,
+  getTopArticles,
 } from "@encarta/storage";
 import { queue } from "@encarta/core";
 import type { Article, ArticleContent, ArticleMetadata } from "@encarta/core";
@@ -21,24 +29,39 @@ import {
   articleParamsSchema,
   searchQuerySchema,
   listQuerySchema,
+  mapListQuerySchema,
+  mapSearchQuerySchema,
 } from "./validation.js";
 
 const app = new Hono();
 
 // Parse allowed origins from CORS_ORIGIN env var (comma-separated)
-const allowedOrigins = (process.env.CORS_ORIGIN || "*")
+const allowedOrigins = (process.env.CORS_ORIGIN || "")
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
 
+// In development, always allow localhost origins
+const devOrigins = process.env.NODE_ENV !== "production"
+  ? ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"]
+  : [];
+
 // Global middleware
 app.use("*", cors({
   origin: (origin) => {
+    if (devOrigins.includes(origin)) return origin;
+    if (allowedOrigins.length === 0) return null;
     if (allowedOrigins.includes("*")) return origin;
     if (allowedOrigins.includes(origin)) return origin;
     return null;
   },
 }));
+
+// Skip rate limiting for status/polling endpoints
+app.use("/queue", async (c, next) => { await next(); });
+app.use("/health", async (c, next) => { await next(); });
+app.use("/articles/:slug/progress", async (c, next) => { await next(); });
+
 app.use("*", rateLimitMiddleware);
 app.use("*", authMiddleware);
 
@@ -52,6 +75,39 @@ function sanitizeError(err: unknown): { error: string } {
   return { error: "Internal server error" };
 }
 
+function computeETag(data: unknown): string {
+  const hash = createHash("md5").update(JSON.stringify(data)).digest("hex");
+  return `"${hash}"`;
+}
+
+function setCacheHeaders(c: any, data: unknown, lastModified?: string): void {
+  const etag = computeETag(data);
+  c.header("ETag", etag);
+  if (lastModified) {
+    c.header("Last-Modified", new Date(lastModified).toUTCString());
+  }
+  c.header("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+}
+
+function checkNotModified(c: any, etag: string, lastModified?: string): boolean {
+  const ifNoneMatch = c.req.header("if-none-match");
+  const ifModifiedSince = c.req.header("if-modified-since");
+
+  if (ifNoneMatch && ifNoneMatch === etag) {
+    return true;
+  }
+
+  if (ifModifiedSince && lastModified) {
+    const sinceDate = new Date(ifModifiedSince);
+    const modDate = new Date(lastModified);
+    if (sinceDate >= modDate) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // List articles
 app.get("/articles", (c) => {
   const parsed = listQuerySchema.safeParse({
@@ -61,8 +117,18 @@ app.get("/articles", (c) => {
   if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
 
   const { limit, offset } = parsed.data;
-  const articles = listArticles(limit, offset);
-  return c.json(articles);
+  const articles = listArticles(limit + 1, offset);
+  const hasMore = articles.length > limit;
+  if (hasMore) articles.pop();
+  return c.json({
+    data: articles,
+    pagination: {
+      limit,
+      offset,
+      hasMore,
+      nextOffset: hasMore ? offset + limit : null,
+    },
+  });
 });
 
 // Search articles
@@ -86,6 +152,13 @@ app.get("/articles/:slug", (c) => {
 
   const article = getArticle(parsed.data.slug);
   if (!article) return c.json({ error: "Article not found", status: "not_generated" }, 404);
+
+  const etag = computeETag(article);
+  if (checkNotModified(c, etag, article.metadata.updated)) {
+    return c.body(null, 304);
+  }
+
+  setCacheHeaders(c, article, article.metadata.updated);
   return c.json(article);
 });
 
@@ -163,6 +236,13 @@ app.get("/articles/:slug/progress", (c) => {
       });
     });
 
+    const unsubAgent = queue.subscribeAgentEvents(slug, (s: string, event: import("@encarta/core").AgentEvent) => {
+      stream.writeSSE({
+        data: JSON.stringify(event),
+        event: "agent_event",
+      });
+    });
+
     const job = queue.getJob(slug);
     // Always send an initial event so the client knows the stream is alive
     stream.writeSSE({
@@ -172,9 +252,128 @@ app.get("/articles/:slug/progress", (c) => {
 
     stream.onAbort(() => {
       unsub();
+      unsubAgent();
     });
   });
 });
+
+// Export article
+app.get("/articles/:slug/export", (c) => {
+  const parsed = articleParamsSchema.safeParse({ slug: c.req.param("slug") });
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
+
+  const article = getArticle(parsed.data.slug);
+  if (!article) return c.json({ error: "Article not found", status: "not_generated" }, 404);
+
+  const format = c.req.query("format") || "json";
+
+  if (format === "json") {
+    return c.json(article);
+  }
+
+  if (format === "markdown") {
+    const md = buildMarkdown(article);
+    c.header("Content-Type", "text/markdown");
+    c.header("Content-Disposition", `attachment; filename="${article.slug}.md"`);
+    return c.body(md);
+  }
+
+  return c.json({ error: "Unsupported format. Use 'json' or 'markdown'." }, 400);
+});
+
+// Track article view
+app.post("/track", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { slug, event } = body as { slug?: string; event?: string };
+
+  if (!slug) {
+    return c.json({ error: "Missing slug" }, 400);
+  }
+
+  const ip = c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown";
+  trackArticleView(slug, ip, event || "view");
+
+  return c.json({ status: "tracked" });
+});
+
+// Get article view count
+app.get("/articles/:slug/views", (c) => {
+  const slug = c.req.param("slug");
+  const count = getArticleViewCount(slug);
+  return c.json({ slug, views: count });
+});
+
+// Get top articles by views
+app.get("/articles/top", (c) => {
+  const limit = parseInt(c.req.query("limit") || "10", 10);
+  const top = getTopArticles(Math.min(limit, 50));
+  return c.json({ data: top });
+});
+
+function buildMarkdown(article: Article): string {
+  const lines: string[] = [];
+
+  lines.push(`# ${article.title}`);
+  lines.push("");
+  lines.push(`> ${article.abstract}`);
+  lines.push("");
+  lines.push(`**Version:** ${article.metadata.version} | **Updated:** ${article.metadata.updated}`);
+  lines.push("");
+  lines.push("---");
+  lines.push("");
+
+  for (const section of article.sections) {
+    lines.push(`## ${section.title}`);
+    lines.push("");
+    lines.push(section.content);
+    lines.push("");
+
+    if (section.media && section.media.length > 0) {
+      for (const media of section.media) {
+        if (media.src) {
+          lines.push(`![${media.caption}](${media.src})`);
+        } else if (media.code) {
+          lines.push("```");
+          lines.push(media.code);
+          lines.push("```");
+        } else {
+          lines.push(`*[Media: ${media.caption}]*`);
+        }
+        lines.push("");
+      }
+    }
+  }
+
+  if (article.timeline.length > 0) {
+    lines.push("## Timeline");
+    lines.push("");
+    for (const event of article.timeline) {
+      lines.push(`- **${event.year}:** ${event.event} — ${event.description}`);
+    }
+    lines.push("");
+  }
+
+  if (article.citations.length > 0) {
+    lines.push("## Citations");
+    lines.push("");
+    for (let i = 0; i < article.citations.length; i++) {
+      const cite = article.citations[i];
+      lines.push(`${i + 1}. [${cite.title}](${cite.url}) — ${cite.relevance || ""}`);
+    }
+    lines.push("");
+  }
+
+  if (article.crossrefs.length > 0) {
+    lines.push("## See Also");
+    lines.push("");
+    for (const ref of article.crossrefs) {
+      lines.push(`- [${ref.title}](/article/${ref.id}) — ${ref.relationship}`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
 
 // Graph data
 app.get("/articles/:slug/graph", (c) => {
@@ -196,29 +395,200 @@ app.get("/queue", (c) => {
   }
 });
 
+app.delete("/queue/:slug", (c) => {
+  try {
+    const slug = c.req.param("slug");
+    const removed = queue.deleteJob(slug);
+    if (!removed) return c.json({ error: "Job not found" }, 404);
+    return c.json({ status: "removed", slug });
+  } catch (err) {
+    return c.json(sanitizeError(err), 500);
+  }
+});
+
+// Map routes
+app.get("/maps", (c) => {
+  const parsed = mapListQuerySchema.safeParse({
+    limit: c.req.query("limit"),
+    offset: c.req.query("offset"),
+  });
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
+
+  const { limit, offset } = parsed.data;
+  const maps = listMaps(limit + 1, offset);
+  const hasMore = maps.length > limit;
+  if (hasMore) maps.pop();
+  const interactive = listInteractiveMaps();
+  const response = {
+    data: maps,
+    interactive,
+    pagination: {
+      limit,
+      offset,
+      hasMore,
+      nextOffset: hasMore ? offset + limit : null,
+    },
+  };
+
+  const etag = computeETag(response);
+  if (checkNotModified(c, etag)) {
+    return c.body(null, 304);
+  }
+
+  setCacheHeaders(c, response);
+  return c.json(response);
+});
+
+app.get("/maps/search", (c) => {
+  const parsed = mapSearchQuerySchema.safeParse({
+    q: c.req.query("q"),
+    limit: c.req.query("limit"),
+  });
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
+
+  const { q, limit } = parsed.data;
+  const results = searchMaps(q, limit);
+  return c.json(results);
+});
+
+app.get("/maps/:slug", (c) => {
+  const parsed = articleParamsSchema.safeParse({ slug: c.req.param("slug") });
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
+
+  const map = getMap(parsed.data.slug);
+  if (!map) return c.json({ error: "Map not found" }, 404);
+
+  const etag = computeETag(map);
+  if (checkNotModified(c, etag, map.updatedAt)) {
+    return c.body(null, 304);
+  }
+
+  setCacheHeaders(c, map, map.updatedAt);
+  return c.json(map);
+});
+
 let dbReady = false;
+let dbError: string | null = null;
 
 // Health check
 app.get("/health", (c) => {
-  return c.json({ status: "ok", dbReady, version: "0.1.0" });
+  if (!dbReady && !dbError) {
+    return c.json({ status: "starting", dbReady: false, version: "0.1.0" }, 503);
+  }
+  if (dbError) {
+    return c.json({ status: "degraded", dbReady: false, dbError, version: "0.1.0" }, 503);
+  }
+  return c.json({ status: "ok", dbReady: true, version: "0.1.0" });
 });
 
+async function withRetry<T>(fn: () => Promise<T>, label: string, maxRetries = 2): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt === maxRetries) throw err;
+      const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
+      console.warn(`[${label}] attempt ${attempt + 1} failed, retrying in ${delay}ms: ${err}`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw new Error("unreachable");
+}
+
 async function processArticle(slug: string, meta?: Record<string, string>): Promise<void> {
-  const { researchPhase, outlinePhase, writePhase } = await import("@encarta/core");
+  const {
+    researchPhase,
+    outlinePhase,
+    writePhase,
+    verifyPhase,
+    mediaPhase,
+    applyCorrections,
+    deleteSession,
+  } = await import("@encarta/core");
   const persona = (meta?.persona || "veritas") as import("@encarta/core").Persona;
 
-  queue.updateJob(slug, "researching", { phase: "research" });
-  const { result: research, sessionId } = await researchPhase(slug, persona);
+  let sessionId: string | null = null;
 
-  queue.updateJob(slug, "writing", { phase: "outline" });
-  const outline = await outlinePhase(sessionId, slug, research, persona);
+  const onAgentEvent = (event: import("@encarta/core").AgentEvent) => {
+    queue.emitAgentEvent(slug, event);
+  };
 
-  queue.updateJob(slug, "writing", { phase: "write" });
-  const content = await writePhase(sessionId, slug, research, outline, persona);
+  try {
+    queue.updateJob(slug, "researching", { phase: "research" });
+    const researchResult = await withRetry(
+      () => researchPhase(slug, persona, onAgentEvent), "research"
+    );
+    sessionId = researchResult.sessionId;
 
-  queue.updateJob(slug, "storing", { phase: "store" });
+    const sid = sessionId!;
+    queue.updateJob(slug, "writing", { phase: "outline" });
+    const outline = await withRetry(
+      () => outlinePhase(sid, slug, researchResult.result, persona, onAgentEvent), "outline"
+    );
 
-  const now = new Date().toISOString();
+    queue.updateJob(slug, "writing", { phase: "write" });
+    let content = await withRetry(
+      () => writePhase(sid, slug, researchResult.result, outline, persona, onAgentEvent), "write"
+    );
+
+    queue.updateJob(slug, "verifying", { phase: "verify" });
+    const verification = await withRetry(
+      () => verifyPhase(sid, slug, researchResult.result, content, persona, onAgentEvent), "verify"
+    );
+
+    if (!verification.verified || verification.confidenceScore < 0.8) {
+      queue.updateJob(slug, "verifying", { phase: "correcting" });
+      content = await withRetry(
+        () => applyCorrections(sid, slug, content, verification, persona, onAgentEvent), "correcting"
+      );
+    }
+
+    queue.updateJob(slug, "media", { phase: "generate-media" });
+    const mediaResult = await withRetry(
+      () => mediaPhase(sid, slug, outline, content, persona, onAgentEvent), "media"
+    );
+
+    const imageItems: { prompt: string; id: string; caption?: string }[] = [];
+
+    for (const mediaItem of mediaResult.mediaItems || []) {
+      for (const section of content.sections) {
+        if (section.id === mediaItem.sectionId) {
+          const existing = section.media.find((m) => m.id === mediaItem.mediaId);
+          if (existing) {
+            existing.prompt = mediaItem.prompt || existing.prompt;
+            if (mediaItem.type === "diagram" && mediaItem.src) {
+              existing.code = mediaItem.src;
+            }
+            if (mediaItem.type === "image" && mediaItem.prompt) {
+              imageItems.push({
+                prompt: mediaItem.prompt,
+                id: mediaItem.mediaId,
+                caption: mediaItem.caption || existing.caption,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    if (imageItems.length > 0) {
+      queue.updateJob(slug, "media", { phase: "generating-images" });
+      const { generateImagesBatch } = await import("./imageGen.js");
+      const generated = await generateImagesBatch(imageItems);
+
+      for (const gen of generated) {
+        for (const section of content.sections) {
+          for (const media of section.media) {
+            if (media.id === gen.id) {
+              media.src = gen.url;
+            }
+          }
+        }
+      }
+    }
+
+    queue.updateJob(slug, "storing", { phase: "store" });
+    const now = new Date().toISOString();
     const article: Article = {
       slug,
       title: content.title ?? slug,
@@ -238,35 +608,72 @@ async function processArticle(slug: string, meta?: Record<string, string>): Prom
       },
     };
 
-  await upsertArticle(article);
-  await commitArticle(article);
+    await upsertArticle(article);
+    await commitArticle(article);
 
-  queue.updateJob(slug, "done", { phase: "complete" });
+    queue.updateJob(slug, "done", { phase: "complete" });
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[processArticle] Error generating "${slug}": ${errorMsg}`);
+    queue.updateJob(slug, "error", {
+      phase: "error",
+      error: errorMsg,
+    });
+    throw error;
+  } finally {
+    if (sessionId) {
+      try {
+        await deleteSession(sessionId);
+      } catch (err) {
+        console.warn(`Session cleanup failed for ${sessionId}:`, err);
+      }
+    }
+  }
 }
 
 queue.setProcessor(processArticle);
 
 const PORT = parseInt(process.env.PORT || "4097", 10);
 
-if (process.argv[1]?.includes("index") || process.argv[1]?.includes("server")) {
+async function startServer() {
   try {
-    serve({ fetch: app.fetch, port: PORT });
+    await initDb();
+    dbReady = true;
+    console.log("Database initialized successfully");
+  } catch (err) {
+    dbError = err instanceof Error ? err.message : String(err);
+    console.error("Failed to initialize DB:", err);
+  }
+
+  try {
+    const server = serve({ fetch: app.fetch, port: PORT });
     console.log(`Truthseekers API server running on port ${PORT}`);
     console.log(`Auth: ${process.env.ENCARTA_API_KEYS ? "enabled" : "disabled"}`);
+
+    process.on("SIGTERM", () => {
+      server.close();
+      process.exit(0);
+    });
   } catch (err) {
     console.error("Failed to start server:", err);
     process.exit(1);
   }
+}
 
-  initDb()
-    .then(() => {
-      dbReady = true;
-      console.log("Database initialized successfully");
-    })
-    .catch((err) => {
-      console.error("Failed to initialize DB:", err);
-      // Keep running — endpoints will return empty until DB is ready
-    });
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Promise Rejection:", reason);
+});
+
+// Only auto-start when run directly
+const isRunningDirectly =
+  process.argv[1] != null &&
+  (process.argv[1].includes("server") || process.argv[1].includes("index"));
+
+if (isRunningDirectly || process.env.START_SERVER === "1") {
+  startServer().catch((err) => {
+    console.error("Unhandled error in startServer:", err);
+    process.exit(1);
+  });
 }
 
 export default app;

@@ -135,7 +135,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
     setPlaying(false);
   }
 
-  const track = (
+  const trackTop = (
     <>
       {/* Header */}
       <div className="flex items-center gap-3 mb-3 flex-wrap">
@@ -274,49 +274,54 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
           });
         })()}
       </div>
+    </>
+  );
 
-      {/* Event list */}
-      <div ref={listRef} className={`overflow-y-auto space-y-1 ${fullscreen ? "max-h-none" : "max-h-64 sm:max-h-48"}`} style={{ scrollBehavior: "smooth" }}>
-        {sorted.map((ev, i) => {
-          const isActive = activeIdx === i;
-          return (
-            <div key={i} onClick={() => selectIdx(i)}
-              className={`flex items-start gap-3 p-3 border-2 border-black cursor-pointer transition-all duration-100 ${
-                isActive ? "bg-white shadow-[3px_3px_0_#1c1917]" : "bg-white/70 hover:bg-white hover:shadow-[2px_2px_0_#1c1917]"
-              }`}
-              style={{ borderLeftColor: catColor(ev.category), borderLeftWidth: 4 }}>
-              <span className="pixel text-xs font-bold shrink-0 mt-0.5 whitespace-nowrap" style={{ color: catColor(ev.category) }}>
-                {ev.year}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <strong className="text-sm leading-snug">{ev.event}</strong>
-                  {ev.category && (
-                    <span className="text-xs sm:text-[9px] px-1.5 py-0.5 border border-black font-medium shrink-0"
-                      style={{ background: `${catColor(ev.category)}20`, color: catColor(ev.category) }}>
-                      {CATEGORY_LABELS[ev.category] ?? ev.category}
-                    </span>
-                  )}
-                </div>
-                {ev.description && (
-                  <p className={`text-xs text-[#555] leading-relaxed mt-0.5 ${isActive ? "" : "line-clamp-2"}`}>
-                    {ev.description}
-                  </p>
+  const trackList = (
+    <div ref={listRef} className="space-y-1" style={{ scrollBehavior: "smooth" }}>
+      {sorted.map((ev, i) => {
+        const isActive = activeIdx === i;
+        return (
+          <div key={i} onClick={() => selectIdx(i)}
+            className={`flex items-start gap-3 p-3 border-2 border-black cursor-pointer transition-all duration-100 ${
+              isActive ? "bg-white shadow-[3px_3px_0_#1c1917]" : "bg-white/70 hover:bg-white hover:shadow-[2px_2px_0_#1c1917]"
+            }`}
+            style={{ borderLeftColor: catColor(ev.category), borderLeftWidth: 4 }}>
+            <span className="pixel text-xs font-bold shrink-0 mt-0.5 whitespace-nowrap" style={{ color: catColor(ev.category) }}>
+              {ev.year}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <strong className="text-sm leading-snug">{ev.event}</strong>
+                {ev.category && (
+                  <span className="text-xs sm:text-[9px] px-1.5 py-0.5 border border-black font-medium shrink-0"
+                    style={{ background: `${catColor(ev.category)}20`, color: catColor(ev.category) }}>
+                    {CATEGORY_LABELS[ev.category] ?? ev.category}
+                  </span>
                 )}
               </div>
+              {ev.description && (
+                <p className={`text-xs text-[#555] leading-relaxed mt-0.5 ${isActive ? "" : "line-clamp-2"}`}>
+                  {ev.description}
+                </p>
+              )}
             </div>
-          );
-        })}
-      </div>
-    </>
+          </div>
+        );
+      })}
+    </div>
   );
 
   if (fullscreen) {
     return (
       <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-2 md:p-6">
         <div className="pixel-card p-5 md:p-6 w-full max-w-4xl max-h-[95vh] flex flex-col bg-white overflow-hidden">
-          <div className="flex-1 overflow-y-auto" style={{ scrollBehavior: "smooth" }}>
-            {track}
+          <div className="shrink-0">
+            {trackTop}
+          </div>
+          <hr className="border-t-2 border-dashed border-[#ccc] my-2" />
+          <div className="flex-1 overflow-y-auto min-h-0" style={{ scrollBehavior: "smooth" }}>
+            {trackList}
           </div>
         </div>
       </div>
@@ -325,7 +330,10 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
 
   return (
     <div className="pixel-card p-3 sm:p-6 my-4" style={{ background: "var(--ice)" }}>
-      {track}
+      {trackTop}
+      <div className="max-h-64 sm:max-h-48 overflow-y-auto" style={{ scrollBehavior: "smooth" }}>
+        {trackList}
+      </div>
     </div>
   );
 }

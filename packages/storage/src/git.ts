@@ -11,8 +11,10 @@ let repoInitialized = false;
 async function ensureRepo(): Promise<void> {
   if (repoInitialized) return;
 
-  if (!fs.existsSync(REPO_PATH)) {
-    fs.mkdirSync(REPO_PATH, { recursive: true });
+  try {
+    await fs.promises.access(REPO_PATH);
+  } catch {
+    await fs.promises.mkdir(REPO_PATH, { recursive: true });
   }
 
   try {
@@ -30,7 +32,7 @@ export async function commitArticle(article: Article): Promise<string> {
   const filePath = path.join(REPO_PATH, `${article.slug}.json`);
   const content = JSON.stringify(article, null, 2);
 
-  fs.writeFileSync(filePath, content, "utf-8");
+  await fs.promises.writeFile(filePath, content, "utf-8");
 
   await git.add({ fs, dir: REPO_PATH, filepath: `${article.slug}.json` });
 

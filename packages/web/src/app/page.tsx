@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { fetchArticles, searchArticles, fetchArticleStatus, generateArticle, fetchArticle, progressUrl } from "@/lib/api";
+import PageLayout from "./components/PageLayout";
 import GenerationBar from "./components/GenerationBar";
-import QueueIndicator from "./components/QueueIndicator";
-import TruthseekersLogo from "./components/TruthseekersLogo";
+import { CardSkeleton, CardGridSkeleton } from "./components/CardSkeleton";
+import type { AgentEvent } from "./components/ProcessViewer";
 
 interface ArticleSummary {
   slug: string;
@@ -20,35 +21,128 @@ interface GeneratingEntry {
   title: string;
   phase: string;
   error?: string;
+  agentEvents?: AgentEvent[];
 }
+
+const PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 400;
 
 export default function HomePage() {
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
   const [generating, setGenerating] = useState<Map<string, GeneratingEntry>>(new Map());
   const [showResults, setShowResults] = useState(false);
   const [featuredCollapsed, setFeaturedCollapsed] = useState(false);
+  const [infiniteLoading, setInfiniteLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
   const sseRef = useRef<Map<string, EventSource>>(new Map());
   const mountedRef = useRef(true);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
-    fetchArticles().then((data) => {
-      if (mountedRef.current) {
-        setArticles(data);
-        setLoading(false);
-      }
-    });
+    loadArticles(0, true);
     return () => { mountedRef.current = false; };
   }, []);
 
   useEffect(() => {
     return () => {
       sseRef.current.forEach((es) => es.close());
+      sseRef.current.clear();
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [query]);
+
+  useEffect(() => {
+    if (debouncedQuery.trim() && showResults) {
+      performSearch(debouncedQuery.trim());
+    }
+  }, [debouncedQuery]);
+
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect();
+
+    observerRef.current = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore && !infiniteLoading && !loading && !showResults) {
+        setInfiniteLoading(true);
+        const nextPage = page + 1;
+        loadArticles(nextPage, false);
+        setPage(nextPage);
+      }
+    }, { threshold: 0.1 });
+
+    if (sentinelRef.current) {
+      observerRef.current.observe(sentinelRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) observerRef.current.disconnect();
+    };
+  }, [hasMore, infiniteLoading, loading, page, showResults]);
+
+  async function loadArticles(p: number, reset: boolean) {
+    try {
+      const data = await fetchArticles(p * PAGE_SIZE, PAGE_SIZE);
+      if (!mountedRef.current) return;
+
+      const items = (data as any).data ?? [];
+      const pagination = (data as any).pagination;
+
+      if (reset) {
+        setArticles(items);
+      } else {
+        setArticles((prev) => [...prev, ...items]);
+      }
+
+      setHasMore(pagination ? pagination.hasMore : items.length >= PAGE_SIZE);
+    } catch (err) {
+      if (mountedRef.current) {
+        setHasMore(false);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+        setInfiniteLoading(false);
+      }
+    }
+  }
+
+  async function performSearch(searchQuery: string) {
+    setSearching(true);
+    try {
+      const results = await searchArticles(searchQuery);
+      if (mountedRef.current) {
+        setArticles(results);
+        setHasMore(false);
+      }
+    } catch (err) {
+      if (mountedRef.current) {
+        setArticles([]);
+        setHasMore(false);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setSearching(false);
+        setLoading(false);
+      }
+    }
+  }
 
   const slugify = useCallback((text: string): string => {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -59,16 +153,23 @@ export default function HomePage() {
     if (!query.trim()) {
       setShowResults(false);
       setLoading(true);
-      const data = await fetchArticles();
-      setArticles(data);
-      setLoading(false);
+      setArticles([]);
+      setPage(0);
+      loadArticles(0, true);
       return;
     }
     setShowResults(true);
     setLoading(true);
-    const results = await searchArticles(query);
-    setArticles(results);
-    setLoading(false);
+    setDebouncedQuery(query.trim());
+  }
+
+  function handleClear() {
+    setQuery("");
+    setShowResults(false);
+    setLoading(true);
+    setArticles([]);
+    setPage(0);
+    loadArticles(0, true);
   }
 
   function mergeEntry(slug: string, updates: Partial<GeneratingEntry>) {
@@ -81,7 +182,7 @@ export default function HomePage() {
   }
 
   async function startGenerate(slug: string) {
-    mergeEntry(slug, { phase: "queued", error: undefined });
+    mergeEntry(slug, { phase: "queued", error: undefined, agentEvents: [] });
 
     try {
       await generateArticle(slug);
@@ -91,19 +192,42 @@ export default function HomePage() {
     }
 
     const existing = sseRef.current.get(slug);
-    if (existing) existing.close();
+    if (existing) {
+      existing.close();
+      sseRef.current.delete(slug);
+    }
 
     const es = new EventSource(progressUrl(slug));
     sseRef.current.set(slug, es);
+
+    es.addEventListener("agent_event", (e) => {
+      const eventData: AgentEvent = JSON.parse(e.data);
+      setGenerating((prev) => {
+        const next = new Map(prev);
+        const entry = next.get(slug);
+        if (entry) {
+          next.set(slug, { ...entry, agentEvents: [...(entry.agentEvents || []), eventData] });
+        }
+        return next;
+      });
+    });
 
     es.addEventListener("progress", (e) => {
       const data = JSON.parse(e.data);
       if (data.status === "done") {
         fetchArticle(slug).then((article) => {
           if (!article || !mountedRef.current) return;
+          const summary: ArticleSummary = {
+            slug: article.slug,
+            title: article.title,
+            abstract: article.abstract,
+            metadata: { status: article.metadata?.status || "published", version: article.metadata?.version || 1, updated: article.metadata?.updated || "" },
+            categories: article.categories || [],
+            thumbnail: (article.sections?.[0]?.media?.find((m: any) => m.type === "image" && m.src) as any)?.src,
+          };
           setArticles((prev) => {
             const filtered = prev.filter((a) => a.slug !== slug);
-            return [article, ...filtered];
+            return [summary, ...filtered];
           });
           setGenerating((prev) => {
             const next = new Map(prev);
@@ -135,6 +259,7 @@ export default function HomePage() {
 
     const existing = await fetchArticleStatus(slug);
     if (existing && "status" in existing && existing.status === "published") {
+      trackArticleView(slug);
       setQuery("");
       window.location.href = `/article/${slug}`;
       return;
@@ -152,18 +277,17 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#fffaf0]">
-      {/* Minimal top nav */}
-      <nav className="flex items-center justify-between px-6 py-4">
-        <TruthseekersLogo />
-        <div className="flex items-center gap-3 sm:gap-6 text-sm text-[#5f6368]">
-          <a href="/article/new" className="hover:text-[#1a1a1a] hover:underline transition-colors">New Article</a>
-          <a href="/queue" className="hover:text-[#1a1a1a] hover:underline transition-colors">Queue</a>
-          <QueueIndicator />
-        </div>
-      </nav>
-
-      {/* Blue wave hero */}
+    <PageLayout
+      showSearch={true}
+      query={query}
+      onQueryChange={setQuery}
+      onSearch={handleSearch}
+      onClear={handleClear}
+      searching={searching}
+      onGenerate={handleGenerate}
+      onKeyDown={handleKeyDown}
+    >
+      {/* Hero wave - only on empty state */}
       {!showResults && (
         <header className="relative overflow-hidden bg-gradient-to-b from-[#0c4a6e] via-[#0284c7] to-[#7dd3fc]">
           <div className="relative z-10 py-16 md:py-20 text-center">
@@ -174,218 +298,223 @@ export default function HomePage() {
           </div>
           <div className="absolute bottom-0 left-0 right-0 h-16 md:h-24 overflow-hidden pointer-events-none">
             <svg className="absolute bottom-0 w-[200%] h-full wave-anim" viewBox="0 0 1200 120" preserveAspectRatio="none">
-              <path d="M0,60 C200,100 400,20 600,60 C800,100 1000,20 1200,60 L1200,120 L0,120 Z" fill="#fffaf0" />
+              <path d="M0,60 C200,100 400,20 600,60 C800,100 1000,20 1200,60 L1200,120 L0,120 Z" fill="var(--warm)" />
             </svg>
           </div>
         </header>
       )}
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col items-center px-4 pb-16" style={{ marginTop: showResults ? "2rem" : "-2rem" }}>
-        {/* Search bar */}
-        <div className="relative z-20 w-full max-w-2xl">
-          <form onSubmit={handleSearch} className="relative">
-            <div className="flex items-center w-full rounded-full border border-[#dfe1e5] hover:shadow-md hover:border-[#c6c6c6] focus-within:shadow-md focus-within:border-[#c6c6c6] transition-shadow bg-white px-5 py-3">
-              <svg className="w-5 h-5 text-[#9aa0a6] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Search or generate an article..."
-                className="flex-1 ml-3 text-base text-[#1a1a1a] placeholder-[#9aa0a6] outline-none bg-transparent"
-                autoFocus
+      <main className="flex-1 pb-16" style={{ marginTop: showResults ? "2rem" : "-2rem" }}>
+        <div className="max-w-6xl mx-auto w-full px-4">
+        {/* Generation bars */}
+        {generating.size > 0 && (
+          <div className="mb-6 space-y-2">
+            {Array.from(generating.values()).map((gen) => (
+              <GenerationBar
+                key={gen.slug}
+                entry={gen}
+                onRetry={(slug) => startGenerate(slug)}
+                onDismiss={(slug) => {
+                  setGenerating((prev) => {
+                    const next = new Map(prev);
+                    next.delete(slug);
+                    return next;
+                  });
+                  const es = sseRef.current.get(slug);
+                  if (es) {
+                    es.close();
+                    sseRef.current.delete(slug);
+                  }
+                }}
               />
-              {query && (
-                <button
-                  type="button"
-                  onClick={() => { setQuery(""); setShowResults(false); inputRef.current?.focus(); }}
-                  className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-[#f0f0f0] text-[#70757a] shrink-0"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
+            ))}
+          </div>
+        )}
 
-            {/* Buttons */}
-            <div className="flex flex-col sm:flex-row justify-center gap-3 mt-6">
-              <button
-                type="submit"
-                className="px-6 py-3.5 sm:py-2.5 bg-[#f8f9fa] hover:bg-[#f1f3f4] text-[#3c4043] text-sm rounded-md border border-transparent hover:border-[#dadce0] transition-all"
-              >
-                Search Articles
-              </button>
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={!query.trim()}
-                className="px-6 py-3.5 sm:py-2.5 bg-[#ea580c] hover:bg-[#d9530b] text-white text-sm rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                ⚡ Generate Article
-              </button>
-            </div>
-          </form>
-
-          {/* Hint text */}
-          {!showResults && (
-            <p className="text-center text-xs text-[#9aa0a6] mt-3">
-              Press Enter to search · Shift+Enter to generate
-            </p>
-          )}
-        </div>
-
-        {/* Results */}
+        {/* Article count */}
         {showResults && (
-          <div className="w-full max-w-3xl mt-10">
-            {/* Generation bars */}
-            {generating.size > 0 && (
-              <div className="mb-6 space-y-2">
-                {Array.from(generating.values()).map((gen) => (
-                  <GenerationBar
-                    key={gen.slug}
-                    entry={gen}
-                    onRetry={(slug) => startGenerate(slug)}
-                    onDismiss={(slug) => {
-                      setGenerating((prev) => {
-                        const next = new Map(prev);
-                        next.delete(slug);
-                        return next;
-                      });
-                      sseRef.current.get(slug)?.close();
-                      sseRef.current.delete(slug);
-                    }}
-                  />
-                ))}
-              </div>
-            )}
+          <div className="text-sm mb-4 px-1" style={{ color: "#5f6368" }}>
+            {searching ? "Searching..." : loading ? "Loading..." : `${articles.length} results`}
+          </div>
+        )}
 
-            {/* Article count */}
-            <div className="text-sm text-[#5f6368] mb-4 px-1">
-              {loading ? "Loading..." : `${articles.length} results`}
+        {/* Article grid */}
+        {loading ? (
+          <CardGridSkeleton />
+        ) : !showResults && articles.length === 0 && generating.size === 0 ? (
+          <div className="max-w-lg mx-auto text-center py-8">
+            <div className="pixel-card-sm p-8 bg-white">
+              <div className="text-5xl mb-4">📚</div>
+              <h2 className="pixel text-sm mb-3" style={{ color: "var(--ink)" }}>No articles yet</h2>
+              <p className="text-sm mb-4 leading-relaxed" style={{ color: "#5f6368" }}>
+                The encyclopedia is empty. Use the Generate button above to create your first article.
+              </p>
+              <p className="text-xs mb-5" style={{ color: "#9aa0a6" }}>
+                Try typing a topic like &ldquo;Ancient Rome&rdquo; and press ⚡ Generate
+              </p>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <span className="pixel-tag text-[10px]" style={{ background: "var(--ice)" }}>Ancient Rome</span>
+                <span className="pixel-tag text-[10px]" style={{ background: "var(--cream)" }}>Solar System</span>
+                <span className="pixel-tag text-[10px]" style={{ background: "var(--ice)" }}>Jazz Music</span>
+              </div>
             </div>
-
-            {/* Article grid */}
-            {loading ? (
-              <div className="text-center py-16">
-                <div className="inline-block w-8 h-8 border-4 border-[#e0e0e0] border-t-[#1a1a1a] rounded-full"
-                  style={{ animation: "spin 0.8s linear infinite" }} />
-              </div>
-            ) : articles.length === 0 && generating.size === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-[#5f6368] text-lg mb-4">No articles found.</p>
-                <button
-                  onClick={handleGenerate}
-                  className="text-[#ea580c] hover:underline text-sm"
-                >
-                  Generate this article →
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {articles.map((article) => (
-                  <a
-                    key={article.slug}
-                    href={`/article/${article.slug}`}
-                    className="block p-4 rounded-lg hover:bg-[#f8f9fa] transition-colors group"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-[#fef3c7] border-2 border-[#1a1a1a] flex items-center justify-center text-lg shrink-0">
-                        📄
+          </div>
+        ) : showResults && articles.length === 0 && generating.size === 0 ? (
+          <div className="max-w-lg mx-auto text-center py-8">
+            <div className="pixel-card-sm p-8 bg-white">
+              <div className="text-5xl mb-4">🔍</div>
+              <h2 className="pixel text-sm mb-3" style={{ color: "var(--ink)" }}>No results found</h2>
+              <p className="text-sm mb-6 leading-relaxed" style={{ color: "#5f6368" }}>
+                No articles found for &ldquo;{query}&rdquo;. Would you like to generate one?
+              </p>
+              <button onClick={handleGenerate} className="pixel-btn" style={{ background: "var(--orange)", color: "white", border: "2px solid var(--ink)" }}>
+                ⚡ Generate this article
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+              {/* Search results grid */}
+              {showResults && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+                  {articles.map((article) => (
+                    <a
+                      key={article.slug}
+                      href={`/article/${article.slug}`}
+                      className="pixel-card-sm p-0 overflow-hidden block"
+                      style={{ background: "white", textDecoration: "none", color: "inherit" }}
+                      onClick={() => trackArticleView(article.slug)}
+                    >
+                      <div className="w-full h-32 overflow-hidden" style={{ background: "#f1f3f4" }}>
+                        {article.thumbnail ? (
+                          <img
+                            src={article.thumbnail}
+                            alt=""
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-2xl font-bold"
+                            style={{ background: "linear-gradient(135deg, #fef3c7, #e0f2fe)", color: "#9aa0a6" }}>
+                            {article.title.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-medium text-[#1a0dab] group-hover:underline truncate">
+                      <div className="p-3">
+                        <h3 className="pixel text-[10px] mb-1" style={{ color: "#1a1a1a" }}>
                           {article.title}
                         </h3>
-                        <p className="text-sm text-[#006621] mt-0.5">
-                          truthseeker.fly.dev/article/{article.slug}
-                        </p>
-                        <p className="text-sm text-[#4d5156] mt-1 line-clamp-2 leading-relaxed">
-                          {article.abstract}
-                        </p>
+                        <p className="text-xs line-clamp-2 leading-relaxed mt-1" style={{ color: "#5f6368" }}>{article.abstract}</p>
                         <div className="flex items-center gap-2 mt-2">
-                          {article.categories?.slice(0, 3).map((cat) => (
-                            <span key={cat} className="text-xs px-2 py-0.5 bg-[#f1f3f4] rounded text-[#5f6368]">
-                              {cat}
-                            </span>
+                          {article.categories?.slice(0, 2).map((cat) => (
+                            <span key={cat} className="pixel-tag text-[10px]">{cat}</span>
                           ))}
-                          <span className="text-xs text-[#9aa0a6]">v{article.metadata.version}</span>
+                          <span className="text-xs ml-auto" style={{ color: "#9aa0a6" }}>v{article.metadata.version}</span>
                         </div>
                       </div>
-                    </div>
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Featured Articles - only on empty state */}
-        {!showResults && !loading && articles.length > 0 && !featuredCollapsed && (
-          <div className="w-full max-w-4xl mt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-[#1a1a1a] uppercase tracking-wide">Featured Articles</h2>
-              <button
-                onClick={() => setFeaturedCollapsed(true)}
-                className="text-[#9aa0a6] hover:text-[#1a1a1a] transition-colors p-1"
-                aria-label="Collapse featured articles"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {articles.slice(0, 6).map((article) => (
-                <a
-                  key={article.slug}
-                  href={`/article/${article.slug}`}
-                  className="group p-0 rounded-xl border border-[#dfe1e5] hover:border-[#c6c6c6] hover:shadow-md transition-all bg-white overflow-hidden"
-                >
-                  <div className="w-full h-28 bg-[#f1f3f4] overflow-hidden">
-                    {article.thumbnail ? (
-                      <img src={article.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-[#9aa0a6]" style={{ background: "linear-gradient(135deg, #fef3c7, #e0f2fe)" }}>
-                        {article.title.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <h3 className="font-medium text-[#1a1a1a] text-sm truncate group-hover:text-[#ea580c] transition-colors">{article.title}</h3>
-                    <p className="text-xs text-[#5f6368] line-clamp-2 leading-relaxed mt-1">{article.abstract}</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      {article.categories?.slice(0, 2).map((cat) => (
-                        <span key={cat} className="text-[10px] px-2 py-0.5 bg-[#f1f3f4] rounded text-[#5f6368]">
-                          {cat}
-                        </span>
+                    </a>
+                  ))}
+                  {infiniteLoading && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4 col-span-full">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <CardSkeleton key={`inf-${i}`} />
                       ))}
                     </div>
-                  </div>
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-      </main>
+                  )}
+                  <div ref={sentinelRef} className="h-1 col-span-full" />
+                </div>
+              )}
 
-      {/* Footer */}
-      <footer className="border-t border-[#dadce0] py-4 px-6">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between text-sm text-[#5f6368]">
-          <div className="flex items-center gap-4">
-            <span className="font-medium text-[#1a1a1a]">Truthseekers</span>
-            <span className="text-xs">AI-powered encyclopedia</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <a href="/queue" className="hover:underline">Queue</a>
-            <span className="text-xs">Built with OpenCode SDK</span>
-          </div>
+            {/* Featured Articles - only on home state */}
+            {!showResults && articles.length > 0 && !featuredCollapsed && (
+              <section>
+                <div className="flex items-center gap-4 mb-6">
+                  <span className="text-2xl">📚</span>
+                  <div>
+                    <h2 className="pixel text-sm" style={{ color: "var(--ink)" }}>ARTICLES</h2>
+                    <div className="h-1 w-12 mt-1" style={{ background: "var(--orange)" }} />
+                  </div>
+                  <button
+                    onClick={() => setFeaturedCollapsed(true)}
+                    className="ml-auto text-sm hover:underline"
+                    style={{ color: "#9aa0a6" }}
+                  >
+                    Hide
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {articles.slice(0, 6).map((article) => (
+                    <a
+                      key={article.slug}
+                      href={`/article/${article.slug}`}
+                      className="pixel-card-sm p-0 overflow-hidden block"
+                      style={{ background: "white", textDecoration: "none", color: "inherit" }}
+                      onClick={() => trackArticleView(article.slug)}
+                    >
+                      <div className="w-full h-32 overflow-hidden" style={{ background: "#f1f3f4" }}>
+                        {article.thumbnail ? (
+                          <img
+                            src={article.thumbnail}
+                            alt=""
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-2xl font-bold"
+                            style={{ background: "linear-gradient(135deg, #fef3c7, #e0f2fe)", color: "#9aa0a6" }}>
+                            {article.title.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-3">
+                        <h3 className="pixel text-[10px] mb-1" style={{ color: "#1a1a1a" }}>
+                          {article.title}
+                        </h3>
+                        <p className="text-xs line-clamp-2 leading-relaxed mt-1" style={{ color: "#5f6368" }}>{article.abstract}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          {article.categories?.slice(0, 2).map((cat) => (
+                            <span key={cat} className="pixel-tag text-[10px]">{cat}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+                {hasMore && (
+                  <div className="text-center mt-6">
+                    <button
+                      onClick={() => {
+                        const nextPage = page + 1;
+                        setPage(nextPage);
+                        loadArticles(nextPage, false);
+                      }}
+                      className="pixel-btn"
+                      style={{ background: "var(--orange)", color: "white", border: "2px solid var(--ink)" }}
+                    >
+                      Load More
+                    </button>
+                  </div>
+                )}
+              </section>
+            )}
+          </>
+        )}
         </div>
-      </footer>
-    </div>
+      </main>
+    </PageLayout>
   );
+}
+
+async function trackArticleView(slug: string) {
+  try {
+    const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
+    await fetch(`${BASE}/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug, event: "view" }),
+    });
+  } catch {
+    // Silently fail
+  }
 }
