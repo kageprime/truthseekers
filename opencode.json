@@ -7,7 +7,7 @@
       "type": "local",
       "command": ["npx", "-y", "@anthropic/firecrawl-mcp"],
       "env": {
-        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+        "FIRECRAWL_API_KEY": "fc-a9450fc7a2c84f3ab6247d18d0c33bac"
       }
     }
   },

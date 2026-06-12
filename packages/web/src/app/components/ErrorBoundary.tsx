@@ -56,8 +56,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             )}
             <button
               onClick={this.handleReset}
-              className="pixel-btn"
-              style={{ background: "var(--orange)", color: "white" }}
+              className="btn-primary"
             >
               Try Again
             </button>

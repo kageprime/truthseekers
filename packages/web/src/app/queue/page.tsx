@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import GenerationBar, { type GeneratingEntry } from "../components/GenerationBar";
 import PageLayout from "../components/PageLayout";
+import SectionHeader from "../components/SectionHeader";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
 
@@ -128,13 +129,7 @@ export default function QueuePage() {
 
         {/* Active Jobs */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <span className="text-xl">⚡</span>
-            <div>
-              <h2 className="pixel text-xs" style={{ color: "var(--ink)" }}>ACTIVE JOBS</h2>
-              <div className="h-1 w-10 mt-1" style={{ background: "var(--orange)" }} />
-            </div>
-          </div>
+          <SectionHeader emoji="⚡" title="ACTIVE JOBS" accent="var(--orange)" />
           {activeJobs.length === 0 ? (
             <p className="text-sm py-4" style={{ color: "#9aa0a6" }}>No active jobs. Submit one from the home page or CLI.</p>
           ) : (
@@ -156,13 +151,7 @@ export default function QueuePage() {
 
         {/* Queued Jobs */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <span className="text-xl">⏳</span>
-            <div>
-              <h2 className="pixel text-xs" style={{ color: "var(--ink)" }}>QUEUED JOBS</h2>
-              <div className="h-1 w-10 mt-1" style={{ background: "var(--blue)" }} />
-            </div>
-          </div>
+          <SectionHeader emoji="⏳" title="QUEUED JOBS" accent="var(--blue)" />
           {queuedJobs.length === 0 ? (
             <p className="text-sm py-4" style={{ color: "#9aa0a6" }}>No queued jobs.</p>
           ) : (
@@ -181,13 +170,7 @@ export default function QueuePage() {
         {/* Error Jobs */}
         {errorJobs.length > 0 && (
           <div className="mb-8">
-            <div className="flex items-center gap-4 mb-4">
-              <span className="text-xl">❌</span>
-              <div>
-                <h2 className="pixel text-xs" style={{ color: "var(--red)" }}>ERRORS</h2>
-                <div className="h-1 w-10 mt-1" style={{ background: "var(--red)" }} />
-              </div>
-            </div>
+            <SectionHeader emoji="❌" title="ERRORS" accent="var(--red)" />
             <div className="space-y-2">
               {errorJobs.map((job) => (
                 <GenerationBar

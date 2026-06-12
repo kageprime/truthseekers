@@ -7,26 +7,15 @@ import HamburgerMenu from "./HamburgerMenu";
 
 interface HeaderProps {
   links?: Array<{ label: string; href: string }>;
-  showSearch?: boolean;
-  query?: string;
-  onQueryChange?: (q: string) => void;
-  onSearch?: (e: React.FormEvent) => void;
-  onClear?: () => void;
-  searching?: boolean;
-  onGenerate?: () => void;
-  onKeyDown?: (e: React.KeyboardEvent) => void;
 }
 
 export default function SharedHeader({
-  links = [],
-  showSearch = false,
-  query = "",
-  onQueryChange,
-  onSearch,
-  onClear,
-  searching = false,
-  onGenerate,
-  onKeyDown,
+  links = [
+    { label: "Home", href: "/" },
+    { label: "Maps", href: "/maps" },
+    { label: "New Article", href: "/article/new" },
+    { label: "Queue", href: "/queue" },
+  ],
 }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -77,62 +66,6 @@ export default function SharedHeader({
           </div>
         </div>
 
-        {/* Search bar */}
-        {showSearch && onSearch && (
-          <form onSubmit={onSearch} className="mt-4 max-w-2xl">
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <svg
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                  style={{ color: "#9aa0a6" }}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => onQueryChange?.(e.target.value)}
-                  onKeyDown={onKeyDown}
-                  placeholder="Search..."
-                  className="w-full pixel-input"
-                  style={{ paddingLeft: "2.5rem" }}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={searching}
-                className="pixel-btn shrink-0"
-                style={{ background: "var(--orange)", color: "white", border: "2px solid var(--ink)" }}
-              >
-                {searching ? "..." : "Search"}
-              </button>
-              {onGenerate && query && (
-                <button
-                  type="button"
-                  onClick={onGenerate}
-                  className="pixel-btn shrink-0"
-                  style={{ background: "var(--orange)", color: "white", border: "2px solid var(--ink)" }}
-                >
-                  ⚡ Generate
-                </button>
-              )}
-              {query && onClear && (
-                <button
-                  type="button"
-                  onClick={onClear}
-                  className="pixel-btn shrink-0"
-                  style={{ background: "white" }}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          </form>
-        )}
       </div>
     </header>
   );

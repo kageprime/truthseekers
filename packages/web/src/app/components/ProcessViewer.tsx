@@ -118,12 +118,8 @@ export default function ProcessViewer({ events, maxVisible = 50 }: ProcessViewer
         </span>
         <button
           onClick={() => setAutoScroll(!autoScroll)}
-          className="text-[10px] px-2 py-0.5 rounded border"
-          style={{
-            background: autoScroll ? "var(--blue)" : "white",
-            color: autoScroll ? "white" : "#5f6368",
-            borderColor: autoScroll ? "var(--blue)" : "#ccc",
-          }}
+          className="btn-ghost"
+          style={{ color: autoScroll ? "var(--blue)" : "#aaa", fontWeight: autoScroll ? 600 : 400, fontSize: "10px" }}
         >
           {autoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}
         </button>

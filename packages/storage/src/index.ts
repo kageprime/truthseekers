@@ -2,6 +2,10 @@ export {
   getDb,
   initDb,
   closeDb,
+  pingDb,
+  saveJob,
+  loadAllJobs,
+  deleteJobDoc,
   upsertArticle,
   getArticle,
   getArticleStatus,
@@ -15,7 +19,6 @@ export {
   listMaps,
   listInteractiveMaps,
   searchMaps,
-  seedMaps,
   trackArticleView,
   getArticleViewCount,
   getTopArticles,
@@ -24,3 +27,4 @@ export {
 export { commitArticle, getArticleHistory, getArticleAtVersion, getRepoStatus } from "./git.js";
 
 export { indexArticle, semanticSearch } from "./vector.js";
+export { ArticleModel, GraphEdgeModel, MapEntryModel, ArticleViewModel, JobModel } from "./db.js";

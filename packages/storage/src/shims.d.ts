@@ -1,35 +1,3 @@
-declare module "sql.js" {
-  interface QueryExecResult {
-    columns: string[];
-    values: unknown[][];
-  }
-
-  interface SqlJsStatic {
-    Database: new (data?: ArrayLike<number> | Buffer | null) => Database;
-  }
-
-  interface Statement {
-    bind(params?: unknown[]): boolean;
-    step(): boolean;
-    getAsObject(): Record<string, unknown>;
-    get(): unknown[];
-    free(): boolean;
-    reset(): void;
-  }
-
-  interface Database {
-    run(sql: string, params?: unknown[]): Database;
-    exec(sql: string): QueryExecResult[];
-    prepare(sql: string): Statement;
-    export(): Uint8Array;
-    close(): void;
-  }
-
-  function initSqlJs(config?: Record<string, unknown>): Promise<SqlJsStatic>;
-  export default initSqlJs;
-  export type { Database, Statement, SqlJsStatic };
-}
-
 declare module "isomorphic-git" {
   namespace git {
     function init(args: { fs: typeof import("fs"); dir: string }): Promise<void>;

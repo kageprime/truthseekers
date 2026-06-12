@@ -35,7 +35,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
 
   if (!article) {
     const status = await fetchArticleStatus(slug);
-    const isGenerating = status && status.status !== "not_found" && status.status !== "done";
+    const isGenerating = status && status.status !== "not_found" && status.status !== "done" && status.status !== "published";
 
     return (
       <ArticleClient

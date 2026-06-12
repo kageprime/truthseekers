@@ -3,12 +3,14 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { fetchArticle, generateArticle, refreshArticle, progressUrl, BASE } from "@/lib/api";
 import PageLayout from "../../components/PageLayout";
+import PageTitleBar from "../../components/PageTitleBar";
+import SectionHeader from "../../components/SectionHeader";
 import MermaidDiagram from "../../components/MermaidDiagram";
 import InteractiveTimeline from "../../components/InteractiveTimeline";
 import GenerationBar from "../../components/GenerationBar";
+import MarkdownRenderer from "../../components/MarkdownRenderer";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import { SkeletonImage, BlankSlateImage, BlankSlateMedia, FigureImage } from "../../components/MediaImage";
-import { sanitizeHTML } from "@/lib/markdown";
 import type { Article, MediaItem } from "@encarta/core";
 
 interface ArticleClientProps {
@@ -155,8 +157,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             <p className="text-sm mb-6" style={{ color: "#5f6368" }}>{error}</p>
             <button
               onClick={() => { setError(null); setLoading(true); window.location.reload(); }}
-              className="pixel-btn"
-              style={{ background: "var(--orange)", color: "white" }}
+              className="btn-primary"
             >
               Try Again
             </button>
@@ -187,7 +188,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   if (!article && !generating) {
     return (
       <PageLayout>
-        <div className="px-6 py-12 sm:py-16">
+        <main className="flex-1 px-6 py-12 sm:py-16">
           <div className="max-w-lg mx-auto text-center pixel-card p-6 sm:p-10" style={{ background: "var(--cream)" }}>
             <div className="w-16 h-16 mx-auto mb-5 flex items-center justify-center text-3xl pixel-card-sm" style={{ background: "white" }}>
               📖
@@ -201,13 +202,12 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             </p>
             <button
               onClick={handleGenerate}
-              className="pixel-btn"
-              style={{ background: "var(--orange)", color: "white", border: "2px solid var(--ink)" }}
+              className="btn-primary btn-lg"
             >
               ⚡ Generate Encyclopedia Article
             </button>
           </div>
-        </div>
+        </main>
       </PageLayout>
     );
   }
@@ -225,7 +225,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
     return (
       <PageLayout>
-        <div className="px-6 py-12 sm:py-16">
+        <main className="flex-1 px-6 py-12 sm:py-16">
           <div className="max-w-lg mx-auto">
             <h1 className="pixel text-xs text-center mb-8 capitalize" style={{ color: "var(--ink)" }}>
               {slug.replace(/-/g, " ")}
@@ -237,7 +237,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
               showWatchLive={false}
             />
           </div>
-        </div>
+        </main>
       </PageLayout>
     );
   }
@@ -248,43 +248,38 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     <PageLayout>
 
       {/* Article action bar */}
-      <div className="border-b px-6 py-3" style={{ borderColor: "#dadce0", background: "white" }}>
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-xs" style={{ color: "#9aa0a6" }}>v{article.metadata.version}</span>
-            <span className="text-xs" style={{ color: "#9aa0a6" }}>·</span>
-            <span className="text-xs" style={{ color: "#9aa0a6" }}>
-              {new Date(article.metadata.updated).toLocaleDateString("en-US", {
-                year: "numeric", month: "long", day: "numeric"
-              })}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleRefresh}
-              disabled={generating}
-              className="pixel-btn text-[8px]"
-              style={{ background: "var(--orange)", color: "white", border: "2px solid var(--ink)" }}
-            >
-              {generating ? "Refreshing..." : "↻ Refresh"}
-            </button>
-            <button
-              onClick={() => handleExport("json")}
-              className="pixel-btn text-[8px]"
-              style={{ background: "white" }}
-            >
-              JSON
-            </button>
-            <button
-              onClick={() => handleExport("markdown")}
-              className="pixel-btn text-[8px]"
-              style={{ background: "white" }}
-            >
-              MD
-            </button>
-          </div>
+      <PageTitleBar>
+        <div className="flex items-center gap-3">
+          <span className="text-xs" style={{ color: "#9aa0a6" }}>v{article.metadata.version}</span>
+          <span className="text-xs" style={{ color: "#9aa0a6" }}>·</span>
+          <span className="text-xs" style={{ color: "#9aa0a6" }}>
+            {new Date(article.metadata.updated).toLocaleDateString("en-US", {
+              year: "numeric", month: "long", day: "numeric"
+            })}
+          </span>
         </div>
-      </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={generating}
+            className="btn-primary btn-sm"
+          >
+            {generating ? "Refreshing..." : "↻ Refresh"}
+          </button>
+          <button
+            onClick={() => handleExport("json")}
+            className="btn-secondary btn-sm"
+          >
+            JSON
+          </button>
+          <button
+            onClick={() => handleExport("markdown")}
+            className="btn-secondary btn-sm"
+          >
+            MD
+          </button>
+        </div>
+      </PageTitleBar>
 
       <article className="max-w-6xl mx-auto px-6 py-10 prose">
         {/* Title Card */}
@@ -316,11 +311,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
                   <div className="h-1 w-12" style={{ background: palette.accent }} />
                 </div>
               </div>
-              <div
-                className="leading-relaxed text-[1.05rem] overflow-x-auto break-words"
-                style={{ color: "#222" }}
-                dangerouslySetInnerHTML={{ __html: sanitizeHTML(section.content) }}
-              />
+              <MarkdownRenderer content={section.content} />
               {section.media && section.media.length > 0 ? (
                 <div className="mt-4 space-y-2">
                   {section.media.map((m: MediaItem, mi: number) => {
@@ -377,13 +368,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         {/* Sources */}
         {article.citations.length > 0 && (
           <div className="pixel-card p-4 sm:p-6 md:p-8 mb-6 bg-white">
-            <div className="flex items-center gap-4 mb-6">
-              <span className="text-4xl">📚</span>
-              <div>
-                <h2 className="pixel text-sm" style={{ color: "var(--ink)" }}>SOURCES</h2>
-                <div className="h-1 w-12 mt-1" style={{ background: "var(--green)" }} />
-              </div>
-            </div>
+            <SectionHeader emoji="📚" title="SOURCES" accent="var(--green)" />
             <ol className="space-y-3 pl-0" style={{ listStyle: "none" }}>
               {article.citations.map((cite, i) => (
                 <li key={i} className="flex gap-3 items-start">
@@ -406,13 +391,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         {/* See Also */}
         {article.crossrefs.length > 0 && (
           <div className="pixel-card p-4 sm:p-6 md:p-8 mb-6" style={{ background: "#fae8ff" }}>
-            <div className="flex items-center gap-4 mb-6">
-              <span className="text-4xl">🔗</span>
-              <div>
-                <h2 className="pixel text-sm" style={{ color: "var(--ink)" }}>SEE ALSO</h2>
-                <div className="h-1 w-12 mt-1" style={{ background: "var(--purple)" }} />
-              </div>
-            </div>
+            <SectionHeader emoji="🔗" title="SEE ALSO" accent="var(--purple)" />
             <div className="flex flex-wrap gap-3">
               {article.crossrefs.map((ref, i) => (
                 <a key={ref.id || i} href={`/article/${ref.id}`}

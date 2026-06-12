@@ -1,54 +1,44 @@
 import type { Context, Next } from "hono";
-import { getDb } from "@encarta/storage";
 
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = parseInt(process.env.RATE_LIMIT || "60", 10);
 const MAX_PER_IP = parseInt(process.env.RATE_LIMIT_IP || "20", 10);
 const MAX_PER_KEY = parseInt(process.env.RATE_LIMIT_KEY || "100", 10);
 
-async function ensureRateLimitTable(): Promise<void> {
-  const db = getDb();
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS rate_limits (
-      key TEXT PRIMARY KEY,
-      count INTEGER NOT NULL DEFAULT 1,
-      reset_at INTEGER NOT NULL
-    )
-  `);
-  db.prepare(`DELETE FROM rate_limits WHERE reset_at < ?`).run(Date.now());
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
 }
 
-let tableInitialized = false;
+const store = new Map<string, RateLimitEntry>();
+
+function cleanup(): void {
+  const now = Date.now();
+  for (const [key, entry] of store) {
+    if (now > entry.resetAt) {
+      store.delete(key);
+    }
+  }
+}
 
 async function checkRateLimit(key: string, limit: number): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
-  if (!tableInitialized) {
-    await ensureRateLimitTable();
-    tableInitialized = true;
-  }
+  cleanup();
 
-  const db = getDb();
   const now = Date.now();
+  const entry = store.get(key);
 
-  const entry = db.prepare("SELECT count, reset_at FROM rate_limits WHERE key = ?").get(key) as { count: number; reset_at: number } | undefined;
-
-  if (!entry || now > entry.reset_at) {
+  if (!entry || now > entry.resetAt) {
     const resetAt = now + WINDOW_MS;
-    db.prepare(
-      "INSERT OR REPLACE INTO rate_limits (key, count, reset_at) VALUES (?, 1, ?)"
-    ).run(key, resetAt);
+    store.set(key, { count: 1, resetAt });
     return { allowed: true, remaining: limit - 1, resetAt };
   }
 
-  const newCount = entry.count + 1;
-  db.prepare(
-    "UPDATE rate_limits SET count = ? WHERE key = ?"
-  ).run(newCount, key);
-
-  if (newCount > limit) {
-    return { allowed: false, remaining: 0, resetAt: entry.reset_at };
+  entry.count++;
+  if (entry.count > limit) {
+    return { allowed: false, remaining: 0, resetAt: entry.resetAt };
   }
 
-  return { allowed: true, remaining: limit - newCount, resetAt: entry.reset_at };
+  return { allowed: true, remaining: limit - entry.count, resetAt: entry.resetAt };
 }
 
 const SKIPPED_PATHS = ["/queue", "/health", "/articles/"];
@@ -78,11 +68,5 @@ export async function rateLimitMiddleware(c: Context, next: Next) {
   await next();
 }
 
-setInterval(() => {
-  try {
-    const db = getDb();
-    db.prepare(`DELETE FROM rate_limits WHERE reset_at < ?`).run(Date.now());
-  } catch {
-    // cleanup failure is non-fatal
-  }
-}, 60_000).unref();
+// Periodic cleanup every 60s
+setInterval(cleanup, 60_000).unref();

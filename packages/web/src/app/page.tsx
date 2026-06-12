@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { fetchArticles, searchArticles, fetchArticleStatus, generateArticle, fetchArticle, progressUrl } from "@/lib/api";
 import PageLayout from "./components/PageLayout";
+import PageHero from "./components/PageHero";
+import SectionHeader from "./components/SectionHeader";
 import GenerationBar from "./components/GenerationBar";
 import { CardSkeleton, CardGridSkeleton } from "./components/CardSkeleton";
 import type { AgentEvent } from "./components/ProcessViewer";
@@ -277,31 +279,49 @@ export default function HomePage() {
   };
 
   return (
-    <PageLayout
-      showSearch={true}
-      query={query}
-      onQueryChange={setQuery}
-      onSearch={handleSearch}
-      onClear={handleClear}
-      searching={searching}
-      onGenerate={handleGenerate}
-      onKeyDown={handleKeyDown}
-    >
+    <PageLayout>
+      {/* Search bar */}
+      <div className="max-w-6xl mx-auto w-full px-6 py-4">
+        <form onSubmit={handleSearch} className="max-w-2xl">
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                style={{ color: "#9aa0a6" }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text" value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Search articles..."
+                className="w-full pixel-input"
+                style={{ paddingLeft: "2.5rem" }}
+              />
+            </div>
+            <button type="submit" disabled={searching} className="btn-primary shrink-0">
+              {searching ? "..." : "Search"}
+            </button>
+            {query && (
+              <button type="button" onClick={handleGenerate} className="btn-primary shrink-0">
+                ⚡ Generate
+              </button>
+            )}
+            {query && (
+              <button type="button" onClick={handleClear} className="btn-secondary shrink-0">
+                Clear
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+
       {/* Hero wave - only on empty state */}
       {!showResults && (
-        <header className="relative overflow-hidden bg-gradient-to-b from-[#0c4a6e] via-[#0284c7] to-[#7dd3fc]">
-          <div className="relative z-10 py-16 md:py-20 text-center">
-            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tighter text-white mb-2 drop-shadow-lg">
-              Truthseekers
-            </h1>
-            <p className="text-lg text-[#e0f2fe] tracking-wide font-medium">The Living Encyclopedia</p>
-          </div>
-          <div className="absolute bottom-0 left-0 right-0 h-16 md:h-24 overflow-hidden pointer-events-none">
-            <svg className="absolute bottom-0 w-[200%] h-full wave-anim" viewBox="0 0 1200 120" preserveAspectRatio="none">
-              <path d="M0,60 C200,100 400,20 600,60 C800,100 1000,20 1200,60 L1200,120 L0,120 Z" fill="var(--warm)" />
-            </svg>
-          </div>
-        </header>
+        <PageHero
+          title="Truthseekers"
+          subtitle="The Living Encyclopedia"
+          gradient="blue"
+        />
       )}
 
       {/* Main content */}
@@ -368,7 +388,7 @@ export default function HomePage() {
               <p className="text-sm mb-6 leading-relaxed" style={{ color: "#5f6368" }}>
                 No articles found for &ldquo;{query}&rdquo;. Would you like to generate one?
               </p>
-              <button onClick={handleGenerate} className="pixel-btn" style={{ background: "var(--orange)", color: "white", border: "2px solid var(--ink)" }}>
+              <button onClick={handleGenerate} className="btn-primary btn-lg">
                 ⚡ Generate this article
               </button>
             </div>
@@ -430,14 +450,10 @@ export default function HomePage() {
             {!showResults && articles.length > 0 && !featuredCollapsed && (
               <section>
                 <div className="flex items-center gap-4 mb-6">
-                  <span className="text-2xl">📚</span>
-                  <div>
-                    <h2 className="pixel text-sm" style={{ color: "var(--ink)" }}>ARTICLES</h2>
-                    <div className="h-1 w-12 mt-1" style={{ background: "var(--orange)" }} />
-                  </div>
+                  <SectionHeader emoji="📚" title="ARTICLES" accent="var(--orange)" />
                   <button
                     onClick={() => setFeaturedCollapsed(true)}
-                    className="ml-auto text-sm hover:underline"
+                    className="btn-ghost ml-auto text-sm hover:underline"
                     style={{ color: "#9aa0a6" }}
                   >
                     Hide
@@ -489,8 +505,7 @@ export default function HomePage() {
                         setPage(nextPage);
                         loadArticles(nextPage, false);
                       }}
-                      className="pixel-btn"
-                      style={{ background: "var(--orange)", color: "white", border: "2px solid var(--ink)" }}
+                      className="btn-primary"
                     >
                       Load More
                     </button>

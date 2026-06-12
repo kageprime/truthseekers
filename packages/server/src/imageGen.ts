@@ -45,7 +45,6 @@ export async function generateImage(
         size: options?.size || "1024x1024",
         quality: "auto",
         response_format: "b64_json",
-        background: "auto",
         output_format: "png",
       }),
     });

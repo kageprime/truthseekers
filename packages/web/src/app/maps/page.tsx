@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { fetchMaps, searchMaps, type MapEntry } from "@/lib/api";
 import PageLayout from "../components/PageLayout";
+import PageHero from "../components/PageHero";
+import SectionHeader from "../components/SectionHeader";
 import MapViewer from "../components/MapViewer";
 import { CardGridSkeleton } from "../components/CardSkeleton";
 
@@ -46,31 +48,42 @@ export default function MapsPage() {
   }
 
   return (
-    <PageLayout
-      showSearch={true}
-      query={query}
-      onQueryChange={setQuery}
-      onSearch={handleSearch}
-      onClear={handleClear}
-      searching={searching}
-    >
+    <PageLayout>
+      {/* Search bar */}
+      <div className="max-w-6xl mx-auto w-full px-6 py-4">
+        <form onSubmit={handleSearch} className="max-w-2xl">
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                style={{ color: "#9aa0a6" }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text" value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search maps..."
+                className="w-full pixel-input"
+                style={{ paddingLeft: "2.5rem" }}
+              />
+            </div>
+            <button type="submit" disabled={searching} className="btn-primary shrink-0">
+              {searching ? "..." : "Search"}
+            </button>
+            {query && (
+              <button type="button" onClick={handleClear} className="btn-secondary shrink-0">
+                Clear
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
 
       {/* Hero with green wave background */}
-      <header className="relative overflow-hidden bg-gradient-to-b from-[#065f46] via-[#059669] to-[#6ee7b7]">
-        <div className="relative z-10 py-16 md:py-20 text-center">
-          <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tighter text-white mb-2 drop-shadow-lg">
-            World History Maps
-          </h1>
-          <p className="text-lg text-[#d1fae5] tracking-wide font-medium">
-            Explore historical maps spanning civilizations, wars, and empires
-          </p>
-        </div>
-        <div className="absolute bottom-0 left-0 right-0 h-16 md:h-24 overflow-hidden pointer-events-none">
-          <svg className="absolute bottom-0 w-[200%] h-full wave-anim" viewBox="0 0 1200 120" preserveAspectRatio="none">
-            <path d="M0,60 C200,100 400,20 600,60 C800,100 1000,20 1200,60 L1200,120 L0,120 Z" fill="var(--warm)" />
-          </svg>
-        </div>
-      </header>
+      <PageHero
+        title="World History Maps"
+        subtitle="Explore historical maps spanning civilizations, wars, and empires"
+        gradient="green"
+      />
 
       <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-6 pb-16">
         {loading ? (
@@ -80,13 +93,7 @@ export default function MapsPage() {
             {/* Latest Maps */}
             {maps.length > 0 && (
               <section>
-                <div className="flex items-center gap-4 mb-6">
-                  <span className="text-2xl">🗺</span>
-                  <div>
-                    <h2 className="pixel text-sm" style={{ color: "var(--ink)" }}>STATIC MAPS</h2>
-                    <div className="h-1 w-12 mt-1" style={{ background: "var(--orange)" }} />
-                  </div>
-                </div>
+                <SectionHeader emoji="🗺" title="STATIC MAPS" accent="var(--orange)" />
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {maps.map((map) => (
                     <a
@@ -155,7 +162,7 @@ export default function MapsPage() {
               <div className="text-center py-16">
                 <div className="text-4xl mb-3">🗺</div>
                 <p className="text-sm" style={{ color: "#5f6368" }}>No maps found for &ldquo;{query}&rdquo;</p>
-                <button onClick={handleClear} className="pixel-btn mt-4" style={{ background: "white" }}>
+                <button onClick={handleClear} className="btn-secondary mt-4">
                   Clear search
                 </button>
               </div>
@@ -164,13 +171,7 @@ export default function MapsPage() {
             {/* Interactive Maps */}
             {interactive.length > 0 && (
               <section className="mt-12">
-                <div className="flex items-center gap-4 mb-6">
-                  <span className="text-2xl">🌍</span>
-                  <div>
-                    <h2 className="pixel text-sm" style={{ color: "var(--ink)" }}>INTERACTIVE MAPS</h2>
-                    <div className="h-1 w-12 mt-1" style={{ background: "var(--blue)" }} />
-                  </div>
-                </div>
+                <SectionHeader emoji="🌍" title="INTERACTIVE MAPS" accent="var(--blue)" />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {interactive.map((map) => (
                     <a

@@ -101,9 +101,32 @@ class AsyncQueue {
     }
     try {
       this.notify(slug, status, info);
+      for (const cb of this.updateCallbacks) {
+        cb(slug, status, info);
+      }
     } catch {
       // notify failures (e.g. closed SSE streams) must not break queue state
     }
+  }
+
+  onQueueUpdate(callback: (slug: string, status: JobStatus, info: Partial<JobInfo>) => void): void {
+    this.updateCallbacks.push(callback);
+  }
+
+  private updateCallbacks: ((slug: string, status: JobStatus, info: Partial<JobInfo>) => void)[] = [];
+
+  restoreJob(slug: string, status: JobStatus, phase: string, createdAt: string, meta?: JobMeta): void {
+    if (this.queue.find((j) => j.slug === slug)) return;
+    const job: QueueJob = {
+      slug,
+      title: slug.replace(/-/g, " "),
+      status,
+      phase,
+      createdAt,
+      meta,
+    };
+    this.queue.push(job);
+    this.notify(slug, status, { phase });
   }
 
   subscribe(slug: string, callback: JobCallback): () => void {

@@ -1,7 +1,13 @@
+import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "..", "..", "..", ".env") });
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { serve } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { createHash } from "node:crypto";
 import {
   searchArticles,
@@ -20,11 +26,16 @@ import {
   trackArticleView,
   getArticleViewCount,
   getTopArticles,
+  pingDb,
+  saveJob,
+  loadAllJobs,
+  deleteJobDoc,
 } from "@encarta/storage";
 import { queue } from "@encarta/core";
 import type { Article, ArticleContent, ArticleMetadata } from "@encarta/core";
 import { authMiddleware } from "./auth.js";
 import { rateLimitMiddleware } from "./rateLimit.js";
+import { sendSuccess, sendError, requestIdMiddleware, errorMiddleware } from "./response.js";
 import {
   articleParamsSchema,
   searchQuerySchema,
@@ -34,6 +45,9 @@ import {
 } from "./validation.js";
 
 const app = new Hono();
+
+// Per-slug generation cooldowns (Map<`gen:${slug}`, expiry timestamp>)
+const generationCooldowns = new Map<string, number>();
 
 // Parse allowed origins from CORS_ORIGIN env var (comma-separated)
 const allowedOrigins = (process.env.CORS_ORIGIN || "")
@@ -45,6 +59,14 @@ const allowedOrigins = (process.env.CORS_ORIGIN || "")
 const devOrigins = process.env.NODE_ENV !== "production"
   ? ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"]
   : [];
+
+// Serve generated images from root public/images
+const publicDir = path.resolve(__dirname, "..", "..", "..", "public");
+app.use("/images/*", serveStatic({ root: publicDir, rewriteRequestPath: (p) => p }));
+
+// Request ID + error handling
+app.use("*", requestIdMiddleware);
+app.onError(errorMiddleware);
 
 // Global middleware
 app.use("*", cors({
@@ -65,15 +87,7 @@ app.use("/articles/:slug/progress", async (c, next) => { await next(); });
 app.use("*", rateLimitMiddleware);
 app.use("*", authMiddleware);
 
-function sanitizeError(err: unknown): { error: string } {
-  if (err instanceof Error) {
-    if (process.env.NODE_ENV === "development") {
-      return { error: err.message };
-    }
-    return { error: "Internal server error" };
-  }
-  return { error: "Internal server error" };
-}
+
 
 function computeETag(data: unknown): string {
   const hash = createHash("md5").update(JSON.stringify(data)).digest("hex");
@@ -109,7 +123,7 @@ function checkNotModified(c: any, etag: string, lastModified?: string): boolean 
 }
 
 // List articles
-app.get("/articles", (c) => {
+app.get("/articles", async (c) => {
   const parsed = listQuerySchema.safeParse({
     limit: c.req.query("limit"),
     offset: c.req.query("offset"),
@@ -117,7 +131,7 @@ app.get("/articles", (c) => {
   if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
 
   const { limit, offset } = parsed.data;
-  const articles = listArticles(limit + 1, offset);
+  const articles = await listArticles(limit + 1, offset);
   const hasMore = articles.length > limit;
   if (hasMore) articles.pop();
   return c.json({
@@ -132,7 +146,7 @@ app.get("/articles", (c) => {
 });
 
 // Search articles
-app.get("/articles/search", (c) => {
+app.get("/articles/search", async (c) => {
   const parsed = searchQuerySchema.safeParse({
     q: c.req.query("q"),
     limit: c.req.query("limit"),
@@ -141,16 +155,16 @@ app.get("/articles/search", (c) => {
   if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
 
   const { q, limit } = parsed.data;
-  const results = searchArticles(q, limit);
+  const results = await searchArticles(q, limit);
   return c.json(results);
 });
 
 // Get article
-app.get("/articles/:slug", (c) => {
+app.get("/articles/:slug", async (c) => {
   const parsed = articleParamsSchema.safeParse({ slug: c.req.param("slug") });
   if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
 
-  const article = getArticle(parsed.data.slug);
+  const article = await getArticle(parsed.data.slug);
   if (!article) return c.json({ error: "Article not found", status: "not_generated" }, 404);
 
   const etag = computeETag(article);
@@ -163,7 +177,7 @@ app.get("/articles/:slug", (c) => {
 });
 
 // Get article status
-app.get("/articles/:slug/status", (c) => {
+app.get("/articles/:slug/status", async (c) => {
   const parsed = articleParamsSchema.safeParse({ slug: c.req.param("slug") });
   if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
 
@@ -171,7 +185,7 @@ app.get("/articles/:slug/status", (c) => {
   const job = queue.getJob(slug);
   if (job && job.status !== "done") return c.json(job);
 
-  const status = getArticleStatus(slug);
+  const status = await getArticleStatus(slug);
   if (!status) return c.json({ status: "not_found" });
 
   return c.json({ status, slug });
@@ -184,7 +198,15 @@ app.post("/articles/:slug/generate", async (c) => {
     if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
 
     const slug = parsed.data.slug;
-    const existing = getArticle(slug);
+
+    // Per-slug generation rate limit (1 per 60s)
+    const genKey = `gen:${slug}`;
+    const genEntry = generationCooldowns.get(genKey);
+    if (genEntry && Date.now() < genEntry) {
+      return c.json({ error: "Article was recently generated. Please wait before trying again." }, 429);
+    }
+
+    const existing = await getArticle(slug);
     if (existing && existing.metadata.status === "published") {
       return c.json({ status: "already_exists", slug });
     }
@@ -197,10 +219,11 @@ app.post("/articles/:slug/generate", async (c) => {
       // no body or invalid JSON, use default
     }
 
+    generationCooldowns.set(genKey, Date.now() + 60_000);
     queue.enqueue(slug, { persona });
     return c.json({ status: "queued", slug, persona }, 202);
   } catch (err) {
-    return c.json(sanitizeError(err), 500);
+    return c.json({ error: err instanceof Error ? err.message : "Internal server error" }, 500);
   }
 });
 
@@ -211,13 +234,13 @@ app.post("/articles/:slug/refresh", async (c) => {
     if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
 
     const slug = parsed.data.slug;
-    const existing = getArticle(slug);
+    const existing = await getArticle(slug);
     if (!existing) return c.json({ error: "Article not found" }, 404);
 
     queue.enqueue(slug);
     return c.json({ status: "queued", slug }, 202);
   } catch (err) {
-    return c.json(sanitizeError(err), 500);
+    return c.json({ error: err instanceof Error ? err.message : "Internal server error" }, 500);
   }
 });
 
@@ -258,11 +281,11 @@ app.get("/articles/:slug/progress", (c) => {
 });
 
 // Export article
-app.get("/articles/:slug/export", (c) => {
+app.get("/articles/:slug/export", async (c) => {
   const parsed = articleParamsSchema.safeParse({ slug: c.req.param("slug") });
   if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
 
-  const article = getArticle(parsed.data.slug);
+  const article = await getArticle(parsed.data.slug);
   if (!article) return c.json({ error: "Article not found", status: "not_generated" }, 404);
 
   const format = c.req.query("format") || "json";
@@ -291,22 +314,22 @@ app.post("/track", async (c) => {
   }
 
   const ip = c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown";
-  trackArticleView(slug, ip, event || "view");
+  await trackArticleView(slug, ip, event || "view");
 
   return c.json({ status: "tracked" });
 });
 
 // Get article view count
-app.get("/articles/:slug/views", (c) => {
+app.get("/articles/:slug/views", async (c) => {
   const slug = c.req.param("slug");
-  const count = getArticleViewCount(slug);
+  const count = await getArticleViewCount(slug);
   return c.json({ slug, views: count });
 });
 
 // Get top articles by views
-app.get("/articles/top", (c) => {
+app.get("/articles/top", async (c) => {
   const limit = parseInt(c.req.query("limit") || "10", 10);
-  const top = getTopArticles(Math.min(limit, 50));
+  const top = await getTopArticles(Math.min(limit, 50));
   return c.json({ data: top });
 });
 
@@ -376,13 +399,13 @@ function buildMarkdown(article: Article): string {
 }
 
 // Graph data
-app.get("/articles/:slug/graph", (c) => {
+app.get("/articles/:slug/graph", async (c) => {
   const parsed = articleParamsSchema.safeParse({ slug: c.req.param("slug") });
   if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
 
   const slug = parsed.data.slug;
-  const edges = getGraphEdges(slug);
-  const backlinks = getBacklinks(slug);
+  const edges = await getGraphEdges(slug);
+  const backlinks = await getBacklinks(slug);
   return c.json({ edges, backlinks });
 });
 
@@ -391,23 +414,24 @@ app.get("/queue", (c) => {
   try {
     return c.json({ jobs: queue.getAllJobs(), stats: queue.getStats() });
   } catch (err) {
-    return c.json(sanitizeError(err), 500);
+    return c.json({ error: err instanceof Error ? err.message : "Internal server error" }, 500);
   }
 });
 
-app.delete("/queue/:slug", (c) => {
+app.delete("/queue/:slug", async (c) => {
   try {
     const slug = c.req.param("slug");
     const removed = queue.deleteJob(slug);
     if (!removed) return c.json({ error: "Job not found" }, 404);
+    try { await deleteJobDoc(slug); } catch { /* ignore mongo delete errors */ }
     return c.json({ status: "removed", slug });
   } catch (err) {
-    return c.json(sanitizeError(err), 500);
+    return c.json({ error: err instanceof Error ? err.message : "Internal server error" }, 500);
   }
 });
 
 // Map routes
-app.get("/maps", (c) => {
+app.get("/maps", async (c) => {
   const parsed = mapListQuerySchema.safeParse({
     limit: c.req.query("limit"),
     offset: c.req.query("offset"),
@@ -415,10 +439,10 @@ app.get("/maps", (c) => {
   if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
 
   const { limit, offset } = parsed.data;
-  const maps = listMaps(limit + 1, offset);
+  const maps = await listMaps(limit + 1, offset);
   const hasMore = maps.length > limit;
   if (hasMore) maps.pop();
-  const interactive = listInteractiveMaps();
+  const interactive = await listInteractiveMaps();
   const response = {
     data: maps,
     interactive,
@@ -439,7 +463,7 @@ app.get("/maps", (c) => {
   return c.json(response);
 });
 
-app.get("/maps/search", (c) => {
+app.get("/maps/search", async (c) => {
   const parsed = mapSearchQuerySchema.safeParse({
     q: c.req.query("q"),
     limit: c.req.query("limit"),
@@ -447,15 +471,15 @@ app.get("/maps/search", (c) => {
   if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
 
   const { q, limit } = parsed.data;
-  const results = searchMaps(q, limit);
+  const results = await searchMaps(q, limit);
   return c.json(results);
 });
 
-app.get("/maps/:slug", (c) => {
+app.get("/maps/:slug", async (c) => {
   const parsed = articleParamsSchema.safeParse({ slug: c.req.param("slug") });
   if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
 
-  const map = getMap(parsed.data.slug);
+  const map = await getMap(parsed.data.slug);
   if (!map) return c.json({ error: "Map not found" }, 404);
 
   const etag = computeETag(map);
@@ -471,9 +495,13 @@ let dbReady = false;
 let dbError: string | null = null;
 
 // Health check
-app.get("/health", (c) => {
+app.get("/health", async (c) => {
   if (!dbReady && !dbError) {
     return c.json({ status: "starting", dbReady: false, version: "0.1.0" }, 503);
+  }
+  const pingOk = await pingDb();
+  if (!pingOk) {
+    return c.json({ status: "degraded", dbReady: false, dbError: "MongoDB ping failed", version: "0.1.0" }, 503);
   }
   if (dbError) {
     return c.json({ status: "degraded", dbReady: false, dbError, version: "0.1.0" }, 503);
@@ -503,11 +531,8 @@ async function processArticle(slug: string, meta?: Record<string, string>): Prom
     verifyPhase,
     mediaPhase,
     applyCorrections,
-    deleteSession,
   } = await import("@encarta/core");
   const persona = (meta?.persona || "veritas") as import("@encarta/core").Persona;
-
-  let sessionId: string | null = null;
 
   const onAgentEvent = (event: import("@encarta/core").AgentEvent) => {
     queue.emitAgentEvent(slug, event);
@@ -518,34 +543,32 @@ async function processArticle(slug: string, meta?: Record<string, string>): Prom
     const researchResult = await withRetry(
       () => researchPhase(slug, persona, onAgentEvent), "research"
     );
-    sessionId = researchResult.sessionId;
 
-    const sid = sessionId!;
     queue.updateJob(slug, "writing", { phase: "outline" });
     const outline = await withRetry(
-      () => outlinePhase(sid, slug, researchResult.result, persona, onAgentEvent), "outline"
+      () => outlinePhase(slug, researchResult, persona, onAgentEvent), "outline"
     );
 
     queue.updateJob(slug, "writing", { phase: "write" });
     let content = await withRetry(
-      () => writePhase(sid, slug, researchResult.result, outline, persona, onAgentEvent), "write"
+      () => writePhase(slug, researchResult, outline, persona, onAgentEvent), "write"
     );
 
     queue.updateJob(slug, "verifying", { phase: "verify" });
     const verification = await withRetry(
-      () => verifyPhase(sid, slug, researchResult.result, content, persona, onAgentEvent), "verify"
+      () => verifyPhase(slug, researchResult, content, persona, onAgentEvent), "verify"
     );
 
     if (!verification.verified || verification.confidenceScore < 0.8) {
       queue.updateJob(slug, "verifying", { phase: "correcting" });
       content = await withRetry(
-        () => applyCorrections(sid, slug, content, verification, persona, onAgentEvent), "correcting"
+        () => applyCorrections(slug, content, verification, persona, onAgentEvent), "correcting"
       );
     }
 
     queue.updateJob(slug, "media", { phase: "generate-media" });
     const mediaResult = await withRetry(
-      () => mediaPhase(sid, slug, outline, content, persona, onAgentEvent), "media"
+      () => mediaPhase(slug, outline, content, persona, onAgentEvent), "media"
     );
 
     const imageItems: { prompt: string; id: string; caption?: string }[] = [];
@@ -620,14 +643,6 @@ async function processArticle(slug: string, meta?: Record<string, string>): Prom
       error: errorMsg,
     });
     throw error;
-  } finally {
-    if (sessionId) {
-      try {
-        await deleteSession(sessionId);
-      } catch (err) {
-        console.warn(`Session cleanup failed for ${sessionId}:`, err);
-      }
-    }
   }
 }
 
@@ -640,6 +655,26 @@ async function startServer() {
     await initDb();
     dbReady = true;
     console.log("Database initialized successfully");
+
+    // Persist queue state changes to MongoDB
+    queue.onQueueUpdate(async (slug: string, status: string, info: Record<string, unknown>) => {
+      try {
+        await saveJob(slug, status, info as any);
+      } catch (err) {
+        console.error(`[queue-persist] failed to save job ${slug}:`, err);
+      }
+    });
+
+    // Restore pending jobs from MongoDB into the queue
+    const pending = await loadAllJobs();
+    for (const job of pending) {
+      if (["queued", "researching", "writing", "outlining", "verifying", "correcting", "media", "images", "storing"].includes(job.status)) {
+        queue.restoreJob(job.slug, job.status as any, job.phase, job.createdAt, job.meta);
+      }
+    }
+    if (pending.length > 0) {
+      console.log(`Restored ${pending.length} pending jobs from MongoDB`);
+    }
   } catch (err) {
     dbError = err instanceof Error ? err.message : String(err);
     console.error("Failed to initialize DB:", err);

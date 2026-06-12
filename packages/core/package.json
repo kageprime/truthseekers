@@ -12,7 +12,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@opencode-ai/sdk": "^1.0.0"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

@@ -93,6 +93,103 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             cursor: not-allowed;
             transform: none;
           }
+          .btn-primary {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            text-transform: uppercase;
+            padding: 0.6rem 1.2rem;
+            border: 2px solid var(--ink);
+            box-shadow: 3px 3px 0px var(--ink);
+            background: var(--orange);
+            color: white;
+            cursor: pointer;
+            transition: all 0.1s ease-out;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            min-height: 44px;
+            line-height: 1;
+            text-decoration: none;
+          }
+          .btn-primary:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 5px 5px 0px var(--ink);
+          }
+          .btn-primary:active {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0px var(--ink);
+          }
+          .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 1px 1px 0px var(--ink);
+          }
+          .btn-primary[data-color="green"] { background: var(--green); }
+          .btn-primary[data-color="blue"] { background: var(--blue); }
+          .btn-primary[data-color="red"] { background: var(--red); }
+          .btn-sm {
+            font-size: 8px;
+            padding: 0.4rem 0.8rem;
+            min-height: 36px;
+          }
+          @media (min-width: 640px) {
+            .btn-sm { min-height: auto; }
+            .btn-primary { min-height: auto; }
+          }
+          .btn-lg {
+            font-size: 12px;
+            padding: 0.8rem 1.6rem;
+          }
+          .btn-secondary {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            text-transform: uppercase;
+            padding: 0.6rem 1.2rem;
+            border: 2px solid var(--ink);
+            box-shadow: 3px 3px 0px var(--ink);
+            background: white;
+            color: var(--ink);
+            cursor: pointer;
+            transition: all 0.1s ease-out;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            min-height: 44px;
+            line-height: 1;
+            text-decoration: none;
+          }
+          .btn-secondary:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 5px 5px 0px var(--ink);
+          }
+          .btn-secondary:active {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0px var(--ink);
+          }
+          .btn-secondary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+          }
+          @media (min-width: 640px) {
+            .btn-secondary { min-height: auto; }
+          }
+          .btn-ghost {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: #aaa;
+            transition: color 0.1s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .btn-ghost:hover { color: var(--ink); }
           .pixel-input {
             font-family: 'Outfit', sans-serif;
             padding: 0.75rem 1rem;

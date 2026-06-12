@@ -38,7 +38,7 @@ export default function NewArticlePage() {
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
                 placeholder="quantum-computing"
-                className="w-full px-4 py-4 sm:py-3 rounded-lg border border-[#dfe1e5] focus:border-[#4285f4] focus:ring-2 focus:ring-[#4285f4]/20 outline-none transition-all text-[#1a1a1a] placeholder-[#9aa0a6]"
+                className="w-full pixel-input"
                 autoFocus
               />
             </div>
@@ -46,7 +46,7 @@ export default function NewArticlePage() {
             <button
               type="submit"
               disabled={!slug.trim() || !!status}
-              className="w-full px-6 py-4 sm:py-3 bg-[#ea580c] hover:bg-[#d9530b] text-white font-medium rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="btn-primary btn-lg w-full"
             >
               {status ? "Generating..." : "Generate Article"}
             </button>

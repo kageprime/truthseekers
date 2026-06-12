@@ -1,181 +1,314 @@
-import Database from "better-sqlite3";
-import fs from "node:fs";
+import dotenv from "dotenv";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import mongoose, { Schema, type Model, type Document } from "mongoose";
 import type { Article, ArticleContent, ArticleMetadata, MapEntry, ThreeDMapScene } from "@encarta/core";
 
-const DB_PATH = process.env.ENCARTA_DB_PATH || path.join(process.cwd(), "encarta.db");
+// Load root .env before accessing env vars
+dotenv.config({ path: path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "..", ".env") });
 
-let db: Database.Database | null = null;
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MOONGOSE_CONNECTION_STRING || "mongodb://localhost:27017/encarta";
 
-export function getDb(): Database.Database {
-  if (db) return db;
+let initialized = false;
 
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+export async function initDb(): Promise<void> {
+  if (initialized) return;
+
+  mongoose.connection.on("disconnected", () => {
+    console.warn("MongoDB disconnected — attempting reconnect...");
+    initialized = false;
+  });
+
+  mongoose.connection.on("reconnected", () => {
+    console.log("MongoDB reconnected.");
+    initialized = true;
+  });
+
+  mongoose.connection.on("error", (err) => {
+    console.error("MongoDB connection error:", err);
+  });
+
+  await mongoose.connect(MONGODB_URI, {
+    serverSelectionTimeoutMS: 10000,
+    connectTimeoutMS: 10000,
+    maxPoolSize: 10,
+    minPoolSize: 2,
+    retryWrites: true,
+    heartbeatFrequencyMS: 10000,
+  });
+  initialized = true;
+  await ensureIndexes();
+}
+
+export async function pingDb(): Promise<boolean> {
+  try {
+    if (!mongoose.connection.readyState || mongoose.connection.readyState !== 1 || !mongoose.connection.db) return false;
+    await mongoose.connection.db.admin().ping();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function getDb(): mongoose.Connection {
+  return mongoose.connection;
+}
+
+export async function closeDb(): Promise<void> {
+  if (initialized) {
+    await mongoose.disconnect();
+    initialized = false;
+  }
+}
+
+// ── Schemas ──────────────────────────────────────────────────────────────
+
+const mediaItemSchema = new Schema({
+  type: { type: String, enum: ["image", "diagram", "timeline", "threed"], required: true },
+  id: { type: String },
+  caption: { type: String },
+  src: { type: String },
+  source: { type: String },
+  code: { type: String },
+  prompt: { type: String },
+}, { _id: false });
+
+const sectionSchema = new Schema({
+  id: { type: String, required: true },
+  title: { type: String, required: true },
+  content: { type: String, required: true },
+  media: { type: [mediaItemSchema], default: [] },
+}, { _id: false });
+
+const citationSchema = new Schema({
+  url: { type: String, required: true },
+  title: { type: String },
+  accessed: { type: String },
+  relevance: { type: String },
+}, { _id: false });
+
+const crossRefSchema = new Schema({
+  id: { type: String, required: true },
+  title: { type: String },
+  relationship: { type: String },
+}, { _id: false });
+
+const timelineEventSchema = new Schema({
+  id: { type: String },
+  year: { type: Schema.Types.Mixed, required: true },
+  event: { type: String, required: true },
+  description: { type: String },
+  image: { type: String },
+  causes: { type: [String] },
+  category: { type: String },
+}, { _id: false });
+
+const threedSceneSchema = new Schema({
+  id: { type: String, required: true },
+  code: { type: String },
+  description: { type: String },
+}, { _id: false });
+
+const metadataSchema = new Schema({
+  version: { type: Number, default: 1 },
+  created: { type: String },
+  updated: { type: String },
+  status: { type: String, enum: ["draft", "published", "error"], default: "draft" },
+  freshness: { type: String },
+}, { _id: false });
+
+const articleSchema = new Schema({
+  slug: { type: String, required: true, unique: true },
+  title: { type: String, required: true },
+  abstract: { type: String, required: true },
+  sections: { type: [sectionSchema], default: [] },
+  timeline: { type: [timelineEventSchema], default: [] },
+  categories: { type: [String], default: [] },
+  crossrefs: { type: [crossRefSchema], default: [] },
+  citations: { type: [citationSchema], default: [] },
+  threedScenes: { type: [threedSceneSchema], default: [] },
+  metadata: { type: metadataSchema, required: true },
+});
+
+const graphEdgeSchema = new Schema({
+  source: { type: String, required: true },
+  target: { type: String, required: true },
+  relationship: { type: String, default: "related" },
+}, { _id: false });
+
+graphEdgeSchema.index({ source: 1, target: 1 }, { unique: true });
+graphEdgeSchema.index({ source: 1 });
+graphEdgeSchema.index({ target: 1 });
+
+const mapMarkerSchema = new Schema({
+  lat: { type: Number },
+  lng: { type: Number },
+  title: { type: String },
+  description: { type: String },
+  type: { type: String, enum: ["city", "battle", "site", "museum", "other"] },
+}, { _id: false });
+
+const mapLayerSchema = new Schema({
+  id: { type: String },
+  label: { type: String },
+  year: { type: Number },
+  geoJson: { type: Schema.Types.Mixed },
+  visible: { type: Boolean, default: true },
+}, { _id: false });
+
+const mapTimelineEventSchema = new Schema({
+  year: { type: Schema.Types.Mixed },
+  event: { type: String },
+  description: { type: String },
+  category: { type: String },
+}, { _id: false });
+
+const buildingSchema = new Schema({
+  id: { type: String },
+  lat: { type: Number },
+  lng: { type: Number },
+  width: { type: Number },
+  depth: { type: Number },
+  height: { type: Number },
+  color: { type: String },
+  label: { type: String },
+  type: { type: String, enum: ["temple", "forum", "wall", "aqueduct", "house", "palace", "other"] },
+}, { _id: false });
+
+const annotationSchema = new Schema({
+  lat: { type: Number },
+  lng: { type: Number },
+  label: { type: String },
+  description: { type: String },
+  articleSlug: { type: String },
+}, { _id: false });
+
+const terrainSchema = new Schema({
+  type: { type: String, enum: ["flat", "hills", "mountain"] },
+  color: { type: String },
+  heightScale: { type: Number },
+}, { _id: false });
+
+const threedMapSceneSchema = new Schema({
+  id: { type: String },
+  title: { type: String },
+  centerLat: { type: Number },
+  centerLng: { type: Number },
+  zoom: { type: Number },
+  terrain: { type: terrainSchema },
+  buildings: { type: [buildingSchema] },
+  models: { type: [new Schema({ id: String, lat: Number, lng: Number, src: String, scale: Number, rotation: Number, label: String, caption: String }, { _id: false })] },
+  annotations: { type: [annotationSchema] },
+}, { _id: false });
+
+const mapEntrySchema = new Schema({
+  slug: { type: String, required: true, unique: true },
+  title: { type: String, required: true },
+  subtitle: { type: String },
+  description: { type: String, required: true },
+  content: { type: String, default: "" },
+  image: { type: String },
+  region: { type: String },
+  era: { type: String },
+  type: { type: String, enum: ["static", "interactive"], required: true },
+  externalUrl: { type: String },
+  centerLat: { type: Number },
+  centerLng: { type: Number },
+  zoom: { type: Number, default: 5 },
+  geoJson: { type: Schema.Types.Mixed },
+  markers: { type: [mapMarkerSchema], default: [] },
+  layers: { type: [mapLayerSchema], default: [] },
+  timeline: { type: [mapTimelineEventSchema], default: [] },
+  threedScene: { type: threedMapSceneSchema },
+  createdAt: { type: String, required: true },
+  updatedAt: { type: String, required: true },
+});
+
+const articleViewSchema = new Schema({
+  slug: { type: String, required: true },
+  event: { type: String, default: "view" },
+  ip: { type: String },
+  createdAt: { type: Date, default: Date.now },
+});
+
+articleViewSchema.index({ slug: 1 });
+articleViewSchema.index({ createdAt: -1 });
+
+// ── Models ───────────────────────────────────────────────────────────────
+
+interface IArticleDocument extends Document {
+  slug: string;
+  title: string;
+  abstract: string;
+  sections: Record<string, unknown>[];
+  timeline: Record<string, unknown>[];
+  categories: string[];
+  crossrefs: Record<string, unknown>[];
+  citations: Record<string, unknown>[];
+  threedScenes: Record<string, unknown>[];
+  metadata: Record<string, unknown>;
+}
+
+const ArticleModel: Model<IArticleDocument> = mongoose.model<IArticleDocument>("Article", articleSchema);
+const GraphEdgeModel = mongoose.model("GraphEdge", graphEdgeSchema);
+const MapEntryModel = mongoose.model("MapEntry", mapEntrySchema);
+const ArticleViewModel = mongoose.model("ArticleView", articleViewSchema);
+
+const jobSchema = new Schema({
+  slug: { type: String, required: true, unique: true },
+  title: { type: String, required: true },
+  status: { type: String, enum: ["queued", "researching", "writing", "outlining", "verifying", "correcting", "media", "images", "storing", "done", "error"], required: true },
+  phase: { type: String, default: "pending" },
+  createdAt: { type: String, required: true },
+  updatedAt: { type: String, required: true },
+  error: { type: String },
+  meta: { type: Schema.Types.Mixed },
+});
+
+const JobModel = mongoose.model("Job", jobSchema);
+
+export { ArticleModel, GraphEdgeModel, MapEntryModel, ArticleViewModel, JobModel };
+
+async function ensureIndexes(): Promise<void> {
+  await ArticleModel.createIndexes();
+  await GraphEdgeModel.createIndexes();
+  await MapEntryModel.createIndexes();
+  await ArticleViewModel.createIndexes();
+
+  // Basic text index for fallback search (when Atlas Search not configured)
+  try {
+    await ArticleModel.collection.createIndex(
+      { title: "text", abstract: "text", "sections.content": "text" },
+      { name: "article_text", default_language: "none", background: true }
+    );
+  } catch {
+    // index may already exist
   }
 
-  db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  initSchema(db);
-  seedMaps(db);
-  return db;
+  await seedMaps();
 }
 
-export async function initDb(): Promise<Database.Database> {
-  return getDb();
-}
+const ATLAS_SEARCH_ENABLED = process.env.ATLAS_SEARCH_ENABLED === "true";
 
-export function closeDb(): void {
-  if (db) {
-    db.close();
-    db = null;
-  }
-}
-
-function createDefaultRomeScene(): ThreeDMapScene {
+function docToArticle(doc: IArticleDocument): Article;
+function docToArticle(doc: Record<string, unknown>): Article;
+function docToArticle(doc: any): Article {
+  const content = typeof doc.toObject === "function" ? doc.toObject() : doc;
   return {
-    id: "scene-roman-empire",
-    title: "Ancient Rome — City Center",
-    centerLat: 41.89,
-    centerLng: 12.49,
-    zoom: 14,
-    terrain: { type: "hills", color: "#8a9a6a", heightScale: 1.0 },
-    buildings: [
-      { id: "colosseum", lat: 41.8902, lng: 12.4922, width: 50, depth: 40, height: 30, color: "#d4c9b3", label: "Colosseum", type: "other" as const },
-      { id: "roman-forum", lat: 41.8925, lng: 12.4853, width: 80, depth: 50, height: 8, color: "#d4c9b3", label: "Roman Forum", type: "forum" as const },
-      { id: "palatine-hill", lat: 41.888, lng: 12.486, width: 60, depth: 40, height: 12, color: "#c4753a", label: "Palatine Hill", type: "palace" as const },
-      { id: "pantheon", lat: 41.8986, lng: 12.4769, width: 30, depth: 30, height: 25, color: "#e8d4a8", label: "Pantheon", type: "temple" as const },
-      { id: "circus-maximus", lat: 41.885, lng: 12.485, width: 100, depth: 20, height: 5, color: "#b8a88a", label: "Circus Maximus", type: "other" as const },
-      { id: "temple-jupiter", lat: 41.8919, lng: 12.4812, width: 25, depth: 20, height: 20, color: "#e8d4a8", label: "Temple of Jupiter", type: "temple" as const },
-      { id: "curia", lat: 41.8929, lng: 12.4857, width: 15, depth: 25, height: 12, color: "#d4c9b3", label: "Curia (Senate House)", type: "forum" as const },
-      { id: "basilica-constant", lat: 41.893, lng: 12.487, width: 40, depth: 30, height: 18, color: "#d4c9b3", label: "Basilica of Constantine", type: "forum" as const },
-      { id: "trajans-market", lat: 41.895, lng: 12.486, width: 35, depth: 25, height: 15, color: "#c4753a", label: "Trajan's Market", type: "other" as const },
-      { id: "aqueduct-claudia", lat: 41.885, lng: 12.495, width: 80, depth: 4, height: 10, color: "#9ab0b8", label: "Aqua Claudia", type: "aqueduct" as const },
-      { id: "mausoleum-augustus", lat: 41.906, lng: 12.476, width: 30, depth: 30, height: 15, color: "#b8a88a", label: "Mausoleum of Augustus", type: "other" as const },
-      { id: "theater-marcellus", lat: 41.8915, lng: 12.479, width: 35, depth: 30, height: 15, color: "#d4c9b3", label: "Theater of Marcellus", type: "other" as const },
-    ],
-    annotations: [
-      { lat: 41.8902, lng: 12.4922, label: "Colosseum", description: "Completed in 80 CE, the Flavian Amphitheater could hold 50,000 spectators for gladiatorial contests and public spectacles.", articleSlug: "colosseum" },
-      { lat: 41.8925, lng: 12.4853, label: "Roman Forum", description: "The political, religious, and commercial center of ancient Rome for over a millennium.", articleSlug: "roman-forum" },
-      { lat: 41.8986, lng: 12.4769, label: "Pantheon", description: "A temple to all gods, completed c. 126 CE under Hadrian, featuring the world's largest unreinforced concrete dome.", articleSlug: "pantheon" },
-      { lat: 41.888, lng: 12.486, label: "Palatine Hill", description: "The centermost of Rome's seven hills, site of imperial palaces and the legendary birthplace of the city.", articleSlug: "palatine-hill" },
-    ],
+    slug: content.slug,
+    title: content.title,
+    abstract: content.abstract,
+    sections: content.sections as ArticleContent["sections"],
+    timeline: content.timeline as ArticleContent["timeline"],
+    categories: content.categories,
+    crossrefs: content.crossrefs as ArticleContent["crossrefs"],
+    citations: content.citations as ArticleContent["citations"],
+    threedScenes: content.threedScenes as ArticleContent["threedScenes"],
+    metadata: content.metadata as ArticleMetadata,
   };
 }
 
-function initSchema(d: Database.Database): void {
-  // Migrate old article_search table to FTS5 if it exists as a regular table
-  const oldTable = d.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='article_search'").get();
-  if (oldTable) {
-    d.exec("DROP TABLE IF EXISTS article_search");
-  }
-
-  d.exec(`
-    CREATE TABLE IF NOT EXISTS articles (
-      slug TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      abstract TEXT NOT NULL,
-      content_json TEXT NOT NULL,
-      metadata_json TEXT NOT NULL,
-      citations_json TEXT NOT NULL DEFAULT '[]',
-      crossrefs_json TEXT NOT NULL DEFAULT '[]',
-      categories_json TEXT NOT NULL DEFAULT '[]',
-      timeline_json TEXT NOT NULL DEFAULT '[]',
-      threed_json TEXT NOT NULL DEFAULT '[]',
-      status TEXT NOT NULL DEFAULT 'draft',
-      version INTEGER NOT NULL DEFAULT 1,
-      created TEXT NOT NULL,
-      updated TEXT NOT NULL,
-      freshness TEXT NOT NULL
-    )
-  `);
-
-  d.exec(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS article_search USING fts5(
-      slug,
-      title,
-      abstract,
-      content_text,
-      tokenize='unicode61'
-    )
-  `);
-
-  d.exec(`
-    CREATE TABLE IF NOT EXISTS graph_edges (
-      source TEXT NOT NULL,
-      target TEXT NOT NULL,
-      relationship TEXT NOT NULL,
-      PRIMARY KEY (source, target)
-    )
-  `);
-
-  d.exec(`
-    CREATE TABLE IF NOT EXISTS maps (
-      slug TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      subtitle TEXT,
-      description TEXT NOT NULL,
-      content TEXT NOT NULL DEFAULT '',
-      image TEXT,
-      region TEXT,
-      era TEXT,
-      type TEXT NOT NULL DEFAULT 'static',
-      external_url TEXT,
-      center_lat REAL,
-      center_lng REAL,
-      zoom INTEGER DEFAULT 5,
-      geo_json TEXT,
-      markers_json TEXT DEFAULT '[]',
-      layers_json TEXT DEFAULT '[]',
-      timeline_json TEXT DEFAULT '[]',
-      threed_scene_json TEXT DEFAULT NULL,
-      created TEXT NOT NULL,
-      updated TEXT NOT NULL
-    )
-  `);
-
-  // Migration: add threed_scene_json to existing maps tables
-  const colCheck = d.prepare("PRAGMA table_info(maps)").all() as Array<{ name: string }>;
-  if (!colCheck.some((c) => c.name === "threed_scene_json")) {
-    d.exec("ALTER TABLE maps ADD COLUMN threed_scene_json TEXT DEFAULT NULL");
-  }
-
-  // Re-seed 3D data for existing rows (idempotent — updates roman-empire-interactive)
-  const existingRome = d.prepare("SELECT slug FROM maps WHERE slug = 'roman-empire-interactive' AND threed_scene_json IS NULL").get();
-  if (existingRome) {
-    d.prepare("UPDATE maps SET threed_scene_json = ? WHERE slug = 'roman-empire-interactive'").run(JSON.stringify(createDefaultRomeScene()));
-  }
-
-  d.exec(`
-    CREATE TABLE IF NOT EXISTS rate_limits (
-      key TEXT PRIMARY KEY,
-      count INTEGER NOT NULL DEFAULT 1,
-      reset_at INTEGER NOT NULL
-    )
-  `);
-
-  d.exec(`
-    CREATE TABLE IF NOT EXISTS article_views (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      slug TEXT NOT NULL,
-      event TEXT NOT NULL DEFAULT 'view',
-      ip TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-  `);
-
-  d.exec(`
-    CREATE INDEX IF NOT EXISTS idx_article_views_slug ON article_views(slug)
-  `);
-
-  d.exec(`
-    CREATE INDEX IF NOT EXISTS idx_article_views_created ON article_views(created_at)
-  `);
-}
-
-function flattenContent(content: ArticleContent): string {
+function flattenContent(content: ArticleContent | Article): string {
   return [
     content.title,
     content.abstract,
@@ -183,11 +316,24 @@ function flattenContent(content: ArticleContent): string {
   ].join(" ");
 }
 
-export async function upsertArticle(article: Article): Promise<void> {
-  const d = getDb();
-  const now = new Date().toISOString();
+function articleToContent(article: Article): ArticleContent {
+  return {
+    title: article.title,
+    abstract: article.abstract,
+    sections: article.sections,
+    timeline: article.timeline,
+    categories: article.categories,
+    crossrefs: article.crossrefs,
+    citations: article.citations,
+    threedScenes: article.threedScenes,
+  };
+}
 
-  const existing = getArticle(article.slug);
+// ── Article CRUD ─────────────────────────────────────────────────────────
+
+export async function upsertArticle(article: Article): Promise<void> {
+  const existing = await getArticle(article.slug);
+  const now = new Date().toISOString();
   const version = existing ? existing.metadata.version + 1 : 1;
 
   const metadata: ArticleMetadata = {
@@ -197,180 +343,155 @@ export async function upsertArticle(article: Article): Promise<void> {
     freshness: now,
   };
 
-  const contentJson = JSON.stringify({
-    title: article.title,
-    abstract: article.abstract,
-    sections: article.sections,
-    timeline: article.timeline,
-    categories: article.categories,
-    crossrefs: article.crossrefs,
-    citations: article.citations,
-    threedScenes: article.threedScenes,
-  });
-
-  d.prepare(
-    `INSERT OR REPLACE INTO articles
-     (slug, title, abstract, content_json, metadata_json, citations_json, crossrefs_json, categories_json, timeline_json, threed_json, status, version, created, updated, freshness)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    article.slug ?? "",
-    article.title ?? "",
-    article.abstract ?? "",
-    contentJson,
-    JSON.stringify(metadata),
-    JSON.stringify(article.citations ?? []),
-    JSON.stringify(article.crossrefs ?? []),
-    JSON.stringify(article.categories ?? []),
-    JSON.stringify(article.timeline ?? []),
-    JSON.stringify(article.threedScenes ?? []),
-    metadata.status ?? "draft",
-    version,
-    existing?.metadata.created ?? now,
-    now,
-    now,
+  await ArticleModel.findOneAndUpdate(
+    { slug: article.slug },
+    {
+      $set: {
+        ...articleToContent(article),
+        metadata,
+        slug: article.slug,
+      },
+    },
+    { upsert: true, new: true }
   );
 
-  // FTS5: delete then insert
-  d.prepare(`DELETE FROM article_search WHERE slug = ?`).run(article.slug);
-  d.prepare(
-    `INSERT INTO article_search (slug, title, abstract, content_text) VALUES (?, ?, ?, ?)`
-  ).run(article.slug, article.title, article.abstract, flattenContent(article));
-
-  upsertGraphEdges(article.slug, article.crossrefs);
+  await upsertGraphEdges(article.slug, article.crossrefs);
 }
 
-export function getArticle(slug: string): Article | null {
-  const d = getDb();
-  const row = d.prepare("SELECT * FROM articles WHERE slug = ?").get(slug) as Record<string, unknown> | undefined;
-  if (!row) return null;
-
-  const content = JSON.parse(row.content_json as string) as ArticleContent;
-  return {
-    slug: row.slug as string,
-    title: row.title as string,
-    abstract: row.abstract as string,
-    sections: content.sections,
-    timeline: content.timeline || [],
-    categories: JSON.parse(row.categories_json as string),
-    crossrefs: JSON.parse(row.crossrefs_json as string),
-    citations: JSON.parse(row.citations_json as string),
-    threedScenes: JSON.parse(row.threed_json as string),
-    metadata: JSON.parse(row.metadata_json as string) as ArticleMetadata,
-  };
+export async function getArticle(slug: string): Promise<Article | null> {
+  const doc = await ArticleModel.findOne({ slug }).lean();
+  if (!doc) return null;
+  return docToArticle(doc as unknown as IArticleDocument);
 }
 
-export function getArticleStatus(slug: string): "draft" | "published" | "error" | null {
-  const d = getDb();
-  const row = d.prepare("SELECT status FROM articles WHERE slug = ?").get(slug) as { status: string } | undefined;
-  if (!row) return null;
-  return row.status as "draft" | "published" | "error";
+export async function getArticleStatus(slug: string): Promise<"draft" | "published" | "error" | null> {
+  const doc = await ArticleModel.findOne({ slug }, { "metadata.status": 1 }).lean();
+  if (!doc) return null;
+  const meta = (doc as Record<string, unknown>).metadata as Record<string, unknown> | undefined;
+  return (meta?.status as "draft" | "published" | "error") ?? null;
 }
 
-export function listArticles(
+export async function listArticles(
   limit = 50,
   offset = 0
-): (Pick<Article, "slug" | "title" | "abstract" | "metadata" | "categories"> & { thumbnail?: string })[] {
-  const d = getDb();
-  const rows = d.prepare(
-    `SELECT slug, title, abstract, content_json, metadata_json, categories_json
-     FROM articles
-     WHERE status = 'published'
-     ORDER BY updated DESC
-     LIMIT ? OFFSET ?`
-  ).all(limit, offset) as Array<Record<string, unknown>>;
+): Promise<(Pick<Article, "slug" | "title" | "abstract" | "metadata" | "categories"> & { thumbnail?: string })[]> {
+  const docs = await ArticleModel.find(
+    { "metadata.status": "published" },
+    { slug: 1, title: 1, abstract: 1, metadata: 1, categories: 1, sections: 1 }
+  )
+    .sort({ "metadata.updated": -1 })
+    .skip(offset)
+    .limit(limit)
+    .lean();
 
-  return rows.map((row) => {
+  return docs.map((doc) => {
+    const d = doc as Record<string, unknown>;
     let thumbnail: string | undefined;
     try {
-      const content = JSON.parse(row.content_json as string) as ArticleContent;
-      for (const sec of content.sections) {
-        const img = sec.media.find((m) => m.type === "image" && m.src);
-        if (img) { thumbnail = img.src; break; }
+      const sections = d.sections as Array<Record<string, unknown>> | undefined;
+      if (sections) {
+        for (const sec of sections) {
+          const media = sec.media as Array<Record<string, unknown>> | undefined;
+          const img = media?.find((m) => m.type === "image" && m.src);
+          if (img) { thumbnail = img.src as string; break; }
+        }
       }
     } catch { /* no thumbnail */ }
     return {
-      slug: row.slug as string,
-      title: row.title as string,
-      abstract: row.abstract as string,
-      metadata: JSON.parse(row.metadata_json as string) as ArticleMetadata,
-      categories: JSON.parse(row.categories_json as string) as string[],
+      slug: d.slug as string,
+      title: d.title as string,
+      abstract: d.abstract as string,
+      metadata: d.metadata as ArticleMetadata,
+      categories: (d.categories || []) as string[],
       thumbnail,
     };
   });
 }
 
-export function searchArticles(query: string, limit = 20): Pick<Article, "slug" | "title" | "abstract">[] {
-  const d = getDb();
-
+export async function searchArticles(
+  query: string,
+  limit = 20
+): Promise<Pick<Article, "slug" | "title" | "abstract">[]> {
   const terms = query.trim().split(/\s+/).filter(Boolean);
   if (terms.length === 0) return [];
 
-  const ftsQuery = terms.map((t) => `"${t.replace(/"/g, '""')}"`).join(" OR ");
+  let docs: Array<Record<string, unknown>>;
 
-  const rows = d.prepare(
-    `SELECT slug, title, abstract
-     FROM article_search
-     WHERE article_search MATCH ?
-     ORDER BY rank
-     LIMIT ?`
-  ).all(ftsQuery, limit) as Array<{ slug: string; title: string; abstract: string }>;
+  if (ATLAS_SEARCH_ENABLED) {
+    docs = await ArticleModel.collection.aggregate([
+      {
+        $search: {
+          index: "articles_fulltext",
+          text: {
+            query: query,
+            path: ["title", "abstract", "sections.content"],
+          },
+        } as any,
+      },
+      { $project: { slug: 1, title: 1, abstract: 1 } },
+      { $limit: limit },
+    ]).toArray() as unknown as Array<Record<string, unknown>>;
+  } else {
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    docs = await ArticleModel.find(
+      { $text: { $search: escaped }, "metadata.status": "published" },
+      { slug: 1, title: 1, abstract: 1 }
+    )
+      .sort({ score: { $meta: "textScore" } })
+      .limit(limit)
+      .lean() as unknown as Array<Record<string, unknown>>;
+  }
 
-  return rows.map((row) => ({
-    slug: row.slug,
-    title: row.title,
-    abstract: row.abstract,
+  return docs.map((d) => ({
+    slug: d.slug as string,
+    title: d.title as string,
+    abstract: d.abstract as string,
   }));
 }
 
-export function upsertGraphEdges(
+// ── Graph Edges ──────────────────────────────────────────────────────────
+
+export async function upsertGraphEdges(
   source: string,
   refs: { id: string; title: string; relationship: string }[]
-): void {
-  const d = getDb();
-  const stmt = d.prepare(
-    "INSERT OR REPLACE INTO graph_edges (source, target, relationship) VALUES (?, ?, ?)"
-  );
-
-  const insertMany = d.transaction((edges: [string, string, string][]) => {
-    for (const [s, t, r] of edges) {
-      stmt.run(s, t, r);
-    }
-  });
-
-  insertMany(refs.map((ref) => [source, ref.id, ref.relationship ?? "related"] as [string, string, string]));
+): Promise<void> {
+  const ops = refs.map((ref) => ({
+    updateOne: {
+      filter: { source, target: ref.id },
+      update: { $set: { source, target: ref.id, relationship: ref.relationship ?? "related" } },
+      upsert: true,
+    },
+  }));
+  if (ops.length > 0) {
+    await GraphEdgeModel.bulkWrite(ops);
+  }
 }
 
-export function getGraphEdges(slug: string): { target: string; relationship: string }[] {
-  const d = getDb();
-  return d.prepare("SELECT target, relationship FROM graph_edges WHERE source = ?").all(slug) as { target: string; relationship: string }[];
+export async function getGraphEdges(slug: string): Promise<{ target: string; relationship: string }[]> {
+  return await GraphEdgeModel.find({ source: slug }, { _id: 0, target: 1, relationship: 1 }).lean();
 }
 
-export function getBacklinks(slug: string): { source: string; relationship: string }[] {
-  const d = getDb();
-  return d.prepare("SELECT source, relationship FROM graph_edges WHERE target = ?").all(slug) as { source: string; relationship: string }[];
+export async function getBacklinks(slug: string): Promise<{ source: string; relationship: string }[]> {
+  return await GraphEdgeModel.find({ target: slug }, { _id: 0, source: 1, relationship: 1 }).lean();
 }
 
-export function upsertMap(map: MapEntry): void {
-  const d = getDb();
-  d.prepare(
-    `INSERT OR REPLACE INTO maps
-     (slug, title, subtitle, description, content, image, region, era, type, external_url, center_lat, center_lng, zoom, geo_json, markers_json, layers_json, timeline_json, threed_scene_json, created, updated)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    map.slug, map.title, map.subtitle ?? null, map.description,
-    map.content, map.image ?? null, map.region ?? null, map.era ?? null,
-    map.type, map.externalUrl ?? null,
-    map.centerLat ?? null, map.centerLng ?? null, map.zoom ?? null,
-    map.geoJson ? JSON.stringify(map.geoJson) : null,
-    map.markers ? JSON.stringify(map.markers) : "[]",
-    map.layers ? JSON.stringify(map.layers) : "[]",
-    map.timeline ? JSON.stringify(map.timeline) : "[]",
-    map.threedScene ? JSON.stringify(map.threedScene) : null,
-    map.createdAt, map.updatedAt,
+// ── Maps ─────────────────────────────────────────────────────────────────
+
+export async function upsertMap(map: MapEntry): Promise<void> {
+  await MapEntryModel.findOneAndUpdate(
+    { slug: map.slug },
+    { $set: map },
+    { upsert: true, new: true }
   );
 }
 
-function rowToMapEntry(row: Record<string, unknown>): MapEntry {
+export async function getMap(slug: string): Promise<MapEntry | null> {
+  const doc = await MapEntryModel.findOne({ slug }).lean();
+  if (!doc) return null;
+  return docToMapEntry(doc as Record<string, unknown>);
+}
+
+function docToMapEntry(row: Record<string, unknown>): MapEntry {
   return {
     slug: row.slug as string,
     title: row.title as string,
@@ -381,57 +502,57 @@ function rowToMapEntry(row: Record<string, unknown>): MapEntry {
     region: (row.region as string) || undefined,
     era: (row.era as string) || undefined,
     type: row.type as "static" | "interactive",
-    externalUrl: (row.external_url as string) || undefined,
-    centerLat: (row.center_lat as number) || undefined,
-    centerLng: (row.center_lng as number) || undefined,
+    externalUrl: (row.externalUrl as string) || undefined,
+    centerLat: (row.centerLat as number) || undefined,
+    centerLng: (row.centerLng as number) || undefined,
     zoom: (row.zoom as number) || undefined,
-    geoJson: row.geo_json ? JSON.parse(row.geo_json as string) : undefined,
-    markers: row.markers_json ? JSON.parse(row.markers_json as string) : undefined,
-    layers: row.layers_json ? JSON.parse(row.layers_json as string) : undefined,
-    timeline: row.timeline_json ? JSON.parse(row.timeline_json as string) : undefined,
-    threedScene: row.threed_scene_json ? JSON.parse(row.threed_scene_json as string) : undefined,
-    createdAt: row.created as string,
-    updatedAt: row.updated as string,
+    geoJson: row.geoJson as object | undefined,
+    markers: (row.markers as MapEntry["markers"]) || undefined,
+    layers: (row.layers as MapEntry["layers"]) || undefined,
+    timeline: (row.timeline as MapEntry["timeline"]) || undefined,
+    threedScene: row.threedScene as MapEntry["threedScene"] || undefined,
+    createdAt: row.createdAt as string,
+    updatedAt: row.updatedAt as string,
   };
 }
 
-export function getMap(slug: string): MapEntry | null {
-  const d = getDb();
-  const row = d.prepare("SELECT * FROM maps WHERE slug = ?").get(slug) as Record<string, unknown> | undefined;
-  if (!row) return null;
-  return rowToMapEntry(row);
+export async function listMaps(limit = 50, offset = 0): Promise<MapEntry[]> {
+  const docs = await MapEntryModel.find({ type: "static" })
+    .sort({ createdAt: -1 })
+    .skip(offset)
+    .limit(limit)
+    .lean();
+  return docs.map((d) => docToMapEntry(d as Record<string, unknown>));
 }
 
-export function listMaps(limit = 50, offset = 0): MapEntry[] {
-  const d = getDb();
-  const rows = d.prepare(
-    `SELECT * FROM maps WHERE type = 'static' ORDER BY created DESC LIMIT ? OFFSET ?`
-  ).all(limit, offset) as Array<Record<string, unknown>>;
-  return rows.map(rowToMapEntry);
+export async function listInteractiveMaps(): Promise<MapEntry[]> {
+  const docs = await MapEntryModel.find({ type: "interactive" })
+    .sort({ createdAt: 1 })
+    .lean();
+  return docs.map((d) => docToMapEntry(d as Record<string, unknown>));
 }
 
-export function listInteractiveMaps(): MapEntry[] {
-  const d = getDb();
-  const rows = d.prepare(
-    `SELECT * FROM maps WHERE type = 'interactive' ORDER BY created ASC`
-  ).all() as Array<Record<string, unknown>>;
-  return rows.map(rowToMapEntry);
+export async function searchMaps(query: string, limit = 20): Promise<MapEntry[]> {
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const docs = await MapEntryModel.find({
+    type: "static",
+    $or: [
+      { title: { $regex: escaped, $options: "i" } },
+      { description: { $regex: escaped, $options: "i" } },
+      { region: { $regex: escaped, $options: "i" } },
+      { era: { $regex: escaped, $options: "i" } },
+    ],
+  })
+    .limit(limit)
+    .lean();
+  return docs.map((d) => docToMapEntry(d as Record<string, unknown>));
 }
 
-export function searchMaps(query: string, limit = 20): MapEntry[] {
-  const d = getDb();
-  const like = `%${query}%`;
-  const rows = d.prepare(
-    `SELECT * FROM maps
-     WHERE type = 'static' AND (title LIKE ? OR description LIKE ? OR region LIKE ? OR era LIKE ?)
-     LIMIT ?`
-  ).all(like, like, like, like, limit) as Array<Record<string, unknown>>;
-  return rows.map(rowToMapEntry);
-}
+// ── Seed Data ────────────────────────────────────────────────────────────
 
-export function seedMaps(d: Database.Database): void {
-  const count = d.prepare("SELECT COUNT(*) as c FROM maps").get() as { c: number };
-  if (count.c > 0) return;
+async function seedMaps(): Promise<void> {
+  const count = await MapEntryModel.countDocuments();
+  if (count > 0) return;
 
   const now = new Date().toISOString();
 
@@ -522,7 +643,7 @@ export function seedMaps(d: Database.Database): void {
       title: "Map of the Byzantine Empire at Its Height, 565 CE",
       subtitle: "The Roman Empire Reborn — Territories, Trade Routes & Military Campaigns under Justinian I",
       description: "At the death of Emperor Justinian I in 565 CE, the Byzantine (Eastern Roman) Empire had reached its greatest territorial extent, encompassing the entire Mediterranean basin. This map details the reconquest of former Roman provinces in Italy, North Africa, and Hispania.",
-      content: "The Byzantine Empire, also called the Eastern Roman Empire, was the continuation of the Roman Empire in its eastern provinces during Late Antiquity and the Middle Ages.\n\n**Justinian's Reconquests:**\n- **Vandalic War (533–534)** — Belisarius recaptured North Africa\n- **Gothic War (535–554)** — Protracted campaign to retake Italy from the Ostrogoths\n- **Visigothic intervention (552)** — Byzantine control of southern Hispania\n\n**Key Features of the Map:**\n- The empire's heartland in Anatolia and the Balkans\n- The strategic importance of Constantinople at the crossroads of Europe and Asia\n- Major trade routes connecting the Mediterranean to the Silk Road\n- The Limes (fortified boundaries) along the Danube and Euphrates\n\nThe empire would never again reach this size, as the Lombard invasions, Slavic migrations, and later Arab conquests steadily reduced Byzantine territory.",
+      content: "The Byzantine Empire, also called the Eastern Roman Empire, was the continuation of the Roman Empire in its eastern provinces during Late Antiquity and the Middle Ages.\n\n**Justinian's Reconquests:**\n- **Vandalic War (533–534)** — Belisarius recaptured North Africa\n- **Gothic War (535–554)** — Protracted campaign to retake Italy from the Ostrogoths\n- **Visigothic intervention (552)** — Byzantine control of southern Hispania\n\n**Key Features of the Map:**\n- The empire's heartland in Anatolia and the Balkans\n- The strategic importance of Constantinople at the crossroads of Europe and Asia\n- Major trade routes connecting the Mediterranean to the Silk Road\n- The Limes (fortified boundaries) along the Danube and Euphrates\nThe empire would never again reach this size, as the Lombard invasions, Slavic migrations, and later Arab conquests steadily reduced Byzantine territory.",
       image: "/maps/byzantine-empire.svg",
       region: "Mediterranean",
       era: "Medieval",
@@ -540,30 +661,7 @@ export function seedMaps(d: Database.Database): void {
     },
   ];
 
-  const insertMap = d.prepare(
-    `INSERT OR REPLACE INTO maps
-     (slug, title, subtitle, description, content, image, region, era, type, external_url, center_lat, center_lng, zoom, geo_json, markers_json, layers_json, timeline_json, threed_scene_json, created, updated)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  );
-
-  const insertMany = d.transaction((maps: MapEntry[]) => {
-    for (const m of maps) {
-      insertMap.run(
-        m.slug, m.title, m.subtitle ?? null, m.description,
-        m.content, m.image ?? null, m.region ?? null, m.era ?? null,
-        m.type, m.externalUrl ?? null,
-        m.centerLat ?? null, m.centerLng ?? null, m.zoom ?? null,
-        m.geoJson ? JSON.stringify(m.geoJson) : null,
-        m.markers ? JSON.stringify(m.markers) : "[]",
-        m.layers ? JSON.stringify(m.layers) : "[]",
-        m.timeline ? JSON.stringify(m.timeline) : "[]",
-        m.threedScene ? JSON.stringify(m.threedScene) : null,
-        m.createdAt, m.updatedAt,
-      );
-    }
-  });
-
-  insertMany(staticMaps);
+  await MapEntryModel.insertMany(staticMaps);
 
   const interactiveMaps: MapEntry[] = [
     {
@@ -828,30 +926,104 @@ export function seedMaps(d: Database.Database): void {
     },
   ];
 
-  insertMany(interactiveMaps);
+  await MapEntryModel.insertMany(interactiveMaps);
 }
 
-export function trackArticleView(slug: string, ip?: string, event = "view"): void {
-  const d = getDb();
-  d.prepare(
-    "INSERT INTO article_views (slug, event, ip, created_at) VALUES (?, ?, ?, datetime('now'))"
-  ).run(slug, event, ip || null);
+function createDefaultRomeScene(): ThreeDMapScene {
+  return {
+    id: "scene-roman-empire",
+    title: "Ancient Rome — City Center",
+    centerLat: 41.89,
+    centerLng: 12.49,
+    zoom: 14,
+    terrain: { type: "hills", color: "#8a9a6a", heightScale: 1.0 },
+    buildings: [
+      { id: "colosseum", lat: 41.8902, lng: 12.4922, width: 50, depth: 40, height: 30, color: "#d4c9b3", label: "Colosseum", type: "other" as const },
+      { id: "roman-forum", lat: 41.8925, lng: 12.4853, width: 80, depth: 50, height: 8, color: "#d4c9b3", label: "Roman Forum", type: "forum" as const },
+      { id: "palatine-hill", lat: 41.888, lng: 12.486, width: 60, depth: 40, height: 12, color: "#c4753a", label: "Palatine Hill", type: "palace" as const },
+      { id: "pantheon", lat: 41.8986, lng: 12.4769, width: 30, depth: 30, height: 25, color: "#e8d4a8", label: "Pantheon", type: "temple" as const },
+      { id: "circus-maximus", lat: 41.885, lng: 12.485, width: 100, depth: 20, height: 5, color: "#b8a88a", label: "Circus Maximus", type: "other" as const },
+      { id: "temple-jupiter", lat: 41.8919, lng: 12.4812, width: 25, depth: 20, height: 20, color: "#e8d4a8", label: "Temple of Jupiter", type: "temple" as const },
+      { id: "curia", lat: 41.8929, lng: 12.4857, width: 15, depth: 25, height: 12, color: "#d4c9b3", label: "Curia (Senate House)", type: "forum" as const },
+      { id: "basilica-constant", lat: 41.893, lng: 12.487, width: 40, depth: 30, height: 18, color: "#d4c9b3", label: "Basilica of Constantine", type: "forum" as const },
+      { id: "trajans-market", lat: 41.895, lng: 12.486, width: 35, depth: 25, height: 15, color: "#c4753a", label: "Trajan's Market", type: "other" as const },
+      { id: "aqueduct-claudia", lat: 41.885, lng: 12.495, width: 80, depth: 4, height: 10, color: "#9ab0b8", label: "Aqua Claudia", type: "aqueduct" as const },
+      { id: "mausoleum-augustus", lat: 41.906, lng: 12.476, width: 30, depth: 30, height: 15, color: "#b8a88a", label: "Mausoleum of Augustus", type: "other" as const },
+      { id: "theater-marcellus", lat: 41.8915, lng: 12.479, width: 35, depth: 30, height: 15, color: "#d4c9b3", label: "Theater of Marcellus", type: "other" as const },
+    ],
+    annotations: [
+      { lat: 41.8902, lng: 12.4922, label: "Colosseum", description: "Completed in 80 CE, the Flavian Amphitheater could hold 50,000 spectators for gladiatorial contests and public spectacles.", articleSlug: "colosseum" },
+      { lat: 41.8925, lng: 12.4853, label: "Roman Forum", description: "The political, religious, and commercial center of ancient Rome for over a millennium.", articleSlug: "roman-forum" },
+      { lat: 41.8986, lng: 12.4769, label: "Pantheon", description: "A temple to all gods, completed c. 126 CE under Hadrian, featuring the world's largest unreinforced concrete dome.", articleSlug: "pantheon" },
+      { lat: 41.888, lng: 12.486, label: "Palatine Hill", description: "The centermost of Rome's seven hills, site of imperial palaces and the legendary birthplace of the city.", articleSlug: "palatine-hill" },
+    ],
+  };
 }
 
-export function getArticleViewCount(slug: string): number {
-  const d = getDb();
-  const row = d.prepare("SELECT COUNT(*) as count FROM article_views WHERE slug = ?").get(slug) as { count: number };
-  return row.count;
+// ── Analytics ────────────────────────────────────────────────────────────
+
+export async function trackArticleView(slug: string, ip?: string, event = "view"): Promise<void> {
+  await ArticleViewModel.create({ slug, event, ip: ip || null });
 }
 
-export function getTopArticles(limit = 10): Array<{ slug: string; title: string; views: number }> {
-  const d = getDb();
-  return d.prepare(
-    `SELECT av.slug, a.title, COUNT(av.id) as views
-     FROM article_views av
-     LEFT JOIN articles a ON av.slug = a.slug
-     GROUP BY av.slug
-     ORDER BY views DESC
-     LIMIT ?`
-  ).all(limit) as Array<{ slug: string; title: string; views: number }>;
+export async function getArticleViewCount(slug: string): Promise<number> {
+  return await ArticleViewModel.countDocuments({ slug });
+}
+
+export async function getTopArticles(limit = 10): Promise<Array<{ slug: string; title: string; views: number }>> {
+  return await ArticleViewModel.aggregate([
+    { $group: { _id: "$slug", views: { $sum: 1 } } },
+    { $lookup: { from: "articles", localField: "_id", foreignField: "slug", as: "article" } },
+    { $unwind: { path: "$article", preserveNullAndEmptyArrays: true } },
+    { $project: { slug: "$_id", title: "$article.title", views: 1, _id: 0 } },
+    { $sort: { views: -1 } },
+    { $limit: limit },
+  ]);
+}
+
+// ── Queue Persistence ─────────────────────────────────────────────────────
+
+export async function saveJob(slug: string, status: string, info: { phase?: string; error?: string; meta?: Record<string, string> }): Promise<void> {
+  const now = new Date().toISOString();
+  const existing = await JobModel.findOne({ slug });
+  if (existing) {
+    const update: Record<string, unknown> = { status, updatedAt: now };
+    if (info.phase) update.phase = info.phase;
+    if (info.error !== undefined) update.error = info.error;
+    if (info.meta) update.meta = info.meta;
+    await JobModel.updateOne({ slug }, { $set: update });
+  } else {
+    await JobModel.create({
+      slug,
+      title: slug.replace(/-/g, " "),
+      status,
+      phase: info.phase || "pending",
+      createdAt: now,
+      updatedAt: now,
+      error: info.error,
+      meta: info.meta,
+    });
+  }
+}
+
+export async function loadAllJobs(): Promise<Array<{ slug: string; status: string; phase: string; createdAt: string; error?: string; meta?: Record<string, string> }>> {
+  const docs = await JobModel.find({
+    status: { $nin: ["done", "error"] },
+  }).sort({ createdAt: -1 }).lean();
+  return docs.map((d) => {
+    const doc = d as Record<string, unknown>;
+    return {
+      slug: doc.slug as string,
+      status: doc.status as string,
+      phase: (doc.phase as string) || "pending",
+      createdAt: doc.createdAt as string,
+      error: doc.error as string | undefined,
+      meta: doc.meta as Record<string, string> | undefined,
+    };
+  });
+}
+
+export async function deleteJobDoc(slug: string): Promise<boolean> {
+  const r = await JobModel.deleteOne({ slug });
+  return r.deletedCount > 0;
 }

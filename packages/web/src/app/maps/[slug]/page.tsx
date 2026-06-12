@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { fetchMap, type MapEntry } from "@/lib/api";
-import { mdToHTML } from "@/lib/markdown";
+import MarkdownRenderer from "../../components/MarkdownRenderer";
 import PageLayout from "../../components/PageLayout";
+import SectionHeader from "../../components/SectionHeader";
 import MapViewer from "../../components/MapViewer";
 import ThreeDMapViewer from "../../components/ThreeDMapViewer";
 import InteractiveTimeline from "../../components/InteractiveTimeline";
@@ -65,26 +66,16 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
 
                 {/* 2D / 3D Toggle */}
                 {map.threedScene && (
-                  <div className="flex gap-1 border-2 border-black rounded overflow-hidden">
+                  <div className="flex gap-1">
                     <button
                       onClick={() => setViewMode("2d")}
-                      className={`px-3 py-1 text-xs font-bold transition-colors ${
-                        viewMode === "2d"
-                          ? "bg-[var(--orange)] text-white"
-                          : "bg-white text-[#5f6368] hover:bg-[#f1f3f4]"
-                      }`}
-                      style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "8px" }}
+                      className={`btn-sm ${viewMode === "2d" ? "btn-primary" : "btn-secondary"}`}
                     >
                       2D
                     </button>
                     <button
                       onClick={() => setViewMode("3d")}
-                      className={`px-3 py-1 text-xs font-bold transition-colors ${
-                        viewMode === "3d"
-                          ? "bg-[var(--orange)] text-white"
-                          : "bg-white text-[#5f6368] hover:bg-[#f1f3f4]"
-                      }`}
-                      style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "8px" }}
+                      className={`btn-sm ${viewMode === "3d" ? "btn-primary" : "btn-secondary"}`}
                     >
                       3D
                     </button>
@@ -130,13 +121,7 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
 
             {/* Title & Meta */}
             <div className="pixel-card p-4 sm:p-6 md:p-8 mb-8" style={{ background: "white" }}>
-              <div className="flex items-center gap-4 mb-6">
-                <span className="text-3xl">📋</span>
-                <div>
-                  <h2 className="pixel text-xs" style={{ color: "var(--ink)" }}>DETAILS</h2>
-                  <div className="h-1 w-12 mt-1" style={{ background: "var(--blue)" }} />
-                </div>
-              </div>
+              <SectionHeader emoji="📋" title="DETAILS" accent="var(--blue)" />
 
               <h1 className="pixel text-base sm:text-lg md:text-xl mb-3 leading-snug" style={{ color: "var(--ink)" }}>
                 {map.title}
@@ -167,18 +152,13 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
             {/* Description */}
             {map.content && (
               <div className="pixel-card p-4 sm:p-6 md:p-8 mb-8" style={{ background: "white" }}>
-                <div className="flex items-center gap-4 mb-6">
-                  <span className="text-3xl">📜</span>
-                  <div>
-                    <h2 className="pixel text-xs" style={{ color: "var(--ink)" }}>DESCRIPTION</h2>
-                    <div className="h-1 w-12 mt-1" style={{ background: "var(--gold)" }} />
-                  </div>
-                </div>
+                <SectionHeader emoji="📜" title="DESCRIPTION" accent="var(--gold)" />
                 <div
-                  className="prose leading-relaxed overflow-x-auto break-words"
+                  className="leading-relaxed overflow-x-auto break-words"
                   style={{ fontSize: "1.05rem", color: "#222", lineHeight: "1.8" }}
-                  dangerouslySetInnerHTML={{ __html: mdToHTML(map.content) }}
-                />
+                >
+                  <MarkdownRenderer content={map.content} />
+                </div>
               </div>
             )}
 
@@ -189,21 +169,14 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
 
             {/* Related Article CTA */}
             <div className="pixel-card p-4 sm:p-6 md:p-8 mb-8" style={{ background: "#fae8ff" }}>
-              <div className="flex items-center gap-4 mb-6">
-                <span className="text-3xl">🔍</span>
-                <div>
-                  <h2 className="pixel text-xs" style={{ color: "var(--ink)" }}>RELATED ARTICLES</h2>
-                  <div className="h-1 w-12 mt-1" style={{ background: "var(--purple)" }} />
-                </div>
-              </div>
+              <SectionHeader emoji="🔍" title="RELATED ARTICLES" accent="var(--purple)" />
               <p className="text-sm mb-2" style={{ color: "#1a1a1a" }}>Explore related articles</p>
               <p className="text-xs mb-4" style={{ color: "#5f6368" }}>
                 Search for articles related to this map&rsquo;s topic and time period.
               </p>
               <a
                 href={`/?q=${encodeURIComponent(map.title.split(",")[0]?.replace(/^Map of (the )?/i, "") || map.region || "")}`}
-                className="pixel-btn inline-block"
-                style={{ background: "var(--orange)", color: "white", border: "2px solid var(--ink)", textDecoration: "none" }}
+                className="btn-primary"
               >
                 Search Articles →
               </a>
@@ -215,7 +188,7 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
             <div className="text-4xl mb-3">🗺</div>
             <h2 className="pixel text-sm mb-2" style={{ color: "var(--ink)" }}>MAP NOT FOUND</h2>
             <p className="text-sm mb-4" style={{ color: "#5f6368" }}>The map &ldquo;{slug}&rdquo; doesn&rsquo;t exist.</p>
-            <a href="/maps" className="pixel-btn inline-block" style={{ background: "white", textDecoration: "none" }}>
+            <a href="/maps" className="btn-secondary">
               Browse all maps
             </a>
           </div>

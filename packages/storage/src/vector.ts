@@ -1,28 +1,99 @@
-import { getDb } from "./db.js";
+import { ArticleModel } from "./db.js";
 
-export async function indexArticle(slug: string, contentText: string): Promise<void> {
-  const db = getDb();
-  db.prepare(`DELETE FROM article_search WHERE slug = ?`).run(slug);
-  db.prepare(
-    `INSERT INTO article_search (slug, title, abstract, content_text) VALUES (?, '', '', ?)`
-  ).run(slug, contentText);
+const ATLAS_SEARCH_ENABLED = process.env.ATLAS_SEARCH_ENABLED === "true";
+
+/**
+ * Index an article for search.
+ *
+ * With MongoDB, no separate index write is needed — articles are
+ * automatically indexed via the `$text` index on the `articles`
+ * collection (basic) or via the Atlas Search index `articles_fulltext`
+ * (when `ATLAS_SEARCH_ENABLED=true`).
+ *
+ * This function is a no-op retained for API compatibility.
+ */
+export async function indexArticle(_slug: string, _contentText: string): Promise<void> {
+  // no-op — indexing is handled by MongoDB text index / Atlas Search
 }
 
-export async function semanticSearch(query: string, limit = 10): Promise<{ slug: string; rank: number }[]> {
-  const db = getDb();
-
+/**
+ * Semantic search using Atlas Vector Search with Automated Embeddings.
+ *
+ * Requires:
+ *   - `ATLAS_SEARCH_ENABLED=true`
+ *   - An Atlas Vector Search index named `articles_vector` created on
+ *     the `articles` collection with Automated Embeddings enabled,
+ *     configured to embed the `contentEmbedding` field.
+ *
+ * Falls back to basic `$text` search if Atlas Vector Search is not
+ * configured.
+ *
+ * To create the Atlas Vector Search index (via Atlas UI or API):
+ * ```json
+ * {
+ *   "name": "articles_vector",
+ *   "type": "vectorSearch",
+ *   "fields": [{
+ *     "type": "vector",
+ *     "path": "contentEmbedding",
+ *     "numDimensions": 1536,
+ *     "similarity": "cosine"
+ *   }],
+ *   "autoEmbedding": true
+ * }
+ * ```
+ *
+ * The `contentEmbedding` field is populated automatically by Atlas
+ * Automated Embeddings on document insert/update.
+ */
+export async function semanticSearch(
+  query: string,
+  limit = 10
+): Promise<{ slug: string; rank: number }[]> {
   const terms = query.trim().split(/\s+/).filter(Boolean);
   if (terms.length === 0) return [];
 
-  const ftsQuery = terms.map((t) => `"${t.replace(/"/g, '""')}"`).join(" OR ");
+  if (ATLAS_SEARCH_ENABLED) {
+    // Atlas Vector Search with Automated Embeddings
+    // queryText causes Atlas to embed the query string on-the-fly
+    // Use collection.aggregate with any[] typing since $vectorSearch
+    // is an Atlas-specific stage not in Mongoose's PipelineStage types
+    const results = await ArticleModel.collection.aggregate([
+      {
+        $vectorSearch: {
+          index: "articles_vector",
+          path: "contentEmbedding",
+          queryText: query,
+          numCandidates: Math.min(limit * 10, 100),
+          limit,
+        } as any,
+      },
+      {
+        $project: {
+          slug: 1,
+          rank: { $meta: "vectorSearchScore" },
+        },
+      },
+    ]).toArray();
 
-  const rows = db.prepare(`
-    SELECT slug, rank
-    FROM article_search
-    WHERE article_search MATCH ?
-    ORDER BY rank
-    LIMIT ?
-  `).all(ftsQuery, limit) as Array<{ slug: string; rank: number }>;
+    return results.map((r: Record<string, unknown>) => ({
+      slug: r.slug as string,
+      rank: (r.rank as number) || 0,
+    }));
+  }
 
-  return rows;
+  // Fallback: basic $text search
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const docs = await ArticleModel.find(
+    { $text: { $search: escaped } },
+    { slug: 1 }
+  )
+    .sort({ score: { $meta: "textScore" } })
+    .limit(limit)
+    .lean();
+
+  return docs.map((d) => ({
+    slug: d.slug,
+    rank: ((d as unknown as Record<string, unknown>).score as number) || 0,
+  }));
 }

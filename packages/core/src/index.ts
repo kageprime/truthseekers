@@ -1,4 +1,4 @@
-export { getClient, createSession, deleteSession, sendPrompt, sendPromptStream, getSessionMessages } from "./agent.js";
+export { sendPrompt, sendPromptStream, webSearch } from "./agent.js";
 export {
   researchPhase,
   outlinePhase,

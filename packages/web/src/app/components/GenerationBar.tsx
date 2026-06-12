@@ -172,8 +172,8 @@ export default function GenerationBar({
         {isDone && (
           <a
             href={`/article/${entry.slug}`}
-            className="pixel text-[8px] bg-[var(--green)] text-white px-2 py-3 sm:py-1 min-h-[44px] border border-black shrink-0"
-            style={{ textDecoration: "none" }}
+            className="btn-primary btn-sm shrink-0"
+            data-color="green"
           >
             VIEW
           </a>
@@ -181,14 +181,16 @@ export default function GenerationBar({
         {isError && (
           <button
             onClick={(e) => { e.stopPropagation(); onRetry(entry.slug); }}
-            className="pixel text-[8px] bg-[var(--red)] text-white px-2 py-3 sm:py-1 min-h-[44px] border border-black shrink-0"
+            className="btn-primary btn-sm shrink-0"
+            data-color="red"
           >
             RETRY
           </button>
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onDismiss(entry.slug); }}
-          className="pixel text-[8px] text-[#aaa] px-1 w-10 h-10 sm:w-auto sm:h-auto border border-[#ccc] shrink-0 hover:bg-[#fee] flex items-center justify-center"
+          className="btn-ghost shrink-0"
+          style={{ minWidth: "44px", minHeight: "44px" }}
           title="Dismiss"
         >
           ✕
@@ -230,8 +232,8 @@ export default function GenerationBar({
             <div className="mt-3 flex gap-2">
               <a
                 href={`/article/${entry.slug}`}
-                className="pixel text-[8px] bg-[var(--blue)] text-white px-3 py-3 sm:py-1 min-h-[44px] border border-black"
-                style={{ textDecoration: "none" }}
+                className="btn-primary btn-sm"
+                data-color="blue"
               >
                 WATCH LIVE →
               </a>
@@ -251,7 +253,7 @@ export default function GenerationBar({
           <p className="text-xs text-[var(--red)] mb-2">{entry.error}</p>
           <button
             onClick={() => onRetry(entry.slug)}
-            className="pixel text-[9px] bg-[var(--orange)] text-white px-3 py-3 sm:py-1 min-h-[44px] border border-black"
+            className="btn-primary btn-sm"
           >
             RETRY GENERATION
           </button>
