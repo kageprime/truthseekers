@@ -340,7 +340,7 @@ export default function HomePage() {
               <GenerationBar
                 key={gen.slug}
                 entry={gen}
-                onRetry={(slug) => startGenerate(slug)}
+                onRetry={(slug) => router.push(`/generate/${slug}`)}
                 onDismiss={(slug) => {
                   setGenerating((prev) => {
                     const next = new Map(prev);

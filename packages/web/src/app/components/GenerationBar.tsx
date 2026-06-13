@@ -187,6 +187,16 @@ export default function GenerationBar({
             RETRY
           </button>
         )}
+        {!isDone && !isError && showWatchLive && (
+          <a
+            href={`/generate/${entry.slug}`}
+            className="btn-primary btn-sm shrink-0"
+            data-color="blue"
+            onClick={(e) => e.stopPropagation()}
+          >
+            LIVE
+          </a>
+        )}
         <button
           onClick={(e) => { e.stopPropagation(); onDismiss(entry.slug); }}
           className="btn-ghost shrink-0"
@@ -231,7 +241,7 @@ export default function GenerationBar({
           {showWatchLive && (
             <div className="mt-3 flex gap-2">
               <a
-                href={`/article/${entry.slug}`}
+                href={`/generate/${entry.slug}`}
                 className="btn-primary btn-sm"
                 data-color="blue"
               >
