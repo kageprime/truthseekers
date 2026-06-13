@@ -39,6 +39,7 @@ export default function HomePage() {
   const [generating, setGenerating] = useState<Map<string, GeneratingEntry>>(new Map());
   const [showResults, setShowResults] = useState(false);
   const [featuredCollapsed, setFeaturedCollapsed] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(6);
   const [infiniteLoading, setInfiniteLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const sseRef = useRef<Map<string, EventSource>>(new Map());
@@ -108,6 +109,7 @@ export default function HomePage() {
 
       if (reset) {
         setArticles(items);
+        setVisibleCount(6);
       } else {
         setArticles((prev) => [...prev, ...items]);
       }
@@ -171,6 +173,7 @@ export default function HomePage() {
     setLoading(true);
     setArticles([]);
     setPage(0);
+    setVisibleCount(6);
     loadArticles(0, true);
   }
 
@@ -460,7 +463,7 @@ export default function HomePage() {
                   </button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {articles.slice(0, 6).map((article) => (
+                  {articles.slice(0, visibleCount).map((article) => (
                     <a
                       key={article.slug}
                       href={`/article/${article.slug}`}
@@ -497,13 +500,17 @@ export default function HomePage() {
                     </a>
                   ))}
                 </div>
-                {hasMore && (
+                {(hasMore || visibleCount < articles.length) && (
                   <div className="text-center mt-6">
                     <button
                       onClick={() => {
-                        const nextPage = page + 1;
-                        setPage(nextPage);
-                        loadArticles(nextPage, false);
+                        const next = visibleCount + 6;
+                        setVisibleCount(next);
+                        if (next >= articles.length) {
+                          const nextPage = page + 1;
+                          setPage(nextPage);
+                          loadArticles(nextPage, false);
+                        }
                       }}
                       className="btn-primary"
                     >
