@@ -496,15 +496,15 @@ let dbError: string | null = null;
 
 // Health check
 app.get("/health", async (c) => {
-  if (!dbReady && !dbError) {
+  if (dbError) {
+    return c.json({ status: "degraded", dbReady: false, dbError, version: "0.1.0" }, 503);
+  }
+  if (!dbReady) {
     return c.json({ status: "starting", dbReady: false, version: "0.1.0" }, 503);
   }
   const pingOk = await pingDb();
   if (!pingOk) {
     return c.json({ status: "degraded", dbReady: false, dbError: "MongoDB ping failed", version: "0.1.0" }, 503);
-  }
-  if (dbError) {
-    return c.json({ status: "degraded", dbReady: false, dbError, version: "0.1.0" }, 503);
   }
   return c.json({ status: "ok", dbReady: true, version: "0.1.0" });
 });
