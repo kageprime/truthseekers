@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { fetchArticles, searchArticles, fetchArticleStatus, generateArticle, fetchArticle, progressUrl } from "@/lib/api";
 import PageLayout from "./components/PageLayout";
 import PageHero from "./components/PageHero";
@@ -30,6 +31,7 @@ const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 400;
 
 export default function HomePage() {
+  const router = useRouter();
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -266,12 +268,13 @@ export default function HomePage() {
     if (existing && "status" in existing && existing.status === "published") {
       trackArticleView(slug);
       setQuery("");
-      window.location.href = `/article/${slug}`;
+      router.push(`/article/${slug}`);
       return;
     }
 
-    setShowResults(true);
-    startGenerate(slug);
+    trackArticleView(slug);
+    setQuery("");
+    router.push(`/generate/${slug}`);
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -391,7 +394,7 @@ export default function HomePage() {
               <p className="text-sm mb-6 leading-relaxed" style={{ color: "#5f6368" }}>
                 No articles found for &ldquo;{query}&rdquo;. Would you like to generate one?
               </p>
-              <button onClick={handleGenerate} className="btn-primary btn-lg">
+              <button onClick={() => router.push(`/generate/${slugify(query.trim())}`)} className="btn-primary btn-lg">
                 ⚡ Generate this article
               </button>
             </div>
