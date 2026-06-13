@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { fetchArticles, searchArticles, fetchArticleStatus, generateArticle, fetchArticle, progressUrl } from "@/lib/api";
 import PageLayout from "./components/PageLayout";
 import PageHero from "./components/PageHero";
@@ -31,7 +30,6 @@ const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 400;
 
 export default function HomePage() {
-  const router = useRouter();
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -268,13 +266,12 @@ export default function HomePage() {
     if (existing && "status" in existing && existing.status === "published") {
       trackArticleView(slug);
       setQuery("");
-      router.push(`/article/${slug}`);
+      window.location.href = `/article/${slug}`;
       return;
     }
 
-    trackArticleView(slug);
-    setQuery("");
-    router.push(`/generate/${slug}`);
+    setShowResults(true);
+    startGenerate(slug);
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -340,7 +337,7 @@ export default function HomePage() {
               <GenerationBar
                 key={gen.slug}
                 entry={gen}
-                onRetry={(slug) => router.push(`/generate/${slug}`)}
+                onRetry={(slug) => startGenerate(slug)}
                 onDismiss={(slug) => {
                   setGenerating((prev) => {
                     const next = new Map(prev);
@@ -394,7 +391,7 @@ export default function HomePage() {
               <p className="text-sm mb-6 leading-relaxed" style={{ color: "#5f6368" }}>
                 No articles found for &ldquo;{query}&rdquo;. Would you like to generate one?
               </p>
-              <button onClick={() => router.push(`/generate/${slugify(query.trim())}`)} className="btn-primary btn-lg">
+              <button onClick={handleGenerate} className="btn-primary btn-lg">
                 ⚡ Generate this article
               </button>
             </div>

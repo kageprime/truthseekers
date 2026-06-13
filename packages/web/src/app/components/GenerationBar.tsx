@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import ProcessViewer from "./ProcessViewer";
+import PhaseTimeline from "./PhaseTimeline";
 import type { AgentEvent } from "./ProcessViewer";
 
 export interface GeneratingEntry {
@@ -12,57 +12,80 @@ export interface GeneratingEntry {
   agentEvents?: AgentEvent[];
 }
 
-interface PhaseInfo {
-  phase: string;
-  label: string;
-  time: string;
-  completed: boolean;
+interface Activity {
+  id: number;
+  timestamp: number;
+  type: string;
+  content: string;
+  icon: string;
+  metadata?: string;
+}
+
+function eventToActivity(event: AgentEvent, id: number): Activity {
+  const base = { id, timestamp: event.timestamp };
+  switch (event.type) {
+    case "status":
+      return { ...base, type: "status", content: String(event.data), icon: "⚡" };
+    case "tool_use": {
+      const d = event.data as Record<string, unknown> | undefined;
+      const name = (d?.name as string) ?? "unknown";
+      const args = d?.args as Record<string, unknown> | undefined;
+      return { ...base, type: "tool_use", content: toolLabel(name), icon: toolIcon(name), metadata: args ? JSON.stringify(args).slice(0, 120) : undefined };
+    }
+    case "tool_result": {
+      const d = event.data as Record<string, unknown> | undefined;
+      const result = (d?.result ?? d?.content ?? "") as string;
+      const snippet = typeof result === "string" ? result.slice(0, 200) : JSON.stringify(result).slice(0, 200);
+      return { ...base, type: "tool_result", content: snippet || "Done", icon: "📋" };
+    }
+    case "text": {
+      const d = event.data as Record<string, unknown> | undefined;
+      const text = (d?.text ?? d?.delta ?? "") as string;
+      return { ...base, type: "text", content: text.slice(0, 300), icon: "💬" };
+    }
+    case "error":
+      return { ...base, type: "error", content: String(event.data), icon: "❌" };
+    default:
+      return { ...base, type: event.type, content: String(event.data), icon: "•" };
+  }
+}
+
+function toolLabel(name: string): string {
+  const labels: Record<string, string> = {
+    firecrawl_search: "Searching the web", websearch: "Searching the web", webfetch: "Fetching a page",
+    read: "Reading a file", write: "Writing content", edit: "Editing content",
+    glob: "Searching files", grep: "Searching code", bash: "Running a command",
+    task: "Spawning sub-agent", think: "Thinking",
+  };
+  return labels[name] ?? `Using ${name}`;
+}
+
+function toolIcon(name: string): string {
+  const icons: Record<string, string> = {
+    firecrawl_search: "🔍", websearch: "🔍", webfetch: "🌐", read: "📖",
+    write: "✍️", edit: "📝", glob: "📁", grep: "🔎", bash: "💻", task: "🤖", think: "🧠",
+  };
+  return icons[name] ?? "🔧";
 }
 
 const PHASE_CHECKPOINTS: Record<string, number> = {
-  queued: 5,
-  starting: 5,
-  research: 20,
-  researching: 20,
-  outline: 40,
-  write: 60,
-  writing: 60,
-  verify: 75,
-  verifying: 75,
-  correcting: 80,
-  "generate-media": 90,
-  media: 90,
-  "generating-images": 93,
-  store: 95,
-  storing: 95,
-  complete: 100,
-  done: 100,
-  error: 0,
+  queued: 5, starting: 5, research: 20, researching: 20, outline: 40,
+  write: 60, writing: 60, verify: 75, verifying: 75, correcting: 80,
+  "generate-media": 90, media: 90, "generating-images": 93, store: 95, storing: 95,
+  complete: 100, done: 100, error: 0,
 };
 
-export function phasePercent(phase: string): number {
+function phasePercent(phase: string): number {
   return PHASE_CHECKPOINTS[phase] ?? 10;
 }
 
-export function phaseLabel(phase: string): string {
+function phaseLabel(phase: string): string {
   const m: Record<string, string> = {
     queued: "QUEUED", researching: "RESEARCHING", outline: "OUTLINING",
     write: "WRITING", verifying: "VERIFYING", correcting: "CORRECTING",
-    media: "GENERATING MEDIA", storing: "STORING", complete: "DONE", done: "DONE",
-    error: "ERROR",
+    media: "GENERATING MEDIA", storing: "STORING", complete: "DONE", done: "DONE", error: "ERROR",
   };
   return m[phase] ?? phase.toUpperCase();
-}
-
-function buildPhaseTimeline(currentPhase: string): PhaseInfo[] {
-  const phases = ["queued", "researching", "outline", "write", "verifying", "media", "storing", "done"];
-  const currentIdx = phases.indexOf(currentPhase);
-  return phases.map((p, i) => ({
-    phase: p,
-    label: phaseLabel(p),
-    time: currentIdx >= i ? "✓" : "",
-    completed: currentIdx > i,
-  }));
 }
 
 function nextCheckpoint(current: string): number {
@@ -71,6 +94,8 @@ function nextCheckpoint(current: string): number {
   if (idx < 0 || idx >= order.length - 1) return 99;
   return PHASE_CHECKPOINTS[order[idx + 1]];
 }
+
+export { phasePercent, phaseLabel };
 
 export default function GenerationBar({
   entry,
@@ -83,22 +108,29 @@ export default function GenerationBar({
   onDismiss: (slug: string) => void;
   showWatchLive?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [smoothPct, setSmoothPct] = useState(5);
   const animRef = useRef<ReturnType<typeof requestAnimationFrame> | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [autoScroll, setAutoScroll] = useState(true);
 
   const targetPct = phasePercent(entry.phase);
   const label = phaseLabel(entry.phase);
   const isDone = entry.phase === "done" || entry.phase === "complete";
   const isError = entry.phase === "error";
-  const timeline = buildPhaseTimeline(entry.phase);
+
+  const activities = (entry.agentEvents ?? []).map((e, i) => eventToActivity(e, i));
+
+  // Auto-expand when generation starts
+  useEffect(() => {
+    if (entry.phase !== "done" && entry.phase !== "error" && entry.phase !== "queued") {
+      setExpanded(true);
+    }
+  }, [entry.phase]);
 
   // Smooth animation: creep toward target between checkpoints
   useEffect(() => {
-    setSmoothPct((prev) => {
-      if (targetPct > prev) return prev; // jump forward on phase change
-      return prev;
-    });
+    setSmoothPct((prev) => (targetPct > prev ? prev : prev));
 
     const creepTarget = nextCheckpoint(entry.phase);
     const startTime = Date.now();
@@ -109,164 +141,134 @@ export default function GenerationBar({
     function tick() {
       if (cancelled) return;
       const elapsed = Date.now() - startTime;
-      const duration = 8000; // 8 seconds to creep to next checkpoint
+      const duration = 8000;
       const progress = Math.min(elapsed / duration, 1);
       const current = startPct + (creepTarget - startPct) * progress;
-
       setSmoothPct(Math.min(current, 99));
-
       if (progress < 1 && entry.phase !== "done" && entry.phase !== "error") {
         animRef.current = requestAnimationFrame(tick);
       }
     }
 
     animRef.current = requestAnimationFrame(tick);
-
-    return () => {
-      cancelled = true;
-      if (animRef.current) cancelAnimationFrame(animRef.current);
-    };
+    return () => { cancelled = true; if (animRef.current) cancelAnimationFrame(animRef.current); };
   }, [entry.phase, targetPct]);
 
-  // Snap to 100% when done
+  useEffect(() => { if (isDone) setSmoothPct(100); }, [isDone]);
+
   useEffect(() => {
-    if (isDone) setSmoothPct(100);
-  }, [isDone]);
+    if (autoScroll && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [activities.length, autoScroll]);
 
   const displayPct = isDone ? 100 : Math.round(smoothPct);
   const barColor = isDone ? "var(--green)" : isError ? "var(--red)" : "var(--orange)";
   const icon = isDone ? "✅" : isError ? "⚠️" : "⚡";
 
   return (
-    <div
-      className={`pixel-card-sm bg-white ${expanded ? "" : "cursor-pointer"}`}
-      style={{ transition: "all 0.2s ease-out" }}
-    >
-      {/* Minimized bar */}
+    <div className="pixel-card-sm bg-white" style={{ transition: "all 0.2s ease-out" }}>
+      {/* Minimized header bar */}
       <div
-        className="p-3 flex items-center gap-3"
-        onClick={() => !isDone && !isError && setExpanded(!expanded)}
+        className="p-3 flex items-center gap-3 cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
       >
         <span className="text-lg shrink-0">{icon}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
             <span className="font-bold text-sm truncate">{entry.title}</span>
             <span className="pixel text-xs sm:text-[9px] shrink-0 ml-2" style={{ color: barColor }}>
-              {label} {!isDone && !isError ? `${displayPct}%` : ""}
+              {isDone ? "DONE" : isError ? "ERROR" : `${label} ${displayPct}%`}
             </span>
           </div>
-          {!isDone && !isError && !expanded && (
-            <div className="w-full h-2 border border-black bg-white overflow-hidden">
-              <div
-                className="h-full"
-                style={{ width: `${displayPct}%`, background: barColor, transition: "width 0.3s linear" }}
-              />
-            </div>
-          )}
-          {isDone && (
-            <div className="w-full h-2 border border-black bg-white overflow-hidden">
-              <div className="h-full" style={{ width: "100%", background: barColor }} />
-            </div>
-          )}
+          <div className="w-full h-2 border border-black bg-white overflow-hidden">
+            <div className="h-full" style={{ width: `${displayPct}%`, background: barColor, transition: "width 0.3s linear" }} />
+          </div>
         </div>
         {isDone && (
-          <a
-            href={`/article/${entry.slug}`}
-            className="btn-primary btn-sm shrink-0"
-            data-color="green"
-          >
-            VIEW
-          </a>
+          <a href={`/article/${entry.slug}`} className="btn-primary btn-sm shrink-0" data-color="green" onClick={(e) => e.stopPropagation()}>VIEW</a>
         )}
         {isError && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onRetry(entry.slug); }}
-            className="btn-primary btn-sm shrink-0"
-            data-color="red"
-          >
-            RETRY
-          </button>
+          <button onClick={(e) => { e.stopPropagation(); onRetry(entry.slug); }} className="btn-primary btn-sm shrink-0" data-color="red">RETRY</button>
         )}
-        {!isDone && !isError && showWatchLive && (
-          <a
-            href={`/generate/${entry.slug}`}
-            className="btn-primary btn-sm shrink-0"
-            data-color="blue"
-            onClick={(e) => e.stopPropagation()}
-          >
-            LIVE
-          </a>
-        )}
-        <button
-          onClick={(e) => { e.stopPropagation(); onDismiss(entry.slug); }}
-          className="btn-ghost shrink-0"
-          style={{ minWidth: "44px", minHeight: "44px" }}
-          title="Dismiss"
-        >
-          ✕
-        </button>
+        <button onClick={(e) => { e.stopPropagation(); onDismiss(entry.slug); }} className="btn-ghost shrink-0" style={{ minWidth: "44px", minHeight: "44px" }} title="Dismiss">✕</button>
       </div>
 
-      {/* Expanded details */}
-      {expanded && !isDone && !isError && (
-        <div className="px-4 pb-4 border-t-2 border-dashed border-[#e0e0e0] pt-3">
-          {/* Progress bar (larger in expanded view) */}
-          <div className="w-full h-4 border-2 border-black mb-3 bg-white overflow-hidden">
-            <div
-              className="h-full"
-              style={{ width: `${displayPct}%`, background: barColor, transition: "width 0.3s linear" }}
-            />
+      {/* Expanded live view */}
+      {expanded && (
+        <div className="border-t-2 border-dashed border-[#e0e0e0]">
+          {/* Phase Timeline */}
+          <div className="px-4 pt-3 pb-2">
+            <PhaseTimeline currentPhase={entry.phase} />
           </div>
 
-          {/* Phase timeline */}
-          <div className="space-y-2">
-            {timeline.map((p) => (
-              <div key={p.phase} className="flex items-center gap-3 text-xs">
-                <span className="w-5 text-center">
-                  {p.completed ? "✅" : entry.phase === p.phase ? "⏳" : "⬜"}
+          {/* Activity Feed */}
+          {!isDone && !isError && (
+            <div className="px-4 pb-2">
+              <div className="flex items-center justify-between mb-2">
+                <span className="pixel text-[9px] font-semibold" style={{ color: "#5f6368" }}>
+                  LIVE ACTIVITY ({activities.length})
                 </span>
-                <span
-                  className="font-semibold"
-                  style={{
-                    color: entry.phase === p.phase ? barColor : p.completed ? "var(--green)" : "#aaa",
-                  }}
+                <button
+                  onClick={() => setAutoScroll(!autoScroll)}
+                  className="btn-ghost"
+                  style={{ color: autoScroll ? "var(--blue)" : "#aaa", fontWeight: autoScroll ? 600 : 400, fontSize: "7px" }}
                 >
-                  {p.label}
-                </span>
-                <span className="text-[#aaa] ml-auto">{p.time}</span>
+                  {autoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}
+                </button>
               </div>
-            ))}
-          </div>
-
-          {showWatchLive && (
-            <div className="mt-3 flex gap-2">
-              <a
-                href={`/generate/${entry.slug}`}
-                className="btn-primary btn-sm"
-                data-color="blue"
+              <div
+                ref={scrollRef}
+                className="activity-feed-inline"
+                onScroll={() => {
+                  if (!scrollRef.current) return;
+                  const el = scrollRef.current;
+                  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
+                  if (atBottom !== autoScroll) setAutoScroll(atBottom);
+                }}
               >
-                WATCH LIVE →
-              </a>
+                {activities.length === 0 && (
+                  <div className="activity-empty">
+                    <div className="empty-pulse" />
+                    <p>Waiting for agent activity...</p>
+                  </div>
+                )}
+                {activities.map((a) => (
+                  <div key={a.id} className={`activity-card ${a.type}`}>
+                    <div className="activity-icon">{a.icon}</div>
+                    <div className="activity-body">
+                      <div className="activity-content">{a.content}</div>
+                      {a.metadata && <div className="activity-meta"><code>{a.metadata}</code></div>}
+                    </div>
+                    <div className="activity-time">
+                      {new Date(a.timestamp).toLocaleTimeString("en-US", { minute: "2-digit", second: "2-digit" })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Agent activity stream */}
-          {entry.agentEvents && entry.agentEvents.length > 0 && (
-            <ProcessViewer events={entry.agentEvents} />
+          {/* Error detail */}
+          {isError && (
+            <div className="px-4 pb-4 pt-2">
+              <p className="text-xs text-[var(--red)] mb-2">{entry.error || "Unknown error"}</p>
+              <button onClick={() => onRetry(entry.slug)} className="btn-primary btn-sm" data-color="red">RETRY GENERATION</button>
+            </div>
           )}
-        </div>
-      )}
 
-      {/* Error details */}
-      {expanded && isError && (
-        <div className="px-4 pb-4 border-t-2 border-dashed border-[#e0e0e0] pt-3">
-          <p className="text-xs text-[var(--red)] mb-2">{entry.error}</p>
-          <button
-            onClick={() => onRetry(entry.slug)}
-            className="btn-primary btn-sm"
-          >
-            RETRY GENERATION
-          </button>
+          {/* Done celebration */}
+          {isDone && (
+            <div className="done-banner-inline">
+              <div className="done-icon">🎉</div>
+              <h2>Article Complete</h2>
+              <p>The encyclopedia has a new entry on <strong>{entry.title}</strong>.</p>
+              <div className="done-actions">
+                <a href={`/article/${entry.slug}`} className="btn-primary">Read Article</a>
+                <button onClick={() => onRetry(entry.slug)} className="btn-secondary">Regenerate</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

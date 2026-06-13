@@ -544,6 +544,36 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             flex-wrap: wrap;
           }
 
+          /* Inline activity feed inside GenerationBar */
+          .activity-feed-inline {
+            max-height: 320px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+            border: 2px solid var(--ink);
+            padding: 0.5rem;
+            background: #fafafa;
+          }
+          .done-banner-inline {
+            text-align: center;
+            padding: 2rem 1rem;
+            animation: slide-up 0.5s ease-out;
+          }
+          .done-banner-inline .done-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+            animation: breathe 2s ease-in-out infinite;
+          }
+          .done-banner-inline h2 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.9rem;
+            margin: 0 0 0.5rem;
+          }
+          .done-banner-inline p {
+            font-size: 0.95rem;
+            color: #5f6368;
+            margin: 0 0 1.25rem;
+          }
+
           /* Scroll toggle */
           .scroll-toggle {
             position: fixed;
