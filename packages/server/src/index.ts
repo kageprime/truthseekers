@@ -571,6 +571,11 @@ async function processArticle(slug: string, meta?: Record<string, string>): Prom
       () => mediaPhase(slug, outline, content, persona, onAgentEvent), "media"
     );
 
+    if (!content.sections || !Array.isArray(content.sections)) {
+      console.error(`[processArticle] Invalid content for "${slug}": sections is ${typeof content.sections}. Content keys: ${Object.keys(content).join(", ")}`);
+      throw new Error("content.sections is not iterable or missing from article content");
+    }
+
     const imageItems: { prompt: string; id: string; caption?: string }[] = [];
 
     for (const mediaItem of mediaResult.mediaItems || []) {
@@ -600,8 +605,8 @@ async function processArticle(slug: string, meta?: Record<string, string>): Prom
       const generated = await generateImagesBatch(imageItems);
 
       for (const gen of generated) {
-        for (const section of content.sections) {
-          for (const media of section.media) {
+        for (const section of content.sections ?? []) {
+          for (const media of section.media ?? []) {
             if (media.id === gen.id) {
               media.src = gen.url;
             }
