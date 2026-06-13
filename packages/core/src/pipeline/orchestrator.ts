@@ -202,7 +202,18 @@ No text outside the JSON object.` }
     { model: "deepseek-v4-pro", maxTokens: 32768, reasoningEffort: "high" }
   );
 
-  return await extractJSON(response) as ArticleContent;
+  const raw = (await extractJSON(response)) as Record<string, unknown>;
+  const content: ArticleContent = {
+    title: (raw.title as string) || topic,
+    abstract: (raw.abstract as string) || "",
+    sections: Array.isArray(raw.sections) ? (raw.sections as ArticleContent["sections"]) : [],
+    timeline: Array.isArray(raw.timeline) ? (raw.timeline as ArticleContent["timeline"]) : [],
+    categories: Array.isArray(raw.categories) ? (raw.categories as string[]) : [],
+    crossrefs: Array.isArray(raw.crossrefs) ? (raw.crossrefs as ArticleContent["crossrefs"]) : [],
+    citations: Array.isArray(raw.citations) ? (raw.citations as ArticleContent["citations"]) : [],
+    threedScenes: Array.isArray(raw.threedScenes) ? (raw.threedScenes as ArticleContent["threedScenes"]) : [],
+  };
+  return content;
 }
 
 export async function verifyPhase(
@@ -351,5 +362,15 @@ IMPORTANT: Output valid JSON only.` }
     onEvent
   );
 
-  return await extractJSON(response) as ArticleContent;
+  const raw = (await extractJSON(response)) as Record<string, unknown>;
+  return {
+    title: (raw.title as string) || content.title || topic,
+    abstract: (raw.abstract as string) || content.abstract || "",
+    sections: Array.isArray(raw.sections) ? (raw.sections as ArticleContent["sections"]) : content.sections || [],
+    timeline: Array.isArray(raw.timeline) ? (raw.timeline as ArticleContent["timeline"]) : content.timeline || [],
+    categories: Array.isArray(raw.categories) ? (raw.categories as string[]) : content.categories || [],
+    crossrefs: Array.isArray(raw.crossrefs) ? (raw.crossrefs as ArticleContent["crossrefs"]) : content.crossrefs || [],
+    citations: Array.isArray(raw.citations) ? (raw.citations as ArticleContent["citations"]) : content.citations || [],
+    threedScenes: Array.isArray(raw.threedScenes) ? (raw.threedScenes as ArticleContent["threedScenes"]) : content.threedScenes || [],
+  };
 }
