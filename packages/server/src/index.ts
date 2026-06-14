@@ -56,6 +56,7 @@ import {
   mapListQuerySchema,
   mapSearchQuerySchema,
 } from "./validation.js";
+import authRoutes from "./auth-routes.js";
 
 const app = new Hono();
 
@@ -91,6 +92,9 @@ app.use("*", cors({
     return null;
   },
 }));
+
+// Mount auth routes (no auth required)
+app.route("/auth", authRoutes);
 
 // Skip rate limiting for status/polling endpoints
 app.use("/queue", async (c, next) => { await next(); });

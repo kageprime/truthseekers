@@ -30,12 +30,17 @@ export {
   revokeApiKey,
   getApiKey,
   touchApiKey,
+  createUser,
+  getUserByEmail,
+  getUserById,
+  updateUser,
+  setUserOnboarded,
 } from "./db.js";
 
 export { commitArticle, getArticleHistory, getArticleAtVersion, getRepoStatus } from "./git.js";
 
 export { indexArticle, semanticSearch } from "./vector.js";
-export { ArticleModel, GraphEdgeModel, MapEntryModel, ArticleViewModel, JobModel, ConversationModel, MessageModel, ApiKeyModel } from "./db.js";
+export { ArticleModel, GraphEdgeModel, MapEntryModel, ArticleViewModel, JobModel, ConversationModel, MessageModel, ApiKeyModel, UserModel } from "./db.js";
 export {
   createConversation,
   listConversations,

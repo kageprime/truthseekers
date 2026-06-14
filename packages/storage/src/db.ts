@@ -527,6 +527,48 @@ export async function touchApiKey(key: string): Promise<void> {
   await ApiKeyModel.updateOne({ key }, { lastUsedAt: new Date() });
 }
 
+// ── Users ─────────────────────────────────────────────────────────────────
+
+const userSchema = new Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  email: { type: String, required: true, unique: true, index: true },
+  name: { type: String, default: "" },
+  avatar: { type: String, default: "" },
+  stripeCustomerId: { type: String },
+  subscriptionTier: { type: String, enum: ["free", "pro", "enterprise"], default: "free" },
+  onboarded: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now },
+});
+
+const UserModel = mongoose.models.User ?? mongoose.model("User", userSchema);
+
+export { UserModel };
+
+export async function createUser(id: string, email: string): Promise<{ id: string; email: string; name: string; avatar: string; subscriptionTier: string; onboarded: boolean; createdAt: Date }> {
+  const doc = await UserModel.create({ id, email });
+  return { id: doc.id, email: doc.email, name: doc.name, avatar: doc.avatar, subscriptionTier: doc.subscriptionTier, onboarded: doc.onboarded, createdAt: doc.createdAt };
+}
+
+export async function getUserByEmail(email: string): Promise<{ id: string; email: string; name: string; avatar: string; subscriptionTier: string; onboarded: boolean } | null> {
+  const doc: any = await UserModel.findOne({ email }).lean();
+  if (!doc) return null;
+  return { id: doc.id, email: doc.email, name: doc.name, avatar: doc.avatar, subscriptionTier: doc.subscriptionTier, onboarded: doc.onboarded };
+}
+
+export async function getUserById(id: string): Promise<{ id: string; email: string; name: string; avatar: string; subscriptionTier: string; onboarded: boolean } | null> {
+  const doc: any = await UserModel.findOne({ id }).lean();
+  if (!doc) return null;
+  return { id: doc.id, email: doc.email, name: doc.name, avatar: doc.avatar, subscriptionTier: doc.subscriptionTier, onboarded: doc.onboarded };
+}
+
+export async function updateUser(id: string, updates: { name?: string; avatar?: string }): Promise<void> {
+  await UserModel.updateOne({ id }, { $set: updates });
+}
+
+export async function setUserOnboarded(id: string): Promise<void> {
+  await UserModel.updateOne({ id }, { $set: { onboarded: true } });
+}
+
 // ── Graph Edges ──────────────────────────────────────────────────────────
 
 export async function upsertGraphEdges(
