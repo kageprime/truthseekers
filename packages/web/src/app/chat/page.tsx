@@ -12,7 +12,7 @@ export default function ChatListPage() {
   }
 
   return (
-    <PageLayout sidebar noFooter>
+    <PageLayout sidebar noFooter noHeader>
       <div className="flex-1 flex flex-col items-center justify-center px-6">
         <div className="text-center max-w-md">
           <div className="text-5xl mb-4">💬</div>

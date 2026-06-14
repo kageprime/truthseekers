@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import SharedHeader from "./SharedHeader";
 import Sidebar from "./Sidebar";
 
@@ -16,6 +16,7 @@ interface PageLayoutProps {
   sidebarDefaultOpen?: boolean;
   activeId?: string;
   noFooter?: boolean;
+  noHeader?: boolean;
 }
 
 export default function PageLayout({
@@ -26,17 +27,31 @@ export default function PageLayout({
   sidebarDefaultOpen = false,
   activeId,
   noFooter = false,
+  noHeader = false,
 }: PageLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(sidebarDefaultOpen);
 
+  const toggleSidebar = useCallback(() => setSidebarOpen((o) => !o), []);
+
   return (
     <div className="h-screen overflow-hidden flex flex-col" style={{ background: "var(--warm)" }}>
-      <SharedHeader
-        links={navLinks}
-        onToggleSidebar={sidebar ? () => setSidebarOpen((o) => !o) : undefined}
-        sidebarOpen={sidebarOpen}
-      />
-      <div className="flex flex-row flex-1 min-h-0 relative">
+      {!noHeader && (
+        <SharedHeader
+          links={navLinks}
+          onToggleSidebar={sidebar ? toggleSidebar : undefined}
+          sidebarOpen={sidebarOpen}
+        />
+      )}
+      {noHeader && sidebar && !sidebarOpen && (
+        <button
+          onClick={toggleSidebar}
+          className="fixed top-4 left-4 z-50 w-9 h-9 flex items-center justify-center border-2 border-black shadow-[2px_2px_0_#1c1917] bg-white text-sm transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_#1c1917] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_#1c1917]"
+          aria-label="Open sidebar"
+        >
+          ☰
+        </button>
+      )}
+      <div className="flex flex-row flex-1 min-h-0 relative overflow-x-hidden">
         {/* Wave background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute inset-0 opacity-[0.07] wave-1">

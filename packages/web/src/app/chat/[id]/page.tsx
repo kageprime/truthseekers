@@ -262,7 +262,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   if (loading) {
     return (
-      <PageLayout sidebar sidebarDefaultOpen activeId={id} noFooter>
+      <PageLayout sidebar sidebarDefaultOpen activeId={id} noFooter noHeader>
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6">
           <div className="w-8 h-8 rounded-full border-3 animate-spin" style={{ borderColor: "#e0e0e0", borderTopColor: "var(--orange)" }} />
           <p className="text-sm" style={{ color: "#9aa0a6" }}>Loading conversation...</p>
@@ -273,7 +273,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   if (!data) {
     return (
-      <PageLayout sidebar sidebarDefaultOpen activeId={id} noFooter>
+      <PageLayout sidebar sidebarDefaultOpen activeId={id} noFooter noHeader>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <p className="text-sm mb-4" style={{ color: "#9aa0a6" }}>Conversation not found</p>
@@ -285,7 +285,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   }
 
   return (
-    <PageLayout sidebar sidebarDefaultOpen activeId={id} noFooter>
+    <PageLayout sidebar sidebarDefaultOpen activeId={id} noFooter noHeader>
       <div className="flex-1 flex flex-col min-h-0 chat-enter">
         <MessageList
           messages={messages}
