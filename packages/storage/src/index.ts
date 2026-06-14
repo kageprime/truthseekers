@@ -22,9 +22,20 @@ export {
   trackArticleView,
   getArticleViewCount,
   getTopArticles,
+  memStore,
+  memRecall,
+  memRecallAll,
 } from "./db.js";
 
 export { commitArticle, getArticleHistory, getArticleAtVersion, getRepoStatus } from "./git.js";
 
 export { indexArticle, semanticSearch } from "./vector.js";
-export { ArticleModel, GraphEdgeModel, MapEntryModel, ArticleViewModel, JobModel } from "./db.js";
+export { ArticleModel, GraphEdgeModel, MapEntryModel, ArticleViewModel, JobModel, ConversationModel, MessageModel } from "./db.js";
+export {
+  createConversation,
+  listConversations,
+  getConversation,
+  getMessages,
+  addMessage,
+  updateConversationTitle,
+} from "./db.js";

@@ -54,6 +54,16 @@ export function BlankSlateMedia() {
   );
 }
 
+export function MediaImage({ src, caption, prompt }: { src?: string; caption?: string; prompt?: string }) {
+  if (src) {
+    return <FigureImage src={src} caption={caption || "Image"} />;
+  }
+  if (prompt) {
+    return <SkeletonImage caption={caption} />;
+  }
+  return <BlankSlateImage caption={caption} prompt={prompt} />;
+}
+
 export function FigureImage({ src, caption, source }: { src: string; caption: string; source?: string }) {
   return (
     <figure className="pixel-card-sm p-3 my-2" style={{ background: "white" }}>

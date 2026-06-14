@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
 
@@ -80,7 +81,7 @@ export default function QueueIndicator() {
         className="pixel text-[9px] px-3 py-3 sm:py-2 min-h-[44px] border-2 border-black shadow-[2px_2px_0_#1c1917] relative"
         style={{ background: total > 0 ? "var(--orange)" : "white", color: total > 0 ? "white" : "var(--ink)" }}
       >
-        {total > 0 ? `⚡ ${total}` : "QUEUE"}
+        {total > 0 ? `⚡ ${total}` : "JOBS"}
       </button>
 
       {open && (
@@ -103,7 +104,7 @@ export default function QueueIndicator() {
             ) : (
               <div className="space-y-1">
                 {activeJobs.map((job) => (
-                  <a
+                  <Link
                     key={job.slug}
                     href={`/article/${job.slug}`}
                     className="flex items-center gap-2 px-2 py-1.5 border border-black/10 hover:bg-[var(--cream)] transition"
@@ -114,7 +115,7 @@ export default function QueueIndicator() {
                     </span>
                     <span className="text-xs font-medium truncate flex-1">{job.title || job.slug}</span>
                     <span className="pixel text-[9px] sm:text-[7px] text-[#888] uppercase">{job.status}</span>
-                  </a>
+                  </Link>
                 ))}
               </div>
             )}

@@ -31,9 +31,39 @@ Truthseekers is an SDK for building AI-powered encyclopedias. Third parties inte
 - **Web (Vercel):** `truthseeker-web` — Next.js static app, calls API via `NEXT_PUBLIC_API_URL`
 - **CORS:** API locked to `https://truthseeker-web.vercel.app` (update to `terranet.tech` when domain ready)
 
-## Pipeline Phases
+## Agent Tool Loop (Chat)
 
-The agent pipeline has 8 sequential phases, each streaming real-time event data:
+The chat agent uses a tool-calling loop with a **planning phase** before execution:
+
+| Phase | Description |
+|-------|-------------|
+| 3a. Plan | LLM outputs a JSON array of tool names in execution order. Plan injected as system message. First `n` iterations use `tool_choice` to force the planned tool. |
+| 3b. Execute | Up to `MAX_TOOL_ITERATIONS` iterations. Each iteration calls `sendPromptStream` with tools, executes tool results via `toolExecutors` record, and feeds back as `tool` role messages. |
+| 3c. Finalize | When LLM returns no tool calls, response text is streamed as final answer. |
+
+## Tool Registry
+
+All tool definitions live in `core/src/tools.ts` (13 tools). Built-in executors (4) also in core; server-dependent executors (9) in `server/src/index.ts`.
+
+| Tool | Executor Location | Purpose |
+|------|-------------------|---------|
+| `web_search` | Core (built-in) | Searches the web via search API |
+| `webfetch` | Core (built-in) | Fetches URL content, strips HTML |
+| `verify_citation` | Core (built-in) | LLM verdict on whether source supports claim |
+| `render_blocks` | Core (built-in) | Returns `output.blocks` for rich rendering |
+| `get_article` | Server | Fetches article by slug, returns blocks |
+| `create_article` | Server | Queues full article generation |
+| `article_search` | Server | Searches articles by query |
+| `get_map` | Server | Fetches map by slug, returns `map_2d` block |
+| `generate_image` | Server | DALL-E image generation via `imageGen.ts` |
+| `suggest_related` | Server | Returns outgoing + incoming graph edges |
+| `task` | Server | Delegates to sub-agent with limited tool set |
+| `mem_store` | Server | Stores key-value preference in MongoDB `Memory` model |
+| `mem_recall` | Server | Recalls stored key-value preference |
+
+## Pipeline Phases (Article Generation)
+
+The article generation pipeline has 8 sequential phases, each streaming real-time event data:
 
 | Phase | Duration | Purpose |
 |-------|----------|---------|

@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import Link from "next/link";
 
 interface Props {
   children: ReactNode;
@@ -60,12 +61,12 @@ export default class ErrorBoundary extends Component<Props, State> {
             >
               Try Again
             </button>
-            <a
+            <Link
               href="/"
               className="block mt-3 text-sm text-[#5f6368] hover:text-[#ea580c]"
             >
               ← Back to home
-            </a>
+            </Link>
           </div>
         </div>
       );

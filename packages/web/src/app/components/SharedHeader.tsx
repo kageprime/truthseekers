@@ -1,24 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import TruthseekersLogo from "./TruthseekersLogo";
 import QueueIndicator from "./QueueIndicator";
 import HamburgerMenu from "./HamburgerMenu";
 
 interface HeaderProps {
   links?: Array<{ label: string; href: string }>;
+  onToggleSidebar?: () => void;
+  sidebarOpen?: boolean;
 }
 
 export default function SharedHeader({
   links = [
-    { label: "Home", href: "/" },
-    { label: "Maps", href: "/maps" },
-    { label: "New Article", href: "/article/new" },
     { label: "Queue", href: "/queue" },
   ],
+  onToggleSidebar,
+  sidebarOpen,
 }: HeaderProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
   return (
     <header className="sticky top-0 z-50 border-b" style={{ borderColor: "#dadce0", background: "white" }}>
       {/* Wave background */}
@@ -28,25 +27,38 @@ export default function SharedHeader({
         </svg>
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6 py-4">
+      <div className="relative z-10 px-4 py-4">
         {/* Top bar */}
-        <div className="flex items-center justify-between gap-4">
-          <TruthseekersLogo />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            {onToggleSidebar && (
+              <button
+                onClick={onToggleSidebar}
+                className="flex items-center justify-center rounded-lg hover:bg-[#f5f5f4] transition-colors"
+                style={{ width: "32px", height: "32px", fontSize: "16px", color: "#5f6368" }}
+                aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+              >
+                {sidebarOpen ? "◀" : "☰"}
+              </button>
+            )}
+            <TruthseekersLogo />
+          </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <QueueIndicator />
 
             {/* Desktop nav links */}
             {links.length > 0 && (
-              <div className="hidden sm:flex items-center gap-6 text-sm" style={{ color: "#5f6368" }}>
+              <div className="hidden sm:flex items-center gap-3 text-sm" style={{ color: "#5f6368" }}>
                 {links.map((link) => (
-                  <a
+                  <Link
                     key={link.href}
                     href={link.href}
-                    className="hover:text-[#1a1a1a] hover:underline transition-colors"
+                    className="pixel text-[9px] px-3 py-3 sm:py-2 min-h-[44px] border-2 border-black shadow-[2px_2px_0_#1c1917] inline-flex items-center justify-center no-underline transition-all hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-[4px_4px_0_#1c1917] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_#1c1917]"
+                    style={{ background: "white", color: "var(--ink)", textTransform: "uppercase" }}
                   >
                     {link.label}
-                  </a>
+                  </Link>
                 ))}
               </div>
             )}
@@ -54,13 +66,13 @@ export default function SharedHeader({
             {/* Mobile hamburger */}
             <HamburgerMenu>
               {links.map((link) => (
-                <a
+                <Link
                   key={link.href}
                   href={link.href}
                   className="block px-4 py-3 text-sm font-medium hover:bg-[#f1f3f4] rounded-lg transition-colors"
                 >
                   {link.label}
-                </a>
+                </Link>
               ))}
             </HamburgerMenu>
           </div>

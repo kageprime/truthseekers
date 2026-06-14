@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import PhaseTimeline from "./PhaseTimeline";
 import type { AgentEvent } from "./ProcessViewer";
 
@@ -55,7 +56,13 @@ function toolLabel(name: string): string {
     firecrawl_search: "Searching the web", websearch: "Searching the web", webfetch: "Fetching a page",
     read: "Reading a file", write: "Writing content", edit: "Editing content",
     glob: "Searching files", grep: "Searching code", bash: "Running a command",
-    task: "Spawning sub-agent", think: "Thinking",
+    web_search: "Searching the web", article_search: "Searching articles",
+    get_article: "Looking up article", get_map: "Looking up map",
+    generate_image: "Generating image", verify_citation: "Verifying citation",
+    suggest_related: "Finding related", render_blocks: "Rendering content",
+    create_article: "Generating article", task: "Spawning sub-agent",
+    mem_store: "Remembering", mem_recall: "Recalling",
+    think: "Thinking",
   };
   return labels[name] ?? `Using ${name}`;
 }
@@ -63,9 +70,16 @@ function toolLabel(name: string): string {
 function toolIcon(name: string): string {
   const icons: Record<string, string> = {
     firecrawl_search: "🔍", websearch: "🔍", webfetch: "🌐", read: "📖",
-    write: "✍️", edit: "📝", glob: "📁", grep: "🔎", bash: "💻", task: "🤖", think: "🧠",
+    write: "✍️", edit: "📝", glob: "📁", grep: "🔎", bash: "💻",
+    web_search: "🔍", article_search: "📚",
+    get_article: "📖", get_map: "🗺️",
+    generate_image: "🎨", verify_citation: "✅",
+    suggest_related: "🔗", render_blocks: "🎨",
+    create_article: "✨", task: "🤖",
+    mem_store: "💾", mem_recall: "🔍",
+    think: "🧠",
   };
-  return icons[name] ?? "🔧";
+  return icons[name] ?? "•";
 }
 
 const PHASE_CHECKPOINTS: Record<string, number> = {
@@ -186,7 +200,7 @@ export default function GenerationBar({
           </div>
         </div>
         {isDone && (
-          <a href={`/article/${entry.slug}`} className="btn-primary btn-sm shrink-0" data-color="green" onClick={(e) => e.stopPropagation()}>VIEW</a>
+          <Link href={`/article/${entry.slug}`} className="btn-primary btn-sm shrink-0" data-color="green" onClick={(e) => e.stopPropagation()}>VIEW</Link>
         )}
         {isError && (
           <button onClick={(e) => { e.stopPropagation(); onRetry(entry.slug); }} className="btn-primary btn-sm shrink-0" data-color="red">RETRY</button>
@@ -196,7 +210,7 @@ export default function GenerationBar({
 
       {/* Expanded live view */}
       {expanded && (
-        <div className="border-t-2 border-dashed border-[#e0e0e0]">
+        <div className="border-t-2" style={{ borderColor: "#e0e0e0" }}>
           {/* Phase Timeline */}
           <div className="px-4 pt-3 pb-2">
             <PhaseTimeline currentPhase={entry.phase} />
@@ -264,7 +278,7 @@ export default function GenerationBar({
               <h2>Article Complete</h2>
               <p>The encyclopedia has a new entry on <strong>{entry.title}</strong>.</p>
               <div className="done-actions">
-                <a href={`/article/${entry.slug}`} className="btn-primary">Read Article</a>
+                <Link href={`/article/${entry.slug}`} className="btn-primary">Read Article</Link>
                 <button onClick={() => onRetry(entry.slug)} className="btn-secondary">Regenerate</button>
               </div>
             </div>

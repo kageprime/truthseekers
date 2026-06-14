@@ -85,7 +85,7 @@ export default function MapsPage() {
         gradient="green"
       />
 
-      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-6 pb-16">
+      <main className="flex-1 overflow-y-auto max-w-6xl mx-auto w-full px-6 py-6 pb-16">
         {loading ? (
           <CardGridSkeleton />
         ) : (

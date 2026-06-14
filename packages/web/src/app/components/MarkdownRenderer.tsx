@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -8,6 +9,23 @@ import "katex/dist/katex.min.css";
 
 interface MarkdownRendererProps {
   content: string;
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      className="absolute top-1 right-1 px-2 py-0.5 text-[10px] font-sans rounded opacity-0 group-hover:opacity-100 transition-opacity"
+      style={{ background: "#333", color: "#ccc" }}
+    >
+      {copied ? "Copied" : "Copy"}
+    </button>
+  );
 }
 
 export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
@@ -64,38 +82,40 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
         code({ className, children, ...props }) {
           const isInline = !className;
           if (isInline) {
-            return (
-              <code
-                style={{
-                  background: "#f0f0f0",
-                  padding: "0.15rem 0.4rem",
-                  borderRadius: "3px",
-                  fontSize: "0.9em",
-                  border: "1px solid #ddd",
-                }}
+          return (
+            <code
+              style={{
+                background: "#f0f0f0",
+                padding: "0.15rem 0.4rem",
+                fontSize: "0.9em",
+                border: "1px solid #ddd",
+              }}
                 {...props}
               >
                 {children}
               </code>
             );
           }
+          const codeText = String(children).replace(/\n$/, "");
           return (
-            <pre
-              style={{
-                background: "#1a1a2e",
-                color: "#e0e0e0",
-                padding: "1rem",
-                borderRadius: "4px",
-                overflowX: "auto",
-                fontSize: "0.85rem",
-                lineHeight: "1.4",
-                margin: "0.75rem 0",
-              }}
-            >
-              <code className={className} {...props}>
-                {children}
-              </code>
-            </pre>
+            <div className="relative group">
+              <CopyButton text={codeText} />
+              <pre
+                style={{
+                  background: "#1a1a2e",
+                  color: "#e0e0e0",
+                  padding: "1rem",
+                  overflowX: "auto",
+                  fontSize: "0.85rem",
+                  lineHeight: "1.4",
+                  margin: "0.75rem 0",
+                }}
+              >
+                <code className={className} {...props}>
+                  {children}
+                </code>
+              </pre>
+            </div>
           );
         },
         a({ href, children }) {
@@ -114,11 +134,11 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
           return (
             <blockquote
               style={{
-                borderLeft: "4px solid var(--orange)",
                 padding: "0.75rem 1rem",
                 margin: "1rem 0",
                 background: "var(--cream)",
                 fontStyle: "italic",
+                border: "2px solid var(--ink)",
               }}
             >
               {children}
@@ -174,7 +194,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
             <hr
               style={{
                 border: "none",
-                borderTop: "2px dashed #e0e0e0",
+                borderTop: "2px solid var(--ink)",
                 margin: "1.5rem 0",
               }}
             />

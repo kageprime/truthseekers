@@ -90,7 +90,7 @@ export default function QueuePage() {
   return (
     <PageLayout>
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-10">
+      <main className="flex-1 overflow-y-auto max-w-5xl mx-auto w-full px-6 py-10">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-2">
           <div>

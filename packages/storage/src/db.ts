@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import mongoose, { Schema, type Model, type Document } from "mongoose";
-import type { Article, ArticleContent, ArticleMetadata, MapEntry, ThreeDMapScene } from "@encarta/core";
+import type { Article, ArticleContent, ArticleMetadata, MapEntry, ThreeDMapScene, Block } from "@encarta/core";
 
 // Load root .env before accessing env vars
 dotenv.config({ path: path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "..", ".env") });
@@ -117,6 +117,13 @@ const metadataSchema = new Schema({
   freshness: { type: String },
 }, { _id: false });
 
+const blockSchema = new Schema({
+  id: { type: String, required: true },
+  type: { type: String, required: true },
+  data: { type: Schema.Types.Mixed, required: true },
+  meta: { type: Schema.Types.Mixed },
+}, { _id: false });
+
 const articleSchema = new Schema({
   slug: { type: String, required: true, unique: true },
   title: { type: String, required: true },
@@ -127,6 +134,7 @@ const articleSchema = new Schema({
   crossrefs: { type: [crossRefSchema], default: [] },
   citations: { type: [citationSchema], default: [] },
   threedScenes: { type: [threedSceneSchema], default: [] },
+  blocks: { type: [blockSchema], default: [] },
   metadata: { type: metadataSchema, required: true },
 });
 
@@ -304,6 +312,7 @@ function docToArticle(doc: any): Article {
     crossrefs: content.crossrefs as ArticleContent["crossrefs"],
     citations: content.citations as ArticleContent["citations"],
     threedScenes: content.threedScenes as ArticleContent["threedScenes"],
+    blocks: content.blocks as Block[] | undefined,
     metadata: content.metadata as ArticleMetadata,
   };
 }
@@ -447,6 +456,34 @@ export async function searchArticles(
     title: d.title as string,
     abstract: d.abstract as string,
   }));
+}
+
+// ── Memory (Key-Value Store) ─────────────────────────────────────────────
+
+const memorySchema = new Schema({
+  key: { type: String, required: true, unique: true },
+  value: { type: String, required: true },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+const MemoryModel = mongoose.models.Memory ?? mongoose.model("Memory", memorySchema);
+
+export async function memStore(key: string, value: string): Promise<void> {
+  await MemoryModel.findOneAndUpdate(
+    { key },
+    { key, value, updatedAt: new Date() },
+    { upsert: true },
+  );
+}
+
+export async function memRecall(key: string): Promise<string | null> {
+  const doc = await MemoryModel.findOne({ key }).lean();
+  return doc ? (doc as any).value : null;
+}
+
+export async function memRecallAll(): Promise<Array<{ key: string; value: string }>> {
+  const docs = await MemoryModel.find({}).lean();
+  return docs.map((d: any) => ({ key: d.key, value: d.value }));
 }
 
 // ── Graph Edges ──────────────────────────────────────────────────────────
@@ -928,6 +965,81 @@ async function seedMaps(): Promise<void> {
 
   await MapEntryModel.insertMany(interactiveMaps);
 }
+
+// ── Chat ──────────────────────────────────────────────────────────────────
+
+const messageSchema = new Schema({
+  id: { type: String, required: true },
+  conversationId: { type: String, required: true, index: true },
+  role: { type: String, enum: ["user", "assistant", "system"], required: true },
+  content: { type: String, required: true },
+  createdAt: { type: String, required: true },
+});
+
+const conversationSchema = new Schema({
+  id: { type: String, required: true, unique: true },
+  title: { type: String, required: true },
+  createdAt: { type: String, required: true },
+  updatedAt: { type: String, required: true },
+});
+
+const ConversationModel = mongoose.model("Conversation", conversationSchema);
+const MessageModel = mongoose.model("Message", messageSchema);
+
+export { ConversationModel, MessageModel };
+
+export async function createConversation(id: string, title: string): Promise<{ id: string; title: string; createdAt: string; updatedAt: string }> {
+  const now = new Date().toISOString();
+  await ConversationModel.create({ id, title, createdAt: now, updatedAt: now });
+  return { id, title, createdAt: now, updatedAt: now };
+}
+
+export async function listConversations(): Promise<Array<{ id: string; title: string; createdAt: string; updatedAt: string; messageCount: number }>> {
+  const convs = await ConversationModel.find().sort({ updatedAt: -1 }).lean();
+  return await Promise.all(convs.map(async (c) => ({
+    id: c.id,
+    title: c.title,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+    messageCount: await MessageModel.countDocuments({ conversationId: c.id }),
+  })));
+}
+
+export async function getConversation(id: string): Promise<{ id: string; title: string; createdAt: string; updatedAt: string } | null> {
+  const c = await ConversationModel.findOne({ id }).lean();
+  if (!c) return null;
+  return { id: c.id, title: c.title, createdAt: c.createdAt, updatedAt: c.updatedAt };
+}
+
+export async function addMessage(id: string, conversationId: string, role: string, content: string, blocks?: any[]): Promise<{ id: string; conversationId: string; role: string; content: string; blocks?: any[]; createdAt: string }> {
+  const now = new Date().toISOString();
+  const doc: Record<string, unknown> = { id, conversationId, role, content, createdAt: now };
+  if (blocks) doc.blocks = blocks;
+  await MessageModel.create(doc);
+  await ConversationModel.updateOne({ id: conversationId }, { $set: { updatedAt: now } });
+  return { id, conversationId, role, content, blocks, createdAt: now };
+}
+
+export async function getMessages(conversationId: string): Promise<Array<{ id: string; conversationId: string; role: string; content: string; blocks?: any[]; createdAt: string }>> {
+  const msgs = await MessageModel.find({ conversationId }).sort({ createdAt: 1 }).lean();
+  return msgs.map((m) => {
+    const doc = m as Record<string, unknown>;
+    return {
+      id: doc.id as string,
+      conversationId: doc.conversationId as string,
+      role: doc.role as string,
+      content: doc.content as string,
+      blocks: doc.blocks as any[] | undefined,
+      createdAt: doc.createdAt as string,
+    };
+  });
+}
+
+export async function updateConversationTitle(id: string, title: string): Promise<void> {
+  await ConversationModel.updateOne({ id }, { $set: { title } });
+}
+
+// ── Default Scenes ─────────────────────────────────────────────────────────
 
 function createDefaultRomeScene(): ThreeDMapScene {
   return {

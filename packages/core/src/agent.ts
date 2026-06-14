@@ -10,9 +10,29 @@ export interface PromptResult {
   structuredOutput?: unknown;
 }
 
-interface Message {
-  role: "system" | "user" | "assistant";
-  content: string;
+export interface Message {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_call_id?: string;
+  tool_calls?: ToolCall[];
+}
+
+export interface ToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+export interface ToolCall {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
 }
 
 export async function sendPrompt(
@@ -68,8 +88,10 @@ export async function sendPromptStream(
     maxTokens?: number;
     temperature?: number;
     reasoningEffort?: "none" | "low" | "medium" | "high";
+    tools?: ToolDefinition[];
+    tool_choice?: "auto" | "none" | { type: "function"; function: { name: string } };
   }
-): Promise<PromptResult> {
+): Promise<PromptResult & { toolCalls?: ToolCall[] }> {
   const msgs: Message[] = [];
   if (options?.system) msgs.push({ role: "system", content: options.system });
   msgs.push(...messages);
@@ -82,6 +104,8 @@ export async function sendPromptStream(
     stream: true,
   };
   if (options?.reasoningEffort) body.reasoning_effort = options.reasoningEffort;
+  if (options?.tools) body.tools = options.tools;
+  if (options?.tool_choice) body.tool_choice = options.tool_choice;
 
   const res = await fetch(`${DO_BASE}/v1/chat/completions`, {
     method: "POST",
@@ -104,6 +128,7 @@ export async function sendPromptStream(
   const decoder = new TextDecoder();
   let buf = "";
   let fullText = "";
+  const toolCallsMap = new Map<number, { id: string; name: string; args: string }>();
 
   while (true) {
     const { done, value } = await reader.read();
@@ -121,12 +146,39 @@ export async function sendPromptStream(
 
       try {
         const chunk = JSON.parse(payload);
-        const delta = chunk.choices?.[0]?.delta?.content || "";
+        const choice = chunk.choices?.[0];
+
+        // Text delta
+        const delta = choice?.delta?.content || "";
         if (delta) {
           fullText += delta;
           onEvent?.({
             type: "text",
             data: delta,
+            timestamp: Date.now(),
+          });
+        }
+
+        // Tool call deltas
+        const toolDeltas = choice?.delta?.tool_calls;
+        if (toolDeltas) {
+          for (const tc of toolDeltas) {
+            const idx = tc.index;
+            if (!toolCallsMap.has(idx)) {
+              toolCallsMap.set(idx, { id: tc.id || "", name: "", args: "" });
+            }
+            const entry = toolCallsMap.get(idx)!;
+            if (tc.id) entry.id = tc.id;
+            if (tc.function?.name) entry.name = tc.function.name;
+            if (tc.function?.arguments) entry.args += tc.function.arguments;
+          }
+        }
+
+        // Finish reason
+        if (choice?.finish_reason === "tool_calls") {
+          onEvent?.({
+            type: "status",
+            data: "Calling tools...",
             timestamp: Date.now(),
           });
         }
@@ -136,7 +188,18 @@ export async function sendPromptStream(
     }
   }
 
-  return { text: fullText };
+  const toolCalls: ToolCall[] = [];
+  for (const [, entry] of toolCallsMap) {
+    if (entry.name) {
+      toolCalls.push({
+        id: entry.id,
+        type: "function",
+        function: { name: entry.name, arguments: entry.args },
+      });
+    }
+  }
+
+  return { text: fullText, toolCalls: toolCalls.length > 0 ? toolCalls : undefined };
 }
 
 export async function webSearch(
@@ -158,22 +221,63 @@ export async function webSearch(
     signal: AbortSignal.timeout(30000),
     body: JSON.stringify({
       query,
-      maxResults,
+      limit: maxResults,
       scrapeOptions: { formats: ["markdown"] },
     }),
   });
 
   if (!res.ok) {
-    console.warn(`Firecrawl search failed (${res.status})`);
+    const body = await res.text().catch(() => "");
+    console.warn(`Firecrawl search failed (${res.status}): ${body}`);
     return [];
   }
 
   const data = await res.json();
-  if (!data.success) return [];
+  if (!data.success) {
+    console.warn(`Firecrawl search returned success=false`, JSON.stringify(data));
+    return [];
+  }
 
   return (data.data || []).map((r: any) => ({
     title: r.title || r.metadata?.title || "",
     url: r.url || "",
     snippet: r.markdown ? r.markdown.slice(0, 1000) : r.description || "",
+  }));
+}
+
+export async function tavilySearch(
+  query: string,
+  maxResults: number = 5
+): Promise<{ title: string; url: string; snippet: string }[]> {
+  const key = process.env.TAVILY_API_KEY;
+  if (!key) {
+    console.warn("TAVILY_API_KEY not set, skipping Tavily search");
+    return [];
+  }
+
+  const res = await fetch("https://api.tavily.com/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(30000),
+    body: JSON.stringify({
+      api_key: key,
+      query,
+      max_results: maxResults,
+      search_depth: "advanced",
+      include_answer: false,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.warn(`Tavily search failed (${res.status}): ${body}`);
+    return [];
+  }
+
+  const data = await res.json();
+  return (data.results || []).map((r: any) => ({
+    title: r.title || "",
+    url: r.url || "",
+    snippet: r.content ? r.content.slice(0, 1000) : "",
   }));
 }

@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import ArticleClient from "./ArticleClient";
 import type { Article } from "@encarta/core";
 

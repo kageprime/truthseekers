@@ -5,7 +5,7 @@ import mermaid from "mermaid";
 
 mermaid.initialize({ startOnLoad: false, theme: "neutral" });
 
-export default function MermaidDiagram({ code, caption }: { code: string; caption: string }) {
+export default function MermaidDiagram({ code, caption }: { code: string; caption?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<"loading" | "rendered" | "error" | "edit">("loading");
   const [editCode, setEditCode] = useState(code.trim());

@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Html } from "@react-three/drei";
 import type { ThreeDMapScene } from "@encarta/core";
@@ -57,7 +56,7 @@ function Buildings({ scene }: { scene: ThreeDMapScene }) {
   return (
     <group>
       {scene.buildings.map((b) => {
-        const [x, y, z] = latLngToPos(b.lat, b.lng, scene.centerLat, scene.centerLng, scale);
+        const [x, _, z] = latLngToPos(b.lat, b.lng, scene.centerLat, scene.centerLng, scale);
         return (
           <mesh key={b.id} position={[x, b.height / 2, z]} castShadow>
             <boxGeometry args={[b.width, b.height, b.depth]} />
@@ -77,7 +76,7 @@ function Annotations({ scene }: { scene: ThreeDMapScene }) {
   return (
     <group>
       {scene.annotations.map((a) => {
-        const [x, y, z] = latLngToPos(a.lat, a.lng, scene.centerLat, scene.centerLng, scale);
+        const [x, _, z] = latLngToPos(a.lat, a.lng, scene.centerLat, scene.centerLng, scale);
         return (
           <Html key={a.label} position={[x, 5, z]} center distanceFactor={30}>
             <div

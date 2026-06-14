@@ -137,7 +137,7 @@ export default function MapViewer({
     if (!map) return;
 
     // Remove all GeoJSON layers
-    for (const [id, gl] of geoJsonLayers.current) {
+    for (const [_, gl] of geoJsonLayers.current) {
       if (map.hasLayer(gl)) map.removeLayer(gl);
     }
 

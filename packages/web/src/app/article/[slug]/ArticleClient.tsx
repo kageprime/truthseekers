@@ -1,17 +1,14 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import Link from "next/link";
 import { fetchArticle, generateArticle, refreshArticle, progressUrl, BASE } from "@/lib/api";
 import PageLayout from "../../components/PageLayout";
 import PageTitleBar from "../../components/PageTitleBar";
-import SectionHeader from "../../components/SectionHeader";
-import MermaidDiagram from "../../components/MermaidDiagram";
-import InteractiveTimeline from "../../components/InteractiveTimeline";
 import GenerationBar from "../../components/GenerationBar";
-import MarkdownRenderer from "../../components/MarkdownRenderer";
+import BlockRenderer, { articleToBlocks } from "../../components/BlockRenderer";
 import type { AgentEvent } from "../../components/ProcessViewer";
-import { SkeletonImage, BlankSlateImage, BlankSlateMedia, FigureImage } from "../../components/MediaImage";
-import type { Article, MediaItem } from "@encarta/core";
+import type { Article } from "@encarta/core";
 
 interface ArticleClientProps {
   slug: string;
@@ -135,17 +132,6 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     window.open(url, "_blank");
   }, [article, slug]);
 
-  const sectionColors = [
-    { bg: "#fef3c7", accent: "#f59e0b" },
-    { bg: "#e0f2fe", accent: "#0284c7" },
-    { bg: "#dcfce7", accent: "#22c55e" },
-    { bg: "#fae8ff", accent: "#a21caf" },
-    { bg: "#fff7ed", accent: "#ea580c" },
-    { bg: "#fce7f3", accent: "#ec4899" },
-    { bg: "#f0fdf4", accent: "#16a34a" },
-    { bg: "#eff6ff", accent: "#2563eb" },
-  ];
-
   // Error state
   if (error && !article) {
     return (
@@ -162,9 +148,9 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
               Try Again
             </button>
             <div className="mt-4">
-              <a href="/" className="text-sm hover:underline" style={{ color: "#5f6368" }}>
+              <Link href="/" className="text-sm hover:underline" style={{ color: "#5f6368" }}>
                 ← Back to home
-              </a>
+              </Link>
             </div>
           </div>
         </main>
@@ -246,6 +232,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
   return (
     <PageLayout>
+      <div className="flex-1 overflow-y-auto">
 
       {/* Article action bar */}
       <PageTitleBar>
@@ -281,130 +268,22 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         </div>
       </PageTitleBar>
 
-      <article className="max-w-6xl mx-auto px-6 py-10 prose">
-        {/* Title Card */}
-        <div className="pixel-card p-4 sm:p-8 md:p-10 mb-10 bg-white">
-          <h1 className="pixel text-xl md:text-2xl mb-4 leading-snug" style={{ color: "var(--ink)" }}>
-            {article.title}
-          </h1>
-          <div className="p-5 mb-0" style={{ background: "var(--cream)", border: "3px solid var(--ink)" }}>
-            <p className="text-lg font-medium leading-relaxed m-0" style={{ color: "var(--ink)" }}>
-              {article.abstract}
-            </p>
-          </div>
-        </div>
-
-        {/* Sections */}
-        {article.sections.map((section, i) => {
-          const palette = sectionColors[i % sectionColors.length];
-          return (
-            <div key={section.id || i} className="pixel-card p-4 sm:p-6 md:p-8 mb-6 bg-white">
-              <div className="flex items-start gap-4 mb-5">
-                <div className="w-12 h-12 flex items-center justify-center text-xl shrink-0 border-2 border-black"
-                  style={{ background: palette.bg }}>
-                  {i + 1}
-                </div>
-                <div>
-                  <h2 className="pixel text-sm mb-2" style={{ color: "var(--ink)" }}>
-                    {section.title}
-                  </h2>
-                  <div className="h-1 w-12" style={{ background: palette.accent }} />
-                </div>
-              </div>
-              <MarkdownRenderer content={section.content} />
-              {section.media && section.media.length > 0 ? (
-                <div className="mt-4 space-y-2">
-                  {section.media.map((m: MediaItem, mi: number) => {
-                    if (m.type === "diagram" && m.code) {
-                      return <MermaidDiagram key={m.id || `media-${mi}`} code={m.code} caption={m.caption} />;
-                    }
-                    if (m.type === "image") {
-                      if (m.src) {
-                        return <FigureImage key={m.id || `media-${mi}`} src={m.src} caption={m.caption} source={m.source} />;
-                      }
-                      if (m.prompt) {
-                        return <SkeletonImage key={m.id || `media-${mi}`} caption={m.caption} />;
-                      }
-                      return <BlankSlateImage key={m.id || `media-${mi}`} caption={m.caption} prompt={m.prompt} />;
-                    }
-                    if (m.type === "threed") {
-                      return (
-                        <div key={m.id || `media-${mi}`} className="pixel-card-sm p-3" style={{ background: "#f0f0ff" }}>
-                          <span className="pixel text-[9px]" style={{ color: "#888" }}>3D SCENE</span>
-                          <div className="h-32 flex items-center justify-center text-4xl bg-white/50 my-2 border border-dashed border-black/20">
-                            <span className="text-2xl opacity-50">🧊</span>
-                          </div>
-                          <p className="text-sm">{m.caption}</p>
-                          {m.code && (
-                            <details className="mt-1">
-                              <summary className="text-xs cursor-pointer" style={{ color: "#888" }}>scene code</summary>
-                              <pre className="text-xs mt-1 p-2 bg-white border overflow-auto max-h-32">{m.code}</pre>
-                            </details>
-                          )}
-                        </div>
-                      );
-                    }
-                    return (
-                      <div key={m.id || `media-${mi}`} className="pixel-card-sm px-4 py-3 flex items-center gap-3"
-                        style={{ background: palette.bg }}>
-                        <span className="pixel text-[9px]" style={{ color: "#888" }}>[{m.type.toUpperCase()}]</span>
-                        <span className="text-sm">{m.caption}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <BlankSlateMedia />
-              )}
-            </div>
-          );
-        })}
-
-        {/* Timeline */}
-        {article.timeline.length > 0 && (
-          <InteractiveTimeline events={article.timeline} />
-        )}
-
-        {/* Sources */}
-        {article.citations.length > 0 && (
-          <div className="pixel-card p-4 sm:p-6 md:p-8 mb-6 bg-white">
-            <SectionHeader emoji="📚" title="SOURCES" accent="var(--green)" />
-            <ol className="space-y-3 pl-0" style={{ listStyle: "none" }}>
-              {article.citations.map((cite, i) => (
-                <li key={i} className="flex gap-3 items-start">
-                  <span className="pixel text-xs shrink-0 mt-0.5" style={{ color: "#888" }}>[{i + 1}]</span>
-                  <div className="min-w-0">
-                    <a href={cite.url} target="_blank" rel="noopener noreferrer" className="font-semibold hover:text-[#ea580c] break-all"
-                      style={{ color: "var(--ink)", textDecoration: "underline", textUnderlineOffset: "3px" }}>
-                      {cite.title}
-                    </a>
-                    {cite.relevance && (
-                      <span className="text-xs ml-2" style={{ color: "#888" }}>— {cite.relevance}</span>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-
-        {/* See Also */}
-        {article.crossrefs.length > 0 && (
-          <div className="pixel-card p-4 sm:p-6 md:p-8 mb-6" style={{ background: "#fae8ff" }}>
-            <SectionHeader emoji="🔗" title="SEE ALSO" accent="var(--purple)" />
-            <div className="flex flex-wrap gap-3">
-              {article.crossrefs.map((ref, i) => (
-                <a key={ref.id || i} href={`/article/${ref.id}`}
-                  className="pixel-card-sm px-4 py-3 sm:py-2"
-                  style={{ background: "white", textDecoration: "none", color: "var(--ink)", fontSize: "0.9rem" }}>
-                  <span className="text-xs mr-2" style={{ color: "#888" }}>[{ref.relationship}]</span>
-                  {ref.title}
-                </a>
-              ))}
-            </div>
-          </div>
+      <article className="max-w-6xl mx-auto px-6 py-10">
+        {article.blocks && article.blocks.length > 0 ? (
+          <BlockRenderer blocks={article.blocks} />
+        ) : (
+          <BlockRenderer blocks={articleToBlocks(
+            article.slug,
+            article.title,
+            article.abstract,
+            article.sections,
+            article.timeline,
+            article.crossrefs,
+            article.citations,
+          )} />
         )}
       </article>
+      </div>
     </PageLayout>
   );
 }

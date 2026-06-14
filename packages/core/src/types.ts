@@ -127,6 +127,7 @@ export interface ArticleContent {
 export interface Article extends ArticleContent {
   slug: string;
   metadata: ArticleMetadata;
+  blocks?: Block[];
 }
 
 export interface ArticleMetadata {
@@ -236,4 +237,128 @@ export interface MediaGenerationItem {
 
 export interface MediaGenerationResult {
   mediaItems: MediaGenerationItem[];
+}
+
+// ── Block System ─────────────────────────────────────────────────────────
+// Every piece of article content is a typed block. Blocks can nest, stream,
+// and render as rich UI cards.
+
+export type BlockType =
+  | "heading"
+  | "text"
+  | "section"
+  | "timeline"
+  | "map_2d"
+  | "map_3d"
+  | "diagram"
+  | "image"
+  | "gallery"
+  | "citation"
+  | "crossref"
+  | "tool_call"
+  | "divider";
+
+export interface Block {
+  id: string;
+  type: BlockType;
+  data: Record<string, unknown>;
+  meta?: {
+    sectionId?: string;
+    phase?: string;
+    collapsed?: boolean;
+  };
+}
+
+// Block data shapes (used at runtime for validation, typed here as interfaces)
+export interface HeadingBlockData {
+  level: 1 | 2 | 3;
+  text: string;
+}
+
+export interface TextBlockData {
+  content: string; // markdown
+}
+
+export interface SectionBlockData {
+  title: string;
+  blocks?: Block[];
+}
+
+export interface TimelineBlockData {
+  events: Array<Omit<TimelineEvent, "year"> & { year: number | string }>;
+}
+
+export interface Map2DBlockData {
+  markers?: MapMarker[];
+  layers?: MapLayer[];
+  geoJson?: object;
+  centerLat?: number;
+  centerLng?: number;
+  zoom?: number;
+}
+
+export interface Map3DBlockData {
+  terrain?: {
+    type: "flat" | "hills" | "mountain";
+    color?: string;
+    heightScale?: number;
+  };
+  buildings?: ThreeDBuilding[];
+  annotations?: ThreeDAnnotation[];
+  centerLat?: number;
+  centerLng?: number;
+  zoom?: number;
+}
+
+export interface DiagramBlockData {
+  code: string; // mermaid.js code
+  caption?: string;
+}
+
+export interface ImageBlockData {
+  src: string;
+  caption?: string;
+  prompt?: string;
+  source?: string;
+}
+
+export interface GalleryBlockData {
+  images: Array<{ src: string; caption?: string; prompt?: string }>;
+}
+
+export interface CitationBlockData {
+  url: string;
+  title: string;
+  relevance?: string;
+  accessed?: string;
+}
+
+export interface CrossrefBlockData {
+  slug: string;
+  title: string;
+  relationship?: string;
+}
+
+export interface ToolCallBlockData {
+  name: string;
+  args?: Record<string, unknown>;
+  result?: string;
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────
+
+export interface Conversation {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  blocks?: Block[];
+  createdAt: string;
 }

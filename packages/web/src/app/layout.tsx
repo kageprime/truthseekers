@@ -5,6 +5,12 @@ import ErrorBoundary from "./components/ErrorBoundary";
 export const metadata: Metadata = {
   title: "Truthseekers — The Living Encyclopedia",
   description: "An LLM-powered interactive encyclopedia. Research, write, verify — all by AI agents.",
+  manifest: "/manifest.json",
+  appleWebApp: { capable: true, title: "Truthseekers", statusBarStyle: "default" },
+  icons: [
+    { rel: "icon", url: "/favicon.ico" },
+    { rel: "apple-touch-icon", url: "/apple-icon.png" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -238,6 +244,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             0% { transform: translateX(0); }
             100% { transform: translateX(-50%); }
           }
+          @keyframes wave-drift-1 { 0% { transform: translateX(0); } 100% { transform: translateX(-33.33%); } }
+          @keyframes wave-drift-2 { 0% { transform: translateX(0); } 100% { transform: translateX(-33.33%); } }
+          @keyframes wave-drift-3 { 0% { transform: translateX(0); } 100% { transform: translateX(-33.33%); } }
+          .wave-1 { animation: wave-drift-1 22s ease-in-out infinite; }
+          .wave-2 { animation: wave-drift-2 16s ease-in-out infinite; }
+          .wave-3 { animation: wave-drift-3 11s ease-in-out infinite; }
           @media (max-width: 639px) {
             .wave-anim { animation: wave 24s linear infinite; }
           }
@@ -297,6 +309,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             from { opacity: 0; transform: translateY(16px); }
             to { opacity: 1; transform: translateY(0); }
           }
+          @keyframes page-enter {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .page-enter { animation: page-enter 0.3s ease-out both; }
+          @keyframes slide-in-main {
+            from { opacity: 0; transform: translateX(24px); }
+            to { opacity: 1; transform: translateX(0); }
+          }
+          .chat-enter { animation: slide-in-main 0.35s ease-out both; }
           @keyframes shimmer-bar {
             0% { background-position: -200% 0; }
             100% { background-position: 200% 0; }
@@ -572,24 +594,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             font-size: 0.95rem;
             color: #5f6368;
             margin: 0 0 1.25rem;
-          }
-
-          /* Scroll toggle */
-          .scroll-toggle {
-            position: fixed;
-            bottom: 1rem;
-            right: 1rem;
-            font-family: 'Press Start 2P', monospace;
-            font-size: 7px;
-            padding: 0.4rem 0.8rem;
-            border: 2px solid var(--ink);
-            background: white;
-            cursor: pointer;
-            transition: all 0.1s;
-            z-index: 10;
-          }
-          .scroll-toggle:hover {
-            background: var(--cream);
           }
 
           @media (max-width: 639px) {

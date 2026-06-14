@@ -165,3 +165,53 @@ export async function fetchMap(slug: string): Promise<MapEntry | null> {
   if (!res.ok) return null;
   return res.json();
 }
+
+// ── Chat ───────────────────────────────────────────────────────────────────
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  messages: Array<{
+    id: string;
+    conversationId: string;
+    role: "user" | "assistant" | "system";
+    content: string;
+    blocks?: any[];
+    createdAt: string;
+  }>;
+}
+
+export async function createChat(title?: string): Promise<ConversationSummary | null> {
+  const res = await fetch(`${BASE}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) {
+    console.error("createChat failed", res.status, await res.text().catch(() => ""));
+    return null;
+  }
+  return res.json();
+}
+
+export async function fetchChats(): Promise<ConversationSummary[]> {
+  const res = await fetch(`${BASE}/chat`, { cache: "no-store" });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function fetchChat(id: string): Promise<ConversationDetail | null> {
+  const res = await fetch(`${BASE}/chat/${id}`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export function chatProgressUrl(id: string): string {
+  return `${BASE}/chat/${id}/messages`;
+}

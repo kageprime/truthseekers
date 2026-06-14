@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { fetchMap, type MapEntry } from "@/lib/api";
 import MarkdownRenderer from "../../components/MarkdownRenderer";
 import PageLayout from "../../components/PageLayout";
@@ -27,14 +28,14 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
 
   return (
     <PageLayout>
-      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-10">
+      <main className="flex-1 overflow-y-auto max-w-6xl mx-auto w-full px-6 py-10">
         {/* Breadcrumb */}
-        <a href="/maps" className="inline-flex items-center gap-1 text-sm mb-6 transition-colors hover:underline" style={{ color: "var(--orange)" }}>
+        <Link href="/maps" className="inline-flex items-center gap-1 text-sm mb-6 transition-colors hover:underline" style={{ color: "var(--orange)" }}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
           Back to Maps
-        </a>
+        </Link>
 
         {loading ? (
           <div className="space-y-6 animate-pulse">
@@ -174,12 +175,12 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
               <p className="text-xs mb-4" style={{ color: "#5f6368" }}>
                 Search for articles related to this map&rsquo;s topic and time period.
               </p>
-              <a
+              <Link
                 href={`/?q=${encodeURIComponent(map.title.split(",")[0]?.replace(/^Map of (the )?/i, "") || map.region || "")}`}
                 className="btn-primary"
               >
                 Search Articles →
-              </a>
+              </Link>
             </div>
           </>
         ) : (
@@ -188,9 +189,9 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
             <div className="text-4xl mb-3">🗺</div>
             <h2 className="pixel text-sm mb-2" style={{ color: "var(--ink)" }}>MAP NOT FOUND</h2>
             <p className="text-sm mb-4" style={{ color: "#5f6368" }}>The map &ldquo;{slug}&rdquo; doesn&rsquo;t exist.</p>
-            <a href="/maps" className="btn-secondary">
+            <Link href="/maps" className="btn-secondary">
               Browse all maps
-            </a>
+            </Link>
           </div>
         )}
       </main>
