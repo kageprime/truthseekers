@@ -25,12 +25,17 @@ export {
   memStore,
   memRecall,
   memRecallAll,
+  createApiKey,
+  listApiKeys,
+  revokeApiKey,
+  getApiKey,
+  touchApiKey,
 } from "./db.js";
 
 export { commitArticle, getArticleHistory, getArticleAtVersion, getRepoStatus } from "./git.js";
 
 export { indexArticle, semanticSearch } from "./vector.js";
-export { ArticleModel, GraphEdgeModel, MapEntryModel, ArticleViewModel, JobModel, ConversationModel, MessageModel } from "./db.js";
+export { ArticleModel, GraphEdgeModel, MapEntryModel, ArticleViewModel, JobModel, ConversationModel, MessageModel, ApiKeyModel } from "./db.js";
 export {
   createConversation,
   listConversations,

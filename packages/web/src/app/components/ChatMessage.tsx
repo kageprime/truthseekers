@@ -84,7 +84,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
       {content && (
         <div className="leading-relaxed text-base">
           {isUser ? (
-            <div className="px-4 py-3 rounded-2xl" style={{ background: "var(--orange)", color: "white" }}>
+            <div className="px-4 py-3 rounded-2xl" style={{ background: "transparent", color: "var(--ink)" }}>
               {content}
             </div>
           ) : (

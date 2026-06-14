@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomBytes } from "node:crypto";
 import mongoose, { Schema, type Model, type Document } from "mongoose";
 import type { Article, ArticleContent, ArticleMetadata, MapEntry, ThreeDMapScene, Block } from "@encarta/core";
 
@@ -484,6 +485,46 @@ export async function memRecall(key: string): Promise<string | null> {
 export async function memRecallAll(): Promise<Array<{ key: string; value: string }>> {
   const docs = await MemoryModel.find({}).lean();
   return docs.map((d: any) => ({ key: d.key, value: d.value }));
+}
+
+// ── API Keys ──────────────────────────────────────────────────────────────
+
+const apiKeySchema = new Schema({
+  key: { type: String, required: true, unique: true, index: true },
+  name: { type: String, required: true },
+  tier: { type: String, enum: ["free", "pro", "enterprise"], default: "free" },
+  active: { type: Boolean, default: true },
+  createdAt: { type: Date, default: Date.now },
+  lastUsedAt: { type: Date },
+});
+
+const ApiKeyModel = mongoose.models.ApiKey ?? mongoose.model("ApiKey", apiKeySchema);
+
+export { ApiKeyModel };
+
+export async function createApiKey(name: string, tier: "free" | "pro" | "enterprise" = "free"): Promise<{ id: string; key: string; name: string; tier: string }> {
+  const raw = `enc_${randomBytes(32).toString("hex")}`;
+  const doc = await ApiKeyModel.create({ key: raw, name, tier });
+  return { id: doc._id.toString(), key: doc.key, name: doc.name, tier: doc.tier };
+}
+
+export async function listApiKeys(): Promise<Array<{ id: string; name: string; tier: string; active: boolean; createdAt: Date; lastUsedAt?: Date }>> {
+  const docs: any[] = await ApiKeyModel.find().sort({ createdAt: -1 }).lean();
+  return docs.map((d: any) => ({ id: d._id.toString(), name: d.name, tier: d.tier, active: d.active, createdAt: d.createdAt, lastUsedAt: d.lastUsedAt }));
+}
+
+export async function revokeApiKey(id: string): Promise<void> {
+  await ApiKeyModel.updateOne({ _id: new mongoose.Types.ObjectId(id) }, { active: false });
+}
+
+export async function getApiKey(key: string): Promise<{ id: string; tier: string; active: boolean } | null> {
+  const doc: any = await ApiKeyModel.findOne({ key }).lean();
+  if (!doc) return null;
+  return { id: doc._id.toString(), tier: doc.tier as string, active: doc.active as boolean };
+}
+
+export async function touchApiKey(key: string): Promise<void> {
+  await ApiKeyModel.updateOne({ key }, { lastUsedAt: new Date() });
 }
 
 // ── Graph Edges ──────────────────────────────────────────────────────────
