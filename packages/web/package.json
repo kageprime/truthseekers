@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3001",
-    "build": "cd ../.. && npm run build:core && npm run build:storage && cd packages/web && next build",
+    "build": "cd ../.. && npm run build:core && cd packages/web && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },
