@@ -57,6 +57,7 @@ import {
   mapSearchQuerySchema,
 } from "./validation.js";
 import authRoutes from "./auth-routes.js";
+import stripeRoutes from "./stripe.js";
 
 const app = new Hono();
 
@@ -95,6 +96,7 @@ app.use("*", cors({
 
 // Mount auth routes (no auth required)
 app.route("/auth", authRoutes);
+app.route("/stripe", stripeRoutes);
 
 // Skip rate limiting for status/polling endpoints
 app.use("/queue", async (c, next) => { await next(); });

@@ -29,6 +29,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.0",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/nodemailer": "^8.0.1",
     "autoprefixer": "^10.5.0",
     "concurrently": "^9.0.0",
     "postcss": "^8.5.15",
@@ -39,6 +40,8 @@
   },
   "dependencies": {
     "jsonwebtoken": "^9.0.3",
-    "mermaid": "^11.15.0"
+    "mermaid": "^11.15.0",
+    "nodemailer": "^9.0.0",
+    "stripe": "^22.2.1"
   }
 }

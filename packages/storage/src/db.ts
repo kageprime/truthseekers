@@ -549,19 +549,19 @@ export async function createUser(id: string, email: string): Promise<{ id: strin
   return { id: doc.id, email: doc.email, name: doc.name, avatar: doc.avatar, subscriptionTier: doc.subscriptionTier, onboarded: doc.onboarded, createdAt: doc.createdAt };
 }
 
-export async function getUserByEmail(email: string): Promise<{ id: string; email: string; name: string; avatar: string; subscriptionTier: string; onboarded: boolean } | null> {
+export async function getUserByEmail(email: string): Promise<{ id: string; email: string; name: string; avatar: string; stripeCustomerId?: string; subscriptionTier: string; onboarded: boolean } | null> {
   const doc: any = await UserModel.findOne({ email }).lean();
   if (!doc) return null;
-  return { id: doc.id, email: doc.email, name: doc.name, avatar: doc.avatar, subscriptionTier: doc.subscriptionTier, onboarded: doc.onboarded };
+  return { id: doc.id, email: doc.email, name: doc.name, avatar: doc.avatar, stripeCustomerId: doc.stripeCustomerId, subscriptionTier: doc.subscriptionTier, onboarded: doc.onboarded };
 }
 
-export async function getUserById(id: string): Promise<{ id: string; email: string; name: string; avatar: string; subscriptionTier: string; onboarded: boolean } | null> {
+export async function getUserById(id: string): Promise<{ id: string; email: string; name: string; avatar: string; stripeCustomerId?: string; subscriptionTier: string; onboarded: boolean } | null> {
   const doc: any = await UserModel.findOne({ id }).lean();
   if (!doc) return null;
-  return { id: doc.id, email: doc.email, name: doc.name, avatar: doc.avatar, subscriptionTier: doc.subscriptionTier, onboarded: doc.onboarded };
+  return { id: doc.id, email: doc.email, name: doc.name, avatar: doc.avatar, stripeCustomerId: doc.stripeCustomerId, subscriptionTier: doc.subscriptionTier, onboarded: doc.onboarded };
 }
 
-export async function updateUser(id: string, updates: { name?: string; avatar?: string }): Promise<void> {
+export async function updateUser(id: string, updates: { name?: string; avatar?: string; stripeCustomerId?: string; subscriptionTier?: string }): Promise<void> {
   await UserModel.updateOne({ id }, { $set: updates });
 }
 
