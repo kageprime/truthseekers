@@ -14,6 +14,8 @@ interface HeaderProps {
 export default function SharedHeader({
   links = [
     { label: "Queue", href: "/queue" },
+    { label: "Maps", href: "/maps" },
+    { label: "Articles", href: "/articles" },
   ],
   onToggleSidebar,
   sidebarOpen,
