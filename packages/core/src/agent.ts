@@ -2,7 +2,7 @@ import type { AgentEvent } from "./types.js";
 
 const DO_BASE = "https://inference.do-ai.run";
 const DO_KEY = () => process.env.MODEL_ACCESS_KEY || "";
-const DEFAULT_MODEL = process.env.DO_MODEL || "deepseek-4-flash";
+const DEFAULT_MODEL = process.env.DO_MODEL || "gemma-4";
 const PROMPT_TIMEOUT = parseInt(process.env.PROMPT_TIMEOUT_MS || "300000", 10);
 
 export interface PromptResult {

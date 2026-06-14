@@ -121,7 +121,7 @@ Output valid JSON with this exact schema:
 No text outside the JSON object.` }
     ],
     onEvent,
-    { model: "deepseek-v4-pro", reasoningEffort: "high", maxTokens: 32768 }
+    { model: "gemma-4", reasoningEffort: "high", maxTokens: 32768 }
   );
 
   const data = await extractJSON(response);
@@ -199,7 +199,7 @@ Output valid JSON with this exact schema:
 No text outside the JSON object.` }
     ],
     onEvent,
-    { model: "deepseek-v4-pro", maxTokens: 32768, reasoningEffort: "high" }
+    { model: "gemma-4", maxTokens: 32768, reasoningEffort: "high" }
   );
 
   const raw = (await extractJSON(response)) as Record<string, unknown>;
