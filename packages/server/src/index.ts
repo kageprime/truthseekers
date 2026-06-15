@@ -892,7 +892,10 @@ tools: CHAT_TOOL_DEFINITIONS,
       });
       const planText = planResult.text || "";
       const planMatch = planText.match(/\[[^\]]*\]/);
-      const plan: string[] = planMatch ? JSON.parse(planMatch[0]) : [];
+      let plan: string[] = [];
+      if (planMatch) {
+        try { plan = JSON.parse(planMatch[0]); } catch { plan = []; }
+      }
       if (plan.length > 0) {
         conversation.push({ role: "assistant", content: planText });
         conversation.push({ role: "system", content: `Your plan: ${JSON.stringify(plan)}. Follow this plan order. After executing each tool, move to the next. If a tool result suggests a different approach, you may adapt.` });
@@ -922,7 +925,14 @@ tools: CHAT_TOOL_DEFINITIONS,
         const toolResults: Array<{ id: string; result: string }> = [];
 
         for (const tc of result.toolCalls) {
-          const args = JSON.parse(tc.function.arguments);
+          let args: Record<string, unknown>;
+          try { args = JSON.parse(tc.function.arguments) as Record<string, unknown>; } catch {
+            args = {};
+            stream.writeSSE({
+              data: JSON.stringify({ type: "status", data: `Warning: malformed tool arguments for ${tc.function.name}`, timestamp: Date.now() }),
+              event: "agent_event",
+            });
+          }
           stream.writeSSE({
             data: JSON.stringify({ type: "tool_use", data: { name: tc.function.name, args }, timestamp: Date.now() }),
             event: "agent_event",

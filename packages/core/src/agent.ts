@@ -246,10 +246,13 @@ export async function sendPromptStream(
   const toolCalls: ToolCall[] = [];
   for (const [, entry] of toolCallsMap) {
     if (entry.name) {
+      // Validate that arguments is parseable JSON — DO API rejects incomplete JSON
+      let validArgs = entry.args;
+      try { JSON.parse(validArgs); } catch { validArgs = "{}"; }
       toolCalls.push({
         id: entry.id,
         type: "function",
-        function: { name: entry.name, arguments: entry.args },
+        function: { name: entry.name, arguments: validArgs },
       });
     }
   }
