@@ -32,9 +32,10 @@ export function useChatStream() {
     abortRef.current = controller;
 
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("truthseekers_token") : null;
       const res = await fetch(chatProgressUrl(id), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ content: msg }),
         signal: controller.signal,
       });

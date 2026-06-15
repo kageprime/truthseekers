@@ -9,6 +9,7 @@ interface Message {
   role: "user" | "assistant" | "system";
   content: string;
   blocks?: any[];
+  agentEvents?: AgentEvent[];
   createdAt?: string;
 }
 
@@ -22,7 +23,6 @@ interface MessageListProps {
   showScrollBtn: boolean;
   phaseLabel: string;
   agentEvents: AgentEvent[];
-  lastAgentEvents: AgentEvent[];
   lastAssistantIndex: number;
   suggestedTopics: string[];
   onScrollToBottom: () => void;
@@ -37,7 +37,7 @@ interface MessageListProps {
 
 export default function MessageList({
   messages, streamContent, streamBlocks, sending, error, followUps,
-  showScrollBtn, phaseLabel, agentEvents, lastAgentEvents, lastAssistantIndex,
+  showScrollBtn, phaseLabel, agentEvents, lastAssistantIndex,
   suggestedTopics, onScrollToBottom, onRegenerate, onEdit, onCopy,
   onSend, onRetry, onSetInput, scrollRef,
 }: MessageListProps) {
@@ -48,7 +48,7 @@ export default function MessageList({
           onClick={onScrollToBottom}
           aria-label="Scroll to bottom"
           className="sticky bottom-4 z-10 mx-auto flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-full shadow-lg border transition-opacity hover:opacity-80"
-          style={{ background: "white", borderColor: "#dadce0", color: "var(--ink)" }}
+          style={{ background: "white", borderColor: "var(--border)", color: "var(--ink)" }}
         >
           ↓ Scroll to bottom
         </button>
@@ -57,14 +57,14 @@ export default function MessageList({
       {messages.length === 0 && !sending && !error ? (
         <div className="flex flex-col items-center justify-center h-full px-6 py-16 text-center">
           <h2 className="text-2xl font-bold mb-2" style={{ color: "var(--ink)" }}>Truthseekers</h2>
-          <p className="text-sm mb-8" style={{ color: "#5f6368" }}>Ask anything — I'll research and build rich, interactive responses</p>
+          <p className="text-sm mb-8" style={{ color: "var(--muted)" }}>Ask anything — I'll research and build rich, interactive responses</p>
           <div className="flex flex-wrap gap-2 justify-center max-w-lg">
             {suggestedTopics.map((topic) => (
               <button
                 key={topic}
                 onClick={() => onSetInput(topic)}
                 className="px-4 py-2 text-sm rounded-full border transition-colors hover:bg-[#fef3c7]"
-                style={{ borderColor: "#dadce0", color: "var(--ink)" }}
+                style={{ borderColor: "var(--border)", color: "var(--ink)" }}
               >
                 {topic}
               </button>
@@ -81,7 +81,7 @@ export default function MessageList({
               blocks={msg.blocks}
               createdAt={msg.createdAt}
               isLastAssistant={i === lastAssistantIndex}
-              agentEvents={i === lastAssistantIndex ? lastAgentEvents : undefined}
+              agentEvents={msg.agentEvents}
               onEdit={() => onEdit(i)}
               onRegenerate={onRegenerate}
               onCopy={() => onCopy(msg.content)}
@@ -109,9 +109,9 @@ export default function MessageList({
           )}
           {sending && (
             <div className="px-6 py-4">
-              <div className="flex items-center gap-2 text-sm" style={{ color: "#9aa0a6" }}>
+              <div className="flex items-center gap-2 text-sm" style={{ color: "var(--subtle)" }}>
                 <span className="inline-block w-2 h-2 rounded-full bg-[var(--orange)] animate-pulse" />
-                <span className="text-xs pixel" style={{ color: "#5f6368" }}>{phaseLabel}</span>
+                <span className="text-xs pixel" style={{ color: "var(--muted)" }}>{phaseLabel}</span>
               </div>
             </div>
           )}

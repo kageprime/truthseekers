@@ -200,7 +200,7 @@ class AsyncQueue {
       ...(this.subscribers.get("__all__") ?? []),
     ];
     for (const cb of callbacks) {
-      cb(slug, status, info);
+      try { cb(slug, status, info); } catch { /* per-callback isolation */ }
     }
   }
 

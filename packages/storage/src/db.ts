@@ -116,6 +116,7 @@ const metadataSchema = new Schema({
   updated: { type: String },
   status: { type: String, enum: ["draft", "published", "error"], default: "draft" },
   freshness: { type: String },
+  generatedBy: { type: String },
 }, { _id: false });
 
 const blockSchema = new Schema({
@@ -288,7 +289,7 @@ async function ensureIndexes(): Promise<void> {
   try {
     await ArticleModel.collection.createIndex(
       { title: "text", abstract: "text", "sections.content": "text" },
-      { name: "article_text", default_language: "none", background: true }
+      { name: "article_text", default_language: "none" }
     );
   } catch {
     // index may already exist
@@ -1062,6 +1063,7 @@ const messageSchema = new Schema({
 const conversationSchema = new Schema({
   id: { type: String, required: true, unique: true },
   title: { type: String, required: true },
+  userId: { type: String, required: true, index: true },
   createdAt: { type: String, required: true },
   updatedAt: { type: String, required: true },
 });
@@ -1071,17 +1073,20 @@ const MessageModel = mongoose.model("Message", messageSchema);
 
 export { ConversationModel, MessageModel };
 
-export async function createConversation(id: string, title: string): Promise<{ id: string; title: string; createdAt: string; updatedAt: string }> {
+export async function createConversation(id: string, title: string, userId: string): Promise<{ id: string; title: string; userId: string; createdAt: string; updatedAt: string }> {
   const now = new Date().toISOString();
-  await ConversationModel.create({ id, title, createdAt: now, updatedAt: now });
-  return { id, title, createdAt: now, updatedAt: now };
+  await ConversationModel.create({ id, title, userId, createdAt: now, updatedAt: now });
+  return { id, title, userId, createdAt: now, updatedAt: now };
 }
 
-export async function listConversations(): Promise<Array<{ id: string; title: string; createdAt: string; updatedAt: string; messageCount: number }>> {
-  const convs = await ConversationModel.find().sort({ updatedAt: -1 }).lean();
+export async function listConversations(userId?: string): Promise<Array<{ id: string; title: string; userId: string; createdAt: string; updatedAt: string; messageCount: number }>> {
+  const filter: Record<string, unknown> = {};
+  if (userId) filter.userId = userId;
+  const convs = await ConversationModel.find(filter).sort({ updatedAt: -1 }).lean();
   return await Promise.all(convs.map(async (c) => ({
     id: c.id,
     title: c.title,
+    userId: c.userId,
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
     messageCount: await MessageModel.countDocuments({ conversationId: c.id }),

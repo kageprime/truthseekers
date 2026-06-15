@@ -1,6 +1,11 @@
+import EventSource from "eventsource";
+
 export {};
 
 const serverUrl = process.env.ENCARTA_SERVER_URL || "http://localhost:4097";
+const apiKey = process.env.ENCARTA_API_KEY;
+const headers: Record<string, string> = { "Content-Type": "application/json" };
+if (apiKey) headers["x-api-key"] = apiKey;
 
 const args = process.argv.slice(2);
 const pliny = args.includes("--pliny");
@@ -30,7 +35,7 @@ async function generate(slug: string, persona: string) {
 
   const res = await fetch(`${serverUrl}/articles/${slug}/generate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ persona }),
   });
 
@@ -49,7 +54,7 @@ async function generate(slug: string, persona: string) {
 
   console.log("  Waiting for generation...\n");
 
-  const es = new EventSource(`${serverUrl}/articles/${slug}/progress`);
+  const es = new EventSource(`${serverUrl}/articles/${slug}/progress`, { headers });
 
   await new Promise<void>((resolve, reject) => {
     es.addEventListener("progress", (e: Event) => {

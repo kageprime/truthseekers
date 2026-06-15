@@ -1,5 +1,7 @@
 "use client";
 
+import { BASE } from "@/lib/api";
+
 export function SkeletonImage({ caption }: { caption?: string }) {
   return (
     <div className="pixel-card-sm p-3 my-2" style={{ background: "var(--ice)" }}>
@@ -65,6 +67,7 @@ export function MediaImage({ src, caption, prompt }: { src?: string; caption?: s
 }
 
 export function FigureImage({ src, caption, source }: { src: string; caption: string; source?: string }) {
+  const resolvedSrc = src.startsWith("/") ? `${BASE}${src}` : src;
   return (
     <figure className="pixel-card-sm p-3 my-2" style={{ background: "white" }}>
       <div className="flex items-center justify-between mb-2">
@@ -72,7 +75,7 @@ export function FigureImage({ src, caption, source }: { src: string; caption: st
         {source && <span className="text-[9px] text-[#888]">via {source}</span>}
       </div>
       <div className="flex justify-center my-2 bg-white/50">
-        <img src={src} alt={caption} className="max-w-full max-h-96 object-contain" loading="lazy" />
+        <img src={resolvedSrc} alt={caption} className="max-w-full max-h-96 object-contain" loading="lazy" />
       </div>
       <figcaption className="text-sm text-[#555] mt-2">{caption}</figcaption>
     </figure>

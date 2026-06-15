@@ -20,7 +20,7 @@ import {
   MODELER_INSTRUCTIONS,
 } from "../prompts/index.js";
 
-const JSON_FENCE = /```(?:json)?\s*([\s\S]*?)```/g;
+const JSON_FENCE = /```(?:json)?\s*([\s\S]*?)```/;
 const JSON_OBJECT = /\{[\s\S]*\}/;
 
 async function extractJSON(response: { text?: string; structuredOutput?: unknown }): Promise<object> {
@@ -121,7 +121,7 @@ Output valid JSON with this exact schema:
 No text outside the JSON object.` }
     ],
     onEvent,
-    { model: "gemma-4", reasoningEffort: "high", maxTokens: 32768 }
+    { model: "gemma-4-31B-it", reasoningEffort: "high", maxTokens: 32768 }
   );
 
   const data = await extractJSON(response);
@@ -199,7 +199,7 @@ Output valid JSON with this exact schema:
 No text outside the JSON object.` }
     ],
     onEvent,
-    { model: "gemma-4", maxTokens: 32768, reasoningEffort: "high" }
+    { model: "gemma-4-31B-it", maxTokens: 32768, reasoningEffort: "high" }
   );
 
   const raw = (await extractJSON(response)) as Record<string, unknown>;

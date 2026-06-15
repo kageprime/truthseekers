@@ -12,6 +12,9 @@
     "seed": "node dist/seed.js",
     "generate": "node dist/generate.js"
   },
+  "dependencies": {
+    "eventsource": "^2.0.2"
+  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"

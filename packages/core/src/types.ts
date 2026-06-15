@@ -74,8 +74,10 @@ export interface ThreeDMapScene {
   annotations?: ThreeDAnnotation[];
 }
 
+export type ModelId = "gemma-4-31B-it" | "deepseek-v4-flash" | "deepseek-v4-pro";
+
 export interface MediaItem {
-  type: "image" | "diagram" | "timeline" | "threed";
+  type: "image" | "diagram" | "timeline" | "threed" | "video";
   id: string;
   caption: string;
   src?: string;
@@ -136,6 +138,7 @@ export interface ArticleMetadata {
   updated: string;
   status: "draft" | "published" | "error";
   freshness?: string;
+  generatedBy?: string;
 }
 
 export type JobStatus = "queued" | "researching" | "writing" | "verifying" | "media" | "storing" | "done" | "error" | "removed";
@@ -253,6 +256,7 @@ export type BlockType =
   | "diagram"
   | "image"
   | "gallery"
+  | "video"
   | "citation"
   | "crossref"
   | "tool_call"
@@ -320,6 +324,13 @@ export interface ImageBlockData {
   caption?: string;
   prompt?: string;
   source?: string;
+}
+
+export interface VideoBlockData {
+  src: string;
+  caption?: string;
+  prompt?: string;
+  poster?: string;
 }
 
 export interface GalleryBlockData {

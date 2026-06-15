@@ -55,7 +55,7 @@ export default function MapsPage() {
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                style={{ color: "#9aa0a6" }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                style={{ color: "var(--subtle)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -102,7 +102,7 @@ export default function MapsPage() {
                       className="pixel-card-sm p-0 overflow-hidden block"
                       style={{ background: "white" }}
                     >
-                      <div className="w-full h-32 overflow-hidden" style={{ background: "#f1f3f4" }}>
+                      <div className="w-full h-32 overflow-hidden" style={{ background: "var(--skeleton)" }}>
                         {map.image ? (
                           <img
                             src={map.image}
@@ -116,7 +116,7 @@ export default function MapsPage() {
                                 const fallback = document.createElement("div");
                                 fallback.className = "w-full h-full flex items-center justify-center text-2xl font-bold";
                                 fallback.style.background = "linear-gradient(135deg, #dbeafe, #e0f2fe)";
-                                fallback.style.color = "#9aa0a6";
+                                fallback.style.color = "var(--subtle)";
                                 fallback.textContent = map.title.charAt(0).toUpperCase();
                                 t.parentElement.appendChild(fallback);
                               }
@@ -124,19 +124,19 @@ export default function MapsPage() {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-2xl font-bold"
-                            style={{ background: "linear-gradient(135deg, #dbeafe, #e0f2fe)", color: "#9aa0a6" }}>
+                            style={{ background: "linear-gradient(135deg, #dbeafe, #e0f2fe)", color: "var(--subtle)" }}>
                             {map.title.charAt(0).toUpperCase()}
                           </div>
                         )}
                       </div>
                       <div className="p-3">
-                        <h3 className="pixel text-[10px] mb-1" style={{ color: "#1a1a1a" }}>
+                        <h3 className="pixel text-[10px] mb-1" style={{ color: "var(--ink)" }}>
                           {map.title}
                         </h3>
                         {map.subtitle && (
-                          <p className="text-[11px] truncate" style={{ color: "#5f6368" }}>{map.subtitle}</p>
+                          <p className="text-[11px] truncate" style={{ color: "var(--muted)" }}>{map.subtitle}</p>
                         )}
-                        <p className="text-xs line-clamp-2 leading-relaxed mt-1" style={{ color: "#5f6368" }}>{map.description}</p>
+                        <p className="text-xs line-clamp-2 leading-relaxed mt-1" style={{ color: "var(--muted)" }}>{map.description}</p>
                         <div className="flex items-center gap-2 mt-2">
                           {map.region && (
                             <span className="pixel-tag text-[10px]" style={{ fontSize: "9px" }}>{map.region}</span>
@@ -161,7 +161,7 @@ export default function MapsPage() {
             {maps.length === 0 && !loading && !searching && (
               <div className="text-center py-16">
                 <div className="text-4xl mb-3">🗺</div>
-                <p className="text-sm" style={{ color: "#5f6368" }}>No maps found for &ldquo;{query}&rdquo;</p>
+                <p className="text-sm" style={{ color: "var(--muted)" }}>No maps found for &ldquo;{query}&rdquo;</p>
                 <button onClick={handleClear} className="btn-secondary mt-4">
                   Clear search
                 </button>
@@ -191,10 +191,10 @@ export default function MapsPage() {
                         />
                       </div>
                       <div className="p-3">
-                        <h3 className="pixel text-[10px] mb-1" style={{ color: "#1a1a1a" }}>
+                        <h3 className="pixel text-[10px] mb-1" style={{ color: "var(--ink)" }}>
                           {map.title}
                         </h3>
-                        <p className="text-xs line-clamp-2 mt-1" style={{ color: "#5f6368" }}>{map.description}</p>
+                        <p className="text-xs line-clamp-2 mt-1" style={{ color: "var(--muted)" }}>{map.description}</p>
                         <div className="flex items-center gap-2 mt-2">
                           {map.region && (
                             <span className="pixel-tag text-[10px]" style={{ fontSize: "9px" }}>{map.region}</span>

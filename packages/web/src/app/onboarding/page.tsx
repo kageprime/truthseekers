@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import TruthseekersLogo from "../components/TruthseekersLogo";
 import { useAuth } from "../hooks/useAuth";
+import { BASE } from "@/lib/api";
 
 const STEPS = [
   { emoji: "👋", title: "YOUR NAME", description: "What should we call you?" },
@@ -36,7 +37,7 @@ export default function OnboardingPage() {
       if (!articleSlug.trim()) return;
       setGenerating(true);
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097"}/articles/${encodeURIComponent(articleSlug)}/generate`, {
+        await fetch(`${BASE}/articles/${encodeURIComponent(articleSlug)}/generate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ persona: "veritas" }),
@@ -54,49 +55,51 @@ export default function OnboardingPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--warm)" }}>
-        <p className="text-sm" style={{ color: "#5f6368" }}>Please sign in first</p>
-      </div>
+      <main className="min-h-screen flex items-center justify-center" style={{ background: "var(--warm)" }}>
+        <p className="text-sm pixel" style={{ color: "var(--muted)" }}>Please sign in first</p>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "var(--warm)" }}>
-      {/* Progress bar */}
-      <div className="w-full h-1.5 flex">
-        {STEPS.map((_, i) => (
-          <div key={i} className="flex-1 transition-all duration-500" style={{ background: i <= step ? "var(--orange)" : "#e0e0e0" }} />
-        ))}
-      </div>
-
-      <div className="flex-1 flex items-center justify-center px-4">
+    <main className="min-h-screen flex flex-col" style={{ background: "var(--warm)" }}>
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
 
           {done ? (
-            <div className="text-center">
+            <div className="pixel-card p-8 text-center">
               <div className="text-4xl mb-4">🎉</div>
               <h2 className="pixel text-lg mb-2" style={{ color: "var(--ink)" }}>YOU'RE ALL SET</h2>
-              <p className="text-sm mb-6" style={{ color: "#5f6368" }}>
+              <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
                 {articleSlug ? `"${articleSlug}" is being generated.` : "Your encyclopedia is ready."}
               </p>
               <button
                 onClick={handleFinish}
-                className="pixel text-[9px] px-6 py-3 min-h-[44px] border-2 border-black"
-                style={{ background: "var(--orange)", color: "white", boxShadow: "4px 4px 0px var(--ink)" }}
+                className="btn-primary btn-lg"
               >
                 START EXPLORING →
               </button>
             </div>
           ) : (
-            <div className="rounded-2xl border-2 border-black p-8" style={{ background: "white", boxShadow: "6px 6px 0px var(--ink)" }}>
-              {/* Step indicator */}
-              <div className="flex items-center gap-2 mb-8">
+            <div className="pixel-card p-6 sm:p-8">
+              {/* Pixel step indicator */}
+              <div className="flex items-center justify-center gap-1 mb-8">
                 {STEPS.map((_, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full border-2 border-black flex items-center justify-center text-xs font-bold" style={{ background: i === step ? "var(--orange)" : i < step ? "var(--green)" : "white", color: i <= step ? "white" : "var(--ink)" }}>
+                  <div key={i} className="flex items-center gap-1">
+                    <div
+                      className="w-8 h-8 flex items-center justify-center pixel text-[9px] border-2"
+                      style={{
+                        background: i === step ? "var(--orange)" : i < step ? "var(--green)" : "white",
+                        color: i <= step ? "white" : "var(--ink)",
+                        borderColor: "var(--ink)",
+                        boxShadow: "2px 2px 0 var(--ink)",
+                      }}
+                    >
                       {i < step ? "✓" : i + 1}
                     </div>
-                    {i < STEPS.length - 1 && <div className="w-8 h-0.5" style={{ background: i < step ? "var(--green)" : "#e0e0e0" }} />}
+                    {i < STEPS.length - 1 && (
+                      <div className="w-6 sm:w-10 h-0.5" style={{ background: i < step ? "var(--green)" : "var(--border)" }} />
+                    )}
                   </div>
                 ))}
               </div>
@@ -104,7 +107,7 @@ export default function OnboardingPage() {
               <div className="text-center mb-6">
                 <div className="text-3xl mb-2">{STEPS[step].emoji}</div>
                 <h2 className="pixel text-sm" style={{ color: "var(--orange)" }}>{STEPS[step].title}</h2>
-                <p className="text-sm mt-1" style={{ color: "#5f6368" }}>{STEPS[step].description}</p>
+                <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>{STEPS[step].description}</p>
               </div>
 
               {step === 0 && (
@@ -114,8 +117,7 @@ export default function OnboardingPage() {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
                   autoFocus
-                  className="w-full px-4 py-3 min-h-[44px] border-2 border-black text-base rounded-xl mb-4"
-                  style={{ background: "var(--warm)", color: "var(--ink)", outline: "none" }}
+                  className="pixel-input mb-4"
                   onKeyDown={(e) => e.key === "Enter" && name.trim() && handleNext()}
                 />
               )}
@@ -126,10 +128,14 @@ export default function OnboardingPage() {
                     <button
                       key={g.id}
                       onClick={() => { setGoal(g.id); }}
-                      className="w-full text-left px-4 py-3 min-h-[44px] border-2 border-black rounded-xl transition-all"
-                      style={{ background: goal === g.id ? "var(--orange)" : "white", color: goal === g.id ? "white" : "var(--ink)" }}
+                      className="w-full text-left px-4 py-3 min-h-[44px] border-2 border-black transition-all"
+                      style={{
+                        background: goal === g.id ? "var(--orange)" : "white",
+                        color: goal === g.id ? "white" : "var(--ink)",
+                        boxShadow: goal === g.id ? "3px 3px 0 var(--ink)" : "2px 2px 0 var(--ink)",
+                      }}
                     >
-                      <div className="font-medium text-sm">{g.label}</div>
+                      <div className="font-medium text-sm pixel">{g.label}</div>
                       <div className="text-xs mt-0.5 opacity-70">{g.desc}</div>
                     </button>
                   ))}
@@ -138,15 +144,14 @@ export default function OnboardingPage() {
 
               {step === 2 && (
                 <div className="mb-4">
-                  <p className="text-xs mb-2" style={{ color: "#5f6368" }}>Pick a topic for your first article</p>
+                  <p className="pixel text-[9px] mb-2" style={{ color: "var(--muted)" }}>Pick a topic for your first article</p>
                   <input
                     type="text"
                     value={articleSlug}
                     onChange={(e) => setArticleSlug(e.target.value)}
                     placeholder="e.g. artificial-intelligence, ancient-rome"
                     autoFocus
-                    className="w-full px-4 py-3 min-h-[44px] border-2 border-black text-base rounded-xl"
-                    style={{ background: "var(--warm)", color: "var(--ink)", outline: "none" }}
+                    className="pixel-input"
                     onKeyDown={(e) => e.key === "Enter" && articleSlug.trim() && handleNext()}
                   />
                 </div>
@@ -155,8 +160,7 @@ export default function OnboardingPage() {
               <button
                 onClick={handleNext}
                 disabled={step === 0 && !name.trim() || step === 1 && !goal || step === 2 && !articleSlug.trim() || generating}
-                className="w-full pixel text-[9px] px-4 py-3 min-h-[44px] border-2 border-black disabled:opacity-40 mt-2"
-                style={{ background: "var(--orange)", color: "white", boxShadow: "4px 4px 0px var(--ink)" }}
+                className="btn-primary w-full mt-2"
               >
                 {generating ? "GENERATING..." : step < 2 ? "NEXT →" : "GENERATE ARTICLE →"}
               </button>
@@ -165,6 +169,6 @@ export default function OnboardingPage() {
 
         </div>
       </div>
-    </div>
+    </main>
   );
 }

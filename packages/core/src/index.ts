@@ -1,5 +1,6 @@
 export { sendPrompt, sendPromptStream, webSearch, tavilySearch } from "./agent.js";
 export type { Message, ToolDefinition, ToolCall } from "./agent.js";
+export type { ModelId } from "./types.js";
 export { CHAT_TOOL_DEFINITIONS, BUILT_IN_TOOL_EXECUTORS } from "./tools.js";
 export type { ToolExecutor } from "./tools.js";
 export {

@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { fetchArticle, generateArticle, refreshArticle, progressUrl, BASE } from "@/lib/api";
 import PageLayout from "../../components/PageLayout";
-import PageTitleBar from "../../components/PageTitleBar";
 import GenerationBar from "../../components/GenerationBar";
 import BlockRenderer, { articleToBlocks } from "../../components/BlockRenderer";
 import type { AgentEvent } from "../../components/ProcessViewer";
@@ -39,9 +38,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   }, [slug]);
 
   useEffect(() => {
-    // SSR already checked everything — no need for client-side re-fetch
     if (initialArticle || generating || isGenerating) return;
-    // Article truly doesn't exist and isn't generating — show "not generated" UI
     setLoading(false);
   }, [slug, initialArticle, generating, isGenerating]);
 
@@ -52,19 +49,22 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     sseRef.current = es;
 
     es.addEventListener("agent_event", (e) => {
-      const eventData: AgentEvent = JSON.parse(e.data);
-      setAgentEvents((prev) => [...prev, eventData]);
+      try {
+        const eventData: AgentEvent = JSON.parse(e.data);
+        setAgentEvents((prev) => [...prev, eventData]);
+      } catch { /* skip malformed events */ }
     });
 
     es.addEventListener("progress", (e) => {
-      const data = JSON.parse(e.data);
+      let data: Record<string, unknown>;
+      try { data = JSON.parse(e.data); } catch { return; /* skip malformed */ }
       if (data.status === "done") {
         fetchArticle(slug).then((a) => {
           if (a) setArticle(a);
           setGenerating(false);
           es.close();
           sseRef.current = null;
-        });
+        }).catch(() => { setGenerating(false); });
       } else if (data.status === "error") {
         setProgress(`Error: ${data.error}`);
         setGenerating(false);
@@ -75,7 +75,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         es.close();
         sseRef.current = null;
       } else {
-        setProgress(data.phase || data.status);
+        const phaseStr = typeof data.phase === "string" ? data.phase : typeof data.status === "string" ? data.status : "unknown";
+        setProgress(phaseStr);
       }
     });
 
@@ -105,8 +106,10 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     try {
       const result = await generateArticle(slug);
       if (result.status === "already_exists") {
-        const a = await fetchArticle(slug);
-        if (a) setArticle(a);
+        try {
+          const a = await fetchArticle(slug);
+          if (a) setArticle(a);
+        } catch { /* fetch failed — stay in generating state */ }
         setGenerating(false);
       }
     } catch (err) {
@@ -132,15 +135,14 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     window.open(url, "_blank");
   }, [article, slug]);
 
-  // Error state
   if (error && !article) {
     return (
       <PageLayout>
         <main className="flex-1 flex items-center justify-center px-6 py-16">
-          <div className="w-full max-w-lg text-center">
-            <div className="text-6xl mb-6">❌</div>
-            <h1 className="text-xl font-bold mb-2" style={{ color: "var(--red)" }}>Error Loading Article</h1>
-            <p className="text-sm mb-6" style={{ color: "#5f6368" }}>{error}</p>
+          <div className="max-w-lg mx-auto text-center pixel-card p-6 sm:p-10" style={{ background: "var(--cream)" }}>
+            <div className="text-5xl mb-5">❌</div>
+            <h1 className="pixel text-xs mb-2" style={{ color: "var(--red)" }}>Error Loading Article</h1>
+            <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>{error}</p>
             <button
               onClick={() => { setError(null); setLoading(true); window.location.reload(); }}
               className="btn-primary"
@@ -148,7 +150,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
               Try Again
             </button>
             <div className="mt-4">
-              <Link href="/" className="text-sm hover:underline" style={{ color: "#5f6368" }}>
+              <Link href="/" className="text-sm hover:underline" style={{ color: "var(--muted)" }}>
                 ← Back to home
               </Link>
             </div>
@@ -158,19 +160,20 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     );
   }
 
-  // Loading
   if (loading) {
     return (
       <PageLayout>
         <main className="flex-1 flex items-center justify-center">
-          <div className="inline-block w-8 h-8 border-4 border-[#e0e0e0] border-t-[#1a1a1a] rounded-full"
-            style={{ animation: "spin 0.8s linear infinite" }} />
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-[3px] border-[var(--border)] border-t-[var(--ink)]"
+              style={{ animation: "spin 0.8s linear infinite" }} />
+            <span className="pixel text-xs" style={{ color: "var(--subtle)" }}>Loading...</span>
+          </div>
         </main>
       </PageLayout>
     );
   }
 
-  // Not generated yet
   if (!article && !generating) {
     return (
       <PageLayout>
@@ -182,8 +185,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             <h1 className="pixel text-sm mb-3" style={{ color: "var(--ink)" }}>
               {slug.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
             </h1>
-            <p className="text-sm mb-6" style={{ color: "#9aa0a6" }}>Topic not yet generated</p>
-            <p className="text-sm leading-relaxed mb-8" style={{ color: "#5f6368" }}>
+            <p className="text-sm mb-6" style={{ color: "var(--subtle)" }}>Topic not yet generated</p>
+            <p className="text-sm leading-relaxed mb-8" style={{ color: "var(--muted)" }}>
               The AI agent will research the web, outline the content, write a full article, and verify all citations.
             </p>
             <button
@@ -198,7 +201,6 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     );
   }
 
-  // Generating
   if (generating && !article) {
     const hasError = progress.startsWith("Error:");
     const progressEntry = {
@@ -219,7 +221,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             <GenerationBar
               entry={progressEntry}
               onRetry={() => handleGenerate()}
-              onDismiss={() => { /* noop */ }}
+              onDismiss={() => {}}
               showWatchLive={false}
             />
           </div>
@@ -232,57 +234,69 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
   return (
     <PageLayout>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" style={{ background: "var(--warm)" }}>
 
-      {/* Article action bar */}
-      <PageTitleBar>
-        <div className="flex items-center gap-3">
-          <span className="text-xs" style={{ color: "#9aa0a6" }}>v{article.metadata.version}</span>
-          <span className="text-xs" style={{ color: "#9aa0a6" }}>·</span>
-          <span className="text-xs" style={{ color: "#9aa0a6" }}>
-            {new Date(article.metadata.updated).toLocaleDateString("en-US", {
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+          {/* Meta bar */}
+          <div className="flex items-center gap-2 text-xs mb-4" style={{ color: "var(--subtle)", fontFamily: "var(--font-mono)" }}>
+            <span>v{article.metadata.version}</span>
+            <span>·</span>
+            <span>{new Date(article.metadata.updated).toLocaleDateString("en-US", {
               year: "numeric", month: "long", day: "numeric"
-            })}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleRefresh}
-            disabled={generating}
-            className="btn-primary btn-sm"
-          >
-            {generating ? "Refreshing..." : "↻ Refresh"}
-          </button>
-          <button
-            onClick={() => handleExport("json")}
-            className="btn-secondary btn-sm"
-          >
-            JSON
-          </button>
-          <button
-            onClick={() => handleExport("markdown")}
-            className="btn-secondary btn-sm"
-          >
-            MD
-          </button>
-        </div>
-      </PageTitleBar>
+            })}</span>
+            {article.metadata.generatedBy && (
+              <>
+                <span>·</span>
+                <span>🧑‍💻 {article.metadata.generatedBy.slice(0, 12)}...</span>
+              </>
+            )}
+          </div>
 
-      <article className="max-w-6xl mx-auto px-6 py-10">
-        {article.blocks && article.blocks.length > 0 ? (
-          <BlockRenderer blocks={article.blocks} />
-        ) : (
-          <BlockRenderer blocks={articleToBlocks(
-            article.slug,
-            article.title,
-            article.abstract,
-            article.sections,
-            article.timeline,
-            article.crossrefs,
-            article.citations,
-          )} />
-        )}
-      </article>
+          {/* Title */}
+          <h1 className="pixel text-lg sm:text-xl mb-6 leading-tight" style={{ color: "var(--ink)" }}>
+            {article.title || slug.replace(/-/g, " ")}
+          </h1>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 mb-8">
+            <button
+              onClick={handleRefresh}
+              disabled={generating}
+              className="btn-primary btn-sm"
+            >
+              {generating ? "⟳ Refreshing..." : "⟳ Refresh"}
+            </button>
+            <button
+              onClick={() => handleExport("json")}
+              className="btn-secondary btn-sm"
+            >
+              📄 JSON
+            </button>
+            <button
+              onClick={() => handleExport("markdown")}
+              className="btn-secondary btn-sm"
+            >
+              📝 MD
+            </button>
+          </div>
+
+          {/* Article content */}
+          <div className="pixel-card p-4 sm:p-8" style={{ background: "white" }}>
+            {article.blocks && article.blocks.length > 0 ? (
+              <BlockRenderer blocks={article.blocks} />
+            ) : (
+              <BlockRenderer blocks={articleToBlocks(
+                article.slug,
+                article.title,
+                article.abstract,
+                article.sections,
+                article.timeline,
+                article.crossrefs,
+                article.citations,
+              )} />
+            )}
+          </div>
+        </div>
       </div>
     </PageLayout>
   );

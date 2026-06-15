@@ -25,6 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="antialiased" style={{ margin: 0 }}>
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-white focus:border-2 focus:border-black focus:text-sm focus:pixel" style={{ color: "var(--ink)" }}>
+          Skip to main content
+        </a>
         <style>{`
           :root {
             --ink: #1c1917;
@@ -39,6 +42,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             --pink: #ec4899;
             --cream: #fef3c7;
             --ice: #e0f2fe;
+            --muted: #5f6368;
+            --subtle: #9aa0a6;
+            --border: #dadce0;
+            --skeleton: #f1f3f4;
+            --hover: #f5f5f4;
           }
           * { box-sizing: border-box; }
           body {
@@ -189,13 +197,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             background: transparent;
             border: none;
             cursor: pointer;
-            color: #aaa;
+            color: var(--muted);
             transition: color 0.1s;
             display: inline-flex;
             align-items: center;
             justify-content: center;
           }
           .btn-ghost:hover { color: var(--ink); }
+          button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+            outline: 2px solid var(--orange);
+            outline-offset: 2px;
+          }
           .pixel-input {
             font-family: 'Outfit', sans-serif;
             padding: 0.75rem 1rem;
@@ -471,7 +483,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             background: #f0f7ff;
           }
           .activity-card.tool_result {
-            border-color: #e0e0e0;
+            border-color: var(--border);
             background: #fafafa;
           }
           .activity-card.text {

@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { getUserById, updateUser } from "@encarta/storage";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-prod";
+const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error("JWT_SECRET environment variable is required"); })();
 
 let stripe: Stripe | null = null;
 if (process.env.STRIPE_SECRET_KEY) {

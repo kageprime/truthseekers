@@ -62,7 +62,7 @@ export default function SharedHeader({
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="block px-4 py-3 text-sm font-medium hover:bg-[#f1f3f4] rounded-lg transition-colors"
+                  className="block px-4 py-3 text-sm font-medium hover:bg-[var(--skeleton)] rounded-lg transition-colors"
                 >
                   {link.label}
                 </Link>

@@ -40,15 +40,15 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
         {loading ? (
           <div className="space-y-6 animate-pulse">
             <div className="pixel-card p-4 sm:p-8" style={{ background: "white" }}>
-              <div className="w-full h-64 sm:h-80 rounded" style={{ background: "#f1f3f4" }} />
+              <div className="w-full h-64 sm:h-80 rounded" style={{ background: "var(--skeleton)" }} />
             </div>
             <div className="pixel-card p-4 sm:p-8" style={{ background: "white" }}>
-              <div className="h-6 rounded w-2/3 mb-4" style={{ background: "#f1f3f4" }} />
-              <div className="h-4 rounded w-1/3 mb-4" style={{ background: "#f1f3f4" }} />
+              <div className="h-6 rounded w-2/3 mb-4" style={{ background: "var(--skeleton)" }} />
+              <div className="h-4 rounded w-1/3 mb-4" style={{ background: "var(--skeleton)" }} />
               <div className="space-y-2">
-                <div className="h-3 rounded w-full" style={{ background: "#f1f3f4" }} />
-                <div className="h-3 rounded w-full" style={{ background: "#f1f3f4" }} />
-                <div className="h-3 rounded w-3/4" style={{ background: "#f1f3f4" }} />
+                <div className="h-3 rounded w-full" style={{ background: "var(--skeleton)" }} />
+                <div className="h-3 rounded w-full" style={{ background: "var(--skeleton)" }} />
+                <div className="h-3 rounded w-3/4" style={{ background: "var(--skeleton)" }} />
               </div>
             </div>
           </div>
@@ -87,12 +87,12 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
               {viewMode === "3d" && map.threedScene ? (
                 <ThreeDMapViewer scene={map.threedScene} height="500px" />
               ) : map.type === "static" && map.image ? (
-                <div className="w-full rounded overflow-hidden border border-[#dfe1e5] bg-white">
+                <div className="w-full overflow-hidden border-2 border-[var(--border)] bg-white">
                   <img
                     src={map.image}
                     alt={map.title}
                     className="w-full h-auto max-h-[500px] object-contain"
-                    style={{ background: "#f1f3f4" }}
+                    style={{ background: "var(--skeleton)" }}
                     onError={(e) => {
                       const t = e.currentTarget;
                       t.style.display = "none";
@@ -100,8 +100,9 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
                       if (parent) {
                         const fallback = document.createElement("div");
                         fallback.className = "w-full h-64 flex items-center justify-center text-4xl font-bold";
-                        fallback.style.background = "linear-gradient(135deg, #dbeafe, #e0f2fe)";
-                        fallback.style.color = "#9aa0a6";
+                        fallback.style.background = "var(--cream)";
+                        fallback.style.color = "var(--ink)";
+                        fallback.style.border = "2px solid var(--ink)";
                         fallback.textContent = map.title.charAt(0).toUpperCase();
                         parent.appendChild(fallback);
                       }

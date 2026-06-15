@@ -5,15 +5,16 @@ import mermaid from "mermaid";
 
 mermaid.initialize({ startOnLoad: false, theme: "neutral" });
 
-export default function MermaidDiagram({ code, caption }: { code: string; caption?: string }) {
+export default function MermaidDiagram({ code, caption }: { code?: string; caption?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<"loading" | "rendered" | "error" | "edit">("loading");
-  const [editCode, setEditCode] = useState(code.trim());
+  const [editCode, setEditCode] = useState(code?.trim() || "");
   const [errorMsg, setErrorMsg] = useState("");
   const [zoomed, setZoomed] = useState(false);
 
-  async function render(codeStr: string) {
-    if (!containerRef.current || !codeStr.trim()) {
+  async function render(codeStr?: string) {
+    const trimmed = (codeStr || "").trim();
+    if (!containerRef.current || !trimmed) {
       setState("error");
       setErrorMsg("No diagram code provided");
       return;
@@ -24,7 +25,7 @@ export default function MermaidDiagram({ code, caption }: { code: string; captio
 
     try {
       const id = `mermaid-${Math.random().toString(36).slice(2, 8)}`;
-      const { svg } = await mermaid.render(id, codeStr.trim());
+      const { svg } = await mermaid.render(id, trimmed);
       if (containerRef.current) {
         containerRef.current.innerHTML = svg;
         setState("rendered");
@@ -36,7 +37,7 @@ export default function MermaidDiagram({ code, caption }: { code: string; captio
   }
 
   useEffect(() => {
-    render(code.trim());
+    render(code || "");
   }, [code]);
 
   function handleEditSubmit() {
@@ -50,7 +51,7 @@ export default function MermaidDiagram({ code, caption }: { code: string; captio
         <div className="flex gap-1">
           {state === "error" && (
             <button
-              onClick={() => { setState("edit"); setEditCode(code.trim()); }}
+              onClick={() => { setState("edit"); setEditCode((code || "").trim()); }}
               className="pixel text-[8px] border border-black px-1 py-1 min-h-[44px] sm:min-h-0 cursor-pointer bg-white"
             >
               EDIT
@@ -71,7 +72,7 @@ export default function MermaidDiagram({ code, caption }: { code: string; captio
       {state === "loading" && (
         <div className="flex items-center justify-center h-32 border-2 border-dashed border-black/20 bg-white/50">
           <div className="text-center">
-            <div className="inline-block w-8 h-8 border-3 border-[#e0e0e0] border-t-[#1c1917] rounded-full"
+            <div className="inline-block w-8 h-8 border-3 border-[var(--border)] border-t-[#1c1917] rounded-full"
               style={{ animation: "spin 0.8s linear infinite" }} />
             <p className="text-xs text-[#888] mt-2">Rendering diagram...</p>
           </div>

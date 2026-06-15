@@ -144,7 +144,7 @@ export default function GenerationBar({
 
   // Smooth animation: creep toward target between checkpoints
   useEffect(() => {
-    setSmoothPct((prev) => (targetPct > prev ? prev : prev));
+    setSmoothPct((prev) => (targetPct > prev ? targetPct : prev));
 
     const creepTarget = nextCheckpoint(entry.phase);
     const startTime = Date.now();
@@ -210,7 +210,7 @@ export default function GenerationBar({
 
       {/* Expanded live view */}
       {expanded && (
-        <div className="border-t-2" style={{ borderColor: "#e0e0e0" }}>
+        <div className="border-t-2" style={{ borderColor: "var(--border)" }}>
           {/* Phase Timeline */}
           <div className="px-4 pt-3 pb-2">
             <PhaseTimeline currentPhase={entry.phase} />
@@ -220,7 +220,7 @@ export default function GenerationBar({
           {!isDone && !isError && (
             <div className="px-4 pb-2">
               <div className="flex items-center justify-between mb-2">
-                <span className="pixel text-[9px] font-semibold" style={{ color: "#5f6368" }}>
+                <span className="pixel text-[9px] font-semibold" style={{ color: "var(--muted)" }}>
                   LIVE ACTIVITY ({activities.length})
                 </span>
                 <button

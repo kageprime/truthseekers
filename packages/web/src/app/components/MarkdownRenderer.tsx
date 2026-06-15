@@ -102,8 +102,9 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
               <CopyButton text={codeText} />
               <pre
                 style={{
-                  background: "#1a1a2e",
-                  color: "#e0e0e0",
+                  background: "#2d2a24",
+                  color: "#e8dcc8",
+                  border: "2px solid var(--ink)",
                   padding: "1rem",
                   overflowX: "auto",
                   fontSize: "0.85rem",
@@ -124,7 +125,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: "#2563eb", textDecoration: "underline", textUnderlineOffset: "2px" }}
+              style={{ color: "var(--orange)", textDecoration: "underline", textUnderlineOffset: "2px" }}
             >
               {children}
             </a>
@@ -167,7 +168,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
                 fontSize: "1.3rem",
                 marginTop: "1.5rem",
                 marginBottom: "0.5rem",
-                borderBottom: "2px solid #e0e0e0",
+                borderBottom: "2px solid var(--border)",
                 paddingBottom: "0.25rem",
               }}
             >

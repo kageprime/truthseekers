@@ -77,15 +77,15 @@ export default function PageLayout({
             activeId={activeId}
           />
         )}
-        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0" id="main-content">
           {children}
         </div>
       </div>
       {!noFooter && (
-        <footer className="border-t px-6 py-6" style={{ borderColor: "#dadce0", background: "white" }}>
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between text-sm gap-1" style={{ color: "#5f6368" }}>
-            <span className="font-medium" style={{ color: "#1a1a1a" }}>Truthseekers</span>
-            <span className="text-xs">{footerText}</span>
+        <footer className="border-t-2 border-black px-6 py-4" style={{ background: "var(--warm)" }}>
+          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span className="pixel text-[8px]" style={{ color: "var(--ink)" }}>◆ Truthseekers</span>
+            <span className="pixel text-[7px]" style={{ color: "var(--subtle)" }}>{footerText}</span>
           </div>
         </footer>
       )}

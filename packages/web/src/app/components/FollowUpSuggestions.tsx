@@ -8,7 +8,7 @@ interface FollowUpSuggestionsProps {
 export default function FollowUpSuggestions({ followUps, onClick }: FollowUpSuggestionsProps) {
   return (
     <div className="px-6 py-4">
-      <p className="text-[10px] pixel mb-3" style={{ color: "#9aa0a6" }}>SUGGESTED FOLLOW-UPS</p>
+      <p className="text-[10px] pixel mb-3" style={{ color: "var(--subtle)" }}>SUGGESTED FOLLOW-UPS</p>
       <div className="flex flex-wrap gap-2">
         {followUps.map((q, i) => (
           <button

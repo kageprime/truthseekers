@@ -45,7 +45,7 @@ export default function HomePage() {
             <p className="text-lg font-semibold text-center max-w-md leading-snug" style={{ color: "var(--ink)" }}>
               {submitted}
             </p>
-            <p className="text-sm animate-pulse" style={{ color: "#9aa0a6" }}>
+            <p className="text-sm animate-pulse" style={{ color: "var(--subtle)" }}>
               Preparing your conversation...
             </p>
           </div>
@@ -56,7 +56,7 @@ export default function HomePage() {
               style={{ color: "var(--ink)" }}>
               Truthseekers
             </h1>
-            <p className="text-lg text-center mb-10" style={{ color: "#5f6368" }}>
+            <p className="text-lg text-center mb-10" style={{ color: "var(--muted)" }}>
               The Living Encyclopedia
             </p>
 
@@ -75,7 +75,7 @@ export default function HomePage() {
                 </button>
               </div>
             </form>
-            <div className="mt-8 text-xs text-center" style={{ color: "#9aa0a6" }}>
+            <div className="mt-8 text-xs text-center" style={{ color: "var(--subtle)" }}>
               Try: &ldquo;What was the Renaissance?&rdquo; &middot; &ldquo;Tell me about the Solar System&rdquo; &middot; &ldquo;Show me a map of ancient Rome&rdquo;
             </div>
           </div>

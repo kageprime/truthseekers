@@ -103,13 +103,13 @@ function Annotations({ scene }: { scene: ThreeDMapScene }) {
   );
 }
 
-export default function ThreeDMapViewer({ scene, height = "400px" }: ThreeDMapViewerProps) {
+export default function ThreeDMapViewer({ scene, height = undefined }: ThreeDMapViewerProps) {
   const zoom = scene.zoom || 14;
   const scale = ZOOM_SCALE[zoom] || ZOOM_SCALE[14];
   const distance = Math.max(50, scale * 0.15);
 
   return (
-    <div style={{ height, width: "100%" }} className="rounded-xl border-2 border-black overflow-hidden bg-[#e8e0d0]">
+    <div style={{ height: height || "50vh", minHeight: height || "250px", maxHeight: height || "500px", width: "100%" }} className="border-2 border-black overflow-hidden bg-[var(--warm)]">
       <Canvas
         camera={{ position: [distance * 0.5, distance * 0.4, distance], fov: 50 }}
         shadows={{ enabled: true, type: 1 }}

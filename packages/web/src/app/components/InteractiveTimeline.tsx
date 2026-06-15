@@ -35,7 +35,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 function catColor(cat?: string): string {
-  return cat ? CATEGORY_COLORS[cat] ?? "#888" : "#888";
+  return cat ? CATEGORY_COLORS[cat] ?? "var(--subtle)" : "var(--subtle)";
 }
 
 export default function InteractiveTimeline({ events }: { events: TimelineEvent[] }) {
@@ -47,7 +47,14 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
   const listRef = useRef<HTMLDivElement>(null);
   const uid = useRef(`tl-${Math.random().toString(36).slice(2, 8)}`).current;
 
-  if (sorted.length === 0) return null;
+  if (sorted.length === 0) {
+    return (
+      <div className="pixel-card-sm p-6 my-4 text-center bg-white">
+        <div className="text-3xl mb-2">📅</div>
+        <p className="pixel text-[9px]" style={{ color: "var(--subtle)" }}>No timeline data available</p>
+      </div>
+    );
+  }
 
   const minYear = sorted[0].year;
   const maxYear = sorted[sorted.length - 1].year;
@@ -167,7 +174,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
                 : <><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" /></>}
             </svg>
           </button>
-          <span className="text-xs text-[#888] ml-1 whitespace-nowrap">{minYear} – {maxYear}</span>
+          <span className="text-xs ml-1 whitespace-nowrap" style={{ color: "var(--subtle)" }}>{minYear} – {maxYear}</span>
         </div>
       </div>
 
@@ -176,7 +183,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
         <div className="flex flex-wrap gap-3 mb-3 text-xs sm:text-[10px]">
           {usedCats.map((cat) => (
             <span key={cat} className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full border border-black" style={{ background: catColor(cat) }} />
+              <span className="w-2.5 h-2.5 border-2 border-black" style={{ background: catColor(cat) }} />
               {CATEGORY_LABELS[cat] ?? cat}
             </span>
           ))}
@@ -207,9 +214,9 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
         )}
 
         {/* Track line */}
-        <div className="absolute top-1/2 left-0 right-0 h-2 -translate-y-1/2 border-2 border-black rounded-full"
+        <div className="absolute top-1/2 left-0 right-0 h-2 -translate-y-1/2 border-2 border-black"
           style={{ background: "var(--blue)", opacity: 0.15 }} />
-        <div className="absolute top-1/2 left-0 h-2 -translate-y-1/2 transition-all duration-150 rounded-full"
+        <div className="absolute top-1/2 left-0 h-2 -translate-y-1/2 transition-all duration-150"
           style={{ width: `${scrubX}%`, background: "var(--blue)", opacity: 0.4 }} />
 
         {/* Scrub handle */}
@@ -226,7 +233,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
           const isActive = activeIdx !== null && g.includes(activeIdx);
           return (
             <div key={ev.year}
-              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-black rounded-full cursor-pointer transition-all duration-150 z-10"
+              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-black cursor-pointer transition-all duration-150 z-10"
               style={{
                 left: `${x}%`, width: n > 1 ? 18 : 12, height: n > 1 ? 18 : 12,
                 background: isActive ? catColor(ev.category) : "white",
@@ -263,7 +270,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
                 style={{
                   left: `${x}%`, transform: "translateX(-50%)",
                   top: hidden ? "8px" : (i % 2 === 0 ? "0px" : "16px"),
-                  color: activeIdx === i ? "var(--ink)" : hidden ? "transparent" : "#aaa",
+                  color: activeIdx === i ? "var(--ink)" : hidden ? "transparent" : "var(--subtle)",
                   fontWeight: activeIdx === i ? 700 : 400,
                   opacity: hidden ? 0 : 1,
                   pointerEvents: hidden ? "none" : "auto",
@@ -294,14 +301,14 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
               <div className="flex items-center gap-2 flex-wrap">
                 <strong className="text-sm leading-snug">{ev.event}</strong>
                 {ev.category && (
-                  <span className="text-xs sm:text-[9px] px-1.5 py-0.5 border border-black font-medium shrink-0"
+                  <span className="text-xs sm:text-[9px] px-1.5 py-0.5 border-2 border-black font-medium shrink-0"
                     style={{ background: `${catColor(ev.category)}20`, color: catColor(ev.category) }}>
                     {CATEGORY_LABELS[ev.category] ?? ev.category}
                   </span>
                 )}
               </div>
               {ev.description && (
-                <p className={`text-xs text-[#555] leading-relaxed mt-0.5 ${isActive ? "" : "line-clamp-2"}`}>
+                <p className={`text-xs leading-relaxed mt-0.5 ${isActive ? "" : "line-clamp-2"}`} style={{ color: "var(--muted)" }}>
                   {ev.description}
                 </p>
               )}
@@ -319,7 +326,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
           <div className="shrink-0">
             {trackTop}
           </div>
-          <hr className="border-t-2 border-dashed border-[#ccc] my-2" />
+          <hr className="border-t-2 border-dashed my-2" style={{ borderColor: "var(--border)" }} />
           <div className="flex-1 overflow-y-auto min-h-0" style={{ scrollBehavior: "smooth" }}>
             {trackList}
           </div>

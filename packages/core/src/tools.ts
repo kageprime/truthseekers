@@ -207,6 +207,21 @@ export const CHAT_TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "generate_video",
+      description: "Generate a short video clip (5s) from a text description using AI video generation.",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt: { type: "string", description: "Detailed text description of the video scene" },
+          caption: { type: "string", description: "Caption for the video" },
+        },
+        required: ["prompt"],
+      },
+    },
+  },
 ];
 
 export const BUILT_IN_TOOL_EXECUTORS: Record<string, ToolExecutor> = {
@@ -222,9 +237,14 @@ export const BUILT_IN_TOOL_EXECUTORS: Record<string, ToolExecutor> = {
   },
   render_blocks: async (args) => {
     const incoming = Array.isArray(args.blocks) ? args.blocks : [];
+    let idCounter = 0;
+    const blocks = incoming.map((b: any) => ({
+      ...b,
+      id: b.id || `rb-${Date.now()}-${idCounter++}`,
+    }));
     return {
-      result: JSON.stringify({ blockCount: incoming.length }),
-      blocks: incoming.length > 0 ? incoming : undefined,
+      result: JSON.stringify({ blockCount: blocks.length }),
+      blocks: blocks.length > 0 ? blocks : undefined,
     };
   },
   webfetch: async (args) => {

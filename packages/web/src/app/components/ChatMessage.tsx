@@ -35,10 +35,10 @@ interface ChatMessageProps {
 
 function AgentEventCard({ event, onClick }: { event: AgentEvent; onClick?: () => void }) {
   return (
-    <div role="button" tabIndex={0} onClick={onClick} onKeyDown={(e) => { if (e.key === "Enter") onClick?.(); }} className="rounded transition-opacity hover:opacity-80" style={{ cursor: "pointer" }}>
-      <div className="flex items-center gap-1.5 text-[9px] mb-0.5" style={{ color: "#9aa0a6" }}>
+    <button onClick={onClick} className="rounded transition-opacity hover:opacity-80 w-full text-left" style={{ cursor: "pointer", background: "none", border: "none", padding: 0, font: "inherit", color: "inherit" }}>
+      <div className="flex items-center gap-1.5 text-[9px] mb-0.5" style={{ color: "var(--subtle)" }}>
         <span>{formatTimestamp(event.timestamp)}</span>
-        <span className="font-semibold uppercase text-[8px] px-1 border rounded" style={{ borderColor: "#e0e0e0" }}>{event.type}</span>
+        <span className="font-semibold uppercase text-[8px] px-1 border rounded" style={{ borderColor: "var(--border)" }}>{event.type}</span>
       </div>
       {event.type === "tool_use" && <ToolUseCard data={event.data as any} />}
       {event.type === "tool_result" && <ToolResultCard data={event.data as any} />}
@@ -53,7 +53,7 @@ function AgentEventCard({ event, onClick }: { event: AgentEvent; onClick?: () =>
           ❌ {String(event.data)}
         </div>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -65,7 +65,8 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
   const [fullscreenEventIdx, setFullscreenEventIdx] = useState<number | undefined>(undefined);
 
   function handleCopy() {
-    navigator.clipboard.writeText(content);
+    if (!navigator.clipboard) { setCopied(true); setTimeout(() => setCopied(false), 2000); return; }
+    navigator.clipboard.writeText(content).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -103,12 +104,12 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
         <div className="mt-3 pt-2 border-t" style={{ borderColor: "#e5e5e5" }}>
           <button
             onClick={() => setShowActivity(!showActivity)}
-            className="flex items-center gap-1.5 text-[9px] font-semibold px-1 py-1 rounded hover:bg-[#f5f5f4] transition-colors"
-            style={{ color: "#5f6368" }}
+            className="flex items-center gap-1.5 text-[9px] font-semibold px-1 py-1 rounded hover:bg-[var(--hover)] transition-colors"
+            style={{ color: "var(--muted)" }}
           >
             <span className="text-[8px]">{showActivity ? "▼" : "▶"}</span>
             Agent Activity
-            <span className="text-[8px] ml-0.5 px-1.5 py-0.5 rounded-full border" style={{ borderColor: "#e0e0e0", color: "#9aa0a6" }}>
+            <span className="text-[8px] ml-0.5 px-1.5 py-0.5 rounded-full border" style={{ borderColor: "var(--border)", color: "var(--subtle)" }}>
               {agentEvents.length}
             </span>
           </button>
@@ -125,7 +126,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
       {/* Action bar */}
       <div className={`flex items-center gap-2 mt-1.5 ${isUser ? "flex-row-reverse" : ""}`}>
         {createdAt && (
-          <span className="text-[10px]" style={{ color: "#9aa0a6" }}>{timeAgo(createdAt)}</span>
+          <span className="text-[10px]" style={{ color: "var(--subtle)" }}>{timeAgo(createdAt)}</span>
         )}
 
         {/* Copy button (assistant messages) */}
@@ -133,7 +134,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
           <button
             onClick={handleCopy}
             className="btn-ghost text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-            style={{ color: copied ? "var(--green)" : "#9aa0a6" }}
+            style={{ color: copied ? "var(--green)" : "var(--subtle)" }}
             title="Copy message"
           >
             {copied ? "✓ Copied" : "📋 Copy"}
@@ -146,7 +147,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
             <button
               onClick={() => setFeedback(feedback === "up" ? null : "up")}
               className="btn-ghost text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ color: feedback === "up" ? "var(--green)" : "#9aa0a6" }}
+              style={{ color: feedback === "up" ? "var(--green)" : "var(--subtle)" }}
               title="Helpful"
             >
               👍
@@ -154,7 +155,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
             <button
               onClick={() => setFeedback(feedback === "down" ? null : "down")}
               className="btn-ghost text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ color: feedback === "down" ? "var(--red)" : "#9aa0a6" }}
+              style={{ color: feedback === "down" ? "var(--red)" : "var(--subtle)" }}
               title="Not helpful"
             >
               👎
@@ -167,7 +168,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
           <button
             onClick={onRegenerate}
             className="btn-ghost text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-            style={{ color: "#9aa0a6" }}
+            style={{ color: "var(--subtle)" }}
             title="Get a different response"
           >
             🔄 Regenerate
@@ -179,7 +180,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
           <button
             onClick={onEdit}
             className="btn-ghost text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-            style={{ color: "#9aa0a6" }}
+            style={{ color: "var(--subtle)" }}
             title="Edit message"
           >
             ✏️ Edit

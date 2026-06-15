@@ -288,7 +288,7 @@ export default function ArticlesPage() {
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                style={{ color: "#9aa0a6" }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                style={{ color: "var(--subtle)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -347,7 +347,7 @@ export default function ArticlesPage() {
 
           {/* Result count */}
           {showResults && (
-            <div className="text-sm mb-4 px-1" style={{ color: "#5f6368" }}>
+            <div className="text-sm mb-4 px-1" style={{ color: "var(--muted)" }}>
               {searching ? "Searching..." : loading ? "Loading..." : `${articles.length} results`}
             </div>
           )}
@@ -360,7 +360,7 @@ export default function ArticlesPage() {
               <div className="pixel-card-sm p-8 bg-white">
                 <div className="text-5xl mb-4">🔍</div>
                 <h2 className="pixel text-sm mb-3" style={{ color: "var(--ink)" }}>No results found</h2>
-                <p className="text-sm mb-6 leading-relaxed" style={{ color: "#5f6368" }}>
+                <p className="text-sm mb-6 leading-relaxed" style={{ color: "var(--muted)" }}>
                   No articles found for &ldquo;{query}&rdquo;. Would you like to generate one?
                 </p>
                 <button onClick={handleGenerate} className="btn-primary btn-lg">
@@ -384,6 +384,25 @@ export default function ArticlesPage() {
                     </div>
                   )}
                   <div ref={sentinelRef} className="h-1 col-span-full" />
+                </div>
+              )}
+
+              {/* Empty database - no search, no articles */}
+              {!showResults && articles.length === 0 && !loading && (
+                <div className="max-w-lg mx-auto text-center py-16">
+                  <div className="pixel-card p-10 bg-white">
+                    <div className="text-6xl mb-4">📖</div>
+                    <h2 className="pixel text-sm mb-3" style={{ color: "var(--ink)" }}>No articles yet</h2>
+                    <p className="text-sm mb-6 leading-relaxed" style={{ color: "var(--muted)" }}>
+                      Your encyclopedia is empty. Search a topic or generate your first article to get started.
+                    </p>
+                    <div className="flex items-center justify-center gap-3">
+                      <span className="pixel text-[9px]" style={{ color: "var(--subtle)" }}>Try:</span>
+                      <button onClick={() => { setQuery("Roman Empire"); setShowResults(true); setLoading(true); setDebouncedQuery("Roman Empire"); }} className="btn-secondary btn-sm">Roman Empire</button>
+                      <button onClick={() => { setQuery("Black Holes"); setShowResults(true); setLoading(true); setDebouncedQuery("Black Holes"); }} className="btn-secondary btn-sm">Black Holes</button>
+                      <button onClick={() => { setQuery("Silk Road"); setShowResults(true); setLoading(true); setDebouncedQuery("Silk Road"); }} className="btn-secondary btn-sm">Silk Road</button>
+                    </div>
+                  </div>
                 </div>
               )}
 

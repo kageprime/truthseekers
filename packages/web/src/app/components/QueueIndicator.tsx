@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-
-const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
+import { BASE } from "@/lib/api";
 
 interface QueueJob {
   slug: string;
@@ -78,6 +77,8 @@ export default function QueueIndicator() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
         className="pixel text-[9px] px-3 py-3 sm:py-2 min-h-[44px] border-2 border-black shadow-[2px_2px_0_#1c1917] relative"
         style={{ background: total > 0 ? "var(--orange)" : "white", color: total > 0 ? "white" : "var(--ink)" }}
       >

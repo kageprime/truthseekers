@@ -67,7 +67,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [streamContent, setStreamContent] = useState("");
   const [streamBlocks, setStreamBlocks] = useState<any[]>([]);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
-  const [lastAgentEvents, setLastAgentEvents] = useState<AgentEvent[]>([]);
   const agentEventsRef = useRef<AgentEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -83,11 +82,15 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
     fetchChat(id).then((d) => {
       if (d) chatCache.set(id, d);
       setData(d);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch((err) => {
+      setLoading(false);
+      setError(err instanceof Error ? err.message : "Failed to load conversation");
+    });
   }, [id]);
 
   useEffect(() => {
@@ -133,14 +136,14 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         }
       },
       onDone: (event) => {
-        setLastAgentEvents(agentEventsRef.current);
+        const savedEvents = agentEventsRef.current;
         setStreamContent("");
         setStreamBlocks(event.blocks || []);
         setFollowUps(generateFollowUps(lastMessageRef.current));
         setData((prev) => {
           if (!prev) return prev;
           const real = prev.messages.filter((m) => !m.id.startsWith("temp-"));
-          const updated = { ...prev, messages: [...real, { id: event.msgId!, conversationId: id, role: "assistant" as const, content: event.content || "", blocks: event.blocks, createdAt: new Date().toISOString() }] };
+          const updated = { ...prev, messages: [...real, { id: event.msgId!, conversationId: id, role: "assistant" as const, content: event.content || "", blocks: event.blocks, agentEvents: savedEvents, createdAt: new Date().toISOString() }] };
           chatCache.set(id, updated);
           return updated;
         });
@@ -264,8 +267,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     return (
       <PageLayout sidebar sidebarDefaultOpen activeId={id} noFooter noHeader>
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6">
-          <div className="w-8 h-8 rounded-full border-3 animate-spin" style={{ borderColor: "#e0e0e0", borderTopColor: "var(--orange)" }} />
-          <p className="text-sm" style={{ color: "#9aa0a6" }}>Loading conversation...</p>
+          <div className="w-8 h-8 rounded-full border-3 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--orange)" }} />
+          <p className="text-sm" style={{ color: "var(--subtle)" }}>Loading conversation...</p>
         </div>
       </PageLayout>
     );
@@ -276,7 +279,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       <PageLayout sidebar sidebarDefaultOpen activeId={id} noFooter noHeader>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <p className="text-sm mb-4" style={{ color: "#9aa0a6" }}>Conversation not found</p>
+            <p className="text-sm mb-4" style={{ color: error ? "var(--red)" : "var(--subtle)" }}>
+              {error || "Conversation not found"}
+            </p>
             <Link href="/chat" className="btn-primary btn-sm">Back to Chat</Link>
           </div>
         </div>
@@ -297,14 +302,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           showScrollBtn={showScrollBtn}
           phaseLabel={phaseLabel}
             agentEvents={agentEvents}
-            lastAgentEvents={lastAgentEvents}
             lastAssistantIndex={lastAssistantIndex}
           suggestedTopics={suggestedTopics}
           scrollRef={scrollRef}
           onScrollToBottom={scrollToBottom}
           onRegenerate={handleRegenerate}
           onEdit={handleEdit}
-          onCopy={(content) => navigator.clipboard.writeText(content)}
+          onCopy={(content) => navigator.clipboard?.writeText(content)?.catch(() => {})}
           onSend={doSend}
           onRetry={handleSend}
           onSetInput={setInput}

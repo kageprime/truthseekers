@@ -106,7 +106,7 @@ export function ToolUseCard({ data }: { data: ToolUseData }) {
   return (
     <div className="flex items-start gap-2 py-1.5 px-2.5 border-l-2 border-[#7dd3fc] rounded-r" style={{ background: "#f0f7ff" }}>
       <span className="text-xs shrink-0 mt-0.5">{toolLabel(data.name ?? "")}</span>
-      <span className="text-[10px] leading-relaxed" style={{ color: "#5f6368" }}>
+      <span className="text-[10px] leading-relaxed" style={{ color: "var(--muted)" }}>
         {toolUseSummary(data.name ?? "", data.args ?? {})}
       </span>
     </div>
@@ -159,7 +159,7 @@ export function TextDeltaCard({ data }: { data: TextDelta }) {
 function AgentActivityFeed({ events, compact }: { events: AgentEvent[]; compact?: boolean }) {
   if (events.length === 0) {
     return (
-      <div className="text-[10px] text-center py-6" style={{ color: "#9aa0a6" }}>
+      <div className="text-[10px] text-center py-6" style={{ color: "var(--subtle)" }}>
         Waiting for agent activity...
       </div>
     );
@@ -169,9 +169,9 @@ function AgentActivityFeed({ events, compact }: { events: AgentEvent[]; compact?
       {events.map((event, i) => (
         <div key={`${event.timestamp}-${i}`}>
           {!compact && (
-            <div className="flex items-center gap-1.5 text-[9px] mb-1" style={{ color: "#9aa0a6" }}>
+            <div className="flex items-center gap-1.5 text-[9px] mb-1" style={{ color: "var(--subtle)" }}>
               <span>{formatTimestamp(event.timestamp)}</span>
-              <span className="font-semibold uppercase text-[8px] px-1 border rounded" style={{ borderColor: "#e0e0e0" }}>{event.type}</span>
+              <span className="font-semibold uppercase text-[8px] px-1 border rounded" style={{ borderColor: "var(--border)" }}>{event.type}</span>
             </div>
           )}
           {event.type === "tool_use" && <ToolUseCard data={event.data as ToolUseData} />}
@@ -228,7 +228,7 @@ export function AgentActivityFullscreen({ open, onClose, events, scrollToIndex }
           <div className="flex items-center gap-2">
             <span className="text-lg">🤖</span>
             <h3 className="pixel text-xs" style={{ color: "var(--ink)" }}>AGENT ACTIVITY</h3>
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full border" style={{ borderColor: "#e0e0e0", color: "#9aa0a6" }}>
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full border" style={{ borderColor: "var(--border)", color: "var(--subtle)" }}>
               {events.length} events
             </span>
           </div>
@@ -248,9 +248,9 @@ export function AgentActivityFullscreen({ open, onClose, events, scrollToIndex }
           <div className="space-y-2">
             {events.map((event, i) => (
               <div key={`${event.timestamp}-${i}`} ref={(el) => { itemRefs.current[i] = el; }}>
-                <div className="flex items-center gap-1.5 text-[9px] mb-1" style={{ color: "#9aa0a6" }}>
+                <div className="flex items-center gap-1.5 text-[9px] mb-1" style={{ color: "var(--subtle)" }}>
                   <span>{formatTimestamp(event.timestamp)}</span>
-                  <span className="font-semibold uppercase text-[8px] px-1 border rounded" style={{ borderColor: "#e0e0e0" }}>{event.type}</span>
+                  <span className="font-semibold uppercase text-[8px] px-1 border rounded" style={{ borderColor: "var(--border)" }}>{event.type}</span>
                 </div>
                 {event.type === "tool_use" && <ToolUseCard data={event.data as ToolUseData} />}
                 {event.type === "tool_result" && <ToolResultCard data={event.data as ToolResultData} />}
@@ -277,7 +277,7 @@ export function AgentActivityFullscreen({ open, onClose, events, scrollToIndex }
           >
             {autoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}
           </button>
-          <span className="text-[9px]" style={{ color: "#9aa0a6" }}>
+          <span className="text-[9px]" style={{ color: "var(--subtle)" }}>
             {events.length} event{events.length !== 1 ? "s" : ""} · last {formatTimestamp(events[events.length - 1]?.timestamp ?? Date.now())}
           </span>
         </div>
@@ -314,27 +314,27 @@ export default function ProcessViewer({ events, maxVisible = 50 }: ProcessViewer
         <div className="flex items-center justify-between mb-2">
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="text-[9px] font-semibold flex items-center gap-1.5 px-1 py-0.5 hover:bg-[#f5f5f4] rounded transition-colors"
-            style={{ color: "#5f6368" }}
+            className="text-[9px] font-semibold flex items-center gap-1.5 px-1 py-0.5 hover:bg-[var(--hover)] rounded transition-colors"
+            style={{ color: "var(--muted)" }}
           >
             <span className="inline-block w-2 text-[8px]">{collapsed ? "▶" : "▼"}</span>
             Agent Activity
-            <span className="text-[8px] ml-0.5 px-1.5 py-0.5 rounded-full border" style={{ borderColor: "#e0e0e0", color: "#9aa0a6" }}>
+            <span className="text-[8px] ml-0.5 px-1.5 py-0.5 rounded-full border" style={{ borderColor: "var(--border)", color: "var(--subtle)" }}>
               {events.length}
             </span>
           </button>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setAutoScroll(!autoScroll)}
-              className="text-[9px] px-1.5 py-0.5 rounded hover:bg-[#f5f5f4] transition-colors"
+              className="text-[9px] px-1.5 py-0.5 rounded hover:bg-[var(--hover)] transition-colors"
               style={{ color: autoScroll ? "var(--blue)" : "#aaa", fontWeight: autoScroll ? 600 : 400 }}
             >
               {autoScroll ? "Auto" : "Manual"}
             </button>
             <button
               onClick={() => setFullscreen(true)}
-              className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#f5f5f4] transition-colors text-xs"
-              style={{ color: "#9aa0a6" }}
+              className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--hover)] transition-colors text-xs"
+              style={{ color: "var(--subtle)" }}
               aria-label="Fullscreen agent activity"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
@@ -357,15 +357,15 @@ export default function ProcessViewer({ events, maxVisible = 50 }: ProcessViewer
             }}
           >
             {visible.length === 0 ? (
-              <div className="text-[10px] text-center py-6" style={{ color: "#9aa0a6" }}>
+              <div className="text-[10px] text-center py-6" style={{ color: "var(--subtle)" }}>
                 Waiting for agent activity...
               </div>
             ) : (
               visible.map((event, i) => (
                 <div key={`${event.timestamp}-${i}`}>
-                  <div className="flex items-center gap-1.5 text-[9px] mb-0.5" style={{ color: "#9aa0a6" }}>
+                  <div className="flex items-center gap-1.5 text-[9px] mb-0.5" style={{ color: "var(--subtle)" }}>
                     <span>{formatTimestamp(event.timestamp)}</span>
-                    <span className="font-semibold uppercase text-[8px] px-1 border" style={{ borderColor: "#e0e0e0" }}>{event.type}</span>
+                    <span className="font-semibold uppercase text-[8px] px-1 border" style={{ borderColor: "var(--border)" }}>{event.type}</span>
                   </div>
                   {event.type === "tool_use" && <ToolUseCard data={event.data as ToolUseData} />}
                   {event.type === "tool_result" && <ToolResultCard data={event.data as ToolResultData} />}

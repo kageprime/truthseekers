@@ -187,10 +187,16 @@ export interface ConversationDetail extends ConversationSummary {
   }>;
 }
 
+function authHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("truthseekers_token");
+  return token ? { authorization: `Bearer ${token}` } : {};
+}
+
 export async function createChat(title?: string): Promise<ConversationSummary | null> {
   const res = await fetch(`${BASE}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ title }),
   });
   if (!res.ok) {
@@ -201,13 +207,13 @@ export async function createChat(title?: string): Promise<ConversationSummary | 
 }
 
 export async function fetchChats(): Promise<ConversationSummary[]> {
-  const res = await fetch(`${BASE}/chat`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/chat`, { cache: "no-store", headers: { ...authHeaders() } });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function fetchChat(id: string): Promise<ConversationDetail | null> {
-  const res = await fetch(`${BASE}/chat/${id}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/chat/${id}`, { cache: "no-store", headers: { ...authHeaders() } });
   if (!res.ok) return null;
   return res.json();
 }

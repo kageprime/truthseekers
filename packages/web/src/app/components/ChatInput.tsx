@@ -43,7 +43,7 @@ export default function ChatInput({
         {editingIndex !== null && (
           <div className="flex items-center gap-2 mb-2 text-xs">
             <span style={{ color: "var(--orange)" }}>✏️ Editing message</span>
-            <button onClick={onCancelEdit} className="text-[10px] font-medium" style={{ color: "#9aa0a6" }}>Cancel</button>
+            <button onClick={onCancelEdit} className="text-[10px] font-medium" style={{ color: "var(--subtle)" }}>Cancel</button>
           </div>
         )}
         {showCommands && (
@@ -55,13 +55,13 @@ export default function ChatInput({
               <button
                 key={cmd.id}
                 onClick={() => onSlashCommand(`/${cmd.id}`)}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-[#f5f5f4] transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-[var(--hover)] transition-colors"
                 style={{ color: "var(--ink)" }}
               >
                 <span>{cmd.icon}</span>
                 <div>
                   <span className="font-medium">{cmd.label}</span>
-                  <span className="text-[11px] ml-2" style={{ color: "#9aa0a6" }}>{cmd.description}</span>
+                  <span className="text-[11px] ml-2" style={{ color: "var(--subtle)" }}>{cmd.description}</span>
                 </div>
               </button>
             ))}

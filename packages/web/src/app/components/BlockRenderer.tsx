@@ -5,6 +5,7 @@ import Link from "next/link";
 import MarkdownRenderer from "./MarkdownRenderer";
 import MermaidDiagram from "./MermaidDiagram";
 import { MediaImage } from "./MediaImage";
+import { BASE } from "@/lib/api";
 
 const InteractiveTimeline = dynamic(() => import("./InteractiveTimeline"), { ssr: false });
 const MapViewer = dynamic(() => import("./MapViewer"), { ssr: false });
@@ -21,6 +22,7 @@ import type {
   Map3DBlockData,
   DiagramBlockData,
   ImageBlockData,
+  VideoBlockData,
   GalleryBlockData,
   CitationBlockData,
   CrossrefBlockData,
@@ -28,7 +30,7 @@ import type {
 
 export default function BlockRenderer({ blocks, compact = false }: { blocks: Block[]; compact?: boolean }) {
   if (!blocks || blocks.length === 0) {
-    return <div className="text-sm" style={{ color: "#9aa0a6" }}>No content yet.</div>;
+    return <div className="text-sm" style={{ color: "var(--subtle)" }}>No content yet.</div>;
   }
 
   return (
@@ -58,6 +60,8 @@ function BlockCard({ block, compact }: { block: Block; compact: boolean }) {
       return <DiagramBlock data={block.data as unknown as DiagramBlockData} />;
     case "image":
       return <ImageBlock data={block.data as unknown as ImageBlockData} />;
+    case "video":
+      return <VideoBlock data={block.data as unknown as VideoBlockData} />;
     case "gallery":
       return <GalleryBlock data={block.data as unknown as GalleryBlockData} />;
     case "citation":
@@ -99,6 +103,7 @@ function SectionBlock({ data }: { data: SectionBlockData }) {
 }
 
 function TimelineBlock({ data }: { data: TimelineBlockData }) {
+  if (!data.events) return <div className="text-xs" style={{ color: "var(--subtle)" }}>No timeline events</div>;
   const events = data.events.map((e) => ({ ...e, year: typeof e.year === "string" ? parseInt(e.year, 10) || 0 : e.year }));
   return (
     <div className="pixel-card-sm p-3 mb-3 bg-white overflow-hidden">
@@ -126,7 +131,7 @@ function Map3DBlock({ data }: { data: Map3DBlockData }) {
 function DiagramBlock({ data }: { data: DiagramBlockData }) {
   return (
     <div className="pixel-card-sm p-3 mb-3 bg-white">
-      {data.caption && <div className="text-xs font-semibold mb-2" style={{ color: "#5f6368" }}>{data.caption}</div>}
+      {data.caption && <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted)" }}>{data.caption}</div>}
       <MermaidDiagram code={data.code} />
     </div>
   );
@@ -140,11 +145,29 @@ function ImageBlock({ data }: { data: ImageBlockData }) {
   );
 }
 
+function VideoBlock({ data }: { data: VideoBlockData }) {
+  if (!data?.src) return <div className="text-xs" style={{ color: "var(--subtle)" }}>Video not available</div>;
+  const videoSrc = data.src.startsWith("/") ? `${BASE}${data.src}` : data.src;
+  return (
+    <div className="pixel-card-sm p-2 mb-3 bg-white">
+      {data.caption && <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted)" }}>{data.caption}</div>}
+      <video
+        controls
+        className="w-full"
+        style={{ maxHeight: "480px", border: "2px solid var(--ink)" }}
+        poster={data.poster}
+      >
+        <source src={videoSrc} type="video/mp4" />
+      </video>
+    </div>
+  );
+}
+
 function GalleryBlock({ data }: { data: GalleryBlockData }) {
   if (!data.images || data.images.length === 0) return null;
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
-      {data.images.map((img, i) => (
+      {data.images.filter(Boolean).map((img, i) => (
         <MediaImage key={i} src={img.src} caption={img.caption} prompt={img.prompt} />
       ))}
     </div>
@@ -160,7 +183,7 @@ function CitationBlock({ data }: { data: CitationBlockData }) {
       <span>🔗</span>
       <span className="flex-1 min-w-0">
         <span className="block truncate font-semibold">{data.title || data.url}</span>
-        {data.relevance && <span className="block text-xs" style={{ color: "#5f6368" }}>{data.relevance}</span>}
+        {data.relevance && <span className="block text-xs" style={{ color: "var(--muted)" }}>{data.relevance}</span>}
       </span>
     </a>
   );
@@ -175,7 +198,7 @@ function CrossrefBlock({ data }: { data: CrossrefBlockData }) {
       <span>🔁</span>
       <span className="flex-1 min-w-0">
         <span className="block truncate font-semibold">{data.title || data.slug}</span>
-        {data.relationship && <span className="block text-xs" style={{ color: "#5f6368" }}>{data.relationship}</span>}
+        {data.relationship && <span className="block text-xs" style={{ color: "var(--muted)" }}>{data.relationship}</span>}
       </span>
       <span style={{ color: "var(--orange)", fontSize: "1.2rem" }}>→</span>
     </Link>
@@ -186,7 +209,7 @@ function ToolCallBlock({ data }: { data: { name: string; args?: Record<string, u
   return (
     <div className="flex items-start gap-2 text-xs py-1 px-2 rounded mb-1" style={{ background: "#f0f7ff" }}>
       <span>⚡ {data.name}</span>
-      {data.result && <code className="text-[10px]" style={{ color: "#5f6368" }}>{data.result.slice(0, 150)}</code>}
+      {data.result && <code className="text-[10px]" style={{ color: "var(--muted)" }}>{data.result.slice(0, 150)}</code>}
     </div>
   );
 }
@@ -197,7 +220,7 @@ function DividerBlock() {
 
 function UnknownBlock({ block }: { block: Block }) {
   return (
-    <div className="text-xs p-2 mb-1 border border-dashed border-[#e0e0e0]" style={{ color: "#9aa0a6" }}>
+    <div className="text-xs p-2 mb-1 border border-dashed border-[var(--border)]" style={{ color: "var(--subtle)" }}>
       Unknown block type: {block.type}
     </div>
   );

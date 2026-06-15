@@ -3,6 +3,7 @@ import type {
   HeadingBlockData,
   TextBlockData,
   ImageBlockData,
+  VideoBlockData,
   DiagramBlockData,
   TimelineBlockData,
   CitationBlockData,
@@ -83,6 +84,9 @@ export function articleToBlocks(
       }
       if (media.type === "diagram" && media.code) {
         blocks.push({ id: idGen(), type: "diagram", data: { code: media.code, caption: media.caption } satisfies DiagramBlockData, meta: { sectionId: sec.id } });
+      }
+      if (media.type === "video" && media.src) {
+        blocks.push({ id: idGen(), type: "video", data: { src: media.src, caption: media.caption, prompt: media.prompt } satisfies VideoBlockData, meta: { sectionId: sec.id } });
       }
     }
   }

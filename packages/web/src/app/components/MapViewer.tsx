@@ -43,7 +43,7 @@ export default function MapViewer({
   markers = [],
   layers = [],
   className = "",
-  height = "400px",
+  height = undefined,
 }: Props) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -178,19 +178,19 @@ export default function MapViewer({
 
   return (
     <div className={`relative ${className}`}>
-      <div ref={mapContainer} style={{ height, width: "100%" }} className="rounded-xl border border-[#dfe1e5] z-0" />
+      <div ref={mapContainer} style={{ height: height || "50vh", minHeight: height || "250px", maxHeight: height || "500px", width: "100%" }} className="border-2 border-[var(--border)] z-0" />
 
       {hasMultipleLayers && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-[#5f6368]">Period:</span>
+          <span className="text-xs font-medium text-[var(--muted)]">Period:</span>
           {layers.map((layer) => (
             <button
               key={layer.id}
               onClick={() => switchLayer(layer.id)}
               className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
                 activeLayerId === layer.id
-                  ? "bg-[#0284c7] text-white border-[#0284c7]"
-                  : "bg-white text-[#5f6368] border-[#dfe1e5] hover:border-[#0284c7] hover:text-[#0284c7]"
+                  ? "bg-[var(--blue)] text-white border-[var(--blue)]"
+                  : "bg-white text-[var(--muted)] border-[var(--border)] hover:border-[var(--blue)] hover:text-[var(--blue)]"
               }`}
             >
               {layer.label}{layer.year ? ` (${layer.year})` : ""}
@@ -200,7 +200,7 @@ export default function MapViewer({
       )}
 
       {markers.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-[#9aa0a6]">
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-[var(--subtle)]">
           <span>Legend:</span>
           {Object.entries(TYPE_ICONS).map(([key, icon]) => {
             const count = markers.filter((m) => (m.type || "other") === key).length;

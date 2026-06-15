@@ -1,8 +1,34 @@
-import type { AgentEvent } from "./types.js";
+import type { AgentEvent, ModelId } from "./types.js";
 
-const DO_BASE = "https://inference.do-ai.run";
-const DO_KEY = () => process.env.MODEL_ACCESS_KEY || "";
-const DEFAULT_MODEL = process.env.DO_MODEL || "gemma-4";
+interface ModelRoute {
+  baseUrl: string;
+  apiKey: () => string;
+  modelName: string;
+}
+
+const MODEL_ROUTES: Record<string, ModelRoute> = {
+  "gemma-4-31B-it": {
+    baseUrl: "https://inference.do-ai.run",
+    apiKey: () => process.env.MODEL_ACCESS_KEY || "",
+    modelName: "gemma-4-31B-it",
+  },
+  "deepseek-v4-flash": {
+    baseUrl: "https://api.deepseek.com",
+    apiKey: () => process.env.DEEPSEEK_API_KEY || "",
+    modelName: "deepseek-v4-flash",
+  },
+  "deepseek-v4-pro": {
+    baseUrl: "https://api.deepseek.com",
+    apiKey: () => process.env.DEEPSEEK_API_KEY || "",
+    modelName: "deepseek-v4-pro",
+  },
+};
+
+function resolveModel(model?: string): ModelRoute {
+  const id = model || process.env.DO_MODEL || "gemma-4-31B-it";
+  return MODEL_ROUTES[id] || MODEL_ROUTES["gemma-4-31B-it"];
+}
+
 const PROMPT_TIMEOUT = parseInt(process.env.PROMPT_TIMEOUT_MS || "300000", 10);
 
 export interface PromptResult {
@@ -49,8 +75,9 @@ export async function sendPrompt(
   if (options?.system) msgs.push({ role: "system", content: options.system });
   msgs.push(...messages);
 
+  const route = resolveModel(options?.model);
   const body: Record<string, unknown> = {
-    model: options?.model || DEFAULT_MODEL,
+    model: route.modelName,
     messages: msgs,
     max_tokens: options?.maxTokens ?? 16384,
     temperature: options?.temperature ?? 0.7,
@@ -58,11 +85,11 @@ export async function sendPrompt(
   };
   if (options?.reasoningEffort) body.reasoning_effort = options.reasoningEffort;
 
-  const res = await fetch(`${DO_BASE}/v1/chat/completions`, {
+  const res = await fetch(`${route.baseUrl}/v1/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${DO_KEY()}`,
+      Authorization: `Bearer ${route.apiKey()}`,
     },
     signal: AbortSignal.timeout(PROMPT_TIMEOUT),
     body: JSON.stringify(body),
@@ -70,7 +97,7 @@ export async function sendPrompt(
 
   if (!res.ok) {
     const err = await res.text().catch(() => "unknown");
-    throw new Error(`DO API error (${res.status}): ${err.slice(0, 500)}`);
+    throw new Error(`LLM API error (${res.status}): ${err.slice(0, 500)}`);
   }
 
   const data = await res.json();
@@ -96,8 +123,9 @@ export async function sendPromptStream(
   if (options?.system) msgs.push({ role: "system", content: options.system });
   msgs.push(...messages);
 
+  const route = resolveModel(options?.model);
   const body: Record<string, unknown> = {
-    model: options?.model || DEFAULT_MODEL,
+    model: route.modelName,
     messages: msgs,
     max_tokens: options?.maxTokens ?? 16384,
     temperature: options?.temperature ?? 0.7,
@@ -107,11 +135,11 @@ export async function sendPromptStream(
   if (options?.tools) body.tools = options.tools;
   if (options?.tool_choice) body.tool_choice = options.tool_choice;
 
-  const res = await fetch(`${DO_BASE}/v1/chat/completions`, {
+  const res = await fetch(`${route.baseUrl}/v1/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${DO_KEY()}`,
+      Authorization: `Bearer ${route.apiKey()}`,
     },
     signal: AbortSignal.timeout(PROMPT_TIMEOUT),
     body: JSON.stringify(body),
@@ -119,7 +147,7 @@ export async function sendPromptStream(
 
   if (!res.ok) {
     const err = await res.text().catch(() => "unknown");
-    throw new Error(`DO API error (${res.status}): ${err.slice(0, 500)}`);
+    throw new Error(`LLM API error (${res.status}): ${err.slice(0, 500)}`);
   }
 
   if (!res.body) throw new Error("No response body for streaming");
@@ -128,7 +156,7 @@ export async function sendPromptStream(
   const decoder = new TextDecoder();
   let buf = "";
   let fullText = "";
-  const toolCallsMap = new Map<number, { id: string; name: string; args: string }>();
+  const toolCallsMap = new Map<string, { id: string; name: string; args: string }>();
 
   while (true) {
     const { done, value } = await reader.read();
@@ -163,11 +191,11 @@ export async function sendPromptStream(
         const toolDeltas = choice?.delta?.tool_calls;
         if (toolDeltas) {
           for (const tc of toolDeltas) {
-            const idx = tc.index;
-            if (!toolCallsMap.has(idx)) {
-              toolCallsMap.set(idx, { id: tc.id || "", name: "", args: "" });
+            const key = tc.id || `idx:${tc.index}`;
+            if (!toolCallsMap.has(key)) {
+              toolCallsMap.set(key, { id: tc.id || key, name: "", args: "" });
             }
-            const entry = toolCallsMap.get(idx)!;
+            const entry = toolCallsMap.get(key)!;
             if (tc.id) entry.id = tc.id;
             if (tc.function?.name) entry.name = tc.function.name;
             if (tc.function?.arguments) entry.args += tc.function.arguments;

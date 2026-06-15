@@ -27,7 +27,7 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
   useEffect(() => {
     setLoading(true);
     fetchChats().then((data) => { setConversations(data); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
+  }, [pathname]);
 
   async function handleNew() {
     const conv = await createChat();
@@ -80,7 +80,7 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
             }`}
             style={{
               background: pathname.startsWith(item.href) ? "white" : "transparent",
-              color: pathname.startsWith(item.href) ? "var(--ink)" : "#5f6368",
+              color: pathname.startsWith(item.href) ? "var(--ink)" : "var(--muted)",
             }}
           >
             <span style={{ fontSize: "14px", lineHeight: 1 }}>{item.icon}</span>
@@ -114,7 +114,7 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
           )}
           {!loading && conversations.length === 0 && (
             <div className="px-3 py-10 text-center">
-              <div className="pixel text-[9px]" style={{ color: "#9aa0a6" }}>No conversations</div>
+              <div className="pixel text-[9px]" style={{ color: "var(--subtle)" }}>No conversations</div>
               <div className="pixel text-[8px] mt-1" style={{ color: "#d4d0c8" }}>Start a new chat above</div>
             </div>
           )}
@@ -136,11 +136,11 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
                 <div className="flex-1 min-w-0">
                   <span
                     className="block truncate font-medium text-sm"
-                    style={{ color: conv.id === activeId ? "var(--ink)" : "#5f6368" }}
+                    style={{ color: conv.id === activeId ? "var(--ink)" : "var(--muted)" }}
                   >
                     {conv.title}
                   </span>
-                  <span className="pixel text-[8px]" style={{ color: "#9aa0a6" }}>
+                  <span className="pixel text-[8px]" style={{ color: "var(--subtle)" }}>
                     {conv.messageCount} messages
                   </span>
                 </div>
@@ -153,7 +153,7 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
       {/* Footer */}
       <div className="shrink-0 border-t-2 border-black px-4 py-2" style={{ background: "white" }}>
         <div className="flex items-center justify-between">
-          <span className="pixel text-[7px]" style={{ color: "#9aa0a6" }}>v1.0.0</span>
+          <span className="pixel text-[7px]" style={{ color: "var(--subtle)" }}>v1.0.0</span>
           <span className="pixel text-[7px]" style={{ color: "var(--orange)" }}>◆ encarta</span>
         </div>
       </div>

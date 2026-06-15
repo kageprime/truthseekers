@@ -83,6 +83,64 @@ export async function generateImage(
   }
 }
 
+export interface GeneratedVideo {
+  id: string;
+  url: string;
+  prompt: string;
+  caption: string;
+}
+
+export async function generateVideo(
+  prompt: string,
+  options?: {
+    id?: string;
+    caption?: string;
+  }
+): Promise<GeneratedVideo | null> {
+  const apiKey = process.env.TOGETHER_API_KEY;
+  if (!apiKey) {
+    console.warn("TOGETHER_API_KEY not configured — skipping video generation");
+    return null;
+  }
+
+  try {
+    const response = await fetch("https://api.together.xyz/v2/videos", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "Wan-AI/Wan2.2-T2V-A14B",
+        prompt,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Together AI video generation failed (${response.status}): ${errorText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    const videoUrl = data?.data?.[0]?.url || data?.output?.url || data?.url;
+    if (!videoUrl) {
+      console.error("No video URL in response:", JSON.stringify(data).slice(0, 500));
+      return null;
+    }
+
+    return {
+      id: options?.id || `vid-${Date.now()}`,
+      url: videoUrl,
+      prompt,
+      caption: options?.caption || "",
+    };
+  } catch (error) {
+    console.error("Video generation failed:", error);
+    return null;
+  }
+}
+
 export async function generateImagesBatch(
   items: { prompt: string; id: string; caption?: string }[]
 ): Promise<GeneratedImage[]> {

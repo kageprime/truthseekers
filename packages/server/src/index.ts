@@ -3,12 +3,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, "..", "..", "..", ".env") });
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createHash, randomUUID } from "node:crypto";
+import jwt from "jsonwebtoken";
 import {
   searchArticles,
   getArticle,
@@ -48,7 +49,7 @@ import type { Article, ArticleContent, ArticleMetadata, ToolCall, Message, ToolE
 import { authMiddleware } from "./auth.js";
 import { rateLimitMiddleware } from "./rateLimit.js";
 import { sendSuccess, sendError, requestIdMiddleware, errorMiddleware } from "./response.js";
-import { generateImage } from "./imageGen.js";
+import { generateImage, generateVideo } from "./imageGen.js";
 import {
   articleParamsSchema,
   searchQuerySchema,
@@ -60,6 +61,22 @@ import authRoutes from "./auth-routes.js";
 import stripeRoutes from "./stripe.js";
 
 const app = new Hono();
+
+const APP_VERSION = "0.1.0";
+const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-in-prod";
+const PUBLIC_URL = process.env.ENCARTA_PUBLIC_URL || process.env.NEXT_PUBLIC_API_URL || "";
+
+function getUserId(c: any): string | null {
+  const auth = c.req.header("authorization");
+  if (!auth?.startsWith("Bearer ")) return null;
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { sub: string };
+    return payload.sub;
+  } catch {
+    return null;
+  }
+}
+
 
 // Per-slug generation cooldowns (Map<`gen:${slug}`, expiry timestamp>)
 const generationCooldowns = new Map<string, number>();
@@ -98,14 +115,6 @@ app.use("*", cors({
 app.route("/auth", authRoutes);
 app.route("/stripe", stripeRoutes);
 
-// Skip rate limiting for status/polling endpoints
-app.use("/queue", async (c, next) => { await next(); });
-app.use("/health", async (c, next) => { await next(); });
-app.use("/articles/:slug/progress", async (c, next) => { await next(); });
-app.use("/chat", async (c, next) => { await next(); });
-app.use("/chat/:id", async (c, next) => { await next(); });
-app.use("/chat/:id/messages", async (c, next) => { await next(); });
-
 app.use("*", rateLimitMiddleware);
 app.use("*", authMiddleware);
 
@@ -116,7 +125,7 @@ function computeETag(data: unknown): string {
   return `"${hash}"`;
 }
 
-function setCacheHeaders(c: any, data: unknown, lastModified?: string): void {
+function setCacheHeaders(c: Context, data: unknown, lastModified?: string): void {
   const etag = computeETag(data);
   c.header("ETag", etag);
   if (lastModified) {
@@ -125,7 +134,7 @@ function setCacheHeaders(c: any, data: unknown, lastModified?: string): void {
   c.header("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
 }
 
-function checkNotModified(c: any, etag: string, lastModified?: string): boolean {
+function checkNotModified(c: Context, etag: string, lastModified?: string): boolean {
   const ifNoneMatch = c.req.header("if-none-match");
   const ifModifiedSince = c.req.header("if-modified-since");
 
@@ -242,7 +251,9 @@ app.post("/articles/:slug/generate", async (c) => {
     }
 
     generationCooldowns.set(genKey, Date.now() + 60_000);
-    queue.enqueue(slug, { persona });
+    const userId = getUserId(c);
+    const meta: Record<string, string> = { persona, ...(userId ? { generatedBy: userId } : {}) };
+    queue.enqueue(slug, meta);
     return c.json({ status: "queued", slug, persona }, 202);
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : "Internal server error" }, 500);
@@ -274,31 +285,43 @@ app.get("/articles/:slug/progress", (c) => {
   const slug = parsed.data.slug;
 
   return streamSSE(c, async (stream) => {
-    const unsub = queue.subscribe(slug, (s: string, status: string, info: Record<string, unknown>) => {
-      stream.writeSSE({
-        data: JSON.stringify({ slug: s, status, ...info }),
-        event: "progress",
-      });
+    let unsub: (() => void) | null = null;
+    let unsubAgent: (() => void) | null = null;
+
+    const cleanup = () => {
+      if (unsub) { unsub(); unsub = null; }
+      if (unsubAgent) { unsubAgent(); unsubAgent = null; }
+    };
+
+    // Register abort handler BEFORE subscribing to prevent leak on early disconnect
+    stream.onAbort(cleanup);
+
+    unsub = queue.subscribe(slug, (s: string, status: string, info: Record<string, unknown>) => {
+      try {
+        stream.writeSSE({
+          data: JSON.stringify({ slug: s, status, ...info }),
+          event: "progress",
+        });
+      } catch { cleanup(); }
     });
 
-    const unsubAgent = queue.subscribeAgentEvents(slug, (s: string, event: import("@encarta/core").AgentEvent) => {
-      stream.writeSSE({
-        data: JSON.stringify(event),
-        event: "agent_event",
-      });
+    unsubAgent = queue.subscribeAgentEvents(slug, (s: string, event: import("@encarta/core").AgentEvent) => {
+      try {
+        stream.writeSSE({
+          data: JSON.stringify(event),
+          event: "agent_event",
+        });
+      } catch { cleanup(); }
     });
 
     const job = queue.getJob(slug);
     // Always send an initial event so the client knows the stream is alive
-    stream.writeSSE({
-      data: JSON.stringify(job || { slug, status: "not_queued", phase: "idle" }),
-      event: "progress",
-    });
-
-    stream.onAbort(() => {
-      unsub();
-      unsubAgent();
-    });
+    try {
+      stream.writeSSE({
+        data: JSON.stringify(job || { slug, status: "not_queued", phase: "idle" }),
+        event: "progress",
+      });
+    } catch { cleanup(); }
   });
 });
 
@@ -562,33 +585,35 @@ app.delete("/admin/keys/:id", async (c) => {
 // Health check
 app.get("/health", async (c) => {
   if (dbError) {
-    return c.json({ status: "degraded", dbReady: false, dbError, version: "0.1.0" }, 503);
+    return c.json({ status: "degraded", dbReady: false, dbError, version: APP_VERSION }, 503);
   }
   if (!dbReady) {
-    return c.json({ status: "starting", dbReady: false, version: "0.1.0" }, 503);
+    return c.json({ status: "starting", dbReady: false, version: APP_VERSION }, 503);
   }
   const pingOk = await pingDb();
   if (!pingOk) {
-    return c.json({ status: "degraded", dbReady: false, dbError: "MongoDB ping failed", version: "0.1.0" }, 503);
+    return c.json({ status: "degraded", dbReady: false, dbError: "MongoDB ping failed", version: APP_VERSION }, 503);
   }
-  return c.json({ status: "ok", dbReady: true, version: "0.1.0" });
+  return c.json({ status: "ok", dbReady: true, version: APP_VERSION });
 });
 
 // ── Chat ───────────────────────────────────────────────────────────────────
 // In-memory fallback when MongoDB is unavailable
-const memConversations = new Map<string, { id: string; title: string; createdAt: string; updatedAt: string }>();
+const memConversations = new Map<string, { id: string; title: string; createdAt: string; updatedAt: string; userId: string }>();
 const memMessages = new Map<string, Array<{ id: string; conversationId: string; role: string; content: string; blocks?: any[]; createdAt: string }>>();
 
 app.post("/chat", async (c) => {
+  const userId = getUserId(c);
+  if (!userId) return c.json({ error: "Authentication required" }, 401);
   const { title } = await c.req.json<{ title?: string }>();
   const id = randomUUID();
   try {
-    const conv = await createConversation(id, title || "New Chat");
+    const conv = await createConversation(id, title || "New Chat", userId);
     return c.json(conv);
   } catch {
     // Fallback: in-memory
     const now = new Date().toISOString();
-    const conv = { id, title: title || "New Chat", createdAt: now, updatedAt: now };
+    const conv = { id, title: title || "New Chat", createdAt: now, updatedAt: now, userId };
     memConversations.set(id, conv);
     memMessages.set(id, []);
     return c.json(conv);
@@ -596,33 +621,39 @@ app.post("/chat", async (c) => {
 });
 
 app.get("/chat", async (c) => {
+  const userId = getUserId(c);
+  if (!userId) return c.json({ error: "Authentication required" }, 401);
   try {
-    const convs = await listConversations();
+    const convs = await listConversations(userId);
     return c.json(convs);
   } catch {
     const convs = Array.from(memConversations.values())
-      .map((c) => ({ ...c, messageCount: (memMessages.get(c.id) || []).length }))
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      .filter((c: any) => c.userId === userId)
+      .map((c: any) => ({ id: c.id, title: c.title, createdAt: c.createdAt, updatedAt: c.updatedAt, messageCount: (memMessages.get(c.id) || []).length }))
+      .sort((a: any, b: any) => b.updatedAt.localeCompare(a.updatedAt));
     return c.json(convs);
   }
 });
 
 app.get("/chat/:id", async (c) => {
+  const userId = getUserId(c);
+  if (!userId) return c.json({ error: "Authentication required" }, 401);
   const id = c.req.param("id");
   try {
     const conv = await getConversation(id);
     if (!conv) return c.json({ error: "Conversation not found" }, 404);
+    // For now, skip ownership check on individual conversation read to avoid breaking existing data
     const messages = await getMessages(id);
     return c.json({ ...conv, messages });
   } catch {
     const conv = memConversations.get(id);
     if (!conv) return c.json({ error: "Conversation not found" }, 404);
+    // For now, skip ownership check on existing conversations
     const messages = memMessages.get(id) || [];
     return c.json({ ...conv, messages });
   }
 });
 
-const CHAT_TOOLS = CHAT_TOOL_DEFINITIONS;
  
 const MAX_TOOL_ITERATIONS = 5;
 
@@ -637,7 +668,7 @@ function memAddMessage(id: string, conversationId: string, role: string, content
 
 app.post("/chat/:id/messages", async (c) => {
   const conversationId = c.req.param("id");
-  const { content } = await c.req.json<{ content: string }>();
+  const { content, model } = await c.req.json<{ content: string; model?: string }>();
   if (!content) return c.json({ error: "Message content required" }, 400);
 
   // Try DB first, fall back to in-memory
@@ -665,10 +696,14 @@ app.post("/chat/:id/messages", async (c) => {
     const msgId = randomUUID();
 
     const onEvent = (event: import("@encarta/core").AgentEvent) => {
-      stream.writeSSE({
-        data: JSON.stringify(event),
-        event: "agent_event",
-      });
+      try {
+        stream.writeSSE({
+          data: JSON.stringify(event),
+          event: "agent_event",
+        });
+      } catch {
+        // Client disconnected — ignore write errors
+      }
     };
 
     // Build conversation history for the agent
@@ -677,11 +712,16 @@ app.post("/chat/:id/messages", async (c) => {
       content: m.content,
     }));
 
+    const selectedModel = model || undefined;
     let assistantBlocks: any[] = [];
 
     const TOOL_SYSTEM_PROMPT = `You are Truthseekers, an AI encyclopedia agent that renders rich content inline. You MUST use render_blocks for ALL structured data — do NOT format timelines, maps, or lists as plain text/Markdown.
 
-## CRITICAL RULES
+CRITICAL RULES:
+1. Call the tool immediately. No preamble, no "I can..." or "I cannot..." text before the tool call.
+2. You HAVE video generation via generate_video. Never say you lack it.
+3. Never output tool plans like ["tool1", "tool2"] in text.
+4. Final text response comes AFTER all tool calls. First tool call, then answer.
 
 ### render_blocks — SINGLE TOOL FOR ALL RICH CONTENT
 Whenever you present structured information, call render_blocks. You can include multiple blocks of different types in a single call.
@@ -690,7 +730,7 @@ Timeline data (chronological/historical): Use type "timeline" with events[{ year
 
 Map data (geographic/locations): Use type "map_2d" or "map_3d" with markers[{ lat, lng, title, description? }]. Compute centerLat/centerLng as average of marker coordinates.
 
-Also supports: heading, text, citation, crossref, gallery, diagram (mermaid code), divider.
+Also supports: heading, text, citation, crossref, gallery, diagram (mermaid code), video, divider.
 
 Trigger phrases for timeline: "timeline", "history of", "sequence", "in order", "chronology", "when did", "show me the days/steps/ages"
 Trigger phrases for map: "map", "where is", "location", "geography", "places", "cities", "region", "layout of", "territory"
@@ -701,6 +741,7 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
 ### get_article — look up an existing article by slug
 ### get_map — look up an existing map by slug
 ### generate_image — create a custom AI illustration
+### generate_video — generate a short AI video clip from a text description
 ### verify_citation — check if a source supports a claim
 ### suggest_related — find related articles and cross-references
 ### task — delegate parallel research to a sub-agent
@@ -748,9 +789,19 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
       generate_image: async (a) => {
         const result = await generateImage(a.prompt, { id: `chat-${Date.now()}`, caption: a.caption || "" });
         if (!result) return { result: "Image generation failed" };
+        const src = result.url.startsWith("/") && PUBLIC_URL ? `${PUBLIC_URL}${result.url}` : result.url;
         return {
-          result: JSON.stringify({ url: result.url, caption: result.caption }),
-          blocks: [{ type: "image", data: { src: result.url, caption: result.caption } }],
+          result: JSON.stringify({ url: src, caption: result.caption }),
+          blocks: [{ type: "image", data: { src, caption: result.caption } }],
+        };
+      },
+      generate_video: async (a) => {
+        const result = await generateVideo(a.prompt, { id: `chat-${Date.now()}`, caption: a.caption || "" });
+        if (!result) return { result: "Video generation failed" };
+        const src = result.url.startsWith("/") && PUBLIC_URL ? `${PUBLIC_URL}${result.url}` : result.url;
+        return {
+          result: JSON.stringify({ url: src, caption: result.caption }),
+          blocks: [{ type: "video", data: { src, caption: result.caption } }],
         };
       },
       suggest_related: async (a) => {
@@ -768,6 +819,7 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
           tools: subTools,
           temperature: 0.5,
           maxTokens: 4096,
+          model: selectedModel,
         });
         return { result: subResult.text || "Sub-agent completed with no output." };
       },
@@ -799,12 +851,13 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
     try {
       let conversation = [...initialMessages];
 
-      // Phase 3a: Planning — ask LLM to outline its strategy before executing
-      const planResult = await sendPromptStream(conversation, onEvent, {
+      // Phase 3a: Planning — ask LLM to outline its strategy before executing (no event streaming, plan is internal)
+      const planResult = await sendPromptStream(conversation, undefined, {
         system: contextualSystem + "\n\nBEFORE calling any tools, output a brief plan as a JSON array of tool names in the order you will call them. E.g. [\"article_search\", \"web_search\", \"webfetch\", \"render_blocks\"]. Then proceed with execution.",
         temperature: 0.5,
-        tools: CHAT_TOOLS,
-        tool_choice: "none",
+tools: CHAT_TOOL_DEFINITIONS,
+    tool_choice: "none",
+    model: selectedModel,
       });
       const planText = planResult.text || "";
       const planMatch = planText.match(/\[[^\]]*\]/);
@@ -825,8 +878,9 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
         const result = await sendPromptStream(conversation, onEvent, {
           system: contextualSystem,
           temperature: 0.7,
-          tools: CHAT_TOOLS,
-          tool_choice: toolChoice,
+tools: CHAT_TOOL_DEFINITIONS,
+    tool_choice: toolChoice,
+    model: selectedModel,
         });
 
         if (!result.toolCalls || result.toolCalls.length === 0) {
@@ -847,7 +901,7 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
           try {
             const output = await toolExecutors[tc.function.name]?.(args) ?? { result: `Unknown tool: ${tc.function.name}` };
             toolResult = output.result;
-            if (output.blocks) assistantBlocks = output.blocks;
+            if (output.blocks) assistantBlocks = assistantBlocks.concat(output.blocks);
           } catch (err) {
             toolResult = `Error executing ${tc.function.name}: ${err instanceof Error ? err.message : String(err)}`;
           }
@@ -899,12 +953,25 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
       } else {
         await addMessage(randomUUID(), conversationId, "assistant", fullResponse).catch(() => {});
       }
+      try {
+        stream.writeSSE({
+          data: JSON.stringify({ type: "done", msgId, content: fullResponse, blocks: undefined }),
+          event: "agent_event",
+        });
+      } catch {
+        // Stream already closed — nothing to write
+      }
+      return;
     }
 
-    stream.writeSSE({
-      data: JSON.stringify({ type: "done", msgId, content: fullResponse, blocks: assistantBlocks.length > 0 ? assistantBlocks : undefined }),
-      event: "agent_event",
-    });
+    try {
+      stream.writeSSE({
+        data: JSON.stringify({ type: "done", msgId, content: fullResponse, blocks: assistantBlocks.length > 0 ? assistantBlocks : undefined }),
+        event: "agent_event",
+      });
+    } catch {
+      // Stream already closed — nothing to write
+    }
   });
 });
 
@@ -919,7 +986,7 @@ async function withRetry<T>(fn: () => Promise<T>, label: string, maxRetries = 2)
       await new Promise((r) => setTimeout(r, delay));
     }
   }
-  throw new Error("unreachable");
+  throw new Error("withRetry: unreachable");
 }
 
 async function processArticle(slug: string, meta?: Record<string, string>): Promise<void> {
@@ -1042,6 +1109,7 @@ async function processArticle(slug: string, meta?: Record<string, string>): Prom
         updated: now,
         status: "published",
         freshness: now,
+        generatedBy: meta?.generatedBy || undefined,
       },
     };
 

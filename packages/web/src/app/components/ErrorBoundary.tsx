@@ -44,7 +44,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <h1 className="pixel text-sm mb-3" style={{ color: "var(--ink)" }}>
               Something went wrong
             </h1>
-            <p className="text-sm text-[#5f6368] mb-4">
+            <p className="text-sm text-[var(--muted)] mb-4">
               The page encountered an unexpected error. Please try refreshing.
             </p>
             {this.state.error && process.env.NODE_ENV === "development" && (
@@ -63,7 +63,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             </button>
             <Link
               href="/"
-              className="block mt-3 text-sm text-[#5f6368] hover:text-[#ea580c]"
+              className="block mt-3 text-sm text-[var(--muted)] hover:text-[#ea580c]"
             >
               ← Back to home
             </Link>

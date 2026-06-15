@@ -18,7 +18,7 @@ export default function ArticleCard({ article }: { article: ArticleSummary }) {
       className="pixel-card-sm p-0 overflow-hidden block"
       style={{ background: "white", textDecoration: "none", color: "inherit" }}
     >
-      <div className="w-full h-32 overflow-hidden" style={{ background: "#f1f3f4" }}>
+      <div className="w-full h-32 overflow-hidden" style={{ background: "var(--skeleton)" }}>
         {article.thumbnail ? (
           <img
             src={article.thumbnail}
@@ -28,7 +28,7 @@ export default function ArticleCard({ article }: { article: ArticleSummary }) {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-2xl font-bold"
-            style={{ background: "linear-gradient(135deg, #fef3c7, #e0f2fe)", color: "#9aa0a6" }}>
+            style={{ background: "linear-gradient(135deg, #fef3c7, #e0f2fe)", color: "var(--subtle)" }}>
             {article.title.charAt(0).toUpperCase()}
           </div>
         )}
@@ -37,12 +37,12 @@ export default function ArticleCard({ article }: { article: ArticleSummary }) {
         <h3 className="pixel text-[10px] mb-1" style={{ color: "#1a1a1a" }}>
           {article.title}
         </h3>
-        <p className="text-xs line-clamp-2 leading-relaxed mt-1" style={{ color: "#5f6368" }}>{article.abstract}</p>
+        <p className="text-xs line-clamp-2 leading-relaxed mt-1" style={{ color: "var(--muted)" }}>{article.abstract}</p>
         <div className="flex items-center gap-2 mt-2">
           {article.categories?.slice(0, 2).map((cat) => (
             <span key={cat} className="pixel-tag text-[10px]">{cat}</span>
           ))}
-          <span className="text-xs ml-auto" style={{ color: "#9aa0a6" }}>v{article.metadata.version}</span>
+          <span className="text-xs ml-auto" style={{ color: "var(--subtle)" }}>v{article.metadata.version}</span>
         </div>
       </div>
       </Link>
