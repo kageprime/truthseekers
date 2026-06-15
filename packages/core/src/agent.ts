@@ -156,7 +156,25 @@ export async function sendPromptStream(
   const decoder = new TextDecoder();
   let buf = "";
   let fullText = "";
+  let preToolText = ""; // buffers text that arrives before first tool call delta
+  let seenToolCall = false;
   const toolCallsMap = new Map<string, { id: string; name: string; args: string }>();
+
+  function flushPreToolText() {
+    if (preToolText) {
+      fullText += preToolText;
+      onEvent?.({ type: "text", data: preToolText, timestamp: Date.now() });
+      preToolText = "";
+    }
+  }
+
+  function discardPreToolText() {
+    if (preToolText && !seenToolCall) {
+      // Log the discarded preamble for debugging
+      console.debug(`[agent] discarded preamble text (${preToolText.length} chars): ${preToolText.slice(0, 100)}`);
+    }
+    preToolText = "";
+  }
 
   while (true) {
     const { done, value } = await reader.read();
@@ -179,17 +197,21 @@ export async function sendPromptStream(
         // Text delta
         const delta = choice?.delta?.content || "";
         if (delta) {
-          fullText += delta;
-          onEvent?.({
-            type: "text",
-            data: delta,
-            timestamp: Date.now(),
-          });
+          if (seenToolCall) {
+            fullText += delta;
+            onEvent?.({ type: "text", data: delta, timestamp: Date.now() });
+          } else {
+            preToolText += delta;
+          }
         }
 
         // Tool call deltas
         const toolDeltas = choice?.delta?.tool_calls;
         if (toolDeltas) {
+          if (!seenToolCall) {
+            seenToolCall = true;
+            discardPreToolText();
+          }
           for (const tc of toolDeltas) {
             const key = tc.id || `idx:${tc.index}`;
             if (!toolCallsMap.has(key)) {
@@ -214,6 +236,11 @@ export async function sendPromptStream(
         // skip malformed chunks
       }
     }
+  }
+
+  // If no tool calls were seen, flush the buffered text as the actual response
+  if (!seenToolCall) {
+    flushPreToolText();
   }
 
   const toolCalls: ToolCall[] = [];

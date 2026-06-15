@@ -916,7 +916,7 @@ tools: CHAT_TOOL_DEFINITIONS,
 
         conversation.push({
           role: "assistant",
-          content: result.text || null,
+          content: null, // omit preamble text when tool calls are present to avoid contaminating conversation history
           tool_calls: result.toolCalls,
         });
 
