@@ -4,7 +4,7 @@ import { createUser, getUserByEmail, getUserById, updateUser, setUserOnboarded }
 import { sendMagicLink } from "./email.js";
 import crypto from "node:crypto";
 
-const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error("JWT_SECRET environment variable is required"); })();
+const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-in-prod";
 const TOKEN_EXPIRY = "30d";
 
 // In-memory magic link tokens (in production, use DB/Redis)
