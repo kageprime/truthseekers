@@ -28,19 +28,19 @@ export default function NewArticlePage() {
       <main className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-xl">
           <div className="text-center mb-10">
-            <h1 className="pixel text-sm mb-3" style={{ color: "var(--ink)" }}>Generate Article</h1>
-            <p className="text-sm" style={{ color: "#5f6368" }}>Enter a topic. The AI will research, outline, and write a full article.</p>
+            <h1 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>Generate Article</h1>
+            <p className="text-sm" style={{ color: "var(--muted)" }}>Enter a topic. The AI will research, outline, and write a full article.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-[#1a1a1a] mb-2">Topic Slug</label>
+              <label className="block text-sm font-medium mb-2" style={{ color: "var(--ink)" }}>Topic Slug</label>
               <input
                 type="text"
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
                 placeholder="quantum-computing"
-                className="w-full pixel-input"
+                className="w-full input"
                 autoFocus
               />
             </div>
@@ -48,17 +48,17 @@ export default function NewArticlePage() {
             <button
               type="submit"
               disabled={!slug.trim() || !!status}
-              className="btn-primary btn-lg w-full"
+              className="btn btn-primary btn-lg w-full"
             >
               {status ? "Generating..." : "Generate Article"}
             </button>
           </form>
 
-          <div className="pixel-card-sm p-5" style={{ background: "var(--cream)" }}>
-            <h3 className="pixel text-[9px] mb-3" style={{ color: "var(--ink)" }}>TIPS</h3>
-            <ul className="space-y-2 text-sm" style={{ color: "#5f6368" }}>
-              <li>• Use hyphens for multi-word: <code className="pixel-card-sm px-2 py-0.5 text-xs" style={{ background: "white" }}>machine-learning</code></li>
-              <li>• Be specific: prefer <code className="pixel-card-sm px-2 py-0.5 text-xs" style={{ background: "white" }}>quantum-entanglement</code> over <code className="pixel-card-sm px-2 py-0.5 text-xs" style={{ background: "white" }}>physics</code></li>
+          <div className="glass-card-static p-5" style={{ background: "var(--cream)" }}>
+            <h3 className="text-xs font-medium mb-3" style={{ color: "var(--ink)" }}>TIPS</h3>
+            <ul className="space-y-2 text-sm" style={{ color: "var(--muted)" }}>
+              <li>• Use hyphens for multi-word: <code className="glass-card-static px-2 py-0.5 text-xs">machine-learning</code></li>
+              <li>• Be specific: prefer <code className="glass-card-static px-2 py-0.5 text-xs">quantum-entanglement</code> over <code className="glass-card-static px-2 py-0.5 text-xs">physics</code></li>
               <li>• Research phase uses web search for primary sources</li>
               <li>• Articles stored in SQLite + versioned in Git</li>
             </ul>

@@ -15,36 +15,38 @@ export default function ArticleCard({ article }: { article: ArticleSummary }) {
   return (
     <Link
       href={`/article/${article.slug}`}
-      className="pixel-card-sm p-0 overflow-hidden block"
-      style={{ background: "white", textDecoration: "none", color: "inherit" }}
+      className="glass-card overflow-hidden block group"
+      style={{ textDecoration: "none", color: "inherit" }}
     >
-      <div className="w-full h-32 overflow-hidden" style={{ background: "var(--skeleton)" }}>
+      <div className="w-full aspect-[16/9] overflow-hidden" style={{ background: "var(--skeleton-start)" }}>
         {article.thumbnail ? (
           <img
             src={article.thumbnail}
             alt=""
-            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-2xl font-bold"
-            style={{ background: "linear-gradient(135deg, #fef3c7, #e0f2fe)", color: "var(--subtle)" }}>
+            style={{ background: "linear-gradient(135deg, var(--accent-bg), var(--border-light))", color: "var(--subtle)" }}>
             {article.title.charAt(0).toUpperCase()}
           </div>
         )}
       </div>
-      <div className="p-3">
-        <h3 className="pixel text-[10px] mb-1" style={{ color: "#1a1a1a" }}>
+      <div className="p-4 space-y-2">
+        <h3 className="font-semibold text-sm leading-snug" style={{ color: "var(--ink)" }}>
           {article.title}
         </h3>
-        <p className="text-xs line-clamp-2 leading-relaxed mt-1" style={{ color: "var(--muted)" }}>{article.abstract}</p>
-        <div className="flex items-center gap-2 mt-2">
+        <p className="text-xs line-clamp-2 leading-relaxed" style={{ color: "var(--muted)" }}>{article.abstract}</p>
+        <div className="flex items-center gap-2 pt-1">
           {article.categories?.slice(0, 2).map((cat) => (
-            <span key={cat} className="pixel-tag text-[10px]">{cat}</span>
+            <span key={cat} className="tag tag-subtle text-[10px]">{cat}</span>
           ))}
-          <span className="text-xs ml-auto" style={{ color: "var(--subtle)" }}>v{article.metadata.version}</span>
+          {article.metadata?.version && (
+            <span className="text-xs ml-auto" style={{ color: "var(--subtle)" }}>v{article.metadata.version}</span>
+          )}
         </div>
       </div>
-      </Link>
+    </Link>
   );
 }

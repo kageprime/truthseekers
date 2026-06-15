@@ -1,11 +1,12 @@
 "use client";
 
 import { BASE } from "@/lib/api";
+import { IconImage } from "./Icons";
 
 export function SkeletonImage({ caption }: { caption?: string }) {
   return (
-    <div className="pixel-card-sm p-3 my-2" style={{ background: "var(--ice)" }}>
-      <span className="pixel text-[9px] text-[#888]">IMAGE</span>
+    <div className="glass-card-static p-3 my-2" style={{ background: "var(--border-light)" }}>
+      <span className="text-xs font-medium text-[#888]">IMAGE</span>
       <div
         className="h-40 flex items-center justify-center my-2 border-2 border-dashed border-black/20 relative overflow-hidden"
         style={{ background: "white" }}
@@ -17,7 +18,7 @@ export function SkeletonImage({ caption }: { caption?: string }) {
             animation: "shimmer 2s infinite",
           }}
         />
-        <span className="text-3xl opacity-40 relative z-10">🖼️</span>
+        <span className="opacity-40 relative z-10"><IconImage size={40} /></span>
       </div>
       {caption && <p className="text-sm text-[#666]">{caption}</p>}
       <p className="text-xs sm:text-[10px] text-[#aaa] mt-1">Image resolving...</p>
@@ -27,10 +28,10 @@ export function SkeletonImage({ caption }: { caption?: string }) {
 
 export function BlankSlateImage({ caption, prompt }: { caption?: string; prompt?: string }) {
   return (
-    <div className="pixel-card-sm p-3 my-2" style={{ background: "var(--cream)", borderStyle: "dashed" }}>
-      <span className="pixel text-[9px] text-[#888]">IMAGE</span>
+    <div className="glass-card-static p-3 my-2" style={{ background: "var(--cream)", borderStyle: "dashed" }}>
+      <span className="text-xs font-medium text-[#888]">IMAGE</span>
       <div className="h-32 flex items-center justify-center text-3xl opacity-50 my-2 border-2 border-dashed border-black/20 bg-white/50">
-        <span>🖼️</span>
+        <IconImage size={16} />
       </div>
       {caption && <p className="text-sm font-medium">{caption}</p>}
       {prompt && (
@@ -45,9 +46,9 @@ export function BlankSlateImage({ caption, prompt }: { caption?: string; prompt?
 
 export function BlankSlateMedia() {
   return (
-    <div className="pixel-card-sm p-3 my-2" style={{ background: "var(--cream)", borderStyle: "dashed", opacity: 0.6 }}>
+    <div className="glass-card-static p-3 my-2" style={{ background: "var(--cream)", borderStyle: "dashed", opacity: 0.6 }}>
       <div className="flex items-center justify-center gap-4 h-20">
-        <span className="text-2xl opacity-40">🖼️</span>
+        <span className="opacity-40"><IconImage size={32} /></span>
         <span className="text-2xl opacity-40">📊</span>
         <span className="text-2xl opacity-40">🧊</span>
       </div>
@@ -69,9 +70,9 @@ export function MediaImage({ src, caption, prompt }: { src?: string; caption?: s
 export function FigureImage({ src, caption, source }: { src: string; caption: string; source?: string }) {
   const resolvedSrc = src.startsWith("/") ? `${BASE}${src}` : src;
   return (
-    <figure className="pixel-card-sm p-3 my-2" style={{ background: "white" }}>
+    <figure className="glass-card-static p-3 my-2">
       <div className="flex items-center justify-between mb-2">
-        <span className="pixel text-[9px] text-[#888]">IMAGE</span>
+        <span className="text-xs font-medium text-[#888]">IMAGE</span>
         {source && <span className="text-[9px] text-[#888]">via {source}</span>}
       </div>
       <div className="flex justify-center my-2 bg-white/50">

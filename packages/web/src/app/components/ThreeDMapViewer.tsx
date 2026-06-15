@@ -109,7 +109,7 @@ export default function ThreeDMapViewer({ scene, height = undefined }: ThreeDMap
   const distance = Math.max(50, scale * 0.15);
 
   return (
-    <div style={{ height: height || "50vh", minHeight: height ? undefined : "250px", maxHeight: height ? undefined : "500px", width: "100%" }} className="border-2 border-black overflow-hidden bg-[var(--warm)]">
+    <div style={{ height: height || "50vh", minHeight: height ? undefined : "250px", maxHeight: height ? undefined : "500px", width: "100%" }} className="border-2 border-black overflow-hidden bg-[var(--surface)]">
       <Canvas
         camera={{ position: [distance * 0.5, distance * 0.4, distance], fov: 50 }}
         shadows={{ enabled: true, type: 1 }}

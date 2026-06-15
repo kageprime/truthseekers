@@ -9,12 +9,13 @@ import MessageList from "../../components/MessageList";
 import ChatInput from "../../components/ChatInput";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import { useChatStream } from "../../hooks/useChatStream";
+import { IconSearch, IconBook, IconMap, IconLightning } from "../../components/Icons";
 
 const SLASH_COMMANDS = [
-  { id: "search", label: "Search the web", description: "/search <query>", icon: "🔍" },
-  { id: "article", label: "Look up an article", description: "/article <slug>", icon: "📖" },
-  { id: "map", label: "Show a map", description: "/map <location>", icon: "🗺️" },
-  { id: "generate", label: "Generate an article", description: "/generate <topic>", icon: "✨" },
+  { id: "search", label: "Search the web", description: "/search <query>", icon: IconSearch },
+  { id: "article", label: "Look up an article", description: "/article <slug>", icon: IconBook },
+  { id: "map", label: "Show a map", description: "/map <location>", icon: IconMap },
+  { id: "generate", label: "Generate an article", description: "/generate <topic>", icon: IconLightning },
 ];
 
 const suggestedTopics = [
@@ -267,7 +268,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     return (
       <PageLayout sidebar sidebarDefaultOpen activeId={id} noFooter noHeader>
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6">
-          <div className="w-8 h-8 rounded-full border-3 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--orange)" }} />
+          <div className="w-8 h-8 rounded-full border-3 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
           <p className="text-sm" style={{ color: "var(--subtle)" }}>Loading conversation...</p>
         </div>
       </PageLayout>
@@ -282,7 +283,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             <p className="text-sm mb-4" style={{ color: error ? "var(--red)" : "var(--subtle)" }}>
               {error || "Conversation not found"}
             </p>
-            <Link href="/chat" className="btn-primary btn-sm">Back to Chat</Link>
+            <Link href="/chat" className="btn btn-primary btn-sm">Back to Chat</Link>
           </div>
         </div>
       </PageLayout>

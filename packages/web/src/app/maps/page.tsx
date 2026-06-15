@@ -7,6 +7,7 @@ import PageHero from "../components/PageHero";
 import SectionHeader from "../components/SectionHeader";
 import MapViewer from "../components/MapViewer";
 import { CardGridSkeleton } from "../components/CardSkeleton";
+import { IconMap, IconGlobe } from "../components/Icons";
 
 export default function MapsPage() {
   const [maps, setMaps] = useState<MapEntry[]>([]);
@@ -48,35 +49,15 @@ export default function MapsPage() {
   }
 
   return (
-    <PageLayout>
-      {/* Search bar */}
-      <div className="max-w-6xl mx-auto w-full px-6 py-4">
-        <form onSubmit={handleSearch} className="max-w-2xl">
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                style={{ color: "var(--subtle)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text" value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search maps..."
-                className="w-full pixel-input"
-                style={{ paddingLeft: "2.5rem" }}
-              />
-            </div>
-            <button type="submit" disabled={searching} className="btn-primary shrink-0">
-              {searching ? "..." : "Search"}
-            </button>
-            {query && (
-              <button type="button" onClick={handleClear} className="btn-secondary shrink-0">
-                Clear
-              </button>
-            )}
-          </div>
-        </form>
-      </div>
+    <PageLayout
+      headerSearch={{
+        value: query,
+        onChange: setQuery,
+        onSubmit: handleSearch,
+        onClear: handleClear,
+        placeholder: "Search maps...",
+      }}
+    >
 
       {/* Hero with green wave background */}
       <PageHero
@@ -93,14 +74,13 @@ export default function MapsPage() {
             {/* Latest Maps */}
             {maps.length > 0 && (
               <section>
-                <SectionHeader emoji="🗺" title="STATIC MAPS" accent="var(--orange)" />
+                <SectionHeader icon={IconMap} title="STATIC MAPS" accent="var(--accent)" />
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {maps.map((map) => (
                     <a
                       key={map.slug}
                       href={`/maps/${map.slug}`}
-                      className="pixel-card-sm p-0 overflow-hidden block"
-                      style={{ background: "white" }}
+                      className="glass-card-static p-0 overflow-hidden block"
                     >
                       <div className="w-full h-32 overflow-hidden" style={{ background: "var(--skeleton)" }}>
                         {map.image ? (
@@ -130,7 +110,7 @@ export default function MapsPage() {
                         )}
                       </div>
                       <div className="p-3">
-                        <h3 className="pixel text-[10px] mb-1" style={{ color: "var(--ink)" }}>
+                        <h3 className="text-xs font-medium mb-1" style={{ color: "var(--ink)" }}>
                           {map.title}
                         </h3>
                         {map.subtitle && (
@@ -139,13 +119,13 @@ export default function MapsPage() {
                         <p className="text-xs line-clamp-2 leading-relaxed mt-1" style={{ color: "var(--muted)" }}>{map.description}</p>
                         <div className="flex items-center gap-2 mt-2">
                           {map.region && (
-                            <span className="pixel-tag text-[10px]" style={{ fontSize: "9px" }}>{map.region}</span>
+                            <span className="tag tag-subtle text-[10px]" style={{ fontSize: "9px" }}>{map.region}</span>
                           )}
                           {map.era && (
-                            <span className="pixel-tag text-[10px]" style={{ background: "var(--ice)", fontSize: "9px" }}>{map.era}</span>
+                            <span className="tag tag-subtle text-[10px]" style={{ background: "var(--border-light)", fontSize: "9px" }}>{map.era}</span>
                           )}
                           {map.threedScene && (
-                            <span className="pixel-tag text-[10px]" style={{ background: "var(--gold)", color: "white", fontSize: "9px" }}>
+                            <span className="tag tag-subtle text-[10px]" style={{ background: "var(--gold)", color: "white", fontSize: "9px" }}>
                               3D
                             </span>
                           )}
@@ -160,9 +140,9 @@ export default function MapsPage() {
             {/* Search empty state */}
             {maps.length === 0 && !loading && !searching && (
               <div className="text-center py-16">
-                <div className="text-4xl mb-3">🗺</div>
+                <div className="mb-3"><IconMap size={36} /></div>
                 <p className="text-sm" style={{ color: "var(--muted)" }}>No maps found for &ldquo;{query}&rdquo;</p>
-                <button onClick={handleClear} className="btn-secondary mt-4">
+                <button onClick={handleClear} className="btn btn-secondary mt-4">
                   Clear search
                 </button>
               </div>
@@ -171,14 +151,13 @@ export default function MapsPage() {
             {/* Interactive Maps */}
             {interactive.length > 0 && (
               <section className="mt-12">
-                <SectionHeader emoji="🌍" title="INTERACTIVE MAPS" accent="var(--blue)" />
+                <SectionHeader icon={IconGlobe} title="INTERACTIVE MAPS" accent="var(--blue)" />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {interactive.map((map) => (
                     <a
                       key={map.slug}
                       href={`/maps/${map.slug}`}
-                      className="pixel-card-sm p-0 overflow-hidden block"
-                      style={{ background: "white" }}
+                      className="glass-card-static p-0 overflow-hidden block"
                     >
                       <div className="pointer-events-none">
                         <MapViewer
@@ -191,18 +170,18 @@ export default function MapsPage() {
                         />
                       </div>
                       <div className="p-3">
-                        <h3 className="pixel text-[10px] mb-1" style={{ color: "var(--ink)" }}>
+                        <h3 className="text-xs font-medium mb-1" style={{ color: "var(--ink)" }}>
                           {map.title}
                         </h3>
                         <p className="text-xs line-clamp-2 mt-1" style={{ color: "var(--muted)" }}>{map.description}</p>
                         <div className="flex items-center gap-2 mt-2">
                           {map.region && (
-                            <span className="pixel-tag text-[10px]" style={{ fontSize: "9px" }}>{map.region}</span>
+                            <span className="tag tag-subtle text-[10px]" style={{ fontSize: "9px" }}>{map.region}</span>
                           )}
                           {map.era && (
-                            <span className="pixel-tag text-[10px]" style={{ background: "var(--ice)", fontSize: "9px" }}>{map.era}</span>
+                            <span className="tag tag-subtle text-[10px]" style={{ background: "var(--border-light)", fontSize: "9px" }}>{map.era}</span>
                           )}
-                          <span className="pixel text-[8px] ml-auto" style={{ color: "var(--orange)" }}>INTERACTIVE →</span>
+                          <span className="text-xs ml-auto" style={{ color: "var(--accent)" }}>INTERACTIVE →</span>
                         </div>
                       </div>
                     </a>

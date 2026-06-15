@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
+import { IconChat, IconLightning, IconX } from "./Icons";
 
 export interface AgentEvent {
   type: string;
@@ -150,7 +151,7 @@ export function TextDeltaCard({ data }: { data: TextDelta }) {
   if (!truncated) return null;
   return (
     <div className="flex items-start gap-2 py-1.5 px-2.5 border-l-2 border-[#fde68a] rounded-r" style={{ background: "#fff8e1" }}>
-      <span className="text-[10px] shrink-0 mt-0.5">💬</span>
+      <span className="shrink-0 mt-0.5"><IconChat size={12} /></span>
       <span className="text-[11px] leading-relaxed whitespace-pre-wrap" style={{ color: "#3c4043" }}>{truncated}</span>
     </div>
   );
@@ -179,12 +180,12 @@ function AgentActivityFeed({ events, compact }: { events: AgentEvent[]; compact?
           {event.type === "text" && <TextDeltaCard data={event.data as TextDelta} />}
           {event.type === "status" && (
             <div className="text-[10px] font-semibold py-1 px-2.5 rounded border-l-2 border-[var(--green)]" style={{ background: "#f0fdf4" }}>
-              ⚡ {String(event.data)}
+              <IconLightning size={10} /> {String(event.data)}
             </div>
           )}
           {event.type === "error" && (
             <div className="text-[10px] font-semibold py-1 px-2.5 rounded border-l-2 border-[var(--red)]" style={{ background: "#fef2f2" }}>
-              ❌ {String(event.data)}
+              <IconX size={10} /> {String(event.data)}
             </div>
           )}
         </div>
@@ -220,14 +221,13 @@ export function AgentActivityFullscreen({ open, onClose, events, scrollToIndex }
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-2 md:p-6" onClick={onClose}>
       <div
-        className="pixel-card p-4 md:p-5 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
-        style={{ background: "white" }}
+        className="glass-card-static p-4 md:p-5 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3 shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-lg">🤖</span>
-            <h3 className="pixel text-xs" style={{ color: "var(--ink)" }}>AGENT ACTIVITY</h3>
+            <h3 className="text-xs font-semibold" style={{ color: "var(--ink)" }}>AGENT ACTIVITY</h3>
             <span className="text-[9px] px-1.5 py-0.5 rounded-full border" style={{ borderColor: "var(--border)", color: "var(--subtle)" }}>
               {events.length} events
             </span>
@@ -257,12 +257,12 @@ export function AgentActivityFullscreen({ open, onClose, events, scrollToIndex }
                 {event.type === "text" && <TextDeltaCard data={event.data as TextDelta} />}
                 {event.type === "status" && (
                   <div className="text-[10px] font-semibold py-1 px-2.5 rounded border-l-2 border-[var(--green)]" style={{ background: "#f0fdf4" }}>
-                    ⚡ {String(event.data)}
+                    <IconLightning size={10} /> {String(event.data)}
                   </div>
                 )}
                 {event.type === "error" && (
                   <div className="text-[10px] font-semibold py-1 px-2.5 rounded border-l-2 border-[var(--red)]" style={{ background: "#fef2f2" }}>
-                    ❌ {String(event.data)}
+                    <IconX size={10} /> {String(event.data)}
                   </div>
                 )}
               </div>
@@ -272,7 +272,7 @@ export function AgentActivityFullscreen({ open, onClose, events, scrollToIndex }
         <div className="flex items-center gap-2 mt-3 shrink-0">
           <button
             onClick={() => setAutoScroll(!autoScroll)}
-            className="btn-secondary"
+            className="btn btn-secondary"
             style={{ fontSize: "8px", padding: "0.3rem 0.6rem", minHeight: "auto" }}
           >
             {autoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}
@@ -372,12 +372,12 @@ export default function ProcessViewer({ events, maxVisible = 50 }: ProcessViewer
                   {event.type === "text" && <TextDeltaCard data={event.data as TextDelta} />}
                   {event.type === "status" && (
                     <div className="text-[10px] font-semibold py-0.5" style={{ color: "var(--green)" }}>
-                      ⚡ {String(event.data)}
+                      <IconLightning size={10} /> {String(event.data)}
                     </div>
                   )}
                   {event.type === "error" && (
                     <div className="text-[10px] font-semibold py-0.5" style={{ color: "var(--red)" }}>
-                      ❌ {String(event.data)}
+                      <IconX size={10} /> {String(event.data)}
                     </div>
                   )}
                 </div>

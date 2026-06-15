@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import PhaseTimeline from "./PhaseTimeline";
 import type { AgentEvent } from "./ProcessViewer";
+import { IconLightning, IconClipboard, IconChat, IconX, IconCheckCircle, IconAlert } from "./Icons";
 
 export interface GeneratingEntry {
   slug: string;
@@ -13,12 +14,14 @@ export interface GeneratingEntry {
   agentEvents?: AgentEvent[];
 }
 
+import type { FC, SVGProps } from "react";
+
 interface Activity {
   id: number;
   timestamp: number;
   type: string;
   content: string;
-  icon: string;
+  icon: string | FC<SVGProps<SVGSVGElement> & { size?: number }>;
   metadata?: string;
 }
 
@@ -26,7 +29,7 @@ function eventToActivity(event: AgentEvent, id: number): Activity {
   const base = { id, timestamp: event.timestamp };
   switch (event.type) {
     case "status":
-      return { ...base, type: "status", content: String(event.data), icon: "⚡" };
+      return { ...base, type: "status", content: String(event.data), icon: IconLightning };
     case "tool_use": {
       const d = event.data as Record<string, unknown> | undefined;
       const name = (d?.name as string) ?? "unknown";
@@ -37,15 +40,15 @@ function eventToActivity(event: AgentEvent, id: number): Activity {
       const d = event.data as Record<string, unknown> | undefined;
       const result = (d?.result ?? d?.content ?? "") as string;
       const snippet = typeof result === "string" ? result.slice(0, 200) : JSON.stringify(result).slice(0, 200);
-      return { ...base, type: "tool_result", content: snippet || "Done", icon: "📋" };
+      return { ...base, type: "tool_result", content: snippet || "Done", icon: IconClipboard };
     }
     case "text": {
       const d = event.data as Record<string, unknown> | undefined;
       const text = (d?.text ?? d?.delta ?? "") as string;
-      return { ...base, type: "text", content: text.slice(0, 300), icon: "💬" };
+      return { ...base, type: "text", content: text.slice(0, 300), icon: IconChat };
     }
     case "error":
-      return { ...base, type: "error", content: String(event.data), icon: "❌" };
+      return { ...base, type: "error", content: String(event.data), icon: IconX };
     default:
       return { ...base, type: event.type, content: String(event.data), icon: "•" };
   }
@@ -177,21 +180,21 @@ export default function GenerationBar({
   }, [activities.length, autoScroll]);
 
   const displayPct = isDone ? 100 : Math.round(smoothPct);
-  const barColor = isDone ? "var(--green)" : isError ? "var(--red)" : "var(--orange)";
-  const icon = isDone ? "✅" : isError ? "⚠️" : "⚡";
+  const barColor = isDone ? "var(--green)" : isError ? "var(--red)" : "var(--accent)";
+  const StatusIcon = isDone ? IconCheckCircle : isError ? IconAlert : IconLightning;
 
   return (
-    <div className="pixel-card-sm bg-white" style={{ transition: "all 0.2s ease-out" }}>
+    <div className="glass-card-static" style={{ transition: "all 0.2s ease-out" }}>
       {/* Minimized header bar */}
       <div
         className="p-3 flex items-center gap-3 cursor-pointer"
         onClick={() => setExpanded(!expanded)}
       >
-        <span className="text-lg shrink-0">{icon}</span>
+        <span className="shrink-0">{typeof StatusIcon === "function" ? <StatusIcon size={20} /> : StatusIcon}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
             <span className="font-bold text-sm truncate">{entry.title}</span>
-            <span className="pixel text-xs sm:text-[9px] shrink-0 ml-2" style={{ color: barColor }}>
+            <span className="text-xs font-semibold sm:text-[9px] shrink-0 ml-2" style={{ color: barColor }}>
               {isDone ? "DONE" : isError ? "ERROR" : `${label} ${displayPct}%`}
             </span>
           </div>
@@ -200,10 +203,10 @@ export default function GenerationBar({
           </div>
         </div>
         {isDone && (
-          <Link href={`/article/${entry.slug}`} className="btn-primary btn-sm shrink-0" data-color="green" onClick={(e) => e.stopPropagation()}>VIEW</Link>
+          <Link href={`/article/${entry.slug}`} className="btn btn-primary btn btn-sm shrink-0" data-color="green" onClick={(e) => e.stopPropagation()}>VIEW</Link>
         )}
         {isError && (
-          <button onClick={(e) => { e.stopPropagation(); onRetry(entry.slug); }} className="btn-primary btn-sm shrink-0" data-color="red">RETRY</button>
+          <button onClick={(e) => { e.stopPropagation(); onRetry(entry.slug); }} className="btn btn-primary btn btn-sm shrink-0" data-color="red">RETRY</button>
         )}
         <button onClick={(e) => { e.stopPropagation(); onDismiss(entry.slug); }} className="btn-ghost shrink-0" style={{ minWidth: "44px", minHeight: "44px" }} title="Dismiss">✕</button>
       </div>
@@ -220,7 +223,7 @@ export default function GenerationBar({
           {!isDone && !isError && (
             <div className="px-4 pb-2">
               <div className="flex items-center justify-between mb-2">
-                <span className="pixel text-[9px] font-semibold" style={{ color: "var(--muted)" }}>
+                <span className="text-xs font-medium font-semibold" style={{ color: "var(--muted)" }}>
                   LIVE ACTIVITY ({activities.length})
                 </span>
                 <button
@@ -249,7 +252,7 @@ export default function GenerationBar({
                 )}
                 {activities.map((a) => (
                   <div key={a.id} className={`activity-card ${a.type}`}>
-                    <div className="activity-icon">{a.icon}</div>
+                    <div className="activity-icon">{typeof a.icon === "function" ? <a.icon size={14} /> : a.icon}</div>
                     <div className="activity-body">
                       <div className="activity-content">{a.content}</div>
                       {a.metadata && <div className="activity-meta"><code>{a.metadata}</code></div>}
@@ -267,7 +270,7 @@ export default function GenerationBar({
           {isError && (
             <div className="px-4 pb-4 pt-2">
               <p className="text-xs text-[var(--red)] mb-2">{entry.error || "Unknown error"}</p>
-              <button onClick={() => onRetry(entry.slug)} className="btn-primary btn-sm" data-color="red">RETRY GENERATION</button>
+              <button onClick={() => onRetry(entry.slug)} className="btn btn-primary btn btn-sm" data-color="red">RETRY GENERATION</button>
             </div>
           )}
 
@@ -278,8 +281,8 @@ export default function GenerationBar({
               <h2>Article Complete</h2>
               <p>The encyclopedia has a new entry on <strong>{entry.title}</strong>.</p>
               <div className="done-actions">
-                <Link href={`/article/${entry.slug}`} className="btn-primary">Read Article</Link>
-                <button onClick={() => onRetry(entry.slug)} className="btn-secondary">Regenerate</button>
+                <Link href={`/article/${entry.slug}`} className="btn btn-primary">Read Article</Link>
+                <button onClick={() => onRetry(entry.slug)} className="btn btn-secondary">Regenerate</button>
               </div>
             </div>
           )}

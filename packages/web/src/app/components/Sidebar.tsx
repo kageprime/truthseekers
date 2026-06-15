@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createChat, fetchChats } from "@/lib/api";
 import type { ConversationSummary } from "@/lib/api";
+import { IconChat, IconBook, IconMap, IconClock, IconX, IconPlus, IconChevronRight } from "./Icons";
 
 interface SidebarProps {
   open: boolean;
@@ -13,9 +14,10 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS = [
-  { label: "Queue", href: "/queue", icon: "⏳" },
-  { label: "Maps", href: "/maps", icon: "🗺️" },
-  { label: "Articles", href: "/articles", icon: "📖" },
+  { label: "Chat", href: "/chat", icon: IconChat },
+  { label: "Articles", href: "/articles", icon: IconBook },
+  { label: "Maps", href: "/maps", icon: IconMap },
+  { label: "Queue", href: "/queue", icon: IconClock },
 ];
 
 export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
@@ -35,114 +37,96 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
     onClose();
   }
 
-  const sidebar = (
-    <aside
-      className="flex flex-col h-full w-full"
-      style={{
-        background: "var(--warm)",
-        backgroundImage: "radial-gradient(#f5d0a9 1px, transparent 1px)",
-        backgroundSize: "24px 24px",
-      }}
-    >
+  const sidebarContent = (
+    <aside className="flex flex-col h-full w-full" style={{ background: "var(--surface)" }}>
       {/* Brand header */}
-      <div className="shrink-0 border-b-2 border-black px-4 py-3 flex items-center justify-between" style={{ background: "white" }}>
-        <Link href="/" className="flex items-center gap-2 no-underline">
-          <div
-            className="flex items-center justify-center font-bold text-white w-8 h-8 text-[8px] border-2 border-black rounded-lg shadow-[2px_2px_0_#1a1a1a]"
-            style={{ fontFamily: "'Press Start 2P', monospace" }}
-          >
-            <span style={{ color: "#ea580c" }}>T</span>
-            <span style={{ color: "#0c4a6e" }}>S</span>
+      <div className="shrink-0 px-4 py-3 flex items-center justify-between border-b" style={{ borderColor: "var(--border-light)" }}>
+        <Link href="/" className="flex items-center gap-2.5 no-underline">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg font-bold text-sm" style={{ background: "var(--accent)", color: "white" }}>
+            TS
           </div>
-          <span className="pixel text-xs" style={{ color: "var(--ink)" }}>
+          <span className="font-semibold text-sm" style={{ color: "var(--ink)" }}>
             Truthseekers
           </span>
         </Link>
         <button
           onClick={onClose}
-          className="w-11 h-11 flex items-center justify-center border-2 border-black shadow-[2px_2px_0_#1c1917] bg-white text-xs transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_#1c1917] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_#1c1917]"
+          className="btn-icon btn-ghost text-sm lg:hidden"
           aria-label="Close sidebar"
         >
-          ✕
+          <IconX size={16} />
         </button>
       </div>
 
       {/* Navigation links */}
-      <div className="px-3 pt-3 pb-2 shrink-0 space-y-1">
-        {NAV_ITEMS.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`flex items-center gap-2.5 px-3 py-2.5 no-underline transition-all border-2 ${
-              pathname.startsWith(item.href)
-                ? "border-black shadow-[2px_2px_0_#1c1917]"
-                : "border-transparent hover:border-black hover:shadow-[2px_2px_0_#1c1917] hover:translate-x-[-1px] hover:translate-y-[-1px]"
-            }`}
-            style={{
-              background: pathname.startsWith(item.href) ? "white" : "transparent",
-              color: pathname.startsWith(item.href) ? "var(--ink)" : "var(--muted)",
-            }}
-          >
-            <span style={{ fontSize: "14px", lineHeight: 1 }}>{item.icon}</span>
-            <span className="pixel text-[9px]" style={{ textTransform: "uppercase" }}>{item.label}</span>
-          </Link>
-        ))}
+      <div className="px-3 pt-3 pb-2 shrink-0 space-y-0.5">
+        {NAV_ITEMS.map((item) => {
+          const IconComp = item.icon;
+          const active = pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium no-underline transition-all"
+              style={{
+                background: active ? "var(--accent-bg)" : "transparent",
+                color: active ? "var(--accent)" : "var(--muted)",
+              }}
+            >
+              <IconComp size={18} />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
       </div>
 
       {/* Divider */}
-      <div className="mx-3 border-t-2 border-dashed" style={{ borderColor: "#d4d0c8" }} />
+      <div className="mx-3 border-t" style={{ borderColor: "var(--border-light)" }} />
 
       {/* New Chat button */}
       <div className="px-3 pt-2 pb-1 shrink-0">
-        <button onClick={handleNew} className="btn-primary btn-sm w-full">
-          + New Chat
+        <button onClick={handleNew} className="btn btn-primary w-full text-sm">
+          <IconPlus size={16} />
+          New Chat
         </button>
       </div>
 
       {/* Conversations list */}
       <div className="flex-1 overflow-hidden px-2 pb-2">
-        <div className="h-full overflow-y-auto space-y-1 pr-1">
+        <div className="h-full overflow-y-auto space-y-0.5 pr-1">
           {loading && (
             <div className="space-y-2 pt-2">
               {[1,2,3,4].map((i) => (
-                <div key={i} className="px-3 py-3 space-y-1.5 border-2 border-black" style={{ background: "white" }}>
-                  <div className="h-3 w-3/4 animate-pulse rounded" style={{ background: "#e5e5e5" }} />
-                  <div className="h-2 w-1/3 animate-pulse rounded" style={{ background: "#e5e5e5" }} />
+                <div key={i} className="px-3 py-2.5 space-y-1.5">
+                  <div className="h-3 w-3/4 skeleton" />
+                  <div className="h-2 w-1/3 skeleton" />
                 </div>
               ))}
             </div>
           )}
           {!loading && conversations.length === 0 && (
-            <div className="px-3 py-10 text-center">
-              <div className="pixel text-[9px]" style={{ color: "var(--subtle)" }}>No conversations</div>
-              <div className="pixel text-[8px] mt-1" style={{ color: "#d4d0c8" }}>Start a new chat above</div>
+            <div className="px-3 py-10 text-center text-sm" style={{ color: "var(--subtle)" }}>
+              <div className="font-medium mb-1">No conversations</div>
+              <div className="text-xs">Start a new chat above</div>
             </div>
           )}
           {conversations.map((conv) => (
             <Link
               key={conv.id}
               href={`/chat/${conv.id}`}
-              className={`block px-3 py-2.5 no-underline transition-all border-2 ${
-                conv.id === activeId
-                  ? "border-black shadow-[2px_2px_0_#1c1917]"
-                  : "border-transparent hover:border-black hover:shadow-[2px_2px_0_#1c1917] hover:translate-x-[-1px] hover:translate-y-[-1px]"
-              }`}
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm no-underline transition-all group"
               style={{
-                background: conv.id === activeId ? "white" : "transparent",
+                background: conv.id === activeId ? "var(--accent-bg)" : "transparent",
+                color: conv.id === activeId ? "var(--accent)" : "var(--muted)",
               }}
             >
-              <div className="flex items-center gap-2">
-                <span className="text-[10px]" style={{ color: "var(--orange)" }}>▸</span>
-                <div className="flex-1 min-w-0">
-                  <span
-                    className="block truncate font-medium text-sm"
-                    style={{ color: conv.id === activeId ? "var(--ink)" : "var(--muted)" }}
-                  >
-                    {conv.title}
-                  </span>
-                  <span className="pixel text-[8px]" style={{ color: "var(--subtle)" }}>
-                    {conv.messageCount} messages
-                  </span>
+              <IconChevronRight size={12} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: conv.id === activeId ? "var(--accent)" : "var(--border)" }} />
+              <div className="flex-1 min-w-0">
+                <div className="truncate font-medium text-sm" style={{ color: conv.id === activeId ? "var(--ink)" : "var(--muted)" }}>
+                  {conv.title}
+                </div>
+                <div className="text-xs" style={{ color: "var(--subtle)" }}>
+                  {conv.messageCount} messages
                 </div>
               </div>
             </Link>
@@ -151,11 +135,9 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
       </div>
 
       {/* Footer */}
-      <div className="shrink-0 border-t-2 border-black px-4 py-2" style={{ background: "white" }}>
-        <div className="flex items-center justify-between">
-          <span className="pixel text-[7px]" style={{ color: "var(--subtle)" }}>v1.0.0</span>
-          <span className="pixel text-[7px]" style={{ color: "var(--orange)" }}>◆ encarta</span>
-        </div>
+      <div className="shrink-0 border-t px-4 py-2 flex items-center justify-between" style={{ borderColor: "var(--border-light)" }}>
+        <span className="text-xs" style={{ color: "var(--subtle)" }}>v1.0.0</span>
+        <span className="text-xs font-medium" style={{ color: "var(--accent)" }}>◆ Truthseekers</span>
       </div>
     </aside>
   );
@@ -165,7 +147,7 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
       {/* Mobile overlay backdrop */}
       {open && (
         <div
-          className="fixed inset-0 z-30 sm:hidden"
+          className="fixed inset-0 z-30 lg:hidden"
           style={{ background: "rgba(0,0,0,0.3)" }}
           onClick={onClose}
           aria-hidden="true"
@@ -173,9 +155,10 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
       )}
       {/* Sidebar: overlay on mobile, push-layout on desktop */}
       <div
-        className={`${open ? "translate-x-0" : "-translate-x-full"} sm:translate-x-0 fixed sm:relative inset-y-0 left-0 z-40 w-60 shrink-0 border-r-2 border-black transition-transform duration-200 ease-out`}
+        className={`${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:relative inset-y-0 left-0 z-40 w-72 shrink-0 border-r transition-transform duration-200 ease-out`}
+        style={{ borderColor: "var(--border-light)" }}
       >
-        {sidebar}
+        {sidebarContent}
       </div>
     </>
   );

@@ -6,6 +6,7 @@ import MarkdownRenderer from "./MarkdownRenderer";
 import MermaidDiagram from "./MermaidDiagram";
 import { MediaImage } from "./MediaImage";
 import { BASE } from "@/lib/api";
+import { IconLink, IconLightning } from "./Icons";
 
 const InteractiveTimeline = dynamic(() => import("./InteractiveTimeline"), { ssr: false });
 const MapViewer = dynamic(() => import("./MapViewer"), { ssr: false });
@@ -93,7 +94,7 @@ function TextBlock({ data }: { data: TextBlockData }) {
 
 function SectionBlock({ data }: { data: SectionBlockData }) {
   return (
-    <details className="pixel-card-sm p-3 mb-3 bg-white" style={{ border: "2px solid var(--ink)" }}>
+    <details className="glass-card-static p-3 mb-3" style={{ border: "2px solid var(--ink)" }}>
       <summary className="font-bold text-sm cursor-pointer" style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "8px" }}>
         {data.title}
       </summary>
@@ -106,7 +107,7 @@ function TimelineBlock({ data }: { data: TimelineBlockData }) {
   if (!data.events) return <div className="text-xs" style={{ color: "var(--subtle)" }}>No timeline events</div>;
   const events = data.events.map((e) => ({ ...e, year: typeof e.year === "string" ? parseInt(e.year, 10) || 0 : e.year }));
   return (
-    <div className="pixel-card-sm p-3 mb-3 bg-white overflow-hidden">
+    <div className="glass-card-static p-3 mb-3 overflow-hidden">
       <InteractiveTimeline events={events} />
     </div>
   );
@@ -114,7 +115,7 @@ function TimelineBlock({ data }: { data: TimelineBlockData }) {
 
 function Map2DBlock({ data }: { data: Map2DBlockData }) {
   return (
-    <div className="pixel-card-sm p-3 mb-3 bg-white overflow-hidden" style={{ height: "clamp(250px, 50vh, 400px)" }}>
+    <div className="glass-card-static p-3 mb-3 overflow-hidden" style={{ height: "clamp(250px, 50vh, 400px)" }}>
       <MapViewer markers={data.markers} layers={data.layers} centerLat={data.centerLat} centerLng={data.centerLng} zoom={data.zoom} />
     </div>
   );
@@ -122,7 +123,7 @@ function Map2DBlock({ data }: { data: Map2DBlockData }) {
 
 function Map3DBlock({ data }: { data: Map3DBlockData }) {
   return (
-    <div className="pixel-card-sm p-3 mb-3 bg-white overflow-hidden" style={{ height: "clamp(250px, 50vh, 400px)" }}>
+    <div className="glass-card-static p-3 mb-3 overflow-hidden" style={{ height: "clamp(250px, 50vh, 400px)" }}>
       <ThreeDMapViewer scene={data as any} />
     </div>
   );
@@ -130,7 +131,7 @@ function Map3DBlock({ data }: { data: Map3DBlockData }) {
 
 function DiagramBlock({ data }: { data: DiagramBlockData }) {
   return (
-    <div className="pixel-card-sm p-3 mb-3 bg-white">
+    <div className="glass-card-static p-3 mb-3">
       {data.caption && <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted)" }}>{data.caption}</div>}
       <MermaidDiagram code={data.code} />
     </div>
@@ -149,7 +150,7 @@ function VideoBlock({ data }: { data: VideoBlockData }) {
   if (!data?.src) return <div className="text-xs" style={{ color: "var(--subtle)" }}>Video not available</div>;
   const videoSrc = data.src.startsWith("/") ? `${BASE}${data.src}` : data.src;
   return (
-    <div className="pixel-card-sm p-2 mb-3 bg-white">
+    <div className="glass-card-static p-2 mb-3">
       {data.caption && <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted)" }}>{data.caption}</div>}
       <video
         controls
@@ -177,10 +178,10 @@ function GalleryBlock({ data }: { data: GalleryBlockData }) {
 function CitationBlock({ data }: { data: CitationBlockData }) {
   return (
     <a href={data.url} target="_blank" rel="noopener noreferrer"
-      className="pixel-card-sm p-2 flex items-center gap-2 mb-2 bg-white"
+      className="glass-card-static p-2 flex items-center gap-2 mb-2"
       style={{ textDecoration: "none", color: "inherit", fontSize: "0.85rem" }}
     >
-      <span>🔗</span>
+      <IconLink size={16} />
       <span className="flex-1 min-w-0">
         <span className="block truncate font-semibold">{data.title || data.url}</span>
         {data.relevance && <span className="block text-xs" style={{ color: "var(--muted)" }}>{data.relevance}</span>}
@@ -192,15 +193,15 @@ function CitationBlock({ data }: { data: CitationBlockData }) {
 function CrossrefBlock({ data }: { data: CrossrefBlockData }) {
   return (
     <Link href={`/article/${data.slug}`}
-      className="pixel-card-sm p-2 flex items-center gap-2 mb-2 bg-white"
+      className="glass-card-static p-2 flex items-center gap-2 mb-2"
       style={{ textDecoration: "none", color: "inherit", fontSize: "0.85rem" }}
     >
-      <span>🔁</span>
+      <IconLink size={16} />
       <span className="flex-1 min-w-0">
         <span className="block truncate font-semibold">{data.title || data.slug}</span>
         {data.relationship && <span className="block text-xs" style={{ color: "var(--muted)" }}>{data.relationship}</span>}
       </span>
-      <span style={{ color: "var(--orange)", fontSize: "1.2rem" }}>→</span>
+      <span style={{ color: "var(--accent)", fontSize: "1.2rem" }}>→</span>
     </Link>
   );
 }
@@ -208,7 +209,7 @@ function CrossrefBlock({ data }: { data: CrossrefBlockData }) {
 function ToolCallBlock({ data }: { data: { name: string; args?: Record<string, unknown>; result?: string } }) {
   return (
     <div className="flex items-start gap-2 text-xs py-1 px-2 rounded mb-1" style={{ background: "#f0f7ff" }}>
-      <span>⚡ {data.name}</span>
+      <IconLightning size={12} /> {data.name}
       {data.result && <code className="text-[10px]" style={{ color: "var(--muted)" }}>{data.result.slice(0, 150)}</code>}
     </div>
   );

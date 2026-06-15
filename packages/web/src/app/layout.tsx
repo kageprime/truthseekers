@@ -1,18 +1,19 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ErrorBoundary from "./components/ErrorBoundary";
+import ThemeProvider from "./components/ThemeProvider";
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#fffaf0",
+  themeColor: "#f0ede6",
 };
 
 export const metadata: Metadata = {
   title: "Truthseekers — The Living Encyclopedia",
   description: "An LLM-powered interactive encyclopedia. Research, write, verify — all by AI agents.",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, title: "Truthseekers", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Truthseekers", statusBarStyle: "black-translucent" },
   icons: [
     { rel: "icon", url: "/favicon.ico" },
     { rel: "apple-touch-icon", url: "/apple-icon.png" },
@@ -21,330 +22,318 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700;900&family=Press+Start+2P&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&family=Press+Start+2P&display=swap"
           rel="stylesheet"
         />
       </head>
       <body className="antialiased" style={{ margin: 0 }}>
-        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-white focus:border-2 focus:border-black focus:text-sm focus:pixel" style={{ color: "var(--ink)" }}>
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-white focus:rounded-lg focus:text-sm focus:shadow-lg" style={{ color: "var(--ink)" }}>
           Skip to main content
         </a>
         <style>{`
           :root {
-            --ink: #1c1917;
-            --warm: #fffaf0;
-            --orange: #ea580c;
-            --gold: #f59e0b;
-            --blue: #0c4a6e;
-            --sky: #7dd3fc;
+            --surface: oklch(98% 0.01 80);
+            --surface-elevated: oklch(100% 0 0);
+            --ink: oklch(15% 0.02 50);
+            --ink-secondary: oklch(35% 0.02 50);
+            --muted: oklch(45% 0.02 50);
+            --subtle: oklch(60% 0.02 50);
+            --border: oklch(88% 0.01 80);
+            --border-light: oklch(93% 0.01 80);
+            --accent: #ea580c;
+            --accent-dark: #f97316;
+            --accent-subtle: oklch(70% 0.15 50);
+            --accent-bg: oklch(95% 0.05 50);
             --green: #22c55e;
+            --green-subtle: oklch(93% 0.08 140);
             --red: #dc2626;
-            --purple: #a21caf;
-            --pink: #ec4899;
+            --red-subtle: oklch(93% 0.08 30);
+            --blue: #0c4a6e;
+            --gold: #f59e0b;
             --cream: #fef3c7;
-            --ice: #e0f2fe;
-            --muted: #5f6368;
-            --subtle: #9aa0a6;
-            --border: #dadce0;
-            --skeleton: #f1f3f4;
-            --hover: #f5f5f4;
+            --glass: rgba(255,255,255,0.6);
+            --glass-border: rgba(255,255,255,0.2);
+            --glass-shadow: 0 4px 24px rgba(0,0,0,0.06);
+            --skeleton-start: oklch(92% 0.01 80);
+            --skeleton-end: oklch(96% 0.01 80);
+          }
+          .dark {
+            --surface: oklch(15% 0.01 50);
+            --surface-elevated: oklch(19% 0.01 50);
+            --ink: oklch(92% 0.01 80);
+            --ink-secondary: oklch(82% 0.01 80);
+            --muted: oklch(70% 0.01 80);
+            --subtle: oklch(55% 0.01 80);
+            --border: oklch(30% 0.01 50);
+            --border-light: oklch(25% 0.01 50);
+            --accent: #f97316;
+            --accent-subtle: oklch(60% 0.15 50);
+            --accent-bg: oklch(25% 0.08 50);
+            --cream: oklch(25% 0.05 50);
+            --glass: rgba(0,0,0,0.4);
+            --glass-border: rgba(255,255,255,0.06);
+            --glass-shadow: 0 4px 24px rgba(0,0,0,0.2);
+            --skeleton-start: oklch(22% 0.01 50);
+            --skeleton-end: oklch(26% 0.01 50);
           }
           * { box-sizing: border-box; }
           body {
-            font-family: 'Outfit', sans-serif;
-            background-color: var(--warm);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--surface);
             color: var(--ink);
-            background-image: radial-gradient(#f5d0a9 1px, transparent 1px);
+            background-image: radial-gradient(oklch(85% 0.02 80 / 0.3) 0.5px, transparent 0.5px);
             background-size: 24px 24px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
           }
-          .pixel {
-            font-family: 'Press Start 2P', monospace;
-            letter-spacing: -0.5px;
+          .dark body {
+            background-image: radial-gradient(oklch(30% 0.01 50 / 0.5) 0.5px, transparent 0.5px);
           }
-          .pixel-card {
-            border: 3px solid var(--ink);
-            box-shadow: 6px 6px 0px var(--ink);
-            transition: all 0.15s ease-out;
-            background: white;
+
+          /* ── Glass Utilities ─────────────────────────────────── */
+          .glass {
+            background: var(--glass);
+            backdrop-filter: blur(24px) saturate(1.4);
+            -webkit-backdrop-filter: blur(24px) saturate(1.4);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
           }
-          .pixel-card:hover {
-            transform: translate(-3px, -3px);
-            box-shadow: 9px 9px 0px var(--ink);
+          .glass-sm {
+            background: var(--glass);
+            backdrop-filter: blur(12px) saturate(1.3);
+            -webkit-backdrop-filter: blur(12px) saturate(1.3);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
           }
-          .pixel-card:active {
-            transform: translate(2px, 2px);
-            box-shadow: 3px 3px 0px var(--ink);
+          .glass-lg {
+            background: var(--glass);
+            backdrop-filter: blur(40px) saturate(1.5);
+            -webkit-backdrop-filter: blur(40px) saturate(1.5);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 40px rgba(0,0,0,0.10);
           }
-          .pixel-card-sm {
-            border: 2px solid var(--ink);
-            box-shadow: 4px 4px 0px var(--ink);
-            transition: all 0.12s ease-out;
-            background: white;
+          .glass-card {
+            background: var(--surface-elevated);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
           }
-          .pixel-card-sm:hover {
-            transform: translate(-2px, -2px);
-            box-shadow: 6px 6px 0px var(--ink);
+          .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.08);
           }
-          .pixel-btn {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 10px;
-            padding: 0.6rem 1.2rem;
-            border: 2px solid var(--ink);
-            box-shadow: 3px 3px 0px var(--ink);
+          .glass-card-static {
+            background: var(--surface-elevated);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+          }
+          .dark .glass-card,
+          .dark .glass-card-static {
+            background: var(--surface-elevated);
+            border-color: var(--border);
+          }
+
+          /* ── Buttons ─────────────────────────────────────────── */
+          .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.375rem;
+            padding: 0.5rem 1rem;
+            border-radius: 10px;
+            font-size: 0.875rem;
+            font-weight: 500;
             cursor: pointer;
-            transition: all 0.1s ease-out;
-            text-transform: uppercase;
+            transition: all 0.15s cubic-bezier(0.23, 1, 0.32, 1);
+            border: none;
+            min-height: 40px;
+            text-decoration: none;
+            line-height: 1;
           }
-          .pixel-btn:hover {
-            transform: translate(-1px, -1px);
-            box-shadow: 5px 5px 0px var(--ink);
+          .btn:active {
+            transform: scale(0.97);
           }
-          .pixel-btn:active {
-            transform: translate(2px, 2px);
-            box-shadow: 1px 1px 0px var(--ink);
-          }
-          .pixel-btn:disabled {
+          .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
           }
           .btn-primary {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 10px;
-            text-transform: uppercase;
-            padding: 0.6rem 1.2rem;
-            border: 2px solid var(--ink);
-            box-shadow: 3px 3px 0px var(--ink);
-            background: var(--orange);
+            background: var(--accent);
             color: white;
-            cursor: pointer;
-            transition: all 0.1s ease-out;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.25rem;
-            min-height: 44px;
-            line-height: 1;
-            text-decoration: none;
           }
           .btn-primary:hover {
-            transform: translate(-1px, -1px);
-            box-shadow: 5px 5px 0px var(--ink);
-          }
-          .btn-primary:active {
-            transform: translate(2px, 2px);
-            box-shadow: 1px 1px 0px var(--ink);
-          }
-          .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: 1px 1px 0px var(--ink);
-          }
-          .btn-primary[data-color="green"] { background: var(--green); }
-          .btn-primary[data-color="blue"] { background: var(--blue); }
-          .btn-primary[data-color="red"] { background: var(--red); }
-          .btn-sm {
-            font-size: 8px;
-            padding: 0.4rem 0.8rem;
-            min-height: 36px;
-          }
-          @media (min-width: 640px) {
-            .btn-sm { min-height: auto; }
-            .btn-primary { min-height: auto; }
-          }
-          .btn-lg {
-            font-size: 12px;
-            padding: 0.8rem 1.6rem;
+            background: var(--accent-dark);
+            box-shadow: 0 4px 16px rgba(234,88,12,0.3);
           }
           .btn-secondary {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 10px;
-            text-transform: uppercase;
-            padding: 0.6rem 1.2rem;
-            border: 2px solid var(--ink);
-            box-shadow: 3px 3px 0px var(--ink);
-            background: white;
+            background: var(--surface-elevated);
             color: var(--ink);
-            cursor: pointer;
-            transition: all 0.1s ease-out;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.25rem;
-            min-height: 44px;
-            line-height: 1;
-            text-decoration: none;
+            border: 1px solid var(--border);
           }
           .btn-secondary:hover {
-            transform: translate(-1px, -1px);
-            box-shadow: 5px 5px 0px var(--ink);
-          }
-          .btn-secondary:active {
-            transform: translate(2px, 2px);
-            box-shadow: 1px 1px 0px var(--ink);
-          }
-          .btn-secondary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-          }
-          @media (min-width: 640px) {
-            .btn-secondary { min-height: auto; }
+            border-color: var(--ink);
+            background: var(--surface);
           }
           .btn-ghost {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 8px;
             background: transparent;
-            border: none;
-            cursor: pointer;
             color: var(--muted);
-            transition: color 0.1s;
+            padding: 0.375rem 0.625rem;
+            border-radius: 8px;
+            font-size: 0.8125rem;
+            min-height: 32px;
+          }
+          .btn-ghost:hover {
+            background: oklch(0% 0 0 / 0.05);
+            color: var(--ink);
+          }
+          .btn-sm {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.8125rem;
+            min-height: 32px;
+            border-radius: 8px;
+          }
+          .btn-lg {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            min-height: 48px;
+            border-radius: 12px;
+          }
+          .btn-icon {
+            width: 40px;
+            height: 40px;
+            padding: 0;
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            border-radius: 10px;
+            min-height: 40px;
           }
-          .btn-ghost:hover { color: var(--ink); }
-          button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
-            outline: 2px solid var(--orange);
-            outline-offset: 2px;
-          }
-          .pixel-input {
-            font-family: 'Outfit', sans-serif;
-            padding: 0.75rem 1rem;
-            border: 3px solid var(--ink);
-            box-shadow: 4px 4px 0px var(--ink);
-            outline: none;
-            font-size: 1rem;
-            width: 100%;
-            background: white;
-            transition: box-shadow 0.1s;
-          }
-          .pixel-input:focus {
-            box-shadow: 6px 6px 0px var(--orange);
-            border-color: var(--ink);
-          }
-          .pixel-tag {
-            display: inline-block;
-            font-size: 0.75rem;
-            padding: 0.2rem 0.6rem;
-            border: 2px solid var(--ink);
-            background: var(--cream);
-            box-shadow: 2px 2px 0px var(--ink);
-            font-weight: 500;
-          }
-          .pixel-section-header {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 1rem;
-            padding: 0.75rem 1.5rem;
-            border: 3px solid var(--ink);
-            box-shadow: 5px 5px 0px rgba(0,0,0,0.15);
-            display: inline-block;
-            margin-bottom: 1.5rem;
-          }
-          @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-8px); }
-          }
-          @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-          }
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-          @keyframes wave {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
-          }
-          @keyframes wave-drift-1 { 0% { transform: translateX(0); } 100% { transform: translateX(-33.33%); } }
-          @keyframes wave-drift-2 { 0% { transform: translateX(0); } 100% { transform: translateX(-33.33%); } }
-          @keyframes wave-drift-3 { 0% { transform: translateX(0); } 100% { transform: translateX(-33.33%); } }
-          .wave-1 { animation: wave-drift-1 22s ease-in-out infinite; }
-          .wave-2 { animation: wave-drift-2 16s ease-in-out infinite; }
-          .wave-3 { animation: wave-drift-3 11s ease-in-out infinite; }
-          @media (max-width: 639px) {
-            .wave-anim { animation: wave 24s linear infinite; }
-          }
-          @media (min-width: 640px) {
-            .wave-anim { animation: wave 12s linear infinite; }
-          }
-          .float-anim { animation: float 4s ease-in-out infinite; }
-          .line-clamp-3 {
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-          }
-          ::-webkit-scrollbar { width: 10px; }
-          ::-webkit-scrollbar-track { background: #fed7aa; }
-          ::-webkit-scrollbar-thumb { background: var(--orange); border: 2px solid var(--ink); }
 
-          article.prose h2 {
+          /* ── Inputs ──────────────────────────────────────────── */
+          .input {
+            font-family: inherit;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            outline: none;
+            font-size: 0.9375rem;
+            width: 100%;
+            background: var(--surface-elevated);
+            color: var(--ink);
+            transition: border-color 0.2s, box-shadow 0.2s;
+          }
+          .input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-bg);
+          }
+          .input::placeholder {
+            color: var(--subtle);
+          }
+
+          /* ── Tags / Chips ────────────────────────────────────── */
+          .tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.125rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: var(--accent-bg);
+            color: var(--accent);
+            border: 1px solid transparent;
+          }
+          .tag-subtle {
+            background: oklch(0% 0 0 / 0.04);
+            color: var(--muted);
+          }
+
+          /* ── Typography ──────────────────────────────────────── */
+          .pixel {
             font-family: 'Press Start 2P', monospace;
-            font-size: 0.8rem;
+            letter-spacing: -0.5px;
+          }
+
+          /* ── Focus ───────────────────────────────────────────── */
+          button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            border-radius: 4px;
+          }
+
+          /* ── Scrollbar ────────────────────────────────────────── */
+          ::-webkit-scrollbar { width: 8px; height: 8px; }
+          ::-webkit-scrollbar-track { background: transparent; }
+          ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+          }
+          ::-webkit-scrollbar-thumb:hover {
+            background: var(--subtle);
+          }
+
+          /* ── Article Prose ───────────────────────────────────── */
+          article.prose {
+            font-size: 1.05rem;
+            line-height: 1.8;
+            color: var(--ink);
+          }
+          article.prose h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
             padding-bottom: 0.5rem;
-            border-bottom: 3px solid var(--ink);
+            border-bottom: 1px solid var(--border);
             margin-top: 2.5rem;
             margin-bottom: 1rem;
+            letter-spacing: -0.01em;
+          }
+          article.prose h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 1.75rem;
+            margin-bottom: 0.75rem;
           }
           article.prose p {
-            line-height: 1.8;
-            font-size: 1.05rem;
             margin-bottom: 1rem;
+            color: var(--ink-secondary);
           }
           article.prose a {
-            color: var(--orange);
-            font-weight: 600;
+            color: var(--accent);
+            font-weight: 500;
             text-decoration: underline;
             text-underline-offset: 3px;
+            text-decoration-thickness: 1px;
+          }
+          article.prose a:hover {
+            text-decoration-thickness: 2px;
           }
           article.prose strong {
             color: var(--ink);
+            font-weight: 600;
           }
           article.prose blockquote {
-            border-left: 4px solid var(--orange);
-            padding: 0.75rem 1rem;
+            border-left: 3px solid var(--accent);
+            padding: 0.75rem 1.25rem;
             margin: 1rem 0;
-            background: var(--cream);
+            background: var(--accent-bg);
+            border-radius: 0 8px 8px 0;
+          }
+          article.prose ul, article.prose ol {
+            padding-left: 1.5rem;
+            margin-bottom: 1rem;
+          }
+          article.prose li {
+            margin-bottom: 0.25rem;
           }
 
-          /* ── Generate Page ─────────────────────────────────── */
-          @keyframes breathe {
-            0%, 100% { opacity: 0.4; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.02); }
-          }
-          @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 8px var(--orange); }
-            50% { box-shadow: 0 0 20px var(--orange), 0 0 40px rgba(234,88,12,0.3); }
-          }
-          @keyframes slide-up {
-            from { opacity: 0; transform: translateY(16px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes page-enter {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          .page-enter { animation: page-enter 0.3s ease-out both; }
-          @keyframes slide-in-main {
-            from { opacity: 0; transform: translateX(24px); }
-            to { opacity: 1; transform: translateX(0); }
-          }
-          .chat-enter { animation: slide-in-main 0.35s ease-out both; }
-          @keyframes shimmer-bar {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-          }
-          @keyframes spin-slow {
-            to { transform: rotate(360deg); }
-          }
-
+          /* ── Generate Page ───────────────────────────────────── */
           .generate-page {
             min-height: 100vh;
             display: flex;
@@ -361,15 +350,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
           .generate-header {
             padding: 1rem 0 0.5rem;
-            border-bottom: 2px solid var(--ink);
+            border-bottom: 1px solid var(--border);
             margin-bottom: 1rem;
           }
           .generate-title {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 1rem;
-            text-transform: uppercase;
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
             margin: 0 0 1rem;
-            letter-spacing: 0.5px;
             word-break: break-word;
           }
 
@@ -379,8 +367,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             align-items: center;
             gap: 0;
             overflow-x: auto;
-            padding: 0.5rem 0;
+            padding: 0.75rem 0;
+            scrollbar-width: none;
           }
+          .phase-timeline::-webkit-scrollbar { display: none; }
           .phase-step {
             display: flex;
             align-items: center;
@@ -388,26 +378,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             flex-shrink: 0;
           }
           .phase-node {
-            width: 36px;
-            height: 36px;
-            border: 2px solid var(--ink);
+            width: 32px;
+            height: 32px;
+            border: 2px solid var(--border);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: white;
+            background: var(--surface-elevated);
             transition: all 0.3s;
             position: relative;
+            font-size: 13px;
           }
           .phase-step.done .phase-node {
             background: var(--green);
             border-color: var(--green);
-            animation: none;
           }
           .phase-step.active .phase-node {
-            background: var(--orange);
-            border-color: var(--orange);
-            animation: pulse-glow 2s ease-in-out infinite;
+            background: var(--accent);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px var(--accent-bg);
           }
           .phase-step.error .phase-node {
             background: var(--red);
@@ -416,29 +406,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           .phase-step:not(.done):not(.active) .phase-node {
             opacity: 0.4;
           }
-          .phase-icon {
-            font-size: 14px;
-            line-height: 1;
-          }
           .phase-label {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 7px;
-            margin-left: 4px;
+            font-family: 'Inter', system-ui, sans-serif;
+            font-size: 0.6875rem;
+            font-weight: 500;
+            margin-left: 6px;
             white-space: nowrap;
-            color: var(--ink);
-            width: 0;
-            overflow: visible;
+            color: var(--muted);
           }
           .phase-step.done .phase-label { color: var(--green); }
-          .phase-step.active .phase-label { color: var(--orange); }
-          .phase-step:not(.done):not(.active) .phase-label { opacity: 0.4; }
+          .phase-step.active .phase-label { color: var(--accent); }
+          .phase-step:not(.done):not(.active) .phase-label { opacity: 0.5; }
           .phase-line {
-            width: 24px;
+            width: 20px;
             height: 2px;
-            background: #ccc;
+            background: var(--border);
             margin: 0 4px;
             flex-shrink: 0;
             transition: background 0.3s;
+            border-radius: 1px;
           }
           .phase-line.done { background: var(--green); }
 
@@ -449,19 +435,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             gap: 0.5rem;
             padding: 0.75rem 1rem;
             margin-top: 0.75rem;
-            border: 2px solid var(--ink);
-            background: var(--cream);
-            font-family: 'Press Start 2P', monospace;
-            font-size: 8px;
+            background: var(--accent-bg);
+            border-radius: 10px;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--accent);
           }
           .queuing-spinner {
-            width: 12px;
-            height: 12px;
-            border: 2px solid var(--ink);
-            border-top-color: var(--orange);
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--accent-bg);
+            border-top-color: var(--accent);
             border-radius: 50%;
-            animation: spin-slow 0.8s linear infinite;
+            animation: spin 0.8s linear infinite;
           }
+          @keyframes spin { to { transform: rotate(360deg); } }
 
           /* Activity Feed */
           .activity-feed {
@@ -476,65 +464,73 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             gap: 0.75rem;
             padding: 0.75rem;
             margin-bottom: 0.5rem;
-            border: 2px solid var(--ink);
-            background: white;
-            animation: slide-up 0.3s ease-out;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--surface-elevated);
+            animation: slide-up 0.25s cubic-bezier(0.23, 1, 0.32, 1);
+          }
+          @keyframes slide-up {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
           }
           .activity-card.error {
             border-color: var(--red);
-            background: #fef2f2;
+            background: var(--red-subtle);
           }
           .activity-card.tool_use {
-            border-color: #bae6fd;
-            background: #f0f7ff;
+            border-color: oklch(85% 0.05 200);
+            background: oklch(95% 0.03 200);
           }
           .activity-card.tool_result {
-            border-color: var(--border);
-            background: #fafafa;
+            border-color: var(--border-light);
+            background: var(--surface);
           }
           .activity-card.text {
-            border-color: #fde68a;
-            background: #fff8e1;
+            border-color: oklch(88% 0.06 80);
+            background: oklch(96% 0.03 80);
+          }
+          .dark .activity-card.tool_use {
+            border-color: oklch(30% 0.05 200);
+            background: oklch(20% 0.03 200);
+          }
+          .dark .activity-card.text {
+            border-color: oklch(30% 0.06 80);
+            background: oklch(22% 0.03 80);
           }
           .activity-icon {
-            font-size: 1.2rem;
-            width: 28px;
-            height: 28px;
+            font-size: 1.1rem;
+            width: 26px;
+            height: 26px;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
           }
-          .activity-body {
-            flex: 1;
-            min-width: 0;
-          }
+          .activity-body { flex: 1; min-width: 0; }
           .activity-content {
-            font-size: 0.9rem;
+            font-size: 0.875rem;
             line-height: 1.5;
             word-break: break-word;
           }
           .activity-card.text .activity-content {
             font-style: italic;
-            color: #444;
+            color: var(--muted);
           }
-          .activity-meta {
-            margin-top: 0.25rem;
-          }
+          .activity-meta { margin-top: 0.25rem; }
           .activity-meta code {
             font-size: 0.7rem;
-            color: #666;
+            color: var(--subtle);
             word-break: break-all;
             display: block;
             max-height: 60px;
             overflow: hidden;
           }
           .activity-time {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 7px;
-            color: #aaa;
+            font-size: 0.6875rem;
+            color: var(--subtle);
             flex-shrink: 0;
             margin-top: 2px;
+            font-weight: 450;
           }
           .activity-empty {
             display: flex;
@@ -544,37 +540,36 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             gap: 1rem;
             padding: 4rem 1rem;
             text-align: center;
-            color: #9aa0a6;
-            font-family: 'Press Start 2P', monospace;
-            font-size: 8px;
+            color: var(--subtle);
+            font-size: 0.875rem;
           }
           .empty-pulse {
-            width: 24px;
-            height: 24px;
-            border: 3px solid var(--orange);
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--accent);
             border-radius: 50%;
-            animation: breathe 2s ease-in-out infinite;
+            opacity: 0.6;
           }
 
           /* Done banner */
           .done-banner {
             text-align: center;
             padding: 3rem 1rem;
-            animation: slide-up 0.5s ease-out;
+            animation: slide-up 0.5s cubic-bezier(0.23, 1, 0.32, 1);
           }
           .done-icon {
-            font-size: 3rem;
+            font-size: 2.5rem;
             margin-bottom: 1rem;
-            animation: breathe 2s ease-in-out infinite;
           }
           .done-banner h2 {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 1rem;
+            font-size: 1.25rem;
+            font-weight: 600;
             margin: 0 0 0.5rem;
+            letter-spacing: -0.01em;
           }
           .done-banner p {
-            font-size: 1rem;
-            color: #5f6368;
+            font-size: 0.9375rem;
+            color: var(--muted);
             margin: 0 0 1.5rem;
           }
           .done-actions {
@@ -589,49 +584,86 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             max-height: 320px;
             overflow-y: auto;
             scroll-behavior: smooth;
-            border: 2px solid var(--ink);
+            border: 1px solid var(--border);
+            border-radius: 12px;
             padding: 0.5rem;
-            background: #fafafa;
+            background: var(--surface);
           }
           .done-banner-inline {
             text-align: center;
             padding: 2rem 1rem;
-            animation: slide-up 0.5s ease-out;
+            animation: slide-up 0.5s cubic-bezier(0.23, 1, 0.32, 1);
           }
           .done-banner-inline .done-icon {
-            font-size: 2.5rem;
+            font-size: 2rem;
             margin-bottom: 0.75rem;
-            animation: breathe 2s ease-in-out infinite;
           }
           .done-banner-inline h2 {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 0.9rem;
+            font-size: 1.1rem;
+            font-weight: 600;
             margin: 0 0 0.5rem;
           }
           .done-banner-inline p {
-            font-size: 0.95rem;
-            color: #5f6368;
+            font-size: 0.875rem;
+            color: var(--muted);
             margin: 0 0 1.25rem;
           }
 
+          /* Skeleton */
+          @keyframes shimmer-sweep {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+          }
+          .skeleton {
+            background: linear-gradient(
+              90deg,
+              var(--skeleton-start) 25%,
+              var(--skeleton-end) 50%,
+              var(--skeleton-start) 75%
+            );
+            background-size: 200% 100%;
+            animation: shimmer-sweep 1.5s ease-in-out infinite;
+            border-radius: 8px;
+          }
+
+          /* Streaming cursor */
+          .streaming-cursor::after {
+            content: "▊";
+            animation: cursor-blink 1s ease-in-out infinite;
+            color: var(--accent);
+            font-weight: 300;
+          }
+          @keyframes cursor-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+          }
+
+          /* Line clamp */
+          .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+          }
+          .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+          }
+
+          /* Touch targets */
           @media (max-width: 639px) {
-            .generate-title { font-size: 0.75rem; }
-            .phase-node { width: 28px; height: 28px; }
-            .phase-icon { font-size: 11px; }
-            .phase-label { font-size: 6px; }
-            .phase-line { width: 14px; }
-            .btn-sm, .btn-lg { min-height: 44px !important; }
-            .btn-ghost { min-height: 44px; }
-            button, a[role="button"], [tabindex][role="button"] { min-height: 44px; }
+            .btn, .btn-sm, .btn-lg, .btn-icon, .btn-ghost {
+              min-height: 44px;
+            }
+            button, a[role="button"], [tabindex][role="button"] {
+              min-height: 44px;
+            }
           }
-          @media (min-width: 640px) {
-            .btn-lg { min-height: auto; }
-          }
-          .footer-text { font-size: 8px; }
-          @media (min-width: 640px) { .footer-text { font-size: 8px; } }
         `}</style>
         <ErrorBoundary>
-          {children}
+          <ThemeProvider>{children}</ThemeProvider>
         </ErrorBoundary>
       </body>
     </html>

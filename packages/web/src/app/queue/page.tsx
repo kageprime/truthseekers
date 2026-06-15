@@ -5,6 +5,7 @@ import GenerationBar, { type GeneratingEntry } from "../components/GenerationBar
 import PageLayout from "../components/PageLayout";
 import SectionHeader from "../components/SectionHeader";
 import { BASE } from "@/lib/api";
+import { IconLightning, IconClock, IconCheckCircle, IconXCircle } from "../components/Icons";
 
 interface QueueJob {
   slug: string;
@@ -93,34 +94,34 @@ export default function QueuePage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-2">
           <div>
-            <h1 className="pixel text-sm" style={{ color: "var(--ink)" }}>QUEUE MANAGER</h1>
+            <h1 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>QUEUE MANAGER</h1>
             <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>Monitor and manage all generation jobs</p>
           </div>
           <div className="flex gap-4 text-sm">
-            <span className="font-medium" style={{ color: "var(--orange)" }}>{data.stats.active}/{data.stats.maxConcurrent} active</span>
+            <span className="font-medium" style={{ color: "var(--accent)" }}>{data.stats.active}/{data.stats.maxConcurrent} active</span>
             <span className="font-medium" style={{ color: "var(--blue)" }}>{data.stats.queued}/{data.stats.maxQueue} queued</span>
           </div>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          <div className="pixel-card-sm p-4 text-center bg-white">
-            <div className="text-2xl mb-1">⚡</div>
-            <div className="text-xl font-bold" style={{ color: "var(--orange)" }}>{data.stats.active}</div>
+          <div className="glass-card-static p-4 text-center">
+            <div className="mb-1"><IconLightning size={28} /></div>
+            <div className="text-xl font-bold" style={{ color: "var(--accent)" }}>{data.stats.active}</div>
             <div className="text-xs uppercase tracking-wide mt-1" style={{ color: "var(--muted)" }}>Active</div>
           </div>
-          <div className="pixel-card-sm p-4 text-center bg-white">
-            <div className="text-2xl mb-1">⏳</div>
+          <div className="glass-card-static p-4 text-center">
+            <div className="mb-1"><IconClock size={28} /></div>
             <div className="text-xl font-bold" style={{ color: "var(--blue)" }}>{data.stats.queued}</div>
             <div className="text-xs uppercase tracking-wide mt-1" style={{ color: "var(--muted)" }}>Queued</div>
           </div>
-          <div className="pixel-card-sm p-4 text-center bg-white">
-            <div className="text-2xl mb-1">✅</div>
+          <div className="glass-card-static p-4 text-center">
+            <div className="mb-1"><IconCheckCircle size={28} /></div>
             <div className="text-xl font-bold" style={{ color: "var(--green)" }}>{doneCount}</div>
             <div className="text-xs uppercase tracking-wide mt-1" style={{ color: "var(--muted)" }}>Done</div>
           </div>
-          <div className="pixel-card-sm p-4 text-center bg-white">
-            <div className="text-2xl mb-1">❌</div>
+          <div className="glass-card-static p-4 text-center">
+            <div className="mb-1"><IconXCircle size={28} /></div>
             <div className="text-xl font-bold" style={{ color: "var(--red)" }}>{errorJobs.length}</div>
             <div className="text-xs uppercase tracking-wide mt-1" style={{ color: "var(--muted)" }}>Errors</div>
           </div>
@@ -128,7 +129,7 @@ export default function QueuePage() {
 
         {/* Active Jobs */}
         <div className="mb-8">
-          <SectionHeader emoji="⚡" title="ACTIVE JOBS" accent="var(--orange)" />
+          <SectionHeader icon={IconLightning} title="ACTIVE JOBS" accent="var(--accent)" />
           {activeJobs.length === 0 ? (
             <p className="text-sm py-4" style={{ color: "var(--subtle)" }}>No active jobs. Submit one from the home page or CLI.</p>
           ) : (
@@ -150,14 +151,14 @@ export default function QueuePage() {
 
         {/* Queued Jobs */}
         <div className="mb-8">
-          <SectionHeader emoji="⏳" title="QUEUED JOBS" accent="var(--blue)" />
+          <SectionHeader icon={IconClock} title="QUEUED JOBS" accent="var(--blue)" />
           {queuedJobs.length === 0 ? (
             <p className="text-sm py-4" style={{ color: "var(--subtle)" }}>No queued jobs.</p>
           ) : (
             <div className="grid sm:grid-cols-2 gap-3">
               {queuedJobs.map((job) => (
-                <div key={job.slug} className="flex items-center gap-3 p-3 pixel-card-sm bg-white">
-                  <span className="text-lg">⏳</span>
+                <div key={job.slug} className="flex items-center gap-3 p-3 glass-card-static">
+                  <IconClock size={20} />
                   <span className="text-sm font-medium truncate flex-1" style={{ color: "var(--ink)" }}>{job.title || job.slug}</span>
                   <span className="text-xs" style={{ color: "var(--subtle)" }}>{timeAgo(job.createdAt)}</span>
                 </div>
@@ -169,7 +170,7 @@ export default function QueuePage() {
         {/* Error Jobs */}
         {errorJobs.length > 0 && (
           <div className="mb-8">
-            <SectionHeader emoji="❌" title="ERRORS" accent="var(--red)" />
+            <SectionHeader icon={IconXCircle} title="ERRORS" accent="var(--red)" />
             <div className="space-y-2">
               {errorJobs.map((job) => (
                 <GenerationBar
@@ -193,8 +194,8 @@ export default function QueuePage() {
         )}
 
         {/* Queue Config */}
-        <div className="mt-12 pixel-card-sm p-6" style={{ background: "#f8f9fa" }}>
-          <h3 className="pixel text-xs mb-4 uppercase tracking-wide" style={{ color: "var(--ink)" }}>Configuration</h3>
+        <div className="mt-12 glass-card-static p-6">
+          <h3 className="text-xs font-semibold mb-4 uppercase tracking-wide" style={{ color: "var(--ink)" }}>Configuration</h3>
           <div className="grid sm:grid-cols-2 gap-4 text-sm" style={{ color: "var(--muted)" }}>
             <div>Max concurrent: <span className="font-bold" style={{ color: "var(--ink)" }}>{data.stats.maxConcurrent}</span></div>
             <div>Max queue size: <span className="font-bold" style={{ color: "var(--ink)" }}>{data.stats.maxQueue}</span></div>

@@ -45,14 +45,14 @@ export default function MermaidDiagram({ code, caption }: { code?: string; capti
   }
 
   return (
-    <div className="pixel-card-sm p-4 my-3" style={{ background: "white" }}>
+    <div className="glass-card-static p-4 my-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="pixel text-[9px] text-[#888]">DIAGRAM</span>
+        <span className="text-xs font-medium text-[#888]">DIAGRAM</span>
         <div className="flex gap-1">
           {state === "error" && (
             <button
               onClick={() => { setState("edit"); setEditCode((code || "").trim()); }}
-              className="pixel text-[8px] border border-black px-1 py-1 min-h-[44px] sm:min-h-0 cursor-pointer bg-white"
+              className="text-xs border border-black px-1 py-1 min-h-[44px] sm:min-h-0 cursor-pointer bg-white"
             >
               EDIT
             </button>
@@ -60,7 +60,7 @@ export default function MermaidDiagram({ code, caption }: { code?: string; capti
           {state === "rendered" && (
             <button
               onClick={() => setZoomed(!zoomed)}
-              className="pixel text-[8px] border border-black px-1 py-1 min-h-[44px] sm:min-h-0 cursor-pointer bg-white"
+              className="text-xs border border-black px-1 py-1 min-h-[44px] sm:min-h-0 cursor-pointer bg-white"
             >
               {zoomed ? "−" : "+"}
             </button>
@@ -99,10 +99,10 @@ export default function MermaidDiagram({ code, caption }: { code?: string; capti
             style={{ outline: "none" }}
           />
           <div className="flex gap-2">
-            <button onClick={handleEditSubmit} className="pixel text-[9px] bg-[var(--orange)] text-white px-3 py-3 sm:py-1 min-h-[44px] border border-black">
+            <button onClick={handleEditSubmit} className="text-xs font-medium bg-[var(--accent)] text-white px-3 py-3 sm:py-1 min-h-[44px] border border-black">
               RENDER
             </button>
-            <button onClick={() => setState("error")} className="pixel text-[9px] border border-black px-3 py-3 sm:py-1 min-h-[44px] bg-white">
+            <button onClick={() => setState("error")} className="text-xs font-medium border border-black px-3 py-3 sm:py-1 min-h-[44px] bg-white">
               CANCEL
             </button>
           </div>

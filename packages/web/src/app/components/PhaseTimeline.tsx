@@ -1,14 +1,16 @@
 "use client";
 
+import { IconSearch, IconClipboard, IconPencil, IconCheck, IconLightning, IconPalette, IconImage, IconDatabase } from "./Icons";
+
 const PHASES = [
-  { key: "researching", icon: "🔍", label: "Research" },
-  { key: "outline", icon: "📋", label: "Outline" },
-  { key: "writing", icon: "✍️", label: "Write" },
-  { key: "verifying", icon: "✅", label: "Verify" },
-  { key: "correcting", icon: "🔧", label: "Correct" },
-  { key: "media", icon: "🎨", label: "Media" },
-  { key: "images", icon: "🖼️", label: "Images" },
-  { key: "storing", icon: "💾", label: "Store" },
+  { key: "researching", icon: IconSearch, label: "Research" },
+  { key: "outline", icon: IconClipboard, label: "Outline" },
+  { key: "writing", icon: IconPencil, label: "Write" },
+  { key: "verifying", icon: IconCheck, label: "Verify" },
+  { key: "correcting", icon: IconLightning, label: "Correct" },
+  { key: "media", icon: IconPalette, label: "Media" },
+  { key: "images", icon: IconImage, label: "Images" },
+  { key: "storing", icon: IconDatabase, label: "Store" },
 ];
 
 export function currentPhaseIndex(phase: string): number {
@@ -41,6 +43,7 @@ export default function PhaseTimeline({ currentPhase, onError }: { currentPhase:
   return (
     <div className="phase-timeline">
       {PHASES.map((p, i) => {
+        const IconComp = p.icon;
         const isDone = activeIdx > i;
         const isActive = activeIdx === i;
         const isLast = i === PHASES.length - 1;
@@ -48,7 +51,7 @@ export default function PhaseTimeline({ currentPhase, onError }: { currentPhase:
         return (
           <div key={p.key} className={`phase-step ${isDone ? "done" : ""} ${isActive ? "active" : ""} ${isError && isActive ? "error" : ""}`}>
             <div className="phase-node">
-              <span className="phase-icon">{p.icon}</span>
+              <IconComp size={16} />
             </div>
             <span className="phase-label">{p.label}</span>
             {!isLast && <div className={`phase-line ${isDone ? "done" : ""}`} />}
@@ -56,7 +59,7 @@ export default function PhaseTimeline({ currentPhase, onError }: { currentPhase:
         );
       })}
       {isError && onError && (
-        <button onClick={onError} className="btn-primary btn-sm" style={{ marginLeft: "1rem" }}>
+        <button onClick={onError} className="btn btn-primary btn btn-sm" style={{ marginLeft: "1rem" }}>
           Retry
         </button>
       )}

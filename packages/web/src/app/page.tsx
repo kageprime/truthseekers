@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createChat } from "@/lib/api";
 import PageLayout from "./components/PageLayout";
@@ -29,7 +30,7 @@ export default function HomePage() {
   }
 
   return (
-    <PageLayout sidebar>
+    <PageLayout sidebar noHeader noFooter>
       <main className="flex-1 flex flex-col items-center justify-center px-6 pb-16 relative">
 
         {busy ? (
@@ -39,7 +40,7 @@ export default function HomePage() {
               className="w-10 h-10 rounded-full border-3 animate-spin"
               style={{
                 borderColor: "var(--ink)",
-                borderTopColor: "var(--orange)",
+                borderTopColor: "var(--accent)",
               }}
             />
             <p className="text-lg font-semibold text-center max-w-md leading-snug" style={{ color: "var(--ink)" }}>
@@ -67,16 +68,22 @@ export default function HomePage() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Ask about any topic..."
-                  className="flex-1 pixel-input text-base py-4 px-5"
+                  className="flex-1 input text-base py-4 px-5"
                   autoFocus
                 />
-                <button type="submit" disabled={!input.trim()} className="btn-primary btn-lg shrink-0">
+                <button type="submit" disabled={!input.trim()} className="btn btn-primary btn-lg shrink-0">
                   Ask
                 </button>
               </div>
             </form>
-            <div className="mt-8 text-xs text-center" style={{ color: "var(--subtle)" }}>
-              Try: &ldquo;What was the Renaissance?&rdquo; &middot; &ldquo;Tell me about the Solar System&rdquo; &middot; &ldquo;Show me a map of ancient Rome&rdquo;
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-xs" style={{ color: "var(--subtle)" }}>
+              <Link href="/chat" className="hover:underline" style={{ color: "var(--accent)" }}>Chat</Link>
+              <span>&middot;</span>
+              <Link href="/articles" className="hover:underline" style={{ color: "var(--accent)" }}>Browse Articles</Link>
+              <span>&middot;</span>
+              <Link href="/maps" className="hover:underline" style={{ color: "var(--accent)" }}>Maps</Link>
+              <span>&middot;</span>
+              <Link href="/queue" className="hover:underline" style={{ color: "var(--accent)" }}>Queue</Link>
             </div>
           </div>
         )}

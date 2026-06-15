@@ -9,6 +9,7 @@ import SectionHeader from "../../components/SectionHeader";
 import MapViewer from "../../components/MapViewer";
 import ThreeDMapViewer from "../../components/ThreeDMapViewer";
 import InteractiveTimeline from "../../components/InteractiveTimeline";
+import { IconMap, IconClipboard, IconSearch, IconFileText } from "../../components/Icons";
 
 export default function MapDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const [map, setMap] = useState<MapEntry | null>(null);
@@ -30,7 +31,7 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
     <PageLayout>
       <main className="flex-1 overflow-y-auto max-w-6xl mx-auto w-full px-6 py-10">
         {/* Breadcrumb */}
-        <Link href="/maps" className="inline-flex items-center gap-1 text-sm mb-6 transition-colors hover:underline" style={{ color: "var(--orange)" }}>
+          <Link href="/maps" className="inline-flex items-center gap-1 text-sm mb-6 transition-colors hover:underline" style={{ color: "var(--accent)" }}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
@@ -39,10 +40,10 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
 
         {loading ? (
           <div className="space-y-6 animate-pulse">
-            <div className="pixel-card p-4 sm:p-8" style={{ background: "white" }}>
-              <div className="w-full h-64 sm:h-80 rounded" style={{ background: "var(--skeleton)" }} />
+            <div className="glass-card-static p-4 sm:p-8 mb-6">
+              <div className="w-full h-64 sm:h-80 rounded skeleton" />
             </div>
-            <div className="pixel-card p-4 sm:p-8" style={{ background: "white" }}>
+            <div className="glass-card-static p-4 sm:p-8 mb-6">
               <div className="h-6 rounded w-2/3 mb-4" style={{ background: "var(--skeleton)" }} />
               <div className="h-4 rounded w-1/3 mb-4" style={{ background: "var(--skeleton)" }} />
               <div className="space-y-2">
@@ -55,13 +56,13 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
         ) : map ? (
           <>
             {/* Map Section */}
-            <div className="pixel-card p-4 sm:p-6 md:p-8 mb-8" style={{ background: "white" }}>
+            <div className="glass-card-static p-4 sm:p-6 md:p-8 mb-8">
               <div className="flex items-center justify-between gap-4 mb-6">
                 <div className="flex items-center gap-4">
-                  <span className="text-3xl">🗺</span>
+                  <IconMap size={28} />
                   <div>
-                    <h2 className="pixel text-xs" style={{ color: "var(--ink)" }}>MAP</h2>
-                    <div className="h-1 w-12 mt-1" style={{ background: "var(--orange)" }} />
+                    <h2 className="text-xs font-semibold" style={{ color: "var(--ink)" }}>Map</h2>
+                    <div className="h-0.5 w-10 mt-1 rounded-full" style={{ background: "var(--accent)" }} />
                   </div>
                 </div>
 
@@ -70,13 +71,13 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
                   <div className="flex gap-1">
                     <button
                       onClick={() => setViewMode("2d")}
-                      className={`btn-sm ${viewMode === "2d" ? "btn-primary" : "btn-secondary"}`}
+                      className={`btn btn-sm ${viewMode === "2d" ? "btn-primary" : "btn-secondary"}`}
                     >
                       2D
                     </button>
                     <button
                       onClick={() => setViewMode("3d")}
-                      className={`btn-sm ${viewMode === "3d" ? "btn-primary" : "btn-secondary"}`}
+                      className={`btn btn-sm ${viewMode === "3d" ? "btn-primary" : "btn-secondary"}`}
                     >
                       3D
                     </button>
@@ -122,10 +123,10 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
             </div>
 
             {/* Title & Meta */}
-            <div className="pixel-card p-4 sm:p-6 md:p-8 mb-8" style={{ background: "white" }}>
-              <SectionHeader emoji="📋" title="DETAILS" accent="var(--blue)" />
+            <div className="glass-card-static p-4 sm:p-6 md:p-8 mb-8">
+              <SectionHeader icon={IconClipboard} title="Details" accent="var(--blue)" />
 
-              <h1 className="pixel text-base sm:text-lg md:text-xl mb-3 leading-snug" style={{ color: "var(--ink)" }}>
+              <h1 className="text-lg sm:text-xl font-semibold mb-3 leading-snug" style={{ color: "var(--ink)" }}>
                 {map.title}
               </h1>
 
@@ -135,13 +136,13 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
 
               <div className="flex flex-wrap items-center gap-2 mb-4">
                 {map.region && (
-                  <span className="pixel-tag text-[10px]" style={{ fontSize: "9px" }}>{map.region}</span>
+                  <span className="tag tag-subtle text-xs">{map.region}</span>
                 )}
                 {map.era && (
-                  <span className="pixel-tag text-[10px]" style={{ background: "var(--ice)", fontSize: "9px" }}>{map.era}</span>
+                  <span className="tag tag-subtle text-xs">{map.era}</span>
                 )}
                 {map.threedScene && (
-                  <span className="pixel-tag text-[10px]" style={{ background: "var(--gold)", color: "white", fontSize: "9px" }}>
+                  <span className="tag tag-subtle text-xs" style={{ background: "var(--gold)", color: "white" }}>
                     3D
                   </span>
                 )}
@@ -153,8 +154,8 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
 
             {/* Description */}
             {map.content && (
-              <div className="pixel-card p-4 sm:p-6 md:p-8 mb-8" style={{ background: "white" }}>
-                <SectionHeader emoji="📜" title="DESCRIPTION" accent="var(--gold)" />
+              <div className="glass-card-static p-4 sm:p-6 md:p-8 mb-8">
+                <SectionHeader icon={IconFileText} title="Description" accent="var(--gold)" />
                 <div
                   className="leading-relaxed overflow-x-auto break-words"
                   style={{ fontSize: "1.05rem", color: "#222", lineHeight: "1.8" }}
@@ -170,15 +171,15 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
             )}
 
             {/* Related Article CTA */}
-            <div className="pixel-card p-4 sm:p-6 md:p-8 mb-8" style={{ background: "#fae8ff" }}>
-              <SectionHeader emoji="🔍" title="RELATED ARTICLES" accent="var(--purple)" />
+            <div className="glass-card-static p-4 sm:p-6 md:p-8 mb-8" style={{ background: "var(--accent-bg)" }}>
+              <SectionHeader icon={IconSearch} title="Related Articles" accent="var(--accent)" />
               <p className="text-sm mb-2" style={{ color: "#1a1a1a" }}>Explore related articles</p>
               <p className="text-xs mb-4" style={{ color: "#5f6368" }}>
                 Search for articles related to this map&rsquo;s topic and time period.
               </p>
               <Link
                 href={`/?q=${encodeURIComponent(map.title.split(",")[0]?.replace(/^Map of (the )?/i, "") || map.region || "")}`}
-                className="btn-primary"
+                className="btn btn-primary"
               >
                 Search Articles →
               </Link>
@@ -187,10 +188,10 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
         ) : (
           /* Not found */
           <div className="text-center py-16">
-            <div className="text-4xl mb-3">🗺</div>
-            <h2 className="pixel text-sm mb-2" style={{ color: "var(--ink)" }}>MAP NOT FOUND</h2>
-            <p className="text-sm mb-4" style={{ color: "#5f6368" }}>The map &ldquo;{slug}&rdquo; doesn&rsquo;t exist.</p>
-            <Link href="/maps" className="btn-secondary">
+            <div className="mb-3"><IconMap size={36} /></div>
+            <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--ink)" }}>Map not found</h2>
+            <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>The map &ldquo;{slug}&rdquo; doesn&rsquo;t exist.</p>
+            <Link href="/maps" className="btn btn-secondary">
               Browse all maps
             </Link>
           </div>

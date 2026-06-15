@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { IconClock } from "./Icons";
 
 interface TimelineEvent {
   id?: string;
@@ -49,9 +50,9 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
 
   if (sorted.length === 0) {
     return (
-      <div className="pixel-card-sm p-6 my-4 text-center bg-white">
+      <div className="glass-card-static p-6 my-4 text-center">
         <div className="text-3xl mb-2">📅</div>
-        <p className="pixel text-[9px]" style={{ color: "var(--subtle)" }}>No timeline data available</p>
+        <p className="text-xs font-medium" style={{ color: "var(--subtle)" }}>No timeline data available</p>
       </div>
     );
   }
@@ -146,9 +147,9 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
     <>
       {/* Header */}
       <div className="flex items-center gap-3 mb-3 flex-wrap">
-        <span className="text-3xl">⏳</span>
+        <IconClock size={32} />
         <div>
-          <h3 className="pixel text-sm" style={{ color: "var(--ink)" }}>TIMELINE</h3>
+          <h3 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>TIMELINE</h3>
           <div className="h-1 w-12 mt-1" style={{ background: "var(--blue)" }} />
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -202,12 +203,12 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
           <svg className="absolute inset-0 w-full h-full pointer-events-none z-20">
             {causeEdges.map((edge, i) => (
               <line key={i} x1={`${edge.from}%`} y1="50%" x2={`${edge.to}%`} y2="50%"
-                stroke="var(--orange)" strokeWidth="2" strokeDasharray="4 2"
+                stroke="var(--accent)" strokeWidth="2" strokeDasharray="4 2"
                 markerEnd={`url(#arrow-${uid})`} />
             ))}
             <defs>
               <marker id={`arrow-${uid}`} markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
-                <polygon points="0 0, 6 2, 0 4" fill="var(--orange)" />
+                <polygon points="0 0, 6 2, 0 4" fill="var(--accent)" />
               </marker>
             </defs>
           </svg>
@@ -266,7 +267,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
             const hidden = overlaps && activeIdx !== i;
             return (
               <div key={i}
-                className="absolute pixel text-xs sm:text-[8px] transition-all duration-150"
+                className="absolute text-xs font-semibold sm:text-[8px] transition-all duration-150"
                 style={{
                   left: `${x}%`, transform: "translateX(-50%)",
                   top: hidden ? "8px" : (i % 2 === 0 ? "0px" : "16px"),
@@ -294,7 +295,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
               isActive ? "bg-white shadow-[3px_3px_0_#1c1917]" : "bg-white/70 hover:bg-white hover:shadow-[2px_2px_0_#1c1917]"
             }`}
             style={{ borderLeftColor: catColor(ev.category), borderLeftWidth: 4 }}>
-            <span className="pixel text-xs font-bold shrink-0 mt-0.5 whitespace-nowrap" style={{ color: catColor(ev.category) }}>
+            <span className="text-xs font-semibold font-bold shrink-0 mt-0.5 whitespace-nowrap" style={{ color: catColor(ev.category) }}>
               {ev.year}
             </span>
             <div className="min-w-0 flex-1">
@@ -322,7 +323,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
   if (fullscreen) {
     return (
       <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-2 md:p-6">
-        <div className="pixel-card p-5 md:p-6 w-full max-w-4xl max-h-[95vh] flex flex-col bg-white overflow-hidden">
+        <div className="glass-card-static p-5 md:p-6 w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden">
           <div className="shrink-0">
             {trackTop}
           </div>
@@ -336,7 +337,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
   }
 
   return (
-    <div className="pixel-card p-3 sm:p-6 my-4" style={{ background: "var(--ice)" }}>
+    <div className="glass-card-static p-3 sm:p-6 my-4" style={{ background: "var(--border-light)" }}>
       {trackTop}
       <div className="max-h-64 sm:max-h-48 overflow-y-auto" style={{ scrollBehavior: "smooth" }}>
         {trackList}

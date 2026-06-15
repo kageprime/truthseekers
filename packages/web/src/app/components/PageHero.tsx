@@ -9,7 +9,7 @@ export default function PageHero({
   title,
   subtitle,
   gradient = "blue",
-  waveColor = "var(--warm)",
+  waveColor = "var(--surface)",
   children,
 }: {
   title: string;

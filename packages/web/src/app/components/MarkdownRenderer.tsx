@@ -125,7 +125,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: "var(--orange)", textDecoration: "underline", textUnderlineOffset: "2px" }}
+              style={{ color: "var(--accent)", textDecoration: "underline", textUnderlineOffset: "2px" }}
             >
               {children}
             </a>

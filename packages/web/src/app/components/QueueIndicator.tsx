@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { BASE } from "@/lib/api";
+import { IconClock, IconLightning, IconPencil, IconSearch, IconPalette, IconDatabase } from "./Icons";
 
 interface QueueJob {
   slug: string;
@@ -79,10 +80,11 @@ export default function QueueIndicator() {
         onClick={() => setOpen(!open)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="pixel text-[9px] px-3 py-3 sm:py-2 min-h-[44px] border-2 border-black shadow-[2px_2px_0_#1c1917] relative"
-        style={{ background: total > 0 ? "var(--orange)" : "white", color: total > 0 ? "white" : "var(--ink)" }}
+        className="btn-icon btn-ghost text-xs font-medium relative"
+        aria-label={`Queue: ${total} jobs`}
       >
-        {total > 0 ? `⚡ ${total}` : "JOBS"}
+        <IconClock size={16} />
+        {total > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center" style={{ background: "var(--accent)", color: "white" }}>{total}</span>}
       </button>
 
       {open && (
@@ -90,9 +92,9 @@ export default function QueueIndicator() {
           className="absolute right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 top-full mt-2 w-[calc(100vw-32px)] sm:w-72 z-50"
           style={{ filter: "drop-shadow(4px 4px 0 rgba(28,25,23,0.15))" }}
         >
-          <div className="pixel-card p-3 bg-white max-h-80 overflow-y-auto">
+          <div className="glass-card-static p-3 max-h-80 overflow-y-auto">
             <div className="flex items-center justify-between mb-2">
-              <span className="pixel text-xs sm:text-[9px]" style={{ color: "var(--ink)" }}>
+              <span className="text-xs font-semibold sm:text-[9px]" style={{ color: "var(--ink)" }}>
                 GENERATION QUEUE
               </span>
               <span className="text-xs sm:text-[10px] text-[#888]">
@@ -112,10 +114,10 @@ export default function QueueIndicator() {
                     style={{ textDecoration: "none", color: "inherit" }}
                   >
                     <span className="text-xs">
-                      {job.status === "queued" ? "⏳" : job.status === "researching" ? "🔬" : job.status === "writing" ? "✍️" : job.status === "verifying" ? "🔍" : job.status === "media" ? "🎨" : job.status === "storing" ? "💾" : "⚡"}
+                      {job.status === "queued" ? <IconClock size={12} /> : job.status === "writing" ? <IconPencil size={12} /> : job.status === "verifying" ? <IconSearch size={12} /> : job.status === "media" ? <IconPalette size={12} /> : job.status === "storing" ? <IconDatabase size={12} /> : <IconLightning size={12} />}
                     </span>
                     <span className="text-xs font-medium truncate flex-1">{job.title || job.slug}</span>
-                    <span className="pixel text-[9px] sm:text-[7px] text-[#888] uppercase">{job.status}</span>
+                    <span className="text-xs font-medium sm:text-[7px] text-[#888] uppercase">{job.status}</span>
                   </Link>
                 ))}
               </div>

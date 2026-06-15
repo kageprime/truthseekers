@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { fetchArticles, searchArticles, fetchArticleStatus, generateArticle, fetchArticle, progressUrl } from "@/lib/api";
 import PageLayout from "../components/PageLayout";
 import SectionHeader from "../components/SectionHeader";
+import PageHero from "../components/PageHero";
 import GenerationBar from "../components/GenerationBar";
 import ArticleCard from "../components/ArticleCard";
 import { CardSkeleton, CardGridSkeleton } from "../components/CardSkeleton";
 import type { AgentEvent } from "../components/ProcessViewer";
+import { IconLightning, IconSearch, IconBook } from "../components/Icons";
 
 interface ArticleSummary {
   slug: string;
@@ -281,47 +283,38 @@ export default function ArticlesPage() {
   };
 
   return (
-    <PageLayout>
-      {/* Search + Generate bar */}
-      <div className="max-w-6xl mx-auto w-full px-6 py-4">
-        <form onSubmit={handleSearch} className="max-w-2xl">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="flex-1 relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                style={{ color: "var(--subtle)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text" value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Search articles..."
-                className="w-full pixel-input"
-                style={{ paddingLeft: "2.5rem" }}
-              />
-            </div>
-            <div className="flex gap-2">
-              <button type="submit" disabled={searching} className="btn-primary flex-1 sm:flex-none">
-                {searching ? "..." : "Search"}
-              </button>
-              {query && (
-                <button type="button" onClick={handleGenerate} className="btn-primary flex-1 sm:flex-none">
-                  ⚡ Generate
-                </button>
-              )}
-              {query && (
-                <button type="button" onClick={handleClear} className="btn-secondary flex-1 sm:flex-none">
-                  Clear
-                </button>
-              )}
-            </div>
-          </div>
-        </form>
-      </div>
+    <PageLayout
+      headerSearch={{
+        value: query,
+        onChange: setQuery,
+        onSubmit: handleSearch,
+        onClear: handleClear,
+        placeholder: "Search articles...",
+      }}
+    >
+
+      <PageHero
+        title="Articles"
+        subtitle="Browse and search the encyclopedia"
+        gradient="blue"
+      />
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto pb-16">
         <div className="max-w-6xl mx-auto w-full px-4">
+          {/* Generate action bar */}
+          {query && (
+            <div className="py-4 flex items-center gap-3">
+              <button
+                onClick={handleGenerate}
+                onKeyDown={handleKeyDown}
+                className="btn btn-primary"
+              >
+                <IconLightning size={16} /> Generate &ldquo;{query}&rdquo;
+              </button>
+              <span className="text-xs" style={{ color: "var(--subtle)" }}>Press Shift+Enter to generate</span>
+            </div>
+          )}
           {/* Generation bars */}
           {generating.size > 0 && (
             <div className="mb-6 space-y-2">
@@ -359,14 +352,14 @@ export default function ArticlesPage() {
             <CardGridSkeleton />
           ) : showResults && articles.length === 0 && generating.size === 0 ? (
             <div className="max-w-lg mx-auto text-center py-8">
-              <div className="pixel-card-sm p-8 bg-white">
-                <div className="text-5xl mb-4">🔍</div>
-                <h2 className="pixel text-sm mb-3" style={{ color: "var(--ink)" }}>No results found</h2>
+              <div className="glass-card-static p-8">
+                <div className="mb-4"><IconSearch size={48} /></div>
+                <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>No results found</h2>
                 <p className="text-sm mb-6 leading-relaxed" style={{ color: "var(--muted)" }}>
                   No articles found for &ldquo;{query}&rdquo;. Would you like to generate one?
                 </p>
-                <button onClick={handleGenerate} className="btn-primary btn-lg">
-                  ⚡ Generate this article
+                <button onClick={handleGenerate} className="btn btn-primary btn-lg">
+                  <IconLightning size={18} /> Generate this article
                 </button>
               </div>
             </div>
@@ -392,17 +385,17 @@ export default function ArticlesPage() {
               {/* Empty database - no search, no articles */}
               {!showResults && articles.length === 0 && !loading && (
                 <div className="max-w-lg mx-auto text-center py-16">
-                  <div className="pixel-card p-10 bg-white">
-                    <div className="text-6xl mb-4">📖</div>
-                    <h2 className="pixel text-sm mb-3" style={{ color: "var(--ink)" }}>No articles yet</h2>
+                  <div className="glass-card-static p-10">
+                    <div className="mb-4"><IconBook size={56} /></div>
+                    <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>No articles yet</h2>
                     <p className="text-sm mb-6 leading-relaxed" style={{ color: "var(--muted)" }}>
                       Your encyclopedia is empty. Search a topic or generate your first article to get started.
                     </p>
                     <div className="flex items-center justify-center gap-3">
-                      <span className="pixel text-[9px]" style={{ color: "var(--subtle)" }}>Try:</span>
-                      <button onClick={() => { setQuery("Roman Empire"); setShowResults(true); setLoading(true); setDebouncedQuery("Roman Empire"); }} className="btn-secondary btn-sm">Roman Empire</button>
-                      <button onClick={() => { setQuery("Black Holes"); setShowResults(true); setLoading(true); setDebouncedQuery("Black Holes"); }} className="btn-secondary btn-sm">Black Holes</button>
-                      <button onClick={() => { setQuery("Silk Road"); setShowResults(true); setLoading(true); setDebouncedQuery("Silk Road"); }} className="btn-secondary btn-sm">Silk Road</button>
+                      <span className="text-xs font-medium" style={{ color: "var(--subtle)" }}>Try:</span>
+                      <button onClick={() => { setQuery("Roman Empire"); setShowResults(true); setLoading(true); setDebouncedQuery("Roman Empire"); }} className="btn btn-secondary btn-sm">Roman Empire</button>
+                      <button onClick={() => { setQuery("Black Holes"); setShowResults(true); setLoading(true); setDebouncedQuery("Black Holes"); }} className="btn btn-secondary btn-sm">Black Holes</button>
+                      <button onClick={() => { setQuery("Silk Road"); setShowResults(true); setLoading(true); setDebouncedQuery("Silk Road"); }} className="btn btn-secondary btn-sm">Silk Road</button>
                     </div>
                   </div>
                 </div>
@@ -412,7 +405,7 @@ export default function ArticlesPage() {
               {!showResults && articles.length > 0 && (
                 <section>
                   <div className="flex items-center gap-4 mb-6">
-                    <SectionHeader emoji="📚" title="ARTICLES" accent="var(--orange)" />
+                    <SectionHeader icon={IconBook} title="ARTICLES" accent="var(--accent)" />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {articles.slice(0, visibleCount).map((article) => (
@@ -431,7 +424,7 @@ export default function ArticlesPage() {
                             loadArticles(nextPage, false);
                           }
                         }}
-                        className="btn-primary"
+                        className="btn btn-primary"
                       >
                         Load More
                       </button>

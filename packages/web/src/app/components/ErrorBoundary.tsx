@@ -2,6 +2,7 @@
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import Link from "next/link";
+import { IconAlert } from "./Icons";
 
 interface Props {
   children: ReactNode;
@@ -39,9 +40,9 @@ export default class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#fffaf0] px-6">
-          <div className="pixel-card p-8 max-w-md text-center bg-white">
-            <div className="text-4xl mb-4">⚠️</div>
-            <h1 className="pixel text-sm mb-3" style={{ color: "var(--ink)" }}>
+          <div className="glass-card-static p-8 max-w-md text-center">
+            <div className="mb-4"><IconAlert size={36} /></div>
+            <h1 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>
               Something went wrong
             </h1>
             <p className="text-sm text-[var(--muted)] mb-4">
@@ -57,7 +58,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             )}
             <button
               onClick={this.handleReset}
-              className="btn-primary"
+              className="btn btn-primary"
             >
               Try Again
             </button>

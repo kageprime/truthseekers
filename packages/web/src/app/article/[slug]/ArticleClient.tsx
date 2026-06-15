@@ -8,6 +8,7 @@ import GenerationBar from "../../components/GenerationBar";
 import BlockRenderer, { articleToBlocks } from "../../components/BlockRenderer";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import type { Article } from "@encarta/core";
+import { IconXCircle, IconBook, IconLightning, IconFile, IconFileText, IconUser, IconRefresh } from "../../components/Icons";
 
 interface ArticleClientProps {
   slug: string;
@@ -139,13 +140,13 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     return (
       <PageLayout>
         <main className="flex-1 flex items-center justify-center px-6 py-16">
-          <div className="max-w-lg mx-auto text-center pixel-card p-6 sm:p-10" style={{ background: "var(--cream)" }}>
-            <div className="text-5xl mb-5">❌</div>
-            <h1 className="pixel text-xs mb-2" style={{ color: "var(--red)" }}>Error Loading Article</h1>
+          <div className="max-w-lg mx-auto text-center glass-card-static p-6 sm:p-10" style={{ background: "var(--cream)" }}>
+            <div className="mb-5"><IconXCircle size={44} /></div>
+            <h1 className="text-xs font-semibold mb-2" style={{ color: "var(--red)" }}>Error Loading Article</h1>
             <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>{error}</p>
             <button
               onClick={() => { setError(null); setLoading(true); window.location.reload(); }}
-              className="btn-primary"
+              className="btn btn-primary"
             >
               Try Again
             </button>
@@ -167,7 +168,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           <div className="flex flex-col items-center gap-3">
             <div className="w-8 h-8 border-[3px] border-[var(--border)] border-t-[var(--ink)]"
               style={{ animation: "spin 0.8s linear infinite" }} />
-            <span className="pixel text-xs" style={{ color: "var(--subtle)" }}>Loading...</span>
+            <span className="text-xs font-semibold" style={{ color: "var(--subtle)" }}>Loading...</span>
           </div>
         </main>
       </PageLayout>
@@ -178,11 +179,11 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     return (
       <PageLayout>
         <main className="flex-1 px-6 py-12 sm:py-16">
-          <div className="max-w-lg mx-auto text-center pixel-card p-6 sm:p-10" style={{ background: "var(--cream)" }}>
-            <div className="w-16 h-16 mx-auto mb-5 flex items-center justify-center text-3xl pixel-card-sm" style={{ background: "white" }}>
-              📖
+          <div className="max-w-lg mx-auto text-center glass-card-static p-6 sm:p-10" style={{ background: "var(--cream)" }}>
+            <div className="w-16 h-16 mx-auto mb-5 flex items-center justify-center glass-card-static">
+              <IconBook size={28} />
             </div>
-            <h1 className="pixel text-sm mb-3" style={{ color: "var(--ink)" }}>
+            <h1 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>
               {slug.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
             </h1>
             <p className="text-sm mb-6" style={{ color: "var(--subtle)" }}>Topic not yet generated</p>
@@ -191,9 +192,9 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             </p>
             <button
               onClick={handleGenerate}
-              className="btn-primary btn-lg"
+              className="btn btn-primary btn-lg"
             >
-              ⚡ Generate Encyclopedia Article
+              <IconLightning size={18} /> Generate Encyclopedia Article
             </button>
           </div>
         </main>
@@ -215,7 +216,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
       <PageLayout>
         <main className="flex-1 px-6 py-12 sm:py-16">
           <div className="max-w-lg mx-auto">
-            <h1 className="pixel text-xs text-center mb-8 capitalize" style={{ color: "var(--ink)" }}>
+            <h1 className="text-xs font-semibold text-center mb-8 capitalize" style={{ color: "var(--ink)" }}>
               {slug.replace(/-/g, " ")}
             </h1>
             <GenerationBar
@@ -234,9 +235,17 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
   return (
     <PageLayout>
-      <div className="flex-1 overflow-y-auto" style={{ background: "var(--warm)" }}>
+      <div className="flex-1 overflow-y-auto">
 
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+          {/* Back to articles */}
+          <Link href="/articles" className="inline-flex items-center gap-1 text-sm mb-4 transition-colors hover:underline" style={{ color: "var(--accent)" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Back to Articles
+          </Link>
+
           {/* Meta bar */}
           <div className="flex items-center gap-2 text-xs mb-4" style={{ color: "var(--subtle)", fontFamily: "var(--font-mono)" }}>
             <span>v{article.metadata.version}</span>
@@ -247,13 +256,13 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             {article.metadata.generatedBy && (
               <>
                 <span>·</span>
-                <span>🧑‍💻 {article.metadata.generatedBy.slice(0, 12)}...</span>
+                <span><IconUser size={12} /> {article.metadata.generatedBy.slice(0, 12)}...</span>
               </>
             )}
           </div>
 
           {/* Title */}
-          <h1 className="pixel text-lg sm:text-xl mb-6 leading-tight" style={{ color: "var(--ink)" }}>
+          <h1 className="text-lg sm:text-xl font-semibold mb-6 leading-tight" style={{ color: "var(--ink)" }}>
             {article.title || slug.replace(/-/g, " ")}
           </h1>
 
@@ -262,26 +271,26 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             <button
               onClick={handleRefresh}
               disabled={generating}
-              className="btn-primary btn-sm"
+              className="btn btn-primary btn-sm"
             >
-              {generating ? "⟳ Refreshing..." : "⟳ Refresh"}
+              {generating ? <><IconRefresh size={14} /> Refreshing...</> : <><IconRefresh size={14} /> Refresh</>}
             </button>
             <button
               onClick={() => handleExport("json")}
-              className="btn-secondary btn-sm"
+              className="btn btn-secondary btn-sm"
             >
-              📄 JSON
+              <IconFile size={14} /> JSON
             </button>
             <button
               onClick={() => handleExport("markdown")}
-              className="btn-secondary btn-sm"
+              className="btn btn-secondary btn-sm"
             >
-              📝 MD
+              <IconFileText size={14} /> MD
             </button>
           </div>
 
           {/* Article content */}
-          <div className="pixel-card p-4 sm:p-8" style={{ background: "white" }}>
+          <div className="glass-card-static p-4 sm:p-8">
             {article.blocks && article.blocks.length > 0 ? (
               <BlockRenderer blocks={article.blocks} />
             ) : (
