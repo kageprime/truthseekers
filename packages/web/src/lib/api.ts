@@ -77,17 +77,37 @@ export async function fetchArticleStatus(slug: string): Promise<JobInfoType | { 
   return res.json();
 }
 
-export async function generateArticle(slug: string, persona?: string): Promise<{ status: string; persona?: string }> {
+export interface QuotaInfo {
+  allowed: boolean;
+  used: number;
+  limit: number;
+  remaining: number;
+  tier: string;
+}
+
+export async function fetchQuota(): Promise<QuotaInfo | null> {
+  const res = await fetch(`${BASE}/quota`, {
+    cache: "no-store",
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function generateArticle(slug: string, persona?: string): Promise<{ status: string; persona?: string; quota?: QuotaInfo }> {
   const res = await fetch(`${BASE}/articles/${slug}/generate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ persona: persona || "veritas" }),
   });
   return res.json();
 }
 
-export async function refreshArticle(slug: string): Promise<{ status: string }> {
-  const res = await fetch(`${BASE}/articles/${slug}/refresh`, { method: "POST" });
+export async function refreshArticle(slug: string): Promise<{ status: string; quota?: QuotaInfo }> {
+  const res = await fetch(`${BASE}/articles/${slug}/refresh`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+  });
   return res.json();
 }
 

@@ -59,6 +59,7 @@ import {
 } from "./validation.js";
 import authRoutes from "./auth-routes.js";
 import stripeRoutes from "./stripe.js";
+import { getQuota, incrementQuota } from "./quota.js";
 
 const app = new Hono();
 
@@ -230,6 +231,15 @@ app.post("/articles/:slug/generate", async (c) => {
 
     const slug = parsed.data.slug;
 
+    // Check generation quota
+    const quota = await getQuota(c);
+    if (!quota.allowed) {
+      return c.json({
+        error: `Generation limit reached (${quota.tier}: ${quota.limit} articles). Upgrade your plan to generate more.`,
+        quota,
+      }, 403);
+    }
+
     // Per-slug generation rate limit (1 per 60s)
     const genKey = `gen:${slug}`;
     const genEntry = generationCooldowns.get(genKey);
@@ -254,7 +264,8 @@ app.post("/articles/:slug/generate", async (c) => {
     const userId = getUserId(c);
     const meta: Record<string, string> = { persona, ...(userId ? { generatedBy: userId } : {}) };
     queue.enqueue(slug, meta);
-    return c.json({ status: "queued", slug, persona }, 202);
+    incrementQuota(c).catch(() => {});
+    return c.json({ status: "queued", slug, persona, quota: await getQuota(c) }, 202);
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : "Internal server error" }, 500);
   }
@@ -270,8 +281,18 @@ app.post("/articles/:slug/refresh", async (c) => {
     const existing = await getArticle(slug);
     if (!existing) return c.json({ error: "Article not found" }, 404);
 
+    // Check generation quota
+    const quota = await getQuota(c);
+    if (!quota.allowed) {
+      return c.json({
+        error: `Generation limit reached (${quota.tier}: ${quota.limit} articles). Upgrade your plan to generate more.`,
+        quota,
+      }, 403);
+    }
+
     queue.enqueue(slug);
-    return c.json({ status: "queued", slug }, 202);
+    incrementQuota(c).catch(() => {});
+    return c.json({ status: "queued", slug, quota: await getQuota(c) }, 202);
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : "Internal server error" }, 500);
   }
@@ -452,6 +473,16 @@ app.get("/articles/:slug/graph", async (c) => {
   const edges = await getGraphEdges(slug);
   const backlinks = await getBacklinks(slug);
   return c.json({ edges, backlinks });
+});
+
+// Generation quota
+app.get("/quota", async (c) => {
+  try {
+    const quota = await getQuota(c);
+    return c.json(quota);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : "Internal server error" }, 500);
+  }
 });
 
 // Queue status
@@ -741,7 +772,7 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
 ### get_article — look up an existing article by slug
 ### get_map — look up an existing map by slug
 ### generate_image — create a custom AI illustration
-### generate_video — generate a short AI video clip from a text description
+### generate_video — generate a short AI video clip from a text description via DigitalOcean
 ### verify_citation — check if a source supports a claim
 ### suggest_related — find related articles and cross-references
 ### task — delegate parallel research to a sub-agent

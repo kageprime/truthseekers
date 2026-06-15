@@ -27,7 +27,7 @@ export function useChatStream() {
     abortRef.current?.abort();
   }, []);
 
-  const send = useCallback(async (id: string, msg: string, callbacks: StreamCallbacks) => {
+  const send = useCallback(async (id: string, msg: string, callbacks: StreamCallbacks, model?: string) => {
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -36,7 +36,7 @@ export function useChatStream() {
       const res = await fetch(chatProgressUrl(id), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ content: msg }),
+        body: JSON.stringify({ content: msg, ...(model ? { model } : {}) }),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error("Failed to send");

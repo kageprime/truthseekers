@@ -211,7 +211,7 @@ export const CHAT_TOOL_DEFINITIONS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "generate_video",
-      description: "Generate a short video clip (5s) from a text description using AI video generation.",
+      description: "Generate a short video clip from a text description using AI video generation via DigitalOcean Serverless Inference.",
       parameters: {
         type: "object",
         properties: {

@@ -1,12 +1,22 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createChat } from "@/lib/api";
+import { useAuth } from "../hooks/useAuth";
 import PageLayout from "../components/PageLayout";
 import { IconChat } from "../components/Icons";
 
 export default function ChatListPage() {
   const router = useRouter();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [user, loading, router]);
+
   async function handleNew() {
     try {
       const conv = await createChat();
@@ -15,6 +25,8 @@ export default function ChatListPage() {
       // API unreachable — silently fail
     }
   }
+
+  if (loading) return null;
 
   return (
     <PageLayout sidebar noFooter noHeader>

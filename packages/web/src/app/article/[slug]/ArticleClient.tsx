@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { fetchArticle, generateArticle, refreshArticle, progressUrl, BASE } from "@/lib/api";
+import { fetchArticle, generateArticle, refreshArticle, fetchQuota, progressUrl, BASE } from "@/lib/api";
+import type { QuotaInfo } from "@/lib/api";
 import PageLayout from "../../components/PageLayout";
 import GenerationBar from "../../components/GenerationBar";
 import BlockRenderer, { articleToBlocks } from "../../components/BlockRenderer";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import type { Article } from "@encarta/core";
-import { IconXCircle, IconBook, IconLightning, IconFile, IconFileText, IconUser, IconRefresh } from "../../components/Icons";
+import { IconXCircle, IconBook, IconLightning, IconFile, IconFileText, IconUser, IconRefresh, IconAlert } from "../../components/Icons";
 
 interface ArticleClientProps {
   slug: string;
@@ -24,8 +25,17 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   const [generating, setGenerating] = useState(isGenerating);
   const [progress, setProgress] = useState(initialPhase);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
+  const [quota, setQuota] = useState<QuotaInfo | null>(null);
+  const [quotaBlocked, setQuotaBlocked] = useState(false);
   const sseRef = useRef<EventSource | null>(null);
   const trackedRef = useRef(false);
+  const quotaFetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (quotaFetchedRef.current) return;
+    quotaFetchedRef.current = true;
+    fetchQuota().then(setQuota).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (slug && !trackedRef.current) {
@@ -104,8 +114,10 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
     setProgress("queued");
+    setQuotaBlocked(false);
     try {
       const result = await generateArticle(slug);
+      if ((result as any).quota) setQuota((result as any).quota);
       if (result.status === "already_exists") {
         try {
           const a = await fetchArticle(slug);
@@ -122,8 +134,10 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   const handleRefresh = useCallback(async () => {
     setGenerating(true);
     setProgress("queued");
+    setQuotaBlocked(false);
     try {
-      await refreshArticle(slug);
+      const result = await refreshArticle(slug);
+      if ((result as any).quota) setQuota((result as any).quota);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to refresh article");
       setGenerating(false);
@@ -176,26 +190,46 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   }
 
   if (!article && !generating) {
+    const atLimit = quota && quota.remaining <= 0;
     return (
       <PageLayout>
         <main className="flex-1 px-6 py-12 sm:py-16">
           <div className="max-w-lg mx-auto text-center glass-card-static p-6 sm:p-10" style={{ background: "var(--cream)" }}>
             <div className="w-16 h-16 mx-auto mb-5 flex items-center justify-center glass-card-static">
-              <IconBook size={28} />
+              {atLimit ? <IconAlert size={28} /> : <IconBook size={28} />}
             </div>
             <h1 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>
               {slug.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
             </h1>
-            <p className="text-sm mb-6" style={{ color: "var(--subtle)" }}>Topic not yet generated</p>
-            <p className="text-sm leading-relaxed mb-8" style={{ color: "var(--muted)" }}>
-              The AI agent will research the web, outline the content, write a full article, and verify all citations.
-            </p>
-            <button
-              onClick={handleGenerate}
-              className="btn btn-primary btn-lg"
-            >
-              <IconLightning size={18} /> Generate Encyclopedia Article
-            </button>
+            {atLimit ? (
+              <>
+                <p className="text-sm mb-3" style={{ color: "var(--red)" }}>Generation limit reached</p>
+                <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--muted)" }}>
+                  Your {quota.tier} plan allows {quota.limit} article generations. Upgrade to create more articles.
+                </p>
+                <Link href="/login" className="btn btn-primary btn-lg">
+                  Upgrade Plan
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className="text-sm mb-6" style={{ color: "var(--subtle)" }}>Topic not yet generated</p>
+                <p className="text-sm leading-relaxed mb-8" style={{ color: "var(--muted)" }}>
+                  The AI agent will research the web, outline the content, write a full article, and verify all citations.
+                </p>
+                <button
+                  onClick={handleGenerate}
+                  className="btn btn-primary btn-lg"
+                >
+                  <IconLightning size={18} /> Generate Encyclopedia Article
+                </button>
+                {quota && (
+                  <p className="text-xs mt-4" style={{ color: "var(--subtle)" }}>
+                    {quota.remaining} of {quota.limit} generations remaining ({quota.tier})
+                  </p>
+                )}
+              </>
+            )}
           </div>
         </main>
       </PageLayout>
@@ -270,7 +304,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           <div className="flex items-center gap-2 mb-8">
             <button
               onClick={handleRefresh}
-              disabled={generating}
+              disabled={generating || (quota !== null && quota.remaining <= 0)}
               className="btn btn-primary btn-sm"
             >
               {generating ? <><IconRefresh size={14} /> Refreshing...</> : <><IconRefresh size={14} /> Refresh</>}
@@ -287,6 +321,11 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             >
               <IconFileText size={14} /> MD
             </button>
+            {quota !== null && quota.remaining <= 3 && (
+              <span className="text-xs ml-auto" style={{ color: quota.remaining === 0 ? "var(--red)" : "var(--accent)" }}>
+                {quota.remaining} / {quota.limit}
+              </span>
+            )}
           </div>
 
           {/* Article content */}

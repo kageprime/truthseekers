@@ -495,6 +495,7 @@ const apiKeySchema = new Schema({
   name: { type: String, required: true },
   tier: { type: String, enum: ["free", "pro", "enterprise"], default: "free" },
   active: { type: Boolean, default: true },
+  generationCount: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
   lastUsedAt: { type: Date },
 });
@@ -528,6 +529,21 @@ export async function touchApiKey(key: string): Promise<void> {
   await ApiKeyModel.updateOne({ key }, { lastUsedAt: new Date() });
 }
 
+export async function getApiKeyGenerationCount(key: string): Promise<number> {
+  const doc = await ApiKeyModel.findOne({ key }).lean();
+  if (!doc) return 0;
+  return (doc as any).generationCount || 0;
+}
+
+export async function incrementApiKeyGenerationCount(key: string): Promise<number> {
+  const doc = await ApiKeyModel.findOneAndUpdate(
+    { key },
+    { $inc: { generationCount: 1 } },
+    { new: true }
+  );
+  return doc ? (doc as any).generationCount || 0 : 0;
+}
+
 // ── Users ─────────────────────────────────────────────────────────────────
 
 const userSchema = new Schema({
@@ -538,6 +554,7 @@ const userSchema = new Schema({
   stripeCustomerId: { type: String },
   subscriptionTier: { type: String, enum: ["free", "pro", "enterprise"], default: "free" },
   onboarded: { type: Boolean, default: false },
+  generationCount: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -568,6 +585,21 @@ export async function updateUser(id: string, updates: { name?: string; avatar?: 
 
 export async function setUserOnboarded(id: string): Promise<void> {
   await UserModel.updateOne({ id }, { $set: { onboarded: true } });
+}
+
+export async function getUserGenerationCount(id: string): Promise<number> {
+  const user = await UserModel.findOne({ id }).lean();
+  if (!user) return 0;
+  return (user as any).generationCount || 0;
+}
+
+export async function incrementUserGenerationCount(id: string): Promise<number> {
+  const doc = await UserModel.findOneAndUpdate(
+    { id },
+    { $inc: { generationCount: 1 } },
+    { new: true }
+  );
+  return doc ? (doc as any).generationCount || 0 : 0;
 }
 
 // ── Graph Edges ──────────────────────────────────────────────────────────

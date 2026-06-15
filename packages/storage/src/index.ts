@@ -35,6 +35,10 @@ export {
   getUserById,
   updateUser,
   setUserOnboarded,
+  getUserGenerationCount,
+  incrementUserGenerationCount,
+  getApiKeyGenerationCount,
+  incrementApiKeyGenerationCount,
 } from "./db.js";
 
 export { commitArticle, getArticleHistory, getArticleAtVersion, getRepoStatus } from "./git.js";

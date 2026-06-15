@@ -74,7 +74,7 @@ export interface ThreeDMapScene {
   annotations?: ThreeDAnnotation[];
 }
 
-export type ModelId = "gemma-4-31B-it" | "deepseek-v4-flash" | "deepseek-v4-pro";
+export type ModelId = "gemma-4-31B-it" | "deepseek-4-flash" | "deepseek-v4-pro";
 
 export interface MediaItem {
   type: "image" | "diagram" | "timeline" | "threed" | "video";

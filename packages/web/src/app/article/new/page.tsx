@@ -1,14 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { generateArticle } from "@/lib/api";
+import Link from "next/link";
+import { generateArticle, fetchQuota } from "@/lib/api";
+import type { QuotaInfo } from "@/lib/api";
 import PageLayout from "../../components/PageLayout";
+import { IconAlert, IconLightning } from "../../components/Icons";
 
 export default function NewArticlePage() {
   const router = useRouter();
   const [slug, setSlug] = useState("");
   const [status, setStatus] = useState("");
+  const [quota, setQuota] = useState<QuotaInfo | null>(null);
+  const [quotaLoaded, setQuotaLoaded] = useState(false);
+
+  useEffect(() => {
+    fetchQuota().then((q) => {
+      setQuota(q);
+      setQuotaLoaded(true);
+    }).catch(() => setQuotaLoaded(true));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -19,8 +31,32 @@ export default function NewArticlePage() {
 
     if (!clean) return;
     setStatus("queued");
-    await generateArticle(clean);
+    const result = await generateArticle(clean);
     router.push(`/article/${clean}`);
+  }
+
+  const atLimit = quotaLoaded && quota && quota.remaining <= 0;
+
+  if (atLimit) {
+    return (
+      <PageLayout>
+        <main className="flex-1 flex items-center justify-center px-6 py-12">
+          <div className="w-full max-w-md text-center glass-card-static p-8" style={{ background: "var(--cream)" }}>
+            <div className="mb-4 flex justify-center"><IconAlert size={32} /></div>
+            <h1 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>Generation Limit Reached</h1>
+            <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
+              Your {quota.tier} plan allows {quota.limit} article generations. Upgrade to create more.
+            </p>
+            <Link href="/login" className="btn btn-primary btn-lg">Upgrade Plan</Link>
+            <div className="mt-4">
+              <Link href="/articles" className="text-sm hover:underline" style={{ color: "var(--muted)" }}>
+                ← Browse Articles
+              </Link>
+            </div>
+          </div>
+        </main>
+      </PageLayout>
+    );
   }
 
   return (
@@ -30,6 +66,11 @@ export default function NewArticlePage() {
           <div className="text-center mb-10">
             <h1 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>Generate Article</h1>
             <p className="text-sm" style={{ color: "var(--muted)" }}>Enter a topic. The AI will research, outline, and write a full article.</p>
+            {quota && (
+              <p className="text-xs mt-2" style={{ color: "var(--subtle)" }}>
+                {quota.remaining} of {quota.limit} generations remaining ({quota.tier})
+              </p>
+            )}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -50,7 +91,7 @@ export default function NewArticlePage() {
               disabled={!slug.trim() || !!status}
               className="btn btn-primary btn-lg w-full"
             >
-              {status ? "Generating..." : "Generate Article"}
+              {status ? "Generating..." : <><IconLightning size={16} /> Generate Article</>}
             </button>
           </form>
 

@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useRef, use, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { fetchChat } from "@/lib/api";
 import type { ConversationDetail } from "@/lib/api";
+import { useAuth } from "../../hooks/useAuth";
 import PageLayout from "../../components/PageLayout";
 import MessageList from "../../components/MessageList";
 import ChatInput from "../../components/ChatInput";
@@ -61,6 +63,8 @@ const chatCache = new Map<string, ConversationDetail>();
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<ConversationDetail | null>(chatCache.get(id) ?? null);
   const [loading, setLoading] = useState(!chatCache.has(id));
   const [input, setInput] = useState("");
@@ -75,11 +79,18 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [phaseLabel, setPhaseLabel] = useState("Thinking...");
   const [followUps, setFollowUps] = useState<string[]>([]);
   const [showCommands, setShowCommands] = useState(false);
+  const [model, setModel] = useState("deepseek-4-flash");
   const lastMessageRef = useRef("");
   const autoSentRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { send: streamSend, stop: streamStop } = useChatStream();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     setLoading(true);
@@ -150,10 +161,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         });
       },
       onError: (errMsg) => setError(errMsg),
-    });
-
+    }, model);
+ 
     setSending(false);
-  }, [id, streamSend]);
+  }, [id, streamSend, model]);
 
   useEffect(() => {
     if (!loading && data && data.messages.length === 0 && !autoSentRef.current) {
@@ -327,6 +338,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           onCancelEdit={cancelEdit}
           onSlashCommand={handleSlashCommand}
           onKeyDown={handleKeyDown}
+          model={model}
+          onModelChange={setModel}
         />
       </div>
     </PageLayout>

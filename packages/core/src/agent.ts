@@ -12,14 +12,14 @@ const MODEL_ROUTES: Record<string, ModelRoute> = {
     apiKey: () => process.env.MODEL_ACCESS_KEY || "",
     modelName: "gemma-4-31B-it",
   },
-  "deepseek-v4-flash": {
-    baseUrl: "https://api.deepseek.com",
-    apiKey: () => process.env.DEEPSEEK_API_KEY || "",
-    modelName: "deepseek-v4-flash",
+  "deepseek-4-flash": {
+    baseUrl: "https://inference.do-ai.run",
+    apiKey: () => process.env.MODEL_ACCESS_KEY || "",
+    modelName: "deepseek-4-flash",
   },
   "deepseek-v4-pro": {
-    baseUrl: "https://api.deepseek.com",
-    apiKey: () => process.env.DEEPSEEK_API_KEY || "",
+    baseUrl: "https://inference.do-ai.run",
+    apiKey: () => process.env.MODEL_ACCESS_KEY || "",
     modelName: "deepseek-v4-pro",
   },
 };

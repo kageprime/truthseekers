@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { FC, SVGProps } from "react";
-import { IconPencil } from "./Icons";
+import { IconPencil, IconChevronRight } from "./Icons";
+
+const MODELS = [
+  { id: "gemma-4-31B-it", label: "Gemma 4 31B" },
+  { id: "deepseek-4-flash", label: "DeepSeek Flash" },
+  { id: "deepseek-v4-pro", label: "DeepSeek Pro" },
+];
 
 interface SlashCommand {
   id: string;
@@ -25,12 +31,17 @@ interface ChatInputProps {
   onKeyDown: (e: React.KeyboardEvent) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   suggestions?: string[];
+  model?: string;
+  onModelChange?: (model: string) => void;
 }
 
 export default function ChatInput({
   input, sending, editingIndex, showCommands, slashCommands,
   onChange, onSend, onStop, onCancelEdit, onSlashCommand, onKeyDown, textareaRef, suggestions = [],
+  model, onModelChange,
 }: ChatInputProps) {
+  const [modelOpen, setModelOpen] = useState(false);
+  const modelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -39,6 +50,16 @@ export default function ChatInput({
       el.style.height = Math.min(el.scrollHeight, 200) + "px";
     }
   }, [input, textareaRef]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (modelRef.current && !modelRef.current.contains(e.target as Node)) {
+        setModelOpen(false);
+      }
+    }
+    if (modelOpen) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [modelOpen]);
 
   const hasInput = input.trim().length > 0;
 
@@ -65,6 +86,41 @@ export default function ChatInput({
                 {s}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Model selector */}
+        {model && onModelChange && (
+          <div className="relative mb-2" ref={modelRef}>
+            <button
+              onClick={() => setModelOpen(!modelOpen)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors"
+              style={{ background: "var(--border-light)", color: "var(--muted)" }}
+            >
+              {MODELS.find((m) => m.id === model)?.label || model}
+              <IconChevronRight size={10} className={`transition-transform ${modelOpen ? "rotate-90" : ""}`} />
+            </button>
+            {modelOpen && (
+              <div
+                className="absolute bottom-full left-0 mb-1 rounded-xl p-1 shadow-lg glass-sm"
+                style={{ background: "var(--surface)", border: "1px solid var(--border-light)", zIndex: 60, minWidth: "150px" }}
+              >
+                {MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => { onModelChange(m.id); setModelOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-left transition-colors"
+                    style={{
+                      background: m.id === model ? "var(--accent-bg)" : "transparent",
+                      color: m.id === model ? "var(--accent)" : "var(--ink)",
+                    }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: m.id === model ? "var(--accent)" : "var(--border)" }} />
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

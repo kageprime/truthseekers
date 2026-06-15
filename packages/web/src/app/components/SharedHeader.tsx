@@ -5,6 +5,7 @@ import Link from "next/link";
 import QueueIndicator from "./QueueIndicator";
 import { useTheme } from "./ThemeProvider";
 import { IconSearch, IconX } from "./Icons";
+import { useAuth } from "../hooks/useAuth";
 
 interface HeaderSearch {
   value: string;
@@ -29,6 +30,7 @@ const NAV_LINKS = [
 
 export default function SharedHeader({ onToggleSidebar, sidebarOpen, search }: HeaderProps) {
   const { resolved, toggle } = useTheme();
+  const { user } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -131,6 +133,19 @@ export default function SharedHeader({ onToggleSidebar, sidebarOpen, search }: H
         )}
 
         <div className="flex items-center gap-2">
+          {/* Tier badge */}
+          {user && (
+            <span
+              className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full"
+              style={{
+                background: user.subscriptionTier === "pro" ? "var(--accent-bg)" : user.subscriptionTier === "enterprise" ? "#fef3c7" : "var(--border-light)",
+                color: user.subscriptionTier === "pro" ? "var(--accent)" : user.subscriptionTier === "enterprise" ? "#92400e" : "var(--subtle)",
+              }}
+            >
+              {user.subscriptionTier}
+            </span>
+          )}
+
           <QueueIndicator />
 
           <button onClick={toggle} className="btn-icon btn-ghost text-base" aria-label="Toggle theme">
