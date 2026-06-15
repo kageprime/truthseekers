@@ -114,7 +114,7 @@ function TimelineBlock({ data }: { data: TimelineBlockData }) {
 
 function Map2DBlock({ data }: { data: Map2DBlockData }) {
   return (
-    <div className="pixel-card-sm p-3 mb-3 bg-white overflow-hidden" style={{ height: "400px" }}>
+    <div className="pixel-card-sm p-3 mb-3 bg-white overflow-hidden" style={{ height: "clamp(250px, 50vh, 400px)" }}>
       <MapViewer markers={data.markers} layers={data.layers} centerLat={data.centerLat} centerLng={data.centerLng} zoom={data.zoom} />
     </div>
   );
@@ -122,7 +122,7 @@ function Map2DBlock({ data }: { data: Map2DBlockData }) {
 
 function Map3DBlock({ data }: { data: Map3DBlockData }) {
   return (
-    <div className="pixel-card-sm p-3 mb-3 bg-white overflow-hidden" style={{ height: "400px" }}>
+    <div className="pixel-card-sm p-3 mb-3 bg-white overflow-hidden" style={{ height: "clamp(250px, 50vh, 400px)" }}>
       <ThreeDMapViewer scene={data as any} />
     </div>
   );

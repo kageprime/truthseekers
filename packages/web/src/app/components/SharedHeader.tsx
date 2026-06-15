@@ -30,7 +30,7 @@ export default function SharedHeader({
             {onToggleSidebar && (
               <button
                 onClick={onToggleSidebar}
-                className="flex items-center justify-center w-9 h-9 border-2 border-black shadow-[2px_2px_0_#1c1917] transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_#1c1917] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_#1c1917]"
+                className="flex items-center justify-center w-11 h-11 border-2 border-black shadow-[2px_2px_0_#1c1917] transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_#1c1917] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_#1c1917]"
                 style={{ background: "white", fontSize: "14px" }}
                 aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
               >

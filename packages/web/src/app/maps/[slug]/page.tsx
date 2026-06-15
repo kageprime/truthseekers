@@ -85,7 +85,7 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
               </div>
 
               {viewMode === "3d" && map.threedScene ? (
-                <ThreeDMapViewer scene={map.threedScene} height="500px" />
+                <ThreeDMapViewer scene={map.threedScene} height="clamp(300px, 50vh, 500px)" />
               ) : map.type === "static" && map.image ? (
                 <div className="w-full overflow-hidden border-2 border-[var(--border)] bg-white">
                   <img
@@ -116,7 +116,7 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
                   zoom={map.zoom}
                   markers={map.markers}
                   layers={map.layers}
-                  height="500px"
+                  height="clamp(300px, 50vh, 500px)"
                 />
               ) : null}
             </div>

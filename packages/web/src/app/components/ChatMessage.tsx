@@ -133,7 +133,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
         {!isUser && onCopy && (
           <button
             onClick={handleCopy}
-            className="btn-ghost text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+            className="btn-ghost text-[10px] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
             style={{ color: copied ? "var(--green)" : "var(--subtle)" }}
             title="Copy message"
           >
@@ -146,7 +146,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
           <>
             <button
               onClick={() => setFeedback(feedback === "up" ? null : "up")}
-              className="btn-ghost text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+              className="btn-ghost text-[10px] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
               style={{ color: feedback === "up" ? "var(--green)" : "var(--subtle)" }}
               title="Helpful"
             >
@@ -154,7 +154,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
             </button>
             <button
               onClick={() => setFeedback(feedback === "down" ? null : "down")}
-              className="btn-ghost text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+              className="btn-ghost text-[10px] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
               style={{ color: feedback === "down" ? "var(--red)" : "var(--subtle)" }}
               title="Not helpful"
             >
@@ -167,7 +167,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
         {!isUser && isLastAssistant && onRegenerate && (
           <button
             onClick={onRegenerate}
-            className="btn-ghost text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+            className="btn-ghost text-[10px] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
             style={{ color: "var(--subtle)" }}
             title="Get a different response"
           >
@@ -179,7 +179,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
         {isUser && onEdit && (
           <button
             onClick={onEdit}
-            className="btn-ghost text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+            className="btn-ghost text-[10px] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
             style={{ color: "var(--subtle)" }}
             title="Edit message"
           >

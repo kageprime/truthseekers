@@ -14,7 +14,7 @@ export default function FollowUpSuggestions({ followUps, onClick }: FollowUpSugg
           <button
             key={i}
             onClick={() => onClick(q)}
-            className="px-4 py-2 text-xs rounded-xl border transition-colors hover:bg-[#f5f5f4]"
+            className="px-4 py-2 min-h-[44px] text-xs border transition-colors hover:bg-[#f5f5f4]"
             style={{ borderColor: "#e5e5e5", color: "var(--ink)", background: "white" }}
           >
             {q}

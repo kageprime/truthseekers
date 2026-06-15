@@ -36,14 +36,14 @@ export default function HamburgerMenu({ children }: { children: React.ReactNode 
           <div className="absolute inset-0 bg-black/40" />
           <div
             ref={panelRef}
-            className="absolute top-0 right-0 h-full w-64 bg-white shadow-xl border-l-2 border-black flex flex-col"
+            className="absolute top-0 right-0 h-full w-[85vw] max-w-[320px] bg-white shadow-xl border-l-2 border-black flex flex-col"
             style={{ animation: "slideIn 0.2s ease-out" }}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b-2 border-black">
               <span className="font-bold text-sm">Menu</span>
               <button
                 onClick={() => setOpen(false)}
-                className="w-10 h-10 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#1c1917] text-sm"
+                className="w-11 h-11 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#1c1917] text-sm"
                 aria-label="Close menu"
               >
                 ✕

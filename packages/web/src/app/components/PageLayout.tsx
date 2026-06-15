@@ -45,15 +45,15 @@ export default function PageLayout({
       {noHeader && sidebar && !sidebarOpen && (
         <button
           onClick={toggleSidebar}
-          className="fixed top-4 left-4 z-50 w-9 h-9 flex items-center justify-center border-2 border-black shadow-[2px_2px_0_#1c1917] bg-white text-sm transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_#1c1917] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_#1c1917]"
+          className="fixed top-4 left-4 z-50 w-11 h-11 flex items-center justify-center border-2 border-black shadow-[2px_2px_0_#1c1917] bg-white text-sm transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_#1c1917] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_#1c1917]"
           aria-label="Open sidebar"
         >
           ☰
         </button>
       )}
       <div className="flex flex-row flex-1 min-h-0 relative overflow-x-hidden">
-        {/* Wave background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Wave background (hidden on mobile) */}
+        <div className="hidden sm:block absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute inset-0 opacity-[0.07] wave-1">
             <svg viewBox="0 0 1800 400" preserveAspectRatio="none" className="w-[300%] h-full">
               <path d="M0,270 C200,150 500,380 800,270 C1100,150 1400,380 1800,270 L1800,400 L0,400 Z" fill="var(--blue)" />
@@ -84,8 +84,8 @@ export default function PageLayout({
       {!noFooter && (
         <footer className="border-t-2 border-black px-6 py-4" style={{ background: "var(--warm)" }}>
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-            <span className="pixel text-[8px]" style={{ color: "var(--ink)" }}>◆ Truthseekers</span>
-            <span className="pixel text-[7px]" style={{ color: "var(--subtle)" }}>{footerText}</span>
+            <span className="pixel text-[8px] sm:text-[8px]" style={{ color: "var(--ink)" }}>◆ Truthseekers</span>
+            <span className="pixel text-[7px] sm:text-[8px]" style={{ color: "var(--subtle)" }}>{footerText}</span>
           </div>
         </footer>
       )}

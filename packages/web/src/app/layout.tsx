@@ -1,6 +1,12 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ErrorBoundary from "./components/ErrorBoundary";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#fffaf0",
+};
 
 export const metadata: Metadata = {
   title: "Truthseekers — The Living Encyclopedia",
@@ -614,7 +620,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             .phase-icon { font-size: 11px; }
             .phase-label { font-size: 6px; }
             .phase-line { width: 14px; }
+            .btn-sm, .btn-lg { min-height: 44px !important; }
+            .btn-ghost { min-height: 44px; }
+            button, a[role="button"], [tabindex][role="button"] { min-height: 44px; }
           }
+          @media (min-width: 640px) {
+            .btn-lg { min-height: auto; }
+          }
+          .footer-text { font-size: 8px; }
+          @media (min-width: 640px) { .footer-text { font-size: 8px; } }
         `}</style>
         <ErrorBoundary>
           {children}

@@ -178,7 +178,7 @@ export default function MapViewer({
 
   return (
     <div className={`relative ${className}`}>
-      <div ref={mapContainer} style={{ height: height || "50vh", minHeight: height || "250px", maxHeight: height || "500px", width: "100%" }} className="border-2 border-[var(--border)] z-0" />
+      <div ref={mapContainer} style={{ height: height || "50vh", minHeight: height ? undefined : "250px", maxHeight: height ? undefined : "500px", width: "100%" }} className="border-2 border-[var(--border)] z-0" />
 
       {hasMultipleLayers && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -187,7 +187,7 @@ export default function MapViewer({
             <button
               key={layer.id}
               onClick={() => switchLayer(layer.id)}
-              className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+              className={`text-xs px-3 py-2.5 min-h-[44px] sm:py-1.5 border transition-colors ${
                 activeLayerId === layer.id
                   ? "bg-[var(--blue)] text-white border-[var(--blue)]"
                   : "bg-white text-[var(--muted)] border-[var(--border)] hover:border-[var(--blue)] hover:text-[var(--blue)]"

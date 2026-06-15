@@ -60,7 +60,7 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
         </Link>
         <button
           onClick={onClose}
-          className="w-7 h-7 flex items-center justify-center border-2 border-black shadow-[2px_2px_0_#1c1917] bg-white text-xs transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_#1c1917] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_#1c1917]"
+          className="w-11 h-11 flex items-center justify-center border-2 border-black shadow-[2px_2px_0_#1c1917] bg-white text-xs transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_#1c1917] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_#1c1917]"
           aria-label="Close sidebar"
         >
           ✕
@@ -161,14 +161,22 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
   );
 
   return (
-    <div
-      className="flex w-60 shrink-0 border-r-2 border-black relative z-10 transition-all duration-200 ease-out"
-      style={{
-        transform: open ? "translateX(0)" : "translateX(-100%)",
-        marginLeft: open ? "0" : "-15rem",
-      }}
-    >
-      {sidebar}
-    </div>
+    <>
+      {/* Mobile overlay backdrop */}
+      {open && (
+        <div
+          className="fixed inset-0 z-30 sm:hidden"
+          style={{ background: "rgba(0,0,0,0.3)" }}
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+      {/* Sidebar: overlay on mobile, push-layout on desktop */}
+      <div
+        className={`${open ? "translate-x-0" : "-translate-x-full"} sm:translate-x-0 fixed sm:relative inset-y-0 left-0 z-40 w-60 shrink-0 border-r-2 border-black transition-transform duration-200 ease-out`}
+      >
+        {sidebar}
+      </div>
+    </>
   );
 }

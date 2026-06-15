@@ -285,7 +285,7 @@ export default function ArticlesPage() {
       {/* Search + Generate bar */}
       <div className="max-w-6xl mx-auto w-full px-6 py-4">
         <form onSubmit={handleSearch} className="max-w-2xl">
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex-1 relative">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
                 style={{ color: "var(--subtle)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -300,19 +300,21 @@ export default function ArticlesPage() {
                 style={{ paddingLeft: "2.5rem" }}
               />
             </div>
-            <button type="submit" disabled={searching} className="btn-primary shrink-0">
-              {searching ? "..." : "Search"}
-            </button>
-            {query && (
-              <button type="button" onClick={handleGenerate} className="btn-primary shrink-0">
-                ⚡ Generate
+            <div className="flex gap-2">
+              <button type="submit" disabled={searching} className="btn-primary flex-1 sm:flex-none">
+                {searching ? "..." : "Search"}
               </button>
-            )}
-            {query && (
-              <button type="button" onClick={handleClear} className="btn-secondary shrink-0">
-                Clear
-              </button>
-            )}
+              {query && (
+                <button type="button" onClick={handleGenerate} className="btn-primary flex-1 sm:flex-none">
+                  ⚡ Generate
+                </button>
+              )}
+              {query && (
+                <button type="button" onClick={handleClear} className="btn-secondary flex-1 sm:flex-none">
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
         </form>
       </div>
