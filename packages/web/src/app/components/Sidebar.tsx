@@ -42,12 +42,8 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
       {/* Brand header */}
       <div className="shrink-0 px-4 py-3 flex items-center justify-between border-b" style={{ borderColor: "var(--border-light)" }}>
         <Link href="/" className="flex items-center gap-2.5 no-underline">
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg font-bold text-sm" style={{ background: "var(--accent)", color: "white" }}>
-            TS
-          </div>
-          <span className="font-semibold text-sm" style={{ color: "var(--ink)" }}>
-            Truthseekers
-          </span>
+          <img src="/logo-icon.png" alt="Truthseekers" className="w-8 h-8" style={{ objectFit: "contain" }} />
+          <span className="font-semibold text-sm" style={{ color: "var(--ink)" }}>Truthseekers</span>
         </Link>
         <button
           onClick={onClose}
@@ -72,6 +68,7 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
                 background: active ? "var(--accent-bg)" : "transparent",
                 color: active ? "var(--accent)" : "var(--muted)",
               }}
+             
             >
               <IconComp size={18} />
               <span>{item.label}</span>
@@ -119,6 +116,7 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
                 background: conv.id === activeId ? "var(--accent-bg)" : "transparent",
                 color: conv.id === activeId ? "var(--accent)" : "var(--muted)",
               }}
+             
             >
               <IconChevronRight size={12} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: conv.id === activeId ? "var(--accent)" : "var(--border)" }} />
               <div className="flex-1 min-w-0">
@@ -137,7 +135,7 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
       {/* Footer */}
       <div className="shrink-0 border-t px-4 py-2 flex items-center justify-between" style={{ borderColor: "var(--border-light)" }}>
         <span className="text-xs" style={{ color: "var(--subtle)" }}>v1.0.0</span>
-        <span className="text-xs font-medium" style={{ color: "var(--accent)" }}>◆ Truthseekers</span>
+        <img src="/logo-text.png" alt="Truthseekers" style={{ height: 14, width: "auto", objectFit: "contain", opacity: 0.5 }} />
       </div>
     </aside>
   );
@@ -155,7 +153,7 @@ export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
       )}
       {/* Sidebar: overlay on mobile, push-layout on desktop */}
       <div
-        className={`${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:relative inset-y-0 left-0 z-40 w-72 shrink-0 border-r transition-transform duration-200 ease-out`}
+        className={`${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:relative inset-y-0 left-0 z-40 w-72 shrink-0 border-r transition-transform duration-200 ease-out sidebar-panel`}
         style={{ borderColor: "var(--border-light)" }}
       >
         {sidebarContent}

@@ -207,7 +207,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
                 <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--muted)" }}>
                   Your {quota.tier} plan allows {quota.limit} article generations. Upgrade to create more articles.
                 </p>
-                <Link href="/login" className="btn btn-primary btn-lg">
+                <Link href="/pricing" className="btn btn-primary btn-lg">
                   Upgrade Plan
                 </Link>
               </>

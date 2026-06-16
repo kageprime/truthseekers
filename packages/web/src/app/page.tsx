@@ -52,12 +52,12 @@ export default function HomePage() {
           </div>
         ) : (
           /* ── Hero content ── */
-          <div className="flex flex-col items-center animate-fade-slide-up w-full" style={{ animationDelay: "0ms" }}>
-            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tighter text-center mb-2"
-              style={{ color: "var(--ink)" }}>
-              Truthseekers
-            </h1>
-            <p className="text-lg text-center mb-10" style={{ color: "var(--muted)" }}>
+            <div className="flex flex-col items-center animate-fade-slide-up w-full" style={{ animationDelay: "0ms" }}>
+              <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tighter text-center mb-2"
+                style={{ color: "var(--ink)" }}>
+                Truthseekers
+              </h1>
+              <p className="text-lg text-center mb-10" style={{ color: "var(--muted)" }}>
               The Living Encyclopedia
             </p>
 

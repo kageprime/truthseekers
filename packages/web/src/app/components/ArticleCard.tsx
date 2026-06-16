@@ -17,6 +17,7 @@ export default function ArticleCard({ article }: { article: ArticleSummary }) {
       href={`/article/${article.slug}`}
       className="glass-card overflow-hidden block group"
       style={{ textDecoration: "none", color: "inherit" }}
+     
     >
       <div className="w-full aspect-[16/9] overflow-hidden" style={{ background: "var(--skeleton-start)" }}>
         {article.thumbnail ? (

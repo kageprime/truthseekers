@@ -112,6 +112,7 @@ export default function QueueIndicator() {
                     href={`/article/${job.slug}`}
                     className="flex items-center gap-2 px-2 py-1.5 border border-black/10 hover:bg-[var(--cream)] transition"
                     style={{ textDecoration: "none", color: "inherit" }}
+                   
                   >
                     <span className="text-xs">
                       {job.status === "queued" ? <IconClock size={12} /> : job.status === "writing" ? <IconPencil size={12} /> : job.status === "verifying" ? <IconSearch size={12} /> : job.status === "media" ? <IconPalette size={12} /> : job.status === "storing" ? <IconDatabase size={12} /> : <IconLightning size={12} />}

@@ -54,7 +54,7 @@ export default function HamburgerMenu({ children }: { children: React.ReactNode 
               {children}
             </div>
             <div className="px-5 py-3 border-t text-xs text-center" style={{ borderColor: "var(--border-light)", color: "var(--subtle)" }}>
-              Truthseekers
+              <img src="/logo-text.png" alt="Truthseekers" style={{ height: 14, width: "auto", objectFit: "contain", opacity: 0.5 }} />
             </div>
           </div>
         </div>

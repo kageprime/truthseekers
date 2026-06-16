@@ -65,6 +65,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <Link
               href="/"
               className="block mt-3 text-sm text-[var(--muted)] hover:text-[#ea580c]"
+             
             >
               ← Back to home
             </Link>

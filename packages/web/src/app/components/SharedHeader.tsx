@@ -47,7 +47,7 @@ export default function SharedHeader({ onToggleSidebar, sidebarOpen, search }: H
   }, [mobileNavOpen]);
 
   return (
-    <header className="sticky top-0 z-50 glass" style={{ borderBottom: "1px solid var(--border-light)" }}>
+    <header className="sticky top-0 z-50 glass header-bar" style={{ borderBottom: "1px solid var(--border-light)" }}>
       <div className="px-4 h-14 flex items-center justify-between max-w-[1440px] mx-auto">
         <div className="flex items-center gap-3">
           {onToggleSidebar ? (
@@ -55,7 +55,7 @@ export default function SharedHeader({ onToggleSidebar, sidebarOpen, search }: H
             <>
               <button
                 onClick={onToggleSidebar}
-                className="btn-icon btn-ghost text-lg"
+                className="btn-icon btn-ghost text-lg lg:hidden"
                 aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
               >
                 {sidebarOpen ? (
@@ -72,21 +72,15 @@ export default function SharedHeader({ onToggleSidebar, sidebarOpen, search }: H
                 )}
               </button>
               <Link href="/" className="no-underline">
-                <div className="flex items-center justify-center w-8 h-8 rounded-lg font-bold text-sm" style={{ background: "var(--accent)", color: "white" }}>
-                  TS
-                </div>
+                <img src="/logo-icon.png" alt="Truthseekers" className="w-8 h-8" style={{ objectFit: "contain" }} />
               </Link>
             </>
           ) : (
             // ── Full: header is primary navigation ──
             <>
               <Link href="/" className="flex items-center gap-2.5 no-underline">
-                <div className="flex items-center justify-center w-8 h-8 rounded-lg font-bold text-sm" style={{ background: "var(--accent)", color: "white" }}>
-                  TS
-                </div>
-                <span className="hidden sm:inline font-semibold text-sm" style={{ color: "var(--ink)" }}>
-                  Truthseekers
-                </span>
+                <img src="/logo-icon.png" alt="Truthseekers" className="w-8 h-8" style={{ objectFit: "contain" }} />
+                <img src="/logo-text.png" alt="Truthseekers" className="hidden sm:inline" style={{ height: 16, width: "auto", objectFit: "contain" }} />
               </Link>
               <div className="hidden sm:flex items-center gap-1 ml-4">
                 {NAV_LINKS.map((link) => (
@@ -95,6 +89,7 @@ export default function SharedHeader({ onToggleSidebar, sidebarOpen, search }: H
                     href={link.href}
                     className="btn-ghost text-sm font-medium"
                     style={{ color: "var(--muted)" }}
+                   
                   >
                     {link.label}
                   </Link>
@@ -133,17 +128,28 @@ export default function SharedHeader({ onToggleSidebar, sidebarOpen, search }: H
         )}
 
         <div className="flex items-center gap-2">
-          {/* Tier badge */}
+          {/* User avatar + settings */}
           {user && (
-            <span
-              className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full"
-              style={{
-                background: user.subscriptionTier === "pro" ? "var(--accent-bg)" : user.subscriptionTier === "enterprise" ? "#fef3c7" : "var(--border-light)",
-                color: user.subscriptionTier === "pro" ? "var(--accent)" : user.subscriptionTier === "enterprise" ? "#92400e" : "var(--subtle)",
-              }}
-            >
-              {user.subscriptionTier}
-            </span>
+            <Link href="/settings" className="flex items-center gap-2 no-underline">
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold"
+                style={{
+                  background: "var(--accent)",
+                  color: "white",
+                }}
+              >
+                {(user.name || user.email)[0].toUpperCase()}
+              </div>
+              <span
+                className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full"
+                style={{
+                  background: user.subscriptionTier === "pro" ? "var(--accent-bg)" : user.subscriptionTier === "enterprise" ? "#fef3c7" : "var(--border-light)",
+                  color: user.subscriptionTier === "pro" ? "var(--accent)" : user.subscriptionTier === "enterprise" ? "#92400e" : "var(--subtle)",
+                }}
+              >
+                {user.subscriptionTier}
+              </span>
+            </Link>
           )}
 
           <QueueIndicator />
@@ -194,6 +200,7 @@ export default function SharedHeader({ onToggleSidebar, sidebarOpen, search }: H
                       onClick={() => setMobileNavOpen(false)}
                       className="block px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors hover:bg-[var(--border-light)]"
                       style={{ color: "var(--ink)" }}
+                     
                     >
                       {link.label}
                     </Link>

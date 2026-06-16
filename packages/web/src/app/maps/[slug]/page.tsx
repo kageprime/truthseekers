@@ -180,6 +180,7 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
               <Link
                 href={`/?q=${encodeURIComponent(map.title.split(",")[0]?.replace(/^Map of (the )?/i, "") || map.region || "")}`}
                 className="btn btn-primary"
+               
               >
                 Search Articles →
               </Link>

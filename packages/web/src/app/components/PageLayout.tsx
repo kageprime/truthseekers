@@ -92,7 +92,7 @@ export default function PageLayout({
       {!noFooter && (
         <footer className="border-t px-6 py-3" style={{ borderColor: "var(--border-light)", background: "var(--surface)" }}>
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-            <span className="text-sm font-medium" style={{ color: "var(--ink)" }}>◆ Truthseekers</span>
+            <img src="/logo-text.png" alt="Truthseekers" style={{ height: 16, width: "auto", objectFit: "contain" }} />
             <span className="text-xs" style={{ color: "var(--subtle)" }}>{footerText}</span>
           </div>
         </footer>

@@ -74,13 +74,10 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
   return (
     <>
       <div className={`flex gap-4 px-6 py-5 ${isUser ? "flex-row-reverse" : ""}`}>
-        {/* Avatar */}
-        <div
-          className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full text-sm font-semibold"
-          style={{ background: isUser ? "var(--accent-bg)" : "var(--accent)", color: isUser ? "var(--accent)" : "white" }}
-        >
-          {isUser ? "U" : "TS"}
-        </div>
+        {/* Assistant avatar only */}
+        {!isUser && (
+          <img src="/logo-icon.png" alt="TS" className="shrink-0 w-9 h-9 rounded-full" style={{ objectFit: "contain" }} />
+        )}
 
         {/* Body */}
         <div className={`w-fit max-w-[75%] space-y-1 ${isUser ? "items-end" : ""}`}>

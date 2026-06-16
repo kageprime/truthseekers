@@ -92,10 +92,7 @@ export default function MessageList({
 
       {messages.length === 0 && !sending && !error ? (
         <div className="flex flex-col items-center justify-center h-full px-6 py-16 text-center animate-fade-in">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold mb-4" style={{ background: "var(--accent)", color: "white" }}>
-            TS
-          </div>
-          <h2 className="text-xl font-semibold mb-2" style={{ color: "var(--ink)" }}>Truthseekers</h2>
+          <img src="/logo.png" alt="Truthseekers" className="mb-4" style={{ height: 48, width: "auto", objectFit: "contain" }} />
           <p className="text-sm mb-8 max-w-md" style={{ color: "var(--muted)" }}>Ask anything — I'll research and build rich, interactive responses with maps, timelines, diagrams, and more.</p>
           <div className="flex flex-wrap gap-2 justify-center max-w-lg">
             {suggestedTopics.map((topic) => (

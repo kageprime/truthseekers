@@ -47,7 +47,7 @@ export default function NewArticlePage() {
             <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
               Your {quota.tier} plan allows {quota.limit} article generations. Upgrade to create more.
             </p>
-            <Link href="/login" className="btn btn-primary btn-lg">Upgrade Plan</Link>
+            <Link href="/pricing" className="btn btn-primary btn-lg">Upgrade Plan</Link>
             <div className="mt-4">
               <Link href="/articles" className="text-sm hover:underline" style={{ color: "var(--muted)" }}>
                 ← Browse Articles

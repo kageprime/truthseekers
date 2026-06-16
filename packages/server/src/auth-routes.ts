@@ -91,6 +91,26 @@ auth.get("/me", async (c) => {
   }
 });
 
+// PUT /auth/me — update profile (name, avatar)
+auth.put("/me", async (c) => {
+  const authHeader = c.req.header("authorization");
+  if (!authHeader?.startsWith("Bearer ")) return c.json({ error: "Missing authorization header" }, 401);
+
+  try {
+    const payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as JwtPayload;
+    const { name, avatar } = await c.req.json<{ name?: string; avatar?: string }>();
+    const updates: { name?: string; avatar?: string } = {};
+    if (name !== undefined) updates.name = name;
+    if (avatar !== undefined) updates.avatar = avatar;
+    if (Object.keys(updates).length > 0) await updateUser(payload.sub, updates);
+    const user = await getUserById(payload.sub);
+    if (!user) return c.json({ error: "User not found" }, 404);
+    return c.json({ user: { ...user, avatar: user.avatar || "" } });
+  } catch {
+    return c.json({ error: "Invalid or expired token" }, 401);
+  }
+});
+
 // POST /auth/onboard — mark user as onboarded, update name
 auth.post("/onboard", async (c) => {
   const authHeader = c.req.header("authorization");

@@ -195,6 +195,7 @@ function CrossrefBlock({ data }: { data: CrossrefBlockData }) {
     <Link href={`/article/${data.slug}`}
       className="glass-card-static p-2 flex items-center gap-2 mb-2"
       style={{ textDecoration: "none", color: "inherit", fontSize: "0.85rem" }}
+     
     >
       <IconLink size={16} />
       <span className="flex-1 min-w-0">
