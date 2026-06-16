@@ -686,7 +686,7 @@ app.get("/chat/:id", async (c) => {
 });
 
  
-const MAX_TOOL_ITERATIONS = 5;
+const MAX_TOOL_ITERATIONS = 15;
 
 function memAddMessage(id: string, conversationId: string, role: string, content: string, blocks?: any[]) {
   const now = new Date().toISOString();
@@ -908,11 +908,9 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
       let iteration = 0;
       while (iteration < MAX_TOOL_ITERATIONS) {
         iteration++;
-        // Reserve the last iteration for "auto" so the LLM can always respond with text
-        const shouldForceTool = plan.length > 0 && iteration <= plan.length && iteration < MAX_TOOL_ITERATIONS;
-        const toolChoice = shouldForceTool
-          ? { type: "function" as const, function: { name: plan[iteration - 1] } }
-          : "auto" as const;
+        // "auto" lets the LLM decide when it has enough information to respond.
+        // The plan is still in the system prompt as guidance but not enforced.
+        const toolChoice = "auto" as const;
 
         const result = await withRetry(
           () => sendPromptStream(conversation, onEvent, {
