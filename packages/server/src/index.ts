@@ -883,13 +883,16 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
       let conversation = [...initialMessages];
 
       // Phase 3a: Planning — ask LLM to outline its strategy before executing (no event streaming, plan is internal)
-      const planResult = await sendPromptStream(conversation, undefined, {
-        system: contextualSystem + "\n\nBEFORE calling any tools, output a brief plan as a JSON array of tool names in the order you will call them. E.g. [\"article_search\", \"web_search\", \"webfetch\", \"render_blocks\"]. Then proceed with execution.",
-        temperature: 0.5,
-tools: CHAT_TOOL_DEFINITIONS,
-    tool_choice: "none",
-    model: selectedModel,
-      });
+      const planResult = await withRetry(
+        () => sendPromptStream(conversation, undefined, {
+          system: contextualSystem + "\n\nBEFORE calling any tools, output a brief plan as a JSON array of tool names in the order you will call them. E.g. [\"article_search\", \"web_search\", \"webfetch\", \"render_blocks\"]. Then proceed with execution.",
+          temperature: 0.5,
+          tools: CHAT_TOOL_DEFINITIONS,
+          tool_choice: "none",
+          model: selectedModel,
+        }),
+        "chat-planning"
+      );
       const planText = planResult.text || "";
       const planMatch = planText.match(/\[[^\]]*\]/);
       let plan: string[] = [];
@@ -909,13 +912,16 @@ tools: CHAT_TOOL_DEFINITIONS,
           ? { type: "function" as const, function: { name: plan[iteration - 1] } }
           : "auto" as const;
 
-        const result = await sendPromptStream(conversation, onEvent, {
-          system: contextualSystem,
-          temperature: 0.7,
-tools: CHAT_TOOL_DEFINITIONS,
-    tool_choice: toolChoice,
-    model: selectedModel,
-        });
+        const result = await withRetry(
+          () => sendPromptStream(conversation, onEvent, {
+            system: contextualSystem,
+            temperature: 0.7,
+            tools: CHAT_TOOL_DEFINITIONS,
+            tool_choice: toolChoice,
+            model: selectedModel,
+          }),
+          `chat-agent-iteration-${iteration}`
+        );
 
         if (!result.toolCalls || result.toolCalls.length === 0) {
           fullResponse = result.text;
@@ -962,7 +968,11 @@ tools: CHAT_TOOL_DEFINITIONS,
         });
 
         for (const tr of toolResults) {
-          conversation.push({ role: "tool", content: tr.result, tool_call_id: tr.id });
+          const MAX_TOOL_CONTENT = 1500;
+          const truncated = tr.result.length > MAX_TOOL_CONTENT
+            ? tr.result.slice(0, MAX_TOOL_CONTENT) + `\n\n[Result truncated (${tr.result.length} total chars)]`
+            : tr.result;
+          conversation.push({ role: "tool", content: truncated, tool_call_id: tr.id });
         }
       }
 
@@ -972,10 +982,11 @@ tools: CHAT_TOOL_DEFINITIONS,
 
       // Save assistant response (with blocks from tool results)
       const finalContent = fullResponse || "I processed your request using available tools.";
+      const finalBlocks = assistantBlocks.length > 0 ? assistantBlocks : undefined;
       if (usingMem) {
-        memAddMessage(msgId, conversationId, "assistant", finalContent);
+        memAddMessage(msgId, conversationId, "assistant", finalContent, finalBlocks);
       } else {
-        await addMessage(msgId, conversationId, "assistant", finalContent);
+        await addMessage(msgId, conversationId, "assistant", finalContent, finalBlocks);
       }
 
       // Update conversation title from first exchange
@@ -988,15 +999,19 @@ tools: CHAT_TOOL_DEFINITIONS,
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      fullResponse = `Error: ${errorMsg}`;
+      const hasBlocks = assistantBlocks.length > 0;
+      fullResponse = hasBlocks
+        ? "Response generated (some tools encountered an error — images or videos may be missing)."
+        : `Error: ${errorMsg}`;
+      const blocks = hasBlocks ? assistantBlocks : undefined;
       if (usingMem) {
-        memAddMessage(randomUUID(), conversationId, "assistant", fullResponse);
+        memAddMessage(randomUUID(), conversationId, "assistant", fullResponse, blocks);
       } else {
-        await addMessage(randomUUID(), conversationId, "assistant", fullResponse).catch(() => {});
+        await addMessage(randomUUID(), conversationId, "assistant", fullResponse, blocks).catch(() => {});
       }
       try {
         await stream.writeSSE({
-          data: JSON.stringify({ type: "done", msgId, content: fullResponse, blocks: undefined }),
+          data: JSON.stringify({ type: "done", msgId, content: fullResponse, blocks }),
           event: "agent_event",
         });
       } catch {

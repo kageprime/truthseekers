@@ -36,8 +36,8 @@ export default function BlockRenderer({ blocks, compact = false }: { blocks: Blo
 
   return (
     <div className="block-renderer">
-      {blocks.map((block) => (
-        <BlockCard key={block.id} block={block} compact={compact} />
+      {blocks.map((block, i) => (
+        <BlockCard key={block.id ?? `block-${i}`} block={block} compact={compact} />
       ))}
     </div>
   );
@@ -98,7 +98,7 @@ function SectionBlock({ data }: { data: SectionBlockData }) {
       <summary className="font-bold text-sm cursor-pointer" style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "8px" }}>
         {data.title}
       </summary>
-      {data.blocks && <div className="mt-3">{data.blocks.map((b) => <BlockCard key={b.id} block={b} compact={false} />)}</div>}
+      {data.blocks && <div className="mt-3">{data.blocks.map((b, i) => <BlockCard key={b.id ?? `section-block-${i}`} block={b} compact={false} />)}</div>}
     </details>
   );
 }

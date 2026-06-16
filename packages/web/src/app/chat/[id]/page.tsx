@@ -71,6 +71,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [sending, setSending] = useState(false);
   const [streamContent, setStreamContent] = useState("");
   const [streamBlocks, setStreamBlocks] = useState<any[]>([]);
+  const streamBlocksRef = useRef<any[]>([]);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
   const agentEventsRef = useRef<AgentEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -136,34 +137,39 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           agentEventsRef.current = next;
           return next;
         });
-        // Extract blocks from render_blocks tool calls
-        if (event.type === "tool_use") {
-          const d = event.data as Record<string, unknown> | undefined;
-          if (d?.name === "render_blocks") {
-            const args = d.args as Record<string, unknown> | undefined;
-            if (args?.blocks && Array.isArray(args.blocks)) {
-              setStreamBlocks(args.blocks);
-            }
+        // Extract blocks from render_blocks tool calls for live streaming preview
+        const d = event.data as Record<string, unknown> | undefined;
+        if (d?.name === "render_blocks") {
+          const result = d.result as Record<string, unknown> | undefined;
+          const blocks = result?.blocks ?? (d.args as Record<string, unknown> | undefined)?.blocks;
+          if (Array.isArray(blocks)) {
+            streamBlocksRef.current = blocks;
+            setStreamBlocks(blocks);
           }
         }
       },
       onDone: (event) => {
         const savedEvents = agentEventsRef.current;
+        // Use event.blocks if available, otherwise fall back to blocks accumulated
+        // during streaming (covers case where done event's blocks key was omitted)
+        const finalBlocks = event.blocks ?? streamBlocksRef.current;
         setStreamContent("");
-        setStreamBlocks(event.blocks || []);
+        setStreamBlocks(finalBlocks);
         setFollowUps(generateFollowUps(lastMessageRef.current));
         setData((prev) => {
           if (!prev) return prev;
           const real = prev.messages.filter((m) => !m.id.startsWith("temp-"));
-          const updated = { ...prev, messages: [...real, { id: event.msgId!, conversationId: id, role: "assistant" as const, content: event.content || "", blocks: event.blocks, agentEvents: savedEvents, createdAt: new Date().toISOString() }] };
+          const updated = { ...prev, messages: [...real, { id: event.msgId ?? `msg-${Date.now()}`, conversationId: id, role: "assistant" as const, content: event.content || "", blocks: finalBlocks, agentEvents: savedEvents, createdAt: new Date().toISOString() }] };
           chatCache.set(id, updated);
           return updated;
         });
       },
       onError: (errMsg) => setError(errMsg),
     }, model);
- 
-    setSending(false);
+  
+    // Defer to next macrotask so React can commit the streaming preview
+    // (with blocks) before sending becomes false.
+    setTimeout(() => setSending(false), 0);
   }, [id, streamSend, model]);
 
   useEffect(() => {
