@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, type FormEvent } from "react";
+import { useState, useCallback, useEffect, type FormEvent } from "react";
 import SharedHeader from "./SharedHeader";
 import Sidebar from "./Sidebar";
 
@@ -49,7 +49,7 @@ export default function PageLayout({
       {noHeader && sidebar && !sidebarOpen && (
         <button
           onClick={toggleSidebar}
-          className="fixed top-4 left-4 z-50 btn-icon btn-secondary shadow-sm lg:hidden"
+          className="fixed top-4 right-4 z-50 btn-icon btn-secondary shadow-sm lg:hidden"
           aria-label="Open sidebar"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
