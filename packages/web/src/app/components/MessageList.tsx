@@ -108,12 +108,12 @@ export default function MessageList({
               </div>
             </div>
           )}
-          {streamContent && (
+          {(streamContent || (sending && streamBlocks.length > 0)) && (
             <div aria-live="polite" aria-atomic="true">
-              <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} agentEvents={agentEvents} streaming />
+              <ChatMessage role="assistant" content={streamContent || ""} blocks={streamBlocks} agentEvents={agentEvents} streaming />
             </div>
           )}
-          {sending && !streamContent && (
+          {sending && !streamContent && streamBlocks.length === 0 && (
             <div className="px-6 py-4 animate-fade-in">
               <div className="flex items-center gap-3 text-sm" style={{ color: "var(--subtle)" }}>
                 <span className="inline-block w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: "var(--accent)" }} />

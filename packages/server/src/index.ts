@@ -995,23 +995,23 @@ tools: CHAT_TOOL_DEFINITIONS,
         await addMessage(randomUUID(), conversationId, "assistant", fullResponse).catch(() => {});
       }
       try {
-        stream.writeSSE({
+        await stream.writeSSE({
           data: JSON.stringify({ type: "done", msgId, content: fullResponse, blocks: undefined }),
           event: "agent_event",
         });
       } catch {
-        // Stream already closed — nothing to write
+        // Stream closed — done event lost; frontend falls back via useChatStream fallback
       }
       return;
     }
 
     try {
-      stream.writeSSE({
+      await stream.writeSSE({
         data: JSON.stringify({ type: "done", msgId, content: fullResponse, blocks: assistantBlocks.length > 0 ? assistantBlocks : undefined }),
         event: "agent_event",
       });
     } catch {
-      // Stream already closed — nothing to write
+      // Stream closed — done event lost; frontend falls back
     }
   });
 });

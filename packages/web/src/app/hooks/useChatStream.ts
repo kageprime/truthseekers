@@ -48,6 +48,8 @@ export function useChatStream() {
       let buf = "";
       let fullText = "";
 
+      let receivedDone = false;
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -67,11 +69,20 @@ export function useChatStream() {
             } else if (event.type === "tool_use" || event.type === "tool_result") {
               callbacks.onToolEvent({ type: event.type, data: event.data, timestamp: Date.now() });
             } else if (event.type === "done") {
+              receivedDone = true;
               callbacks.onDone(event);
               fullText = "";
             }
           } catch {}
         }
+      }
+
+      // Fallback: if the stream ended without a done event, synthesize one
+      if (!receivedDone && fullText) {
+        callbacks.onDone({
+          type: "done",
+          content: fullText,
+        });
       }
     } catch (err: any) {
       if (err?.name === "AbortError") return;
