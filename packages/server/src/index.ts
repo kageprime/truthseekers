@@ -908,7 +908,9 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
       let iteration = 0;
       while (iteration < MAX_TOOL_ITERATIONS) {
         iteration++;
-        const toolChoice = (plan.length > 0 && iteration <= plan.length)
+        // Reserve the last iteration for "auto" so the LLM can always respond with text
+        const shouldForceTool = plan.length > 0 && iteration <= plan.length && iteration < MAX_TOOL_ITERATIONS;
+        const toolChoice = shouldForceTool
           ? { type: "function" as const, function: { name: plan[iteration - 1] } }
           : "auto" as const;
 
