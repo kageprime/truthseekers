@@ -34,10 +34,10 @@ export const CHAT_TOOL_DEFINITIONS: ToolDefinition[] = [
               properties: {
                 type: {
                   type: "string",
-                  enum: ["heading", "text", "timeline", "image", "gallery", "citation", "crossref", "diagram", "divider", "map_2d", "map_3d"],
+                  enum: ["heading", "text", "timeline", "image", "video", "gallery", "citation", "crossref", "diagram", "divider", "map_2d", "map_3d"],
                   description: "Block type. Use 'timeline' for any chronological/historical data with year/event/description entries. Use 'map_2d' or 'map_3d' for any geographic/location data with markers.",
                 },
-                data: { type: "object", description: "Block data. For 'timeline': { events: [{ year: number | string, event: string, description: string }] }. For 'map_2d'/'map_3d': { markers: [{ lat: number, lng: number, title: string, description?: string, type?: string }], centerLat?: number, centerLng?: number, zoom?: number }. For 'heading': { text: string, level?: number }. For 'text': { content: string }. For 'diagram': { code: string, caption?: string }. For 'citation': { source: string, url?: string, text: string }. For 'crossref': { slug: string, title: string, abstract?: string }. For 'gallery': { images: Array<{ src: string, alt: string, caption?: string }> }. For 'divider': {}." },
+                data: { type: "object", description: "Block data. For 'timeline': { events: [{ year: number | string, event: string, description: string }] }. For 'map_2d'/'map_3d': { markers: [{ lat: number, lng: number, title: string, description?: string, type?: string }], centerLat?: number, centerLng?: number, zoom?: number }. For 'heading': { text: string, level?: number }. For 'text': { content: string }. For 'image': { src: string, caption?: string, prompt?: string }. For 'video': { src: string, caption?: string }. For 'diagram': { code: string, caption?: string }. For 'citation': { title: string, url?: string, relevance?: string }. For 'crossref': { slug: string, title: string, abstract?: string }. For 'gallery': { images: Array<{ src: string, caption?: string }> }. For 'divider': {}." },
               },
               required: ["type", "data"],
             },
@@ -238,18 +238,49 @@ export const BUILT_IN_TOOL_EXECUTORS: Record<string, ToolExecutor> = {
     const incoming = Array.isArray(args.blocks) ? args.blocks : [];
     let idCounter = 0;
     const DATA_KEYS = new Set(["id", "type", "meta"]);
+    const FIELD_ALIAS: Record<string, Record<string, string>> = {
+      text: { text: "content" },
+      heading: {},
+      image: { url: "src" },
+      video: { url: "src" },
+      citation: { text: "title", source: "url" },
+    };
     const blocks = incoming.map((b: any) => {
       const normalized: Record<string, unknown> = { id: b.id || `rb-${Date.now()}-${idCounter++}`, type: b.type };
       if (b.meta) normalized.meta = b.meta;
+      let data: Record<string, unknown> = {};
       if (b.data) {
-        normalized.data = b.data;
+        data = { ...b.data };
       } else {
-        const data: Record<string, unknown> = {};
         for (const key of Object.keys(b)) {
           if (!DATA_KEYS.has(key)) data[key] = b[key];
         }
-        normalized.data = Object.keys(data).length > 0 ? data : undefined;
       }
+      const aliases = FIELD_ALIAS[b.type];
+      if (aliases) {
+        for (const [from, to] of Object.entries(aliases)) {
+          if (from in data && to !== from) {
+            data[to] = data[from];
+            delete data[from];
+          }
+        }
+      }
+      if (b.type === "gallery" && Array.isArray(data.images)) {
+        data.images = data.images.map((img: any) => {
+          if (img.url && !img.src) img.src = img.url;
+          return img;
+        });
+      }
+      if (b.type === "timeline" && Array.isArray(data.events)) {
+        data.events = data.events.map((e: any) => {
+          if (typeof e.year === "string") {
+            const cleaned = e.year.replace(/[^0-9\-]/g, "");
+            e.year = parseInt(cleaned, 10) || 0;
+          }
+          return e;
+        });
+      }
+      normalized.data = Object.keys(data).length > 0 ? data : undefined;
       return normalized;
     });
     return {

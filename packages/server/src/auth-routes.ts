@@ -223,7 +223,7 @@ auth.get("/github/callback", async (c) => {
     const user = await findOrCreateUser(primary.email);
     const jwtToken = issueToken(user);
     // Redirect back to frontend with token in hash
-    const frontendUrl = `${getFrontendOrigin()}/auth/callback#token=${jwtToken}`;
+    const frontendUrl = `${getFrontendOrigin()}/login#token=${jwtToken}`;
     return c.redirect(frontendUrl);
   } catch {
     return c.json({ error: "OAuth failed" }, 500);
@@ -265,7 +265,7 @@ auth.get("/google/callback", async (c) => {
 
     const user = await findOrCreateUser(userData.email);
     const jwtToken = issueToken(user);
-    const frontendUrl = `${getFrontendOrigin()}/auth/callback#token=${jwtToken}`;
+    const frontendUrl = `${getFrontendOrigin()}/login#token=${jwtToken}`;
     return c.redirect(frontendUrl);
   } catch {
     return c.json({ error: "OAuth failed" }, 500);
