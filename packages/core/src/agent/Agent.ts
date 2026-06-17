@@ -119,6 +119,7 @@ export class Agent {
           role: "tool",
           content: result.result,
           tool_call_id: tc.id,
+          tool_name: tc.function.name,
         });
       }
     }

@@ -53,6 +53,7 @@ export interface Message {
   content: string | null;
   tool_call_id?: string;
   tool_calls?: ToolCall[];
+  tool_name?: string;
 }
 
 export interface ToolCall {
@@ -118,7 +119,7 @@ export function toPiMessages(msgs: Message[], system?: string): PiMessage[] {
       pi.push({
         role: "toolResult" as const,
         toolCallId: m.tool_call_id || "",
-        toolName: "",
+        toolName: m.tool_name || "",
         content: [{ type: "text" as const, text: m.content || "" }],
         isError: false,
         timestamp: piTimestamp(),

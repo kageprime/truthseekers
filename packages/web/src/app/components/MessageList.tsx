@@ -9,7 +9,7 @@ import type { AgentEvent } from "./ProcessViewer";
 
 interface Message {
   id: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool";
   content: string;
   blocks?: any[];
   agentEvents?: AgentEvent[];
