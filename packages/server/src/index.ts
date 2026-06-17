@@ -44,8 +44,9 @@ import {
   listApiKeys,
   revokeApiKey,
 } from "@encarta/storage";
-import { queue, articleToBlocks, sendPromptStream, CHAT_TOOL_DEFINITIONS, BUILT_IN_TOOL_EXECUTORS } from "@encarta/core";
-import type { Article, ArticleContent, ArticleMetadata, ToolCall, Message, ToolExecutor } from "@encarta/core";
+import { queue, articleToBlocks, sendPromptStream, CHAT_TOOL_DEFINITIONS, AGENT_TOOLS, BUILT_IN_TOOL_EXECUTORS, Agent, buildModel, resolveModelRoute } from "@encarta/core";
+import type { Article, ArticleContent, ArticleMetadata, ToolExecutor } from "@encarta/core";
+import type { AgentTool, AgentMessage } from "@earendil-works/pi-agent-core";
 import { authMiddleware } from "./auth.js";
 import { rateLimitMiddleware } from "./rateLimit.js";
 import { sendSuccess, sendError, requestIdMiddleware, errorMiddleware } from "./response.js";
@@ -631,7 +632,7 @@ app.get("/health", async (c) => {
 // ── Chat ───────────────────────────────────────────────────────────────────
 // In-memory fallback when MongoDB is unavailable
 const memConversations = new Map<string, { id: string; title: string; createdAt: string; updatedAt: string; userId: string }>();
-const memMessages = new Map<string, Array<{ id: string; conversationId: string; role: string; content: string; blocks?: any[]; createdAt: string }>>();
+const memMessages = new Map<string, Array<{ id: string; conversationId: string; role: string; content: string; blocks?: any[]; tool_calls?: any[]; tool_call_id?: string; createdAt: string }>>();
 
 app.post("/chat", async (c) => {
   const userId = getUserId(c);
@@ -685,39 +686,60 @@ app.get("/chat/:id", async (c) => {
   }
 });
 
- 
-const MAX_TOOL_ITERATIONS = 15;
-
-function memAddMessage(id: string, conversationId: string, role: string, content: string, blocks?: any[]) {
+function memAddMessage(id: string, conversationId: string, role: string, content: string, blocks?: any[], tool_calls?: any[], tool_call_id?: string) {
   const now = new Date().toISOString();
   const msgs = memMessages.get(conversationId) || [];
-  msgs.push({ id, conversationId, role, content, blocks, createdAt: now });
+  msgs.push({ id, conversationId, role, content, blocks, tool_calls, tool_call_id, createdAt: now });
   memMessages.set(conversationId, msgs);
   const conv = memConversations.get(conversationId);
   if (conv) { conv.updatedAt = now; }
 }
 
+function tsMsgToAgentMsg(m: { role: string; content: string; tool_calls?: any[]; tool_call_id?: string }): AgentMessage {
+  if (m.role === "user") {
+    return { role: "user", content: m.content, timestamp: Date.now() } as AgentMessage;
+  }
+  if (m.role === "assistant") {
+    const content: any[] = [];
+    if (m.content) content.push({ type: "text" as const, text: m.content });
+    if (m.tool_calls) {
+      for (const tc of m.tool_calls) {
+        let args: Record<string, any> = {};
+        try { args = JSON.parse(tc.function?.arguments || "{}"); } catch {}
+        content.push({ type: "toolCall" as const, id: tc.id || tc.toolCallId, name: tc.function?.name || tc.toolName, arguments: args });
+      }
+    }
+    return { role: "assistant", content, timestamp: Date.now() } as AgentMessage;
+  }
+  if (m.role === "tool") {
+    return {
+      role: "toolResult" as const,
+      toolCallId: m.tool_call_id || "",
+      toolName: "",
+      content: [{ type: "text" as const, text: m.content || "" }],
+      isError: false,
+      timestamp: Date.now(),
+    } as AgentMessage;
+  }
+  return { role: "user", content: m.content || "", timestamp: Date.now() } as AgentMessage;
+}
+
 app.post("/chat/:id/messages", async (c) => {
   const conversationId = c.req.param("id");
-  const { content, model } = await c.req.json<{ content: string; model?: string }>();
+  const { content, model: selectedModel } = await c.req.json<{ content: string; model?: string }>();
   if (!content) return c.json({ error: "Message content required" }, 400);
 
-  // Try DB first, fall back to in-memory
   let conv: { id: string; title: string; createdAt: string; updatedAt: string } | null = null;
-  let existing: Array<{ id: string; conversationId: string; role: string; content: string; blocks?: any[]; createdAt: string }> = [];
+  let existing: Array<any> = [];
   let usingMem = false;
 
   try {
     conv = await getConversation(conversationId);
     if (!conv) return c.json({ error: "Conversation not found" }, 404);
-    const userMsgId = randomUUID();
-    await addMessage(userMsgId, conversationId, "user", content);
     existing = await getMessages(conversationId);
   } catch {
     conv = memConversations.get(conversationId) || null;
     if (!conv) return c.json({ error: "Conversation not found" }, 404);
-    const userMsgId = randomUUID();
-    memAddMessage(userMsgId, conversationId, "user", content);
     existing = memMessages.get(conversationId) || [];
     usingMem = true;
   }
@@ -725,25 +747,6 @@ app.post("/chat/:id/messages", async (c) => {
   return streamSSE(c, async (stream) => {
     let fullResponse = "";
     const msgId = randomUUID();
-
-    const onEvent = (event: import("@encarta/core").AgentEvent) => {
-      try {
-        stream.writeSSE({
-          data: JSON.stringify(event),
-          event: "agent_event",
-        });
-      } catch {
-        // Client disconnected — ignore write errors
-      }
-    };
-
-    // Build conversation history for the agent
-    const initialMessages: Message[] = existing.map((m) => ({
-      role: m.role as "user" | "assistant" | "system",
-      content: m.content,
-    }));
-
-    const selectedModel = model || undefined;
     let assistantBlocks: any[] = [];
 
     const TOOL_SYSTEM_PROMPT = `You are Truthseekers, an AI encyclopedia agent that renders rich content inline. You MUST use render_blocks for ALL structured data — do NOT format timelines, maps, or lists as plain text/Markdown.
@@ -756,29 +759,24 @@ CRITICAL RULES:
 
 ### render_blocks — SINGLE TOOL FOR ALL RICH CONTENT
 Whenever you present structured information, call render_blocks. You can include multiple blocks of different types in a single call.
-
-Timeline data (chronological/historical): Use type "timeline" with events[{ year, event, description }]. Sort chronologically.
-
-Map data (geographic/locations): Use type "map_2d" or "map_3d" with markers[{ lat, lng, title, description? }]. Compute centerLat/centerLng as average of marker coordinates.
+Timeline data: Use type "timeline" with events[{ year, event, description }].
+Map data: Use type "map_2d" or "map_3d" with markers[{ lat, lng, title, description? }].
 
 Also supports: heading, text, citation, crossref, gallery, diagram (mermaid code), video, divider.
 
-Trigger phrases for timeline: "timeline", "history of", "sequence", "in order", "chronology", "when did", "show me the days/steps/ages"
-Trigger phrases for map: "map", "where is", "location", "geography", "places", "cities", "region", "layout of", "territory"
-
-### web_search — search the web for current information
-### webfetch — fetch the full content of a specific URL
-### article_search — search existing encyclopedia articles
-### get_article — look up an existing article by slug
-### get_map — look up an existing map by slug
-### generate_image — create a custom AI illustration
-### generate_video — generate a short AI video clip from a text description via DigitalOcean
-### verify_citation — check if a source supports a claim
-### suggest_related — find related articles and cross-references
-### task — delegate parallel research to a sub-agent
-### create_article — queue full article generation
-### mem_store — remember user preferences across conversations
-### mem_recall — recall stored user preferences`;
+### web_search — search the web
+### webfetch — fetch URL content
+### article_search — search existing articles
+### get_article — look up article by slug
+### get_map — look up map by slug
+### generate_image — create AI illustration
+### generate_video — generate AI video clip
+### verify_citation — verify claim against source
+### suggest_related — find related articles
+### task — delegate parallel research to sub-agent
+### create_article — queue article generation
+### mem_store — remember user preferences
+### mem_recall — recall user preferences`;
 
     const toolExecutors: Record<string, ToolExecutor> = {
       ...BUILT_IN_TOOL_EXECUTORS,
@@ -798,42 +796,27 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
       article_search: async (a) => {
         const results = await searchArticles(a.query, a.maxResults || 5);
         if (results.length === 0) return { result: "No articles found" };
-        return {
-          result: JSON.stringify(results.map((r) => ({ slug: r.slug, title: r.title, abstract: r.abstract?.slice(0, 300) }))),
-        };
+        return { result: JSON.stringify(results.map((r: any) => ({ slug: r.slug, title: r.title, abstract: r.abstract?.slice(0, 300) }))) };
       },
       get_map: async (a) => {
         const map = await getMap(a.slug);
         if (!map) return { result: "Map not found" };
         return {
-          result: JSON.stringify({
-            slug: map.slug, title: map.title, type: map.type,
-            region: map.region, era: map.era,
-            centerLat: map.centerLat, centerLng: map.centerLng, zoom: map.zoom,
-            markerCount: map.markers?.length || 0,
-            has3D: !!map.threedScene,
-            timelineCount: map.timeline?.length || 0,
-          }),
+          result: JSON.stringify({ slug: map.slug, title: map.title, markerCount: map.markers?.length || 0, has3D: !!map.threedScene }),
           blocks: map.markers ? [{ type: "map_2d", data: { markers: map.markers, centerLat: map.centerLat, centerLng: map.centerLng, zoom: map.zoom } }] : undefined,
         };
       },
       generate_image: async (a) => {
-        const result = await generateImage(a.prompt, { id: `chat-${Date.now()}`, caption: a.caption || "" });
-        if (!result) return { result: "Image generation failed" };
-        const src = result.url.startsWith("/") && PUBLIC_URL ? `${PUBLIC_URL}${result.url}` : result.url;
-        return {
-          result: JSON.stringify({ url: src, caption: result.caption }),
-          blocks: [{ type: "image", data: { src, caption: result.caption } }],
-        };
+        const r = await generateImage(a.prompt, { id: `chat-${Date.now()}`, caption: a.caption || "" });
+        if (!r) return { result: "Image generation failed" };
+        const src = r.url.startsWith("/") && PUBLIC_URL ? `${PUBLIC_URL}${r.url}` : r.url;
+        return { result: JSON.stringify({ url: src, caption: r.caption }), blocks: [{ type: "image", data: { src, caption: r.caption } }] };
       },
       generate_video: async (a) => {
-        const result = await generateVideo(a.prompt, { id: `chat-${Date.now()}`, caption: a.caption || "" });
-        if (!result) return { result: "Video generation failed" };
-        const src = result.url.startsWith("/") && PUBLIC_URL ? `${PUBLIC_URL}${result.url}` : result.url;
-        return {
-          result: JSON.stringify({ url: src, caption: result.caption }),
-          blocks: [{ type: "video", data: { src, caption: result.caption } }],
-        };
+        const r = await generateVideo(a.prompt, { id: `chat-${Date.now()}`, caption: a.caption || "" });
+        if (!r) return { result: "Video generation failed" };
+        const src = r.url.startsWith("/") && PUBLIC_URL ? `${PUBLIC_URL}${r.url}` : r.url;
+        return { result: JSON.stringify({ url: src, caption: r.caption }), blocks: [{ type: "video", data: { src, caption: r.caption } }] };
       },
       suggest_related: async (a) => {
         const [edges, backlinks] = await Promise.all([getGraphEdges(a.slug), getBacklinks(a.slug)]);
@@ -844,179 +827,151 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
         const subTools = Array.isArray(a.tools) && a.tools.length > 0
           ? CHAT_TOOL_DEFINITIONS.filter((t) => a.tools.includes(t.function.name))
           : CHAT_TOOL_DEFINITIONS.filter((t) => t.function.name === "web_search" || t.function.name === "webfetch");
-        const subConversation = [{ role: "user" as const, content: a.objective }];
-        const subResult = await sendPromptStream(subConversation, undefined, {
-          system: "You are a research sub-agent. Use your tools to accomplish the objective. Be concise and factual.",
-          tools: subTools,
-          temperature: 0.5,
-          maxTokens: 4096,
-          model: selectedModel,
-        });
+        const subResult = await sendPromptStream(
+          [{ role: "user" as const, content: a.objective }],
+          undefined,
+          { system: "You are a research sub-agent.", tools: subTools, temperature: 0.5, maxTokens: 4096, model: selectedModel }
+        );
         return { result: subResult.text || "Sub-agent completed with no output." };
       },
-      mem_store: async (a) => {
-        await memStore(a.key, a.value);
-        return { result: `Stored "${a.key}"` };
-      },
-      mem_recall: async (a) => {
-        const value = await memRecall(a.key);
-        return { result: value ?? `No stored value for "${a.key}"` };
-      },
+      mem_store: async (a) => { await memStore(a.key, a.value); return { result: `Stored "${a.key}"` }; },
+      mem_recall: async (a) => { const v = await memRecall(a.key); return { result: v ?? `No stored value for "${a.key}"` }; },
     };
 
-    // Inject session context: stored memories + recent conversation summary
     let sessionContext = "";
     try {
       const allMemories = await memRecallAll();
       if (allMemories.length > 0) {
-        sessionContext += "\n\n## User Preferences\n" + allMemories.map((m) => `${m.key}: ${m.value}`).join("\n");
+        sessionContext = "\n\n## User Preferences\n" + allMemories.map((m: any) => `${m.key}: ${m.value}`).join("\n");
       }
-    } catch {
-      // Memory backend unavailable — proceed without context
-    }
-    const recentSummary = existing.length > 2
-      ? `\n\n## Recent Conversation\nThis conversation has ${existing.length} prior messages. The last user message was: "${content.slice(0, 200)}"`
-      : "";
-    let contextualSystem = TOOL_SYSTEM_PROMPT + sessionContext + recentSummary;
+    } catch {}
 
-    try {
-      let conversation = [...initialMessages];
-
-      // Phase 3a: Planning — ask LLM to outline its strategy before executing (no event streaming, plan is internal)
-      const planResult = await withRetry(
-        () => sendPromptStream(conversation, undefined, {
-          system: contextualSystem + "\n\nBEFORE calling any tools, output a brief plan as a JSON array of tool names in the order you will call them. E.g. [\"article_search\", \"web_search\", \"webfetch\", \"render_blocks\"]. Then proceed with execution.",
-          temperature: 0.5,
-          tools: CHAT_TOOL_DEFINITIONS,
-          tool_choice: "none",
-          model: selectedModel,
-        }),
-        "chat-planning"
-      );
-      const planText = planResult.text || "";
-      const planMatch = planText.match(/\[[^\]]*\]/);
-      let plan: string[] = [];
-      if (planMatch) {
-        try { plan = JSON.parse(planMatch[0]); } catch { plan = []; }
-      }
-      if (plan.length > 0) {
-        conversation.push({ role: "assistant", content: planText });
-        conversation.push({ role: "system", content: `Your plan: ${JSON.stringify(plan)}. Follow this plan order. After executing each tool, move to the next. If a tool result suggests a different approach, you may adapt.` });
-      }
-
-      // Tool execution loop
-      let iteration = 0;
-      while (iteration < MAX_TOOL_ITERATIONS) {
-        iteration++;
-        // "auto" lets the LLM decide when it has enough information to respond.
-        // The plan is still in the system prompt as guidance but not enforced.
-        const toolChoice = "auto" as const;
-
-        const result = await withRetry(
-          () => sendPromptStream(conversation, onEvent, {
-            system: contextualSystem,
-            temperature: 0.7,
-            tools: CHAT_TOOL_DEFINITIONS,
-            tool_choice: toolChoice,
-            model: selectedModel,
-          }),
-          `chat-agent-iteration-${iteration}`
-        );
-
-        if (!result.toolCalls || result.toolCalls.length === 0) {
-          fullResponse = result.text;
-          break;
+    const piTools: AgentTool[] = AGENT_TOOLS.map((t: any) => ({
+      ...t,
+      execute: async (toolCallId: string, params: any) => {
+        const executor = toolExecutors[t.name];
+        if (!executor) return { content: [{ type: "text" as const, text: `Unknown tool: ${t.name}` }], details: {} };
+        try {
+          const output = await executor(params);
+          if (output.blocks) assistantBlocks.push(...output.blocks);
+          return { content: [{ type: "text" as const, text: output.result }], details: {} };
+        } catch (err: any) {
+          return { content: [{ type: "text" as const, text: `Error: ${err.message || err}` }], details: {}, isError: true };
         }
+      },
+    }));
 
-        const toolResults: Array<{ id: string; result: string }> = [];
+    const route = resolveModelRoute(selectedModel);
+    const model = buildModel(route);
 
-        for (const tc of result.toolCalls) {
-          let args: Record<string, unknown>;
-          try { args = JSON.parse(tc.function.arguments) as Record<string, unknown>; } catch {
-            args = {};
+    const piMessages: AgentMessage[] = existing.map(tsMsgToAgentMsg);
+
+    const agent = new Agent({
+      initialState: {
+        systemPrompt: TOOL_SYSTEM_PROMPT + sessionContext,
+        model,
+        messages: piMessages,
+        tools: piTools as any,
+      },
+      getApiKey: () => process.env.MODEL_ACCESS_KEY,
+    });
+
+    agent.subscribe((event: any) => {
+      try {
+        switch (event.type) {
+          case "tool_execution_start":
             stream.writeSSE({
-              data: JSON.stringify({ type: "status", data: `Warning: malformed tool arguments for ${tc.function.name}`, timestamp: Date.now() }),
+              data: JSON.stringify({ type: "tool_use", data: { name: event.toolName, args: event.args }, timestamp: Date.now() }),
               event: "agent_event",
             });
+            break;
+          case "tool_execution_end": {
+            const text = event.result?.content?.filter((b: any) => b.type === "text").map((b: any) => b.text).join("") || "";
+            stream.writeSSE({
+              data: JSON.stringify({ type: "tool_result", data: { name: event.toolName, result: text.slice(0, 1000) }, timestamp: Date.now() }),
+              event: "agent_event",
+            });
+            break;
           }
-          stream.writeSSE({
-            data: JSON.stringify({ type: "tool_use", data: { name: tc.function.name, args }, timestamp: Date.now() }),
-            event: "agent_event",
-          });
-
-          let toolResult = "";
-          try {
-            const output = await toolExecutors[tc.function.name]?.(args) ?? { result: `Unknown tool: ${tc.function.name}` };
-            toolResult = output.result;
-            if (output.blocks) assistantBlocks = assistantBlocks.concat(output.blocks);
-          } catch (err) {
-            toolResult = `Error executing ${tc.function.name}: ${err instanceof Error ? err.message : String(err)}`;
-          }
-
-          stream.writeSSE({
-            data: JSON.stringify({ type: "tool_result", data: { name: tc.function.name, result: toolResult.slice(0, 1000) }, timestamp: Date.now() }),
-            event: "agent_event",
-          });
-
-          toolResults.push({ id: tc.id, result: toolResult });
+          case "message_update":
+            if (event.assistantMessageEvent?.type === "text_delta") {
+              stream.writeSSE({
+                data: JSON.stringify({ type: "text", data: event.assistantMessageEvent.delta, timestamp: Date.now() }),
+                event: "agent_event",
+              });
+            }
+            break;
+          case "turn_end":
+            stream.writeSSE({
+              data: JSON.stringify({ type: "status", data: "Processing...", timestamp: Date.now() }),
+              event: "agent_event",
+            });
+            break;
         }
+      } catch {}
+    });
 
-        conversation.push({
-          role: "assistant",
-          content: null, // omit preamble text when tool calls are present to avoid contaminating conversation history
-          tool_calls: result.toolCalls,
-        });
+    try {
+      await agent.prompt(content);
 
-        for (const tr of toolResults) {
-          const MAX_TOOL_CONTENT = 1500;
-          const truncated = tr.result.length > MAX_TOOL_CONTENT
-            ? tr.result.slice(0, MAX_TOOL_CONTENT) + `\n\n[Result truncated (${tr.result.length} total chars)]`
-            : tr.result;
-          conversation.push({ role: "tool", content: truncated, tool_call_id: tr.id });
+      const finalMessages = agent.state.messages;
+      // Extract final assistant text — walk backwards to find last assistant message with text
+      for (let i = finalMessages.length - 1; i >= 0; i--) {
+        const m = finalMessages[i];
+        if (m.role === "assistant") {
+          const text = m.content?.filter((b: any) => b.type === "text").map((b: any) => b.text).join("") || "";
+          if (text) { fullResponse = text; break; }
         }
       }
+      const savedBase = existing.length;
 
-      if (iteration >= MAX_TOOL_ITERATIONS) {
-        fullResponse = fullResponse || "I've reached the maximum number of tool calls for this response. Let me know if you need more information.";
+      for (let i = savedBase; i < finalMessages.length; i++) {
+        const m = finalMessages[i];
+        const entryId = randomUUID();
+        if (m.role === "user") {
+          let c = "";
+          if (typeof m.content === "string") c = m.content;
+          else if (Array.isArray(m.content)) c = m.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
+          if (usingMem) memAddMessage(entryId, conversationId, "user", c || " ");
+          else await addMessage(entryId, conversationId, "user", c || " ");
+        } else if (m.role === "assistant") {
+          const text = m.content?.filter((b: any) => b.type === "text").map((b: any) => b.text).join("") || " ";
+          const toolCalls = m.content?.filter((b: any) => b.type === "toolCall").map((b: any) => ({
+            id: b.id, type: "function",
+            function: { name: b.name, arguments: JSON.stringify(b.arguments) },
+          })) || [];
+          if (usingMem) memAddMessage(entryId, conversationId, "assistant", text, undefined, toolCalls.length > 0 ? toolCalls : undefined);
+          else await addMessage(entryId, conversationId, "assistant", text, undefined, toolCalls.length > 0 ? toolCalls : undefined);
+        } else if (m.role === "toolResult") {
+          const text = m.content?.filter((b: any) => b.type === "text").map((b: any) => b.text).join("") || " ";
+          if (usingMem) memAddMessage(entryId, conversationId, "tool", text, undefined, undefined, m.toolCallId);
+          else await addMessage(entryId, conversationId, "tool", text, undefined, undefined, m.toolCallId);
+        }
       }
 
-      // Save assistant response (with blocks from tool results)
-      const finalContent = fullResponse || "I processed your request using available tools.";
-      const finalBlocks = assistantBlocks.length > 0 ? assistantBlocks : undefined;
-      if (usingMem) {
-        memAddMessage(msgId, conversationId, "assistant", finalContent, finalBlocks);
-      } else {
-        await addMessage(msgId, conversationId, "assistant", finalContent, finalBlocks);
-      }
-
-      // Update conversation title from first exchange
       if (existing.length <= 1) {
-        const firstContent = content.length > 60 ? content.slice(0, 60) + "..." : content;
-        try { await updateConversationTitle(conversationId, firstContent); } catch {
+        const title = content.length > 60 ? content.slice(0, 60) + "..." : content;
+        try { await updateConversationTitle(conversationId, title); } catch {
           const conv = memConversations.get(conversationId);
-          if (conv) conv.title = firstContent;
+          if (conv) conv.title = title;
         }
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      const hasBlocks = assistantBlocks.length > 0;
-      fullResponse = hasBlocks
-        ? "Response generated (some tools encountered an error — images or videos may be missing)."
-        : `Error: ${errorMsg}`;
-      const blocks = hasBlocks ? assistantBlocks : undefined;
-      if (usingMem) {
-        memAddMessage(randomUUID(), conversationId, "assistant", fullResponse, blocks);
-      } else {
-        await addMessage(randomUUID(), conversationId, "assistant", fullResponse, blocks).catch(() => {});
+      if (!fullResponse) {
+        fullResponse = assistantBlocks.length > 0
+          ? "Response generated (some tools encountered an error)."
+          : `Error: ${errorMsg}`;
       }
+      const blocks = assistantBlocks.length > 0 ? assistantBlocks : undefined;
       try {
-        await stream.writeSSE({
-          data: JSON.stringify({ type: "done", msgId, content: fullResponse, blocks }),
-          event: "agent_event",
-        });
-      } catch {
-        // Stream closed — done event lost; frontend falls back via useChatStream fallback
-      }
+        const catchMsgId = randomUUID();
+        if (usingMem) memAddMessage(catchMsgId, conversationId, "assistant", fullResponse, blocks);
+        else await addMessage(catchMsgId, conversationId, "assistant", fullResponse, blocks);
+      } catch {}
+      try {
+        await stream.writeSSE({ data: JSON.stringify({ type: "done", msgId, content: fullResponse, blocks }), event: "agent_event" });
+      } catch {}
       return;
     }
 
@@ -1025,9 +980,7 @@ Trigger phrases for map: "map", "where is", "location", "geography", "places", "
         data: JSON.stringify({ type: "done", msgId, content: fullResponse, blocks: assistantBlocks.length > 0 ? assistantBlocks : undefined }),
         event: "agent_event",
       });
-    } catch {
-      // Stream closed — done event lost; frontend falls back
-    }
+    } catch {}
   });
 });
 
