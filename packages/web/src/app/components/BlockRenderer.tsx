@@ -31,6 +31,41 @@ import type {
   ListBlockData,
 } from "@encarta/core";
 
+function normalizeBlockData(block: Block): Block {
+  if (!block.data) return block;
+  const d = block.data as Record<string, unknown>;
+
+  if (block.type === "text" && typeof d.text === "string" && !d.content) {
+    d.content = d.text; delete d.text;
+  }
+  if (block.type === "image" && typeof d.url === "string" && !d.src) {
+    d.src = d.url; delete d.url;
+  }
+  if (block.type === "video" && typeof d.url === "string" && !d.src) {
+    d.src = d.url; delete d.url;
+  }
+  if (block.type === "citation") {
+    if (typeof d.text === "string" && !d.title) { d.title = d.text; delete d.text; }
+    if (typeof d.source === "string" && !d.url) { d.url = d.source; delete d.source; }
+  }
+  if (block.type === "gallery" && Array.isArray(d.images)) {
+    d.images = d.images.map((img: any) => {
+      if (img && typeof img.url === "string" && !img.src) { img.src = img.url; }
+      return img;
+    });
+  }
+  if (block.type === "timeline" && Array.isArray(d.events)) {
+    d.events = d.events.map((e: any) => {
+      if (e && typeof e.year === "string") {
+        const cleaned = e.year.replace(/[^0-9\-]/g, "");
+        e.year = parseInt(cleaned, 10) || 0;
+      }
+      return e;
+    });
+  }
+  return block;
+}
+
 export default function BlockRenderer({ blocks, compact = false }: { blocks: Block[]; compact?: boolean }) {
   if (!blocks || blocks.length === 0) {
     return <div className="text-sm" style={{ color: "var(--subtle)" }}>No content yet.</div>;
@@ -39,7 +74,7 @@ export default function BlockRenderer({ blocks, compact = false }: { blocks: Blo
   return (
     <div className="block-renderer">
       {blocks.map((block, i) => (
-        <BlockCard key={block.id ?? `block-${i}`} block={block} compact={compact} />
+        <BlockCard key={block.id ?? `block-${i}`} block={normalizeBlockData(block)} compact={compact} />
       ))}
     </div>
   );
