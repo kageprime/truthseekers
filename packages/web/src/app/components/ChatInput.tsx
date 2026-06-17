@@ -33,12 +33,14 @@ interface ChatInputProps {
   suggestions?: string[];
   model?: string;
   onModelChange?: (model: string) => void;
+  consoleOpen?: boolean;
+  onToggleConsole?: () => void;
 }
 
 export default function ChatInput({
   input, sending, editingIndex, showCommands, slashCommands,
   onChange, onSend, onStop, onCancelEdit, onSlashCommand, onKeyDown, textareaRef, suggestions = [],
-  model, onModelChange,
+  model, onModelChange, consoleOpen, onToggleConsole,
 }: ChatInputProps) {
   const [modelOpen, setModelOpen] = useState(false);
   const modelRef = useRef<HTMLDivElement>(null);
@@ -89,40 +91,58 @@ export default function ChatInput({
           </div>
         )}
 
-        {/* Model selector */}
-        {model && onModelChange && (
-          <div className="relative mb-2" ref={modelRef}>
-            <button
-              onClick={() => setModelOpen(!modelOpen)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors"
-              style={{ background: "var(--border-light)", color: "var(--muted)" }}
-            >
-              {MODELS.find((m) => m.id === model)?.label || model}
-              <IconChevronRight size={10} className={`transition-transform ${modelOpen ? "rotate-90" : ""}`} />
-            </button>
-            {modelOpen && (
-              <div
-                className="absolute bottom-full left-0 mb-1 rounded-xl p-1 shadow-lg glass-sm"
-                style={{ background: "var(--surface)", border: "1px solid var(--border-light)", zIndex: 60, minWidth: "150px" }}
+        {/* Model selector + Console toggle */}
+        <div className="flex items-center gap-2 mb-2" style={{ minHeight: 28 }}>
+          {model && onModelChange && (
+            <div className="relative" ref={modelRef}>
+              <button
+                onClick={() => setModelOpen(!modelOpen)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors"
+                style={{ background: "var(--border-light)", color: "var(--muted)" }}
               >
-                {MODELS.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => { onModelChange(m.id); setModelOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-left transition-colors"
-                    style={{
-                      background: m.id === model ? "var(--accent-bg)" : "transparent",
-                      color: m.id === model ? "var(--accent)" : "var(--ink)",
-                    }}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: m.id === model ? "var(--accent)" : "var(--border)" }} />
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                {MODELS.find((m) => m.id === model)?.label || model}
+                <IconChevronRight size={10} className={`transition-transform ${modelOpen ? "rotate-90" : ""}`} />
+              </button>
+              {modelOpen && (
+                <div
+                  className="absolute bottom-full left-0 mb-1 rounded-xl p-1 shadow-lg glass-sm"
+                  style={{ background: "var(--surface)", border: "1px solid var(--border-light)", zIndex: 60, minWidth: "150px" }}
+                >
+                  {MODELS.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => { onModelChange(m.id); setModelOpen(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-left transition-colors"
+                      style={{
+                        background: m.id === model ? "var(--accent-bg)" : "transparent",
+                        color: m.id === model ? "var(--accent)" : "var(--ink)",
+                      }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: m.id === model ? "var(--accent)" : "var(--border)" }} />
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {onToggleConsole && (
+            <button
+              onClick={onToggleConsole}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors"
+              style={{
+                background: consoleOpen ? "var(--accent-bg)" : "var(--border-light)",
+                color: consoleOpen ? "var(--accent)" : "var(--muted)",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              Console
+            </button>
+          )}
+        </div>
 
         {/* Slash commands dropdown */}
         {showCommands && (

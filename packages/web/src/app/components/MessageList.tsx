@@ -2,8 +2,8 @@
 
 import ChatMessage from "./ChatMessage";
 import FollowUpSuggestions from "./FollowUpSuggestions";
-import { type AgentEvent, ToolUseCard, ToolResultCard, TextDeltaCard } from "./ProcessViewer";
-import { IconXCircle, IconLightning, IconX } from "./Icons";
+import type { AgentEvent } from "./ProcessViewer";
+import { IconXCircle } from "./Icons";
 
 interface Message {
   id: string;
@@ -34,41 +34,6 @@ interface MessageListProps {
   onRetry: () => void;
   onSetInput: (val: string) => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
-}
-
-function InlineAgentEvent({ event }: { event: AgentEvent }) {
-  return (
-    <div className="flex items-start gap-1.5 py-1 px-2 rounded-lg">
-      <div className="shrink-0 flex items-center gap-1 text-xs" style={{ color: "var(--muted)", fontFamily: "monospace", minWidth: "3.5rem" }}>
-        {event.type === "tool_use" && <span style={{ color: "var(--accent)" }}>◆</span>}
-        {event.type === "tool_result" && <span style={{ color: "var(--green)" }}>◀</span>}
-        {event.type === "text" && <span style={{ color: "var(--ink)" }}>▸</span>}
-        {event.type === "status" && <IconLightning size={10} />}
-        {event.type === "error" && <IconX size={10} />}
-      </div>
-      <div className="flex-1 min-w-0">
-        {event.type === "tool_use" && (
-          <ToolUseCard data={event.data as any} />
-        )}
-        {event.type === "tool_result" && (
-          <ToolResultCard data={event.data as any} />
-        )}
-        {event.type === "text" && (
-          <TextDeltaCard data={event.data as any} />
-        )}
-        {event.type === "status" && (
-          <div className="text-xs font-medium" style={{ color: "var(--muted)" }}>
-            {String(event.data)}
-          </div>
-        )}
-        {event.type === "error" && (
-          <div className="text-xs font-medium" style={{ color: "var(--red)" }}>
-            {String(event.data)}
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }
 
 export default function MessageList({
@@ -152,15 +117,11 @@ export default function MessageList({
                 </div>
               )}
 
-              {/* Live agent activity — always visible during streaming */}
-              {agentEvents.length > 0 && (
-                <div className="glass-sm rounded-xl py-2 px-1 space-y-0.5" style={{ background: "var(--surface-glass)" }}>
-                  <div className="text-xs font-semibold px-2 pb-1" style={{ color: "var(--muted)" }}>
-                    Agent Activity · {agentEvents.length}
-                  </div>
-                  {agentEvents.map((event, i) => (
-                    <InlineAgentEvent key={`${event.timestamp}-${i}`} event={event} />
-                  ))}
+              {/* Agent activity count badge — console handles the details */}
+              {agentEvents.length > 0 && !streamContent && streamBlocks.length === 0 && (
+                <div className="flex items-center gap-2 text-xs mb-3" style={{ color: "var(--muted)" }}>
+                  <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--accent)" }} />
+                  <span>{agentEvents.length} events · {phaseLabel}</span>
                 </div>
               )}
             </div>

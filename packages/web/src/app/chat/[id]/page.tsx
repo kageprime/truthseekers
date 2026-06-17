@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { fetchChat } from "@/lib/api";
 import type { ConversationDetail } from "@/lib/api";
 import { useAuth } from "../../hooks/useAuth";
-import PageLayout from "../../components/PageLayout";
 import MessageList from "../../components/MessageList";
 import ChatInput from "../../components/ChatInput";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import { useChatStream } from "../../hooks/useChatStream";
+import TruthConsole from "../../components/TruthConsole";
 import { IconSearch, IconBook, IconMap, IconLightning } from "../../components/Icons";
 
 const SLASH_COMMANDS = [
@@ -81,6 +81,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [followUps, setFollowUps] = useState<string[]>([]);
   const [showCommands, setShowCommands] = useState(false);
   const [model, setModel] = useState("deepseek-4-flash");
+  const [consoleOpen, setConsoleOpen] = useState(false);
   const lastMessageRef = useRef("");
   const autoSentRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -158,7 +159,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         setFollowUps(generateFollowUps(lastMessageRef.current));
         setData((prev) => {
           if (!prev) return prev;
-          const real = prev.messages.filter((m) => !m.id.startsWith("temp-"));
+          const real = prev.messages.map((m) =>
+            m.id.startsWith("temp-") ? { ...m, id: `user-${Date.now()}`, conversationId: id } : m
+          );
           const updated = { ...prev, messages: [...real, { id: event.msgId ?? `msg-${Date.now()}`, conversationId: id, role: "assistant" as const, content: event.content || "", blocks: finalBlocks, agentEvents: savedEvents, createdAt: new Date().toISOString() }] };
           chatCache.set(id, updated);
           return updated;
@@ -283,33 +286,29 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   if (loading) {
     return (
-      <PageLayout sidebar sidebarDefaultOpen activeId={id} noFooter noHeader>
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6">
-          <div className="w-8 h-8 rounded-full border-3 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
-          <p className="text-sm" style={{ color: "var(--subtle)" }}>Loading conversation...</p>
-        </div>
-      </PageLayout>
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6">
+        <div className="w-8 h-8 rounded-full border-3 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
+        <p className="text-sm" style={{ color: "var(--subtle)" }}>Loading conversation...</p>
+      </div>
     );
   }
 
   if (!data) {
     return (
-      <PageLayout sidebar sidebarDefaultOpen activeId={id} noFooter noHeader>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-sm mb-4" style={{ color: error ? "var(--red)" : "var(--subtle)" }}>
-              {error || "Conversation not found"}
-            </p>
-            <Link href="/chat" className="btn btn-primary btn-sm">Back to Chat</Link>
-          </div>
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-sm mb-4" style={{ color: error ? "var(--red)" : "var(--subtle)" }}>
+            {error || "Conversation not found"}
+          </p>
+          <Link href="/chat" className="btn btn-primary btn-sm">Back to Chat</Link>
         </div>
-      </PageLayout>
+      </div>
     );
   }
 
   return (
-    <PageLayout sidebar sidebarDefaultOpen activeId={id} noFooter noHeader>
-      <div className="flex-1 flex flex-col min-h-0 chat-enter">
+    <div className="flex-1 flex flex-row min-h-0 chat-enter">
+      <div className="flex-1 flex flex-col min-w-0">
         <MessageList
           messages={messages}
           streamContent={streamContent}
@@ -319,8 +318,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           followUps={followUps}
           showScrollBtn={showScrollBtn}
           phaseLabel={phaseLabel}
-            agentEvents={agentEvents}
-            lastAssistantIndex={lastAssistantIndex}
+          agentEvents={agentEvents}
+          lastAssistantIndex={lastAssistantIndex}
           suggestedTopics={suggestedTopics}
           scrollRef={scrollRef}
           onScrollToBottom={scrollToBottom}
@@ -346,8 +345,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           onKeyDown={handleKeyDown}
           model={model}
           onModelChange={setModel}
+          consoleOpen={consoleOpen}
+          onToggleConsole={() => setConsoleOpen((c) => !c)}
         />
       </div>
-    </PageLayout>
+      {consoleOpen && (
+        <TruthConsole
+          events={agentEvents}
+          loading={sending}
+          onClose={() => setConsoleOpen(false)}
+        />
+      )}
+    </div>
   );
 }
