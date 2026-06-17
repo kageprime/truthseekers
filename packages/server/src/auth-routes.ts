@@ -179,7 +179,7 @@ const GOOGLE_CLIENT_ID_ENV = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 
 export function getApiOrigin(c: any): string {
-  return `${c.req.header("x-forwarded-proto") || "http"}://${c.req.header("host") || "localhost:4097"}`;
+  return process.env.OAUTH_REDIRECT_URL || `${c.req.header("x-forwarded-proto") || "http"}://${c.req.header("host") || "localhost:4097"}`;
 }
 
 export function getFrontendOrigin(): string {
