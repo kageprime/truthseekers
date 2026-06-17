@@ -17,6 +17,7 @@ interface PageLayoutProps {
   footerText?: string;
   sidebar?: boolean;
   sidebarDefaultOpen?: boolean;
+  sidebarDefaultCollapsed?: boolean;
   activeId?: string;
   noFooter?: boolean;
   noHeader?: boolean;
@@ -28,6 +29,7 @@ export default function PageLayout({
   footerText = "The Living Encyclopedia · AI-powered knowledge base",
   sidebar = false,
   sidebarDefaultOpen = false,
+  sidebarDefaultCollapsed = false,
   activeId,
   noFooter = false,
   noHeader = false,
@@ -83,6 +85,7 @@ export default function PageLayout({
             open={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
             activeId={activeId}
+            defaultCollapsed={sidebarDefaultCollapsed}
           />
         )}
         <div className="flex-1 flex flex-col min-w-0 min-h-0" id="main-content">
