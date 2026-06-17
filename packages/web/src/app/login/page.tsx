@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import TruthseekersLogo from "../components/TruthseekersLogo";
 import { BASE } from "@/lib/constants";
-import { IconSend, IconLightning } from "../components/Icons";
+import { IconSend } from "../components/Icons";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -113,31 +113,6 @@ export default function LoginPage() {
               <span className="text-xs" style={{ color: "var(--subtle)" }}>or</span>
               <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
             </div>
-
-            {/* Dev login shortcut */}
-            <button
-              onClick={async () => {
-                setLoading(true); setError("");
-                try {
-                  const res = await fetch(`${BASE}/auth/login`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email: "dev@encarta.local" }),
-                  });
-                  const data = await res.json();
-                  if (!res.ok) { setError(data.error || "Login failed"); setLoading(false); return; }
-                  if (data.token) {
-                    localStorage.setItem("truthseekers_token", data.token);
-                    router.push(data.user?.onboarded ? "/" : "/onboarding");
-                  }
-                } catch { setError("Network error"); }
-                setLoading(false);
-              }}
-              className="w-full mb-4 text-xs py-2 border-2 border-dashed border-[var(--ink)] transition-all hover:bg-white"
-              style={{ background: "transparent", color: "var(--ink)" }}
-            >
-              <IconLightning size={14} /> Dev Login (skip OAuth)
-            </button>
 
             {/* Email form */}
             <form onSubmit={handleEmailSubmit} className="space-y-4">
