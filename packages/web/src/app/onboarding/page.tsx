@@ -2,14 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import TruthseekersLogo from "../components/TruthseekersLogo";
 import { useAuth } from "../hooks/useAuth";
-import { BASE } from "@/lib/api";
 
 const STEPS = [
-  { icon: "👋", title: "YOUR NAME", description: "What should we call you?" },
+  { icon: "👋", title: "WELCOME", description: "What should we call you?" },
   { icon: "🎯", title: "YOUR GOAL", description: "How will you use Truthseekers?" },
-  { icon: "🚀", title: "FIRST ARTICLE", description: "Let's generate your first article" },
 ];
 
 const GOALS = [
@@ -22,9 +19,6 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
-  const [articleSlug, setArticleSlug] = useState("");
-  const [generating, setGenerating] = useState(false);
-  const [done, setDone] = useState(false);
   const { user, completeOnboarding } = useAuth();
   const router = useRouter();
 
@@ -32,25 +26,9 @@ export default function OnboardingPage() {
     if (step === 0 && name.trim()) {
       setStep(1);
     } else if (step === 1 && goal) {
-      setStep(2);
-    } else if (step === 2) {
-      if (!articleSlug.trim()) return;
-      setGenerating(true);
-      try {
-        await fetch(`${BASE}/articles/${encodeURIComponent(articleSlug)}/generate`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ persona: "veritas" }),
-        });
-      } catch {}
-      setGenerating(false);
-      setDone(true);
+      const ok = await completeOnboarding(name);
+      if (ok) router.push("/chat?tour=true");
     }
-  };
-
-  const handleFinish = async () => {
-    const ok = await completeOnboarding(name);
-    if (ok) router.push("/chat");
   };
 
   if (!user) {
@@ -65,23 +43,7 @@ export default function OnboardingPage() {
     <main className="min-h-screen flex flex-col" style={{ background: "var(--surface)" }}>
       <div className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
-
-          {done ? (
-            <div className="glass-card-static p-8 text-center">
-              <div className="text-4xl mb-4">🎉</div>
-              <h2 className="text-lg font-semibold mb-2" style={{ color: "var(--ink)" }}>YOU'RE ALL SET</h2>
-              <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
-                {articleSlug ? `"${articleSlug}" is being generated.` : "Your encyclopedia is ready."}
-              </p>
-              <button
-                onClick={handleFinish}
-                className="btn btn-primary btn-lg"
-              >
-                START EXPLORING →
-              </button>
-            </div>
-          ) : (
-            <div className="glass-card-static p-6 sm:p-8">
+          <div className="glass-card-static p-6 sm:p-8">
               {/* Pixel step indicator */}
               <div className="flex items-center justify-center gap-1 mb-8">
                 {STEPS.map((_, i) => (
@@ -142,30 +104,14 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              {step === 2 && (
-                <div className="mb-4">
-                  <p className="text-xs font-medium mb-2" style={{ color: "var(--muted)" }}>Pick a topic for your first article</p>
-                  <input
-                    type="text"
-                    value={articleSlug}
-                    onChange={(e) => setArticleSlug(e.target.value)}
-                    placeholder="e.g. artificial-intelligence, ancient-rome"
-                    autoFocus
-                    className="input"
-                    onKeyDown={(e) => e.key === "Enter" && articleSlug.trim() && handleNext()}
-                  />
-                </div>
-              )}
-
               <button
                 onClick={handleNext}
-                disabled={step === 0 && !name.trim() || step === 1 && !goal || step === 2 && !articleSlug.trim() || generating}
+                disabled={step === 0 && !name.trim() || step === 1 && !goal}
                 className="btn btn-primary w-full mt-2"
               >
-                {generating ? "GENERATING..." : step < 2 ? "NEXT →" : "GENERATE ARTICLE →"}
+                {step === 1 ? "START CHAT →" : "NEXT →"}
               </button>
             </div>
-          )}
 
         </div>
       </div>

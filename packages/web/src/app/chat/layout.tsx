@@ -1,17 +1,32 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import Sidebar from "../components/Sidebar";
+import ChatTour from "../components/ChatTour";
 
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showTour, setShowTour] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("tour") === "true") {
+      setShowTour(true);
+      // Clean URL without full page reload
+      const url = new URL(window.location.href);
+      url.searchParams.delete("tour");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [searchParams]);
 
   const activeId = pathname.startsWith("/chat/") ? pathname.split("/")[2] : undefined;
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col">
+    <>
+      {showTour && <ChatTour onComplete={() => setShowTour(false)} />}
+      <div className="h-screen overflow-hidden flex flex-col">
       {/* Mobile hamburger when sidebar is closed */}
       {!sidebarOpen && (
         <button
@@ -55,5 +70,6 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
         </div>
       </div>
     </div>
+    </>
   );
 }
