@@ -1,95 +1,37 @@
-export const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
-
-import type {
-  Article as ArticleType,
-  MediaItem,
-  ArticleMetadata,
-  Section,
-  TimelineEvent as TimelineEventType,
-  CrossReference,
-  Citation,
-  ThreeDScene,
-  ThreeDMapScene,
-  ThreeDBuilding,
-  ThreeDAnnotation,
-  JobInfo as JobInfoType,
-} from "@encarta/core";
-
-export type {
-  ArticleType as Article,
-  MediaItem,
-  ArticleMetadata,
-  Section,
-  TimelineEventType as TimelineEvent,
-  CrossReference,
-  Citation,
-  ThreeDScene,
-  ThreeDMapScene,
-  ThreeDBuilding,
-  ThreeDAnnotation,
-  JobInfoType as JobInfo,
-};
-
-interface ArticleSummary {
-  slug: string;
-  title: string;
-  abstract: string;
-  metadata: { status: string; version: number; updated: string };
-  categories: string[];
-  thumbnail?: string;
-}
+import { BASE } from "./constants";
+import type { Article, JobInfo, ArticleSummary, QuotaInfo, ConversationSummary, ConversationDetail, MapEntry } from "@encarta/core";
 
 interface PaginatedResponse<T> {
   data: T[];
-  pagination: {
-    limit: number;
-    offset: number;
-    hasMore: boolean;
-    nextOffset: number | null;
-  };
+  pagination: { limit: number; offset: number; hasMore: boolean; nextOffset: number | null };
 }
 
 export async function fetchArticles(offset = 0, limit = 50): Promise<PaginatedResponse<ArticleSummary>> {
-  const res = await fetch(`${BASE}/articles?limit=${limit}&offset=${offset}`, {
-    cache: "no-store",
-  });
+  const res = await fetch(`${BASE}/articles?limit=${limit}&offset=${offset}`, { cache: "no-store" });
   if (!res.ok) return { data: [], pagination: { limit, offset, hasMore: false, nextOffset: null } };
   return res.json();
 }
 
 export async function searchArticles(query: string): Promise<ArticleSummary[]> {
-  const res = await fetch(`${BASE}/articles/search?q=${encodeURIComponent(query)}`, {
-    cache: "no-store",
-  });
+  const res = await fetch(`${BASE}/articles/search?q=${encodeURIComponent(query)}`, { cache: "no-store" });
   if (!res.ok) return [];
   return res.json();
 }
 
-export async function fetchArticle(slug: string): Promise<ArticleType | null> {
+export async function fetchArticle(slug: string): Promise<Article | null> {
   const res = await fetch(`${BASE}/articles/${slug}`, { cache: "no-store" });
   if (!res.ok) return null;
   return res.json();
 }
 
-export async function fetchArticleStatus(slug: string): Promise<JobInfoType | { status: string } | null> {
+export async function fetchArticleStatus(slug: string): Promise<JobInfo | { status: string } | null> {
   const res = await fetch(`${BASE}/articles/${slug}/status`, { cache: "no-store" });
   if (!res.ok) return null;
   return res.json();
 }
 
-export interface QuotaInfo {
-  allowed: boolean;
-  used: number;
-  limit: number;
-  remaining: number;
-  tier: string;
-}
-
 export async function fetchQuota(): Promise<QuotaInfo | null> {
-  const res = await fetch(`${BASE}/quota`, {
-    cache: "no-store",
-    headers: { ...authHeaders() },
-  });
+  const res = await fetch(`${BASE}/quota`, { cache: "no-store", headers: { ...authHeaders() } });
   if (!res.ok) return null;
   return res.json();
 }
@@ -117,54 +59,10 @@ export function progressUrl(slug: string): string {
 
 // --- Maps ---
 
-export interface MapMarker {
-  lat: number;
-  lng: number;
-  title: string;
-  description?: string;
-  type?: "city" | "battle" | "site" | "museum" | "other";
-}
-
-export interface MapLayer {
-  id: string;
-  label: string;
-  year?: number;
-  geoJson: object;
-  visible?: boolean;
-}
-
-export interface MapEntry {
-  slug: string;
-  title: string;
-  subtitle?: string;
-  description: string;
-  content: string;
-  image?: string;
-  region?: string;
-  era?: string;
-  type: "static" | "interactive";
-  externalUrl?: string;
-  centerLat?: number;
-  centerLng?: number;
-  zoom?: number;
-  geoJson?: object;
-  markers?: MapMarker[];
-  layers?: MapLayer[];
-  timeline?: TimelineEventType[];
-  threedScene?: ThreeDMapScene;
-  createdAt: string;
-  updatedAt: string;
-}
-
 interface MapsResponse {
   data: MapEntry[];
   interactive: MapEntry[];
-  pagination: {
-    limit: number;
-    offset: number;
-    hasMore: boolean;
-    nextOffset: number | null;
-  };
+  pagination: { limit: number; offset: number; hasMore: boolean; nextOffset: number | null };
 }
 
 export async function fetchMaps(limit = 50, offset = 0): Promise<{ maps: MapEntry[]; interactive: MapEntry[] }> {
@@ -186,26 +84,7 @@ export async function fetchMap(slug: string): Promise<MapEntry | null> {
   return res.json();
 }
 
-// ── Chat ───────────────────────────────────────────────────────────────────
-
-export interface ConversationSummary {
-  id: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  messageCount: number;
-}
-
-export interface ConversationDetail extends ConversationSummary {
-  messages: Array<{
-    id: string;
-    conversationId: string;
-    role: "user" | "assistant" | "system";
-    content: string;
-    blocks?: any[];
-    createdAt: string;
-  }>;
-}
+// ── Chat ──
 
 function authHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {};
@@ -219,10 +98,7 @@ export async function createChat(title?: string): Promise<ConversationSummary | 
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ title }),
   });
-  if (!res.ok) {
-    console.error("createChat failed", res.status, await res.text().catch(() => ""));
-    return null;
-  }
+  if (!res.ok) { console.error("createChat failed", res.status, await res.text().catch(() => "")); return null; }
   return res.json();
 }
 

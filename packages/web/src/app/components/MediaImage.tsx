@@ -1,6 +1,6 @@
 "use client";
 
-import { BASE } from "@/lib/api";
+import { BASE } from "@/lib/constants";
 import { IconImage } from "./Icons";
 
 export function SkeletonImage({ caption }: { caption?: string }) {

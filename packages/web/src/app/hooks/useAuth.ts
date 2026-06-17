@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { BASE } from "@/lib/api";
+import { BASE } from "@/lib/constants";
 
 interface User {
   id: string;

@@ -20,8 +20,8 @@ function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}
-      className="absolute top-1 right-1 px-2 py-0.5 text-[10px] font-sans rounded opacity-0 group-hover:opacity-100 transition-opacity"
-      style={{ background: "#333", color: "#ccc" }}
+      className="absolute top-2 right-2 px-2 py-0.5 text-[10px] font-sans rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+      style={{ background: "var(--background)", color: "var(--subtle)", border: "1px solid var(--border)" }}
     >
       {copied ? "Copied" : "Copy"}
     </button>
@@ -34,17 +34,13 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
       remarkPlugins={[remarkGfm, remarkMath]}
       rehypePlugins={[rehypeKatex]}
       components={{
+        p({ children }) {
+          return <p style={{ margin: "0.5rem 0", lineHeight: "1.7", color: "var(--ink)" }}>{children}</p>;
+        },
         table({ children }) {
           return (
-            <div style={{ overflowX: "auto", margin: "1rem 0" }}>
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  border: "3px solid #1c1917",
-                  boxShadow: "4px 4px 0 rgba(28,25,23,0.1)",
-                }}
-              >
+            <div style={{ overflowX: "auto", margin: "1rem 0", borderRadius: "0.5rem", border: "1px solid var(--border)" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.875rem" }}>
                 {children}
               </table>
             </div>
@@ -55,11 +51,12 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
             <th
               style={{
                 padding: "0.5rem 0.75rem",
-                border: "2px solid #1c1917",
-                background: "#fef3c7",
+                borderBottom: "2px solid var(--border)",
+                background: "var(--surface-glass)",
                 textAlign: "left",
-                fontFamily: "'Press Start 2P',monospace",
-                fontSize: "0.65rem",
+                fontWeight: 600,
+                fontSize: "0.8rem",
+                color: "var(--ink)",
               }}
             >
               {children}
@@ -71,8 +68,9 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
             <td
               style={{
                 padding: "0.4rem 0.75rem",
-                border: "1.5px solid #ddd",
-                fontSize: "0.9rem",
+                borderBottom: "1px solid var(--border)",
+                fontSize: "0.85rem",
+                color: "var(--ink)",
               }}
             >
               {children}
@@ -82,14 +80,16 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
         code({ className, children, ...props }) {
           const isInline = !className;
           if (isInline) {
-          return (
-            <code
-              style={{
-                background: "#f0f0f0",
-                padding: "0.15rem 0.4rem",
-                fontSize: "0.9em",
-                border: "1px solid #ddd",
-              }}
+            return (
+              <code
+                style={{
+                  background: "var(--surface-glass)",
+                  padding: "0.15rem 0.4rem",
+                  fontSize: "0.85em",
+                  borderRadius: "0.25rem",
+                  border: "1px solid var(--border)",
+                  color: "var(--ink)",
+                }}
                 {...props}
               >
                 {children}
@@ -102,13 +102,14 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
               <CopyButton text={codeText} />
               <pre
                 style={{
-                  background: "#2d2a24",
-                  color: "#e8dcc8",
-                  border: "2px solid var(--ink)",
+                  background: "var(--surface-glass)",
+                  color: "var(--ink)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "0.5rem",
                   padding: "1rem",
                   overflowX: "auto",
                   fontSize: "0.85rem",
-                  lineHeight: "1.4",
+                  lineHeight: "1.5",
                   margin: "0.75rem 0",
                 }}
               >
@@ -125,7 +126,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: "var(--accent)", textDecoration: "underline", textUnderlineOffset: "2px" }}
+              style={{ color: "var(--accent)", textDecoration: "underline", textUnderlineOffset: "2px", textDecorationColor: "var(--border)" }}
             >
               {children}
             </a>
@@ -137,9 +138,11 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
               style={{
                 padding: "0.75rem 1rem",
                 margin: "1rem 0",
-                background: "var(--cream)",
+                borderLeft: "3px solid var(--accent)",
+                background: "var(--surface-glass)",
+                borderRadius: "0.5rem",
+                color: "var(--muted)",
                 fontStyle: "italic",
-                border: "2px solid var(--ink)",
               }}
             >
               {children}
@@ -150,10 +153,12 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
           return (
             <h1
               style={{
-                fontWeight: 800,
-                fontSize: "1.5rem",
+                fontWeight: 700,
+                fontSize: "1.4rem",
                 marginTop: "1.5rem",
                 marginBottom: "0.5rem",
+                color: "var(--ink)",
+                letterSpacing: "-0.02em",
               }}
             >
               {children}
@@ -164,12 +169,12 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
           return (
             <h2
               style={{
-                fontWeight: 800,
-                fontSize: "1.3rem",
+                fontWeight: 600,
+                fontSize: "1.2rem",
                 marginTop: "1.5rem",
                 marginBottom: "0.5rem",
-                borderBottom: "2px solid var(--border)",
-                paddingBottom: "0.25rem",
+                color: "var(--ink)",
+                letterSpacing: "-0.01em",
               }}
             >
               {children}
@@ -180,10 +185,11 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
           return (
             <h3
               style={{
-                fontWeight: 700,
-                fontSize: "1.1rem",
+                fontWeight: 600,
+                fontSize: "1.05rem",
                 marginTop: "1.25rem",
                 marginBottom: "0.5rem",
+                color: "var(--ink)",
               }}
             >
               {children}
@@ -195,11 +201,26 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
             <hr
               style={{
                 border: "none",
-                borderTop: "2px solid var(--ink)",
+                borderTop: "1px solid var(--border)",
                 margin: "1.5rem 0",
               }}
             />
           );
+        },
+        ul({ children }) {
+          return <ul style={{ margin: "0.5rem 0", paddingLeft: "1.5rem", lineHeight: "1.7", color: "var(--ink)" }}>{children}</ul>;
+        },
+        ol({ children }) {
+          return <ol style={{ margin: "0.5rem 0", paddingLeft: "1.5rem", lineHeight: "1.7", color: "var(--ink)" }}>{children}</ol>;
+        },
+        li({ children }) {
+          return <li style={{ margin: "0.15rem 0" }}>{children}</li>;
+        },
+        strong({ children }) {
+          return <strong style={{ fontWeight: 600 }}>{children}</strong>;
+        },
+        em({ children }) {
+          return <em style={{ fontStyle: "italic" }}>{children}</em>;
         },
       }}
     >

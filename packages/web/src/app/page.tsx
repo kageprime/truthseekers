@@ -3,13 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createChat } from "@/lib/api";
+import { useCreateChat } from "./hooks";
 import PageLayout from "./components/PageLayout";
 
 export default function HomePage() {
   const router = useRouter();
   const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { mutate: createChat, loading: busy } = useCreateChat();
   const [submitted, setSubmitted] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
@@ -17,15 +17,9 @@ export default function HomePage() {
     if (!input.trim() || busy) return;
     const query = input.trim();
     setSubmitted(query);
-    setBusy(true);
-    try {
-      const conv = await createChat(query);
-      if (conv) {
-        router.push(`/chat/${conv.id}?q=${encodeURIComponent(query)}`);
-      }
-    } catch (err) {
-      console.error("Failed to create chat:", err);
-      setBusy(false);
+    const conv = await createChat(query);
+    if (conv) {
+      router.push(`/chat/${conv.id}?q=${encodeURIComponent(query)}`);
     }
   }
 
@@ -77,8 +71,6 @@ export default function HomePage() {
               </div>
             </form>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-xs" style={{ color: "var(--subtle)" }}>
-              <Link href="/chat" className="hover:underline" style={{ color: "var(--accent)" }}>Chat</Link>
-              <span>&middot;</span>
               <Link href="/articles" className="hover:underline" style={{ color: "var(--accent)" }}>Browse Articles</Link>
               <span>&middot;</span>
               <Link href="/maps" className="hover:underline" style={{ color: "var(--accent)" }}>Maps</Link>

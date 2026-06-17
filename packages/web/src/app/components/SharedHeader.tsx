@@ -22,7 +22,7 @@ interface HeaderProps {
 }
 
 const NAV_LINKS = [
-  { label: "Chat", href: "/chat" },
+  { label: "Chat", href: "/" },
   { label: "Articles", href: "/articles" },
   { label: "Maps", href: "/maps" },
   { label: "Queue", href: "/queue" },

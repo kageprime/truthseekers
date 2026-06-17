@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import GenerationBar, { type GeneratingEntry } from "../components/GenerationBar";
 import PageLayout from "../components/PageLayout";
 import SectionHeader from "../components/SectionHeader";
-import { BASE } from "@/lib/api";
+import { BASE } from "@/lib/constants";
 import type { AgentEvent } from "../components/ProcessViewer";
 import { IconLightning, IconClock, IconCheckCircle, IconXCircle, IconX } from "../components/Icons";
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { fetchMap, type MapEntry } from "@/lib/api";
+import { useMap } from "../../hooks";
 import MarkdownRenderer from "../../components/MarkdownRenderer";
 import PageLayout from "../../components/PageLayout";
 import SectionHeader from "../../components/SectionHeader";
@@ -12,19 +12,12 @@ import InteractiveTimeline from "../../components/InteractiveTimeline";
 import { IconMap, IconClipboard, IconSearch, IconFileText } from "../../components/Icons";
 
 export default function MapDetailPage({ params }: { params: Promise<{ slug: string }> }) {
-  const [map, setMap] = useState<MapEntry | null>(null);
-  const [loading, setLoading] = useState(true);
   const [slug, setSlug] = useState("");
   const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
+  const { data: map, loading } = useMap(slug || undefined);
 
   useEffect(() => {
-    params.then((p) => {
-      setSlug(p.slug);
-      fetchMap(p.slug).then((data) => {
-        setMap(data);
-        setLoading(false);
-      });
-    });
+    params.then((p) => setSlug(p.slug));
   }, [params]);
 
   return (

@@ -1,15 +1,7 @@
 "use client";
 
 import Link from "next/link";
-
-interface ArticleSummary {
-  slug: string;
-  title: string;
-  abstract: string;
-  metadata: { status: string; version: number; updated: string };
-  categories: string[];
-  thumbnail?: string;
-}
+import type { ArticleSummary } from "@encarta/core";
 
 export default function ArticleCard({ article }: { article: ArticleSummary }) {
   return (

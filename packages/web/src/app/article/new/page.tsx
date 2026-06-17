@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { generateArticle, fetchQuota } from "@/lib/api";
-import type { QuotaInfo } from "@/lib/api";
+import { useQuota, useGenerateArticle } from "../../hooks";
 import PageLayout from "../../components/PageLayout";
 import { IconAlert, IconLightning } from "../../components/Icons";
 
@@ -12,15 +11,8 @@ export default function NewArticlePage() {
   const router = useRouter();
   const [slug, setSlug] = useState("");
   const [status, setStatus] = useState("");
-  const [quota, setQuota] = useState<QuotaInfo | null>(null);
-  const [quotaLoaded, setQuotaLoaded] = useState(false);
-
-  useEffect(() => {
-    fetchQuota().then((q) => {
-      setQuota(q);
-      setQuotaLoaded(true);
-    }).catch(() => setQuotaLoaded(true));
-  }, []);
+  const { data: quota, loading: quotaLoading, error: quotaError } = useQuota();
+  const { mutate: generateArticle } = useGenerateArticle();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,11 +23,11 @@ export default function NewArticlePage() {
 
     if (!clean) return;
     setStatus("queued");
-    const result = await generateArticle(clean);
+    const result = await generateArticle({ slug: clean });
     router.push(`/article/${clean}`);
   }
 
-  const atLimit = quotaLoaded && quota && quota.remaining <= 0;
+  const atLimit = !quotaLoading && quota && quota.remaining <= 0;
 
   if (atLimit) {
     return (

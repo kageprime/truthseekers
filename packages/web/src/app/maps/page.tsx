@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchMaps, searchMaps, type MapEntry } from "@/lib/api";
+import { useMaps, useMapSearch, type MapEntry } from "../hooks";
 import PageLayout from "../components/PageLayout";
 import PageHero from "../components/PageHero";
 import SectionHeader from "../components/SectionHeader";
@@ -10,42 +10,20 @@ import { CardGridSkeleton } from "../components/CardSkeleton";
 import { IconMap, IconGlobe } from "../components/Icons";
 
 export default function MapsPage() {
-  const [maps, setMaps] = useState<MapEntry[]>([]);
-  const [interactive, setInteractive] = useState<MapEntry[]>([]);
   const [query, setQuery] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { data: allMaps, loading } = useMaps();
+  const { data: searchResults, loading: searching } = useMapSearch(query);
 
-  useEffect(() => {
-    fetchMaps().then((data) => {
-      setMaps(data.maps);
-      setInteractive(data.interactive);
-      setLoading(false);
-    });
-  }, []);
+  const isSearching = query.trim().length > 0;
+  const maps: MapEntry[] = isSearching ? (searchResults ?? []) : (allMaps?.maps ?? []);
+  const interactive: MapEntry[] = isSearching ? [] : (allMaps?.interactive ?? []);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    const q = query.trim();
-    if (!q) {
-      const data = await fetchMaps();
-      setMaps(data.maps);
-      setInteractive(data.interactive);
-      return;
-    }
-    setSearching(true);
-    const results = await searchMaps(q);
-    setMaps(results);
-    setInteractive([]);
-    setSearching(false);
   }
 
   function handleClear() {
     setQuery("");
-    fetchMaps().then((data) => {
-      setMaps(data.maps);
-      setInteractive(data.interactive);
-    });
   }
 
   return (

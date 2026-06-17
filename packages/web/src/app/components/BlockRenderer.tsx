@@ -5,7 +5,7 @@ import Link from "next/link";
 import MarkdownRenderer from "./MarkdownRenderer";
 import MermaidDiagram from "./MermaidDiagram";
 import { MediaImage } from "./MediaImage";
-import { BASE } from "@/lib/api";
+import { BASE } from "@/lib/constants";
 import { IconLink, IconLightning } from "./Icons";
 
 const InteractiveTimeline = dynamic(() => import("./InteractiveTimeline"), { ssr: false });
@@ -27,6 +27,8 @@ import type {
   GalleryBlockData,
   CitationBlockData,
   CrossrefBlockData,
+  TableBlockData,
+  ListBlockData,
 } from "@encarta/core";
 
 export default function BlockRenderer({ blocks, compact = false }: { blocks: Block[]; compact?: boolean }) {
@@ -69,6 +71,10 @@ function BlockCard({ block, compact }: { block: Block; compact: boolean }) {
       return <CitationBlock data={block.data as unknown as CitationBlockData} />;
     case "crossref":
       return <CrossrefBlock data={block.data as unknown as CrossrefBlockData} />;
+    case "table":
+      return <TableBlock data={block.data as unknown as TableBlockData} />;
+    case "list":
+      return <ListBlock data={block.data as unknown as ListBlockData} />;
     case "tool_call":
       return <ToolCallBlock data={block.data as any} />;
     case "divider":
@@ -78,21 +84,66 @@ function BlockCard({ block, compact }: { block: Block; compact: boolean }) {
   }
 }
 
+function TableBlock({ data }: { data: TableBlockData }) {
+  if (!data?.headers && !data?.rows) return null;
+  return (
+    <div style={{ overflowX: "auto", margin: "1rem 0", borderRadius: "0.5rem", border: "1px solid var(--border)" }}>
+      {data.caption && <div className="text-xs font-semibold p-2" style={{ color: "var(--muted)", borderBottom: "1px solid var(--border)" }}>{data.caption}</div>}
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.875rem" }}>
+        {data.headers && (
+          <thead>
+            <tr>
+              {data.headers.map((h: string, i: number) => (
+                <th key={i} style={{ padding: "0.5rem 0.75rem", borderBottom: "2px solid var(--border)", background: "var(--surface-glass)", textAlign: "left", fontWeight: 600, fontSize: "0.8rem", color: "var(--ink)" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+        )}
+        <tbody>
+          {data.rows?.map((row: string[], i: number) => (
+            <tr key={i}>
+              {row.map((cell: string, j: number) => (
+                <td key={j} style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid var(--border)", fontSize: "0.85rem", color: "var(--ink)" }}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ListBlock({ data }: { data: ListBlockData }) {
+  if (!data?.items) return null;
+  const Tag = data.style === "ordered" ? "ol" : "ul";
+  return (
+    <Tag style={{ margin: "0.5rem 0", paddingLeft: "1.5rem", lineHeight: "1.7", color: "var(--ink)" }}>
+      {data.items.map((item: string, i: number) => (
+        <li key={i} style={{ margin: "0.15rem 0" }}>{item}</li>
+      ))}
+    </Tag>
+  );
+}
+
 function HeadingBlock({ data }: { data: HeadingBlockData }) {
-  const Tag = data.level === 1 ? "h1" : data.level === 2 ? "h2" : "h3";
-  const style: React.CSSProperties = data.level === 1
+  if (!data) return null;
+  const level = data.level ?? 3;
+  const Tag = level === 1 ? "h1" : level === 2 ? "h2" : "h3";
+  const style: React.CSSProperties = level === 1
     ? { fontFamily: "'Press Start 2P', monospace", fontSize: "1rem", margin: "1.5rem 0 0.75rem", wordBreak: "break-word" }
-    : data.level === 2
+    : level === 2
     ? { fontFamily: "'Press Start 2P', monospace", fontSize: "0.8rem", margin: "1.25rem 0 0.5rem", paddingBottom: "0.5rem", borderBottom: "3px solid var(--ink)" }
     : { fontFamily: "'Press Start 2P', monospace", fontSize: "0.7rem", margin: "1rem 0 0.5rem" };
   return <Tag style={style}>{data.text}</Tag>;
 }
 
 function TextBlock({ data }: { data: TextBlockData }) {
+  if (!data) return null;
   return <MarkdownRenderer content={data.content} />;
 }
 
 function SectionBlock({ data }: { data: SectionBlockData }) {
+  if (!data) return null;
   return (
     <details className="glass-card-static p-3 mb-3" style={{ border: "2px solid var(--ink)" }}>
       <summary className="font-bold text-sm cursor-pointer" style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "8px" }}>
@@ -104,7 +155,7 @@ function SectionBlock({ data }: { data: SectionBlockData }) {
 }
 
 function TimelineBlock({ data }: { data: TimelineBlockData }) {
-  if (!data.events) return <div className="text-xs" style={{ color: "var(--subtle)" }}>No timeline events</div>;
+  if (!data?.events) return <div className="text-xs" style={{ color: "var(--subtle)" }}>No timeline events</div>;
   const events = data.events.map((e) => ({ ...e, year: typeof e.year === "string" ? parseInt(e.year, 10) || 0 : e.year }));
   return (
     <div className="glass-card-static p-3 mb-3 overflow-hidden">
@@ -114,6 +165,7 @@ function TimelineBlock({ data }: { data: TimelineBlockData }) {
 }
 
 function Map2DBlock({ data }: { data: Map2DBlockData }) {
+  if (!data) return null;
   return (
     <div className="glass-card-static p-3 mb-3 overflow-hidden" style={{ height: "clamp(250px, 50vh, 400px)" }}>
       <MapViewer markers={data.markers} layers={data.layers} centerLat={data.centerLat} centerLng={data.centerLng} zoom={data.zoom} />
@@ -122,6 +174,7 @@ function Map2DBlock({ data }: { data: Map2DBlockData }) {
 }
 
 function Map3DBlock({ data }: { data: Map3DBlockData }) {
+  if (!data) return null;
   return (
     <div className="glass-card-static p-3 mb-3 overflow-hidden" style={{ height: "clamp(250px, 50vh, 400px)" }}>
       <ThreeDMapViewer scene={data as any} />
@@ -130,6 +183,7 @@ function Map3DBlock({ data }: { data: Map3DBlockData }) {
 }
 
 function DiagramBlock({ data }: { data: DiagramBlockData }) {
+  if (!data) return null;
   return (
     <div className="glass-card-static p-3 mb-3">
       {data.caption && <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted)" }}>{data.caption}</div>}
@@ -139,6 +193,7 @@ function DiagramBlock({ data }: { data: DiagramBlockData }) {
 }
 
 function ImageBlock({ data }: { data: ImageBlockData }) {
+  if (!data) return null;
   return (
     <div className="mb-3">
       <MediaImage src={data.src} caption={data.caption} prompt={data.prompt} />
@@ -165,7 +220,7 @@ function VideoBlock({ data }: { data: VideoBlockData }) {
 }
 
 function GalleryBlock({ data }: { data: GalleryBlockData }) {
-  if (!data.images || data.images.length === 0) return null;
+  if (!data?.images || data.images.length === 0) return null;
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
       {data.images.filter(Boolean).map((img, i) => (
@@ -176,6 +231,7 @@ function GalleryBlock({ data }: { data: GalleryBlockData }) {
 }
 
 function CitationBlock({ data }: { data: CitationBlockData }) {
+  if (!data) return null;
   return (
     <a href={data.url} target="_blank" rel="noopener noreferrer"
       className="glass-card-static p-2 flex items-center gap-2 mb-2"
@@ -191,6 +247,7 @@ function CitationBlock({ data }: { data: CitationBlockData }) {
 }
 
 function CrossrefBlock({ data }: { data: CrossrefBlockData }) {
+  if (!data) return null;
   return (
     <Link href={`/article/${data.slug}`}
       className="glass-card-static p-2 flex items-center gap-2 mb-2"
@@ -208,6 +265,7 @@ function CrossrefBlock({ data }: { data: CrossrefBlockData }) {
 }
 
 function ToolCallBlock({ data }: { data: { name: string; args?: Record<string, unknown>; result?: string } }) {
+  if (!data) return null;
   return (
     <div className="flex items-start gap-2 text-xs py-1 px-2 rounded mb-1" style={{ background: "#f0f7ff" }}>
       <IconLightning size={12} /> {data.name}

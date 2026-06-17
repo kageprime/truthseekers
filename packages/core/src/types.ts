@@ -260,7 +260,9 @@ export type BlockType =
   | "citation"
   | "crossref"
   | "tool_call"
-  | "divider";
+  | "divider"
+  | "table"
+  | "list";
 
 export interface Block {
   id: string;
@@ -356,6 +358,36 @@ export interface ToolCallBlockData {
   result?: string;
 }
 
+export interface TableBlockData {
+  headers?: string[];
+  rows?: string[][];
+  caption?: string;
+}
+
+export interface ListBlockData {
+  style?: "ordered" | "unordered";
+  items: string[];
+}
+
+// ── API Response Shapes ────────────────────────────────────────────────────
+
+export interface ArticleSummary {
+  slug: string;
+  title: string;
+  abstract: string;
+  metadata: { status: string; version: number; updated: string };
+  categories: string[];
+  thumbnail?: string;
+}
+
+export interface QuotaInfo {
+  allowed: boolean;
+  used: number;
+  limit: number;
+  remaining: number;
+  tier: string;
+}
+
 // ── Chat ──────────────────────────────────────────────────────────────────
 
 export interface Conversation {
@@ -363,6 +395,25 @@ export interface Conversation {
   title: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  messages: Array<{
+    id: string;
+    conversationId: string;
+    role: "user" | "assistant" | "system";
+    content: string;
+    blocks?: Block[];
+    createdAt: string;
+  }>;
 }
 
 export interface ChatMessage {

@@ -3,8 +3,8 @@
 import { useEffect, useState, useRef, use, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fetchChat } from "@/lib/api";
-import type { ConversationDetail } from "@/lib/api";
+import { useChat } from "../../hooks";
+import type { ConversationDetail } from "../../hooks";
 import { useAuth } from "../../hooks/useAuth";
 import MessageList from "../../components/MessageList";
 import ChatInput from "../../components/ChatInput";
@@ -65,6 +65,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const { id } = use(params);
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { data: fetchedData, loading: chatLoading } = useChat(id);
   const [data, setData] = useState<ConversationDetail | null>(chatCache.get(id) ?? null);
   const [loading, setLoading] = useState(!chatCache.has(id));
   const [input, setInput] = useState("");
@@ -95,17 +96,12 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-    fetchChat(id).then((d) => {
-      if (d) chatCache.set(id, d);
-      setData(d);
+    if (fetchedData !== undefined) {
       setLoading(false);
-    }).catch((err) => {
-      setLoading(false);
-      setError(err instanceof Error ? err.message : "Failed to load conversation");
-    });
-  }, [id]);
+      setData(fetchedData);
+      if (fetchedData) chatCache.set(id, fetchedData);
+    }
+  }, [fetchedData, id]);
 
   useEffect(() => {
     setPhaseLabel(getPhaseLabel(agentEvents));
@@ -300,7 +296,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           <p className="text-sm mb-4" style={{ color: error ? "var(--red)" : "var(--subtle)" }}>
             {error || "Conversation not found"}
           </p>
-          <Link href="/chat" className="btn btn-primary btn-sm">Back to Chat</Link>
+          <Link href="/" className="btn btn-primary btn-sm">New Chat</Link>
         </div>
       </div>
     );

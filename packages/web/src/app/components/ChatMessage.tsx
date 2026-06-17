@@ -80,7 +80,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
         )}
 
         {/* Body */}
-        <div className={`w-fit max-w-[75%] space-y-1 ${isUser ? "items-end" : ""}`}>
+        <div className={`space-y-1 ${isUser ? "w-fit max-w-[75%] items-end" : "flex-1 min-w-0"}`}>
           {content && (
             <div className={isUser ? "" : "space-y-1"}>
               {!isUser && streaming ? (

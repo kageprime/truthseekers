@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import PageLayout from "../components/PageLayout";
 import { useAuth } from "../hooks/useAuth";
-import { BASE } from "@/lib/api";
+import { BASE } from "@/lib/constants";
 import { IconCheck, IconLightning } from "../components/Icons";
 
 const PLANS = [

@@ -1,32 +1,42 @@
 import type { AgentEvent, ModelId } from "./types.js";
+import { complete, stream, Type } from "@earendil-works/pi-ai";
+import type { Model, Context, Tool, Message as PiMessage, ToolCall as PiToolCall, TextContent, UserMessage, AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
 
 interface ModelRoute {
-  baseUrl: string;
-  apiKey: () => string;
+  modelId: string;
   modelName: string;
+  reasoning: boolean;
 }
 
 const MODEL_ROUTES: Record<string, ModelRoute> = {
-  "gemma-4-31B-it": {
-    baseUrl: "https://inference.do-ai.run",
-    apiKey: () => process.env.MODEL_ACCESS_KEY || "",
-    modelName: "gemma-4-31B-it",
-  },
-  "deepseek-4-flash": {
-    baseUrl: "https://inference.do-ai.run",
-    apiKey: () => process.env.MODEL_ACCESS_KEY || "",
-    modelName: "deepseek-4-flash",
-  },
-  "deepseek-v4-pro": {
-    baseUrl: "https://inference.do-ai.run",
-    apiKey: () => process.env.MODEL_ACCESS_KEY || "",
-    modelName: "deepseek-v4-pro",
-  },
+  "gemma-4-31B-it": { modelId: "gemma-4-31B-it", modelName: "gemma-4-31B-it", reasoning: true },
+  "deepseek-4-flash": { modelId: "deepseek-4-flash", modelName: "deepseek-4-flash", reasoning: false },
+  "deepseek-v4-pro": { modelId: "deepseek-v4-pro", modelName: "deepseek-v4-pro", reasoning: true },
 };
 
-function resolveModel(model?: string): ModelRoute {
+export function resolveModelRoute(model?: string): ModelRoute {
   const id = model || process.env.DO_MODEL || "gemma-4-31B-it";
   return MODEL_ROUTES[id] || MODEL_ROUTES["gemma-4-31B-it"];
+}
+
+export function buildModel(route: ModelRoute): Model<"openai-completions"> {
+  return {
+    id: route.modelId,
+    name: route.modelName,
+    api: "openai-completions",
+    provider: "do-ai",
+    baseUrl: "https://inference.do-ai.run/v1",
+    reasoning: route.reasoning,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 128000,
+    maxTokens: 32768,
+    compat: {
+      supportsStore: false,
+      supportsDeveloperRole: true,
+      supportsReasoningEffort: true,
+    },
+  };
 }
 
 const PROMPT_TIMEOUT = parseInt(process.env.PROMPT_TIMEOUT_MS || "300000", 10);
@@ -61,6 +71,81 @@ export interface ToolCall {
   };
 }
 
+function piTimestamp(): number {
+  return Date.now();
+}
+
+function makeEmptyUsage() {
+  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+}
+
+function toPiMessages(msgs: Message[], system?: string): PiMessage[] {
+  const pi: PiMessage[] = [];
+  for (const m of msgs) {
+    if (m.role === "system") {
+      pi.push({ role: "user" as const, content: m.content || "", timestamp: piTimestamp() });
+    } else if (m.role === "user") {
+      pi.push({ role: "user" as const, content: m.content || "", timestamp: piTimestamp() });
+    } else if (m.role === "assistant") {
+      const content: (TextContent | import("@earendil-works/pi-ai").ToolCall)[] = [];
+      if (m.content) content.push({ type: "text" as const, text: m.content });
+      if (m.tool_calls) {
+        for (const tc of m.tool_calls) {
+          let args: Record<string, any> = {};
+          try { args = JSON.parse(tc.function.arguments); } catch {}
+          content.push({ type: "toolCall" as const, id: tc.id, name: tc.function.name, arguments: args });
+        }
+      }
+      const hasToolCalls = content.some((c) => c.type === "toolCall");
+      pi.push({
+        role: "assistant" as const,
+        content,
+        timestamp: piTimestamp(),
+        usage: makeEmptyUsage(),
+        stopReason: hasToolCalls ? "toolUse" as const : "stop" as const,
+      } as AssistantMessage);
+    } else if (m.role === "tool") {
+      pi.push({
+        role: "toolResult" as const,
+        toolCallId: m.tool_call_id || "",
+        toolName: "",
+        content: [{ type: "text" as const, text: m.content || "" }],
+        isError: false,
+        timestamp: piTimestamp(),
+      });
+    }
+  }
+  if (system && pi.length > 0 && pi[0].role === "user") {
+    const first = pi[0] as UserMessage;
+    first.content = `[System Instructions]\n${system}\n\n[Conversation]\n${typeof first.content === "string" ? first.content : ""}`;
+  } else if (system) {
+    pi.unshift({ role: "user" as const, content: `[System Instructions]\n${system}`, timestamp: piTimestamp() });
+  }
+  return pi;
+}
+
+function toPiTools(defs?: ToolDefinition[]): Tool[] | undefined {
+  if (!defs || defs.length === 0) return undefined;
+  return defs.map((d) => ({
+    name: d.function.name,
+    description: d.function.description,
+    parameters: Type.Object(
+      Object.fromEntries(
+        Object.entries((d.function.parameters as any).properties || {}).map(([k, v]: [string, any]) => [
+          k,
+          v.type === "string" ? Type.String({ description: v.description }) :
+          v.type === "number" ? Type.Number({ description: v.description }) :
+          v.type === "boolean" ? Type.Boolean({ description: v.description }) :
+          v.type === "array" ? Type.Array(Type.Any(), { description: v.description }) :
+          v.type === "object" ? Type.Object({}, { description: v.description }) :
+          Type.Any({ description: v.description }),
+        ])
+      ),
+      { description: d.function.description }
+    ) as any,
+  }));
+}
+
 export async function sendPrompt(
   messages: Message[],
   options?: {
@@ -71,39 +156,25 @@ export async function sendPrompt(
     reasoningEffort?: "none" | "low" | "medium" | "high";
   }
 ): Promise<PromptResult> {
-  const msgs: Message[] = [];
-  if (options?.system) msgs.push({ role: "system", content: options.system });
-  msgs.push(...messages);
+  const route = resolveModelRoute(options?.model);
+  const model = buildModel(route);
+  const piMsgs = toPiMessages(messages, options?.system);
 
-  const route = resolveModel(options?.model);
-  const body: Record<string, unknown> = {
-    model: route.modelName,
-    messages: msgs,
-    max_tokens: options?.maxTokens ?? 16384,
+  const ctx: Context = { messages: piMsgs };
+  const result = await complete(model, ctx, {
+    maxTokens: options?.maxTokens ?? 16384,
     temperature: options?.temperature ?? 0.7,
-    stream: false,
-  };
-  if (options?.reasoningEffort) body.reasoning_effort = options.reasoningEffort;
-
-  const res = await fetch(`${route.baseUrl}/v1/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${route.apiKey()}`,
-    },
+    reasoningEffort: options?.reasoningEffort,
+    apiKey: process.env.MODEL_ACCESS_KEY || "",
     signal: AbortSignal.timeout(PROMPT_TIMEOUT),
-    body: JSON.stringify(body),
   });
 
-  if (!res.ok) {
-    const err = await res.text().catch(() => "unknown");
-    throw new Error(`LLM API error (${res.status}): ${err.slice(0, 500)}`);
-  }
+  const text = result.content
+    .filter((b): b is TextContent => b.type === "text")
+    .map((b) => b.text)
+    .join("");
 
-  const data = await res.json();
-  const content = data.choices?.[0]?.message?.content || "";
-
-  return { text: content };
+  return { text };
 }
 
 export async function sendPromptStream(
@@ -119,145 +190,47 @@ export async function sendPromptStream(
     tool_choice?: "auto" | "none" | { type: "function"; function: { name: string } };
   }
 ): Promise<PromptResult & { toolCalls?: ToolCall[] }> {
-  const msgs: Message[] = [];
-  if (options?.system) msgs.push({ role: "system", content: options.system });
-  msgs.push(...messages);
+  const route = resolveModelRoute(options?.model);
+  const model = buildModel(route);
+  const piMsgs = toPiMessages(messages, options?.system);
+  const piTools = toPiTools(options?.tools);
 
-  const route = resolveModel(options?.model);
-  const body: Record<string, unknown> = {
-    model: route.modelName,
-    messages: msgs,
-    max_tokens: options?.maxTokens ?? 16384,
+  const ctx: Context = { messages: piMsgs, tools: piTools };
+  const s = stream(model, ctx, {
+    maxTokens: options?.maxTokens ?? 16384,
     temperature: options?.temperature ?? 0.7,
-    stream: true,
-  };
-  if (options?.reasoningEffort) body.reasoning_effort = options.reasoningEffort;
-  if (options?.tools) body.tools = options.tools;
-  if (options?.tool_choice) body.tool_choice = options.tool_choice;
-
-  const res = await fetch(`${route.baseUrl}/v1/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${route.apiKey()}`,
-    },
+    reasoningEffort: options?.reasoningEffort,
+    toolChoice: options?.tool_choice === "none" ? "none" :
+      options?.tool_choice && typeof options.tool_choice === "object"
+        ? { type: "function", function: { name: (options.tool_choice as any).function.name } }
+        : undefined,
+    apiKey: process.env.MODEL_ACCESS_KEY || "",
     signal: AbortSignal.timeout(PROMPT_TIMEOUT),
-    body: JSON.stringify(body),
   });
 
-  if (!res.ok) {
-    const err = await res.text().catch(() => "unknown");
-    throw new Error(`LLM API error (${res.status}): ${err.slice(0, 500)}`);
-  }
-
-  if (!res.body) throw new Error("No response body for streaming");
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
   let fullText = "";
-  let preToolText = ""; // buffers text that arrives before first tool call delta
-  let seenToolCall = false;
-  const toolCallsMap = new Map<string, { id: string; name: string; args: string }>();
-
-  function flushPreToolText() {
-    if (preToolText) {
-      fullText += preToolText;
-      onEvent?.({ type: "text", data: preToolText, timestamp: Date.now() });
-      preToolText = "";
-    }
-  }
-
-  function discardPreToolText() {
-    if (preToolText && !seenToolCall) {
-      // Log the discarded preamble for debugging
-      console.debug(`[agent] discarded preamble text (${preToolText.length} chars): ${preToolText.slice(0, 100)}`);
-    }
-    preToolText = "";
-  }
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buf += decoder.decode(value, { stream: true });
-    const parts = buf.split("\n");
-    buf = parts.pop() ?? "";
-
-    for (const line of parts) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith("data: ")) continue;
-      const payload = trimmed.slice(6).trim();
-      if (payload === "[DONE]") break;
-
-      try {
-        const chunk = JSON.parse(payload);
-        const choice = chunk.choices?.[0];
-
-        // Text delta
-        const delta = choice?.delta?.content || "";
-        if (delta) {
-          if (seenToolCall) {
-            fullText += delta;
-            onEvent?.({ type: "text", data: delta, timestamp: Date.now() });
-          } else {
-            preToolText += delta;
-          }
-        }
-
-        // Tool call deltas
-        const toolDeltas = choice?.delta?.tool_calls;
-        if (toolDeltas) {
-          if (!seenToolCall) {
-            seenToolCall = true;
-            discardPreToolText();
-          }
-          for (const tc of toolDeltas) {
-            const key = tc.id || `idx:${tc.index}`;
-            if (!toolCallsMap.has(key)) {
-              toolCallsMap.set(key, { id: tc.id || key, name: "", args: "" });
-            }
-            const entry = toolCallsMap.get(key)!;
-            if (tc.id) entry.id = tc.id;
-            if (tc.function?.name) entry.name = tc.function.name;
-            if (tc.function?.arguments) entry.args += tc.function.arguments;
-          }
-        }
-
-        // Finish reason
-        if (choice?.finish_reason === "tool_calls") {
-          onEvent?.({
-            type: "status",
-            data: "Calling tools...",
-            timestamp: Date.now(),
-          });
-        }
-      } catch {
-        // skip malformed chunks
-      }
-    }
-  }
-
-  // If no tool calls were seen, flush the buffered text as the actual response
-  if (!seenToolCall) {
-    flushPreToolText();
-  }
-
   const toolCalls: ToolCall[] = [];
-  for (const [, entry] of toolCallsMap) {
-    if (entry.name) {
-      // Validate that arguments is parseable JSON — DO API rejects incomplete JSON
-      let validArgs = entry.args;
-      try { JSON.parse(validArgs); } catch { validArgs = "{}"; }
-      toolCalls.push({
-        id: entry.id,
-        type: "function",
-        function: { name: entry.name, arguments: validArgs },
-      });
+
+  for await (const event of s) {
+    switch (event.type) {
+      case "text_delta":
+        fullText += event.delta;
+        onEvent?.({ type: "text", data: event.delta, timestamp: Date.now() });
+        break;
+      case "toolcall_end":
+        toolCalls.push({
+          id: event.toolCall.id,
+          type: "function",
+          function: { name: event.toolCall.name, arguments: JSON.stringify(event.toolCall.arguments) },
+        });
+        break;
     }
   }
 
-  return { text: fullText, toolCalls: toolCalls.length > 0 ? toolCalls : undefined };
+  return {
+    text: fullText,
+    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+  };
 }
 
 export async function webSearch(
@@ -323,7 +296,7 @@ export async function tavilySearch(
       max_results: maxResults,
       search_depth: "advanced",
       include_answer: false,
-    }),
+    } as any),
   });
 
   if (!res.ok) {

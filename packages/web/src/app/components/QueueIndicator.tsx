@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { BASE } from "@/lib/api";
+import { BASE } from "@/lib/constants";
 import { IconClock, IconLightning, IconPencil, IconSearch, IconPalette, IconDatabase } from "./Icons";
 
 interface QueueJob {

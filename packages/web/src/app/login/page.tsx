@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import TruthseekersLogo from "../components/TruthseekersLogo";
-import { BASE } from "@/lib/api";
+import { BASE } from "@/lib/constants";
 import { IconSend, IconLightning } from "../components/Icons";
 
 export default function LoginPage() {
@@ -48,7 +48,7 @@ export default function LoginPage() {
 
       if (data.token) {
         localStorage.setItem("truthseekers_token", data.token);
-        if (data.user?.onboarded) router.push("/chat");
+        if (data.user?.onboarded) router.push("/");
         else router.push("/onboarding");
       } else if (data.sent) {
         setSent(true);
@@ -128,7 +128,7 @@ export default function LoginPage() {
                   if (!res.ok) { setError(data.error || "Login failed"); setLoading(false); return; }
                   if (data.token) {
                     localStorage.setItem("truthseekers_token", data.token);
-                    router.push(data.user?.onboarded ? "/chat" : "/onboarding");
+                    router.push(data.user?.onboarded ? "/" : "/onboarding");
                   }
                 } catch { setError("Network error"); }
                 setLoading(false);

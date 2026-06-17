@@ -1,7 +1,6 @@
-import { tavilySearch, sendPrompt } from "./agent.js";
-import type { ToolDefinition } from "./agent.js";
-
-export type ToolExecutor = (args: any) => Promise<{ result: string; blocks?: any[] }>;
+import { tavilySearch, sendPrompt } from "./llm.js";
+import type { ToolDefinition } from "./models.js";
+import type { ToolExecutor } from "./agent/types.js";
 
 export const CHAT_TOOL_DEFINITIONS: ToolDefinition[] = [
   {
@@ -238,10 +237,21 @@ export const BUILT_IN_TOOL_EXECUTORS: Record<string, ToolExecutor> = {
   render_blocks: async (args) => {
     const incoming = Array.isArray(args.blocks) ? args.blocks : [];
     let idCounter = 0;
-    const blocks = incoming.map((b: any) => ({
-      ...b,
-      id: b.id || `rb-${Date.now()}-${idCounter++}`,
-    }));
+    const DATA_KEYS = new Set(["id", "type", "meta"]);
+    const blocks = incoming.map((b: any) => {
+      const normalized: Record<string, unknown> = { id: b.id || `rb-${Date.now()}-${idCounter++}`, type: b.type };
+      if (b.meta) normalized.meta = b.meta;
+      if (b.data) {
+        normalized.data = b.data;
+      } else {
+        const data: Record<string, unknown> = {};
+        for (const key of Object.keys(b)) {
+          if (!DATA_KEYS.has(key)) data[key] = b[key];
+        }
+        normalized.data = Object.keys(data).length > 0 ? data : undefined;
+      }
+      return normalized;
+    });
     return {
       result: JSON.stringify({ blockCount: blocks.length }),
       blocks: blocks.length > 0 ? blocks : undefined,

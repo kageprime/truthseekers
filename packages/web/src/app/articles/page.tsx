@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { fetchArticles, searchArticles, fetchArticleStatus, generateArticle, fetchArticle, progressUrl } from "@/lib/api";
+import { fetchArticles, searchArticles, fetchArticle, fetchArticleStatus, progressUrl } from "@/lib/api";
+import type { ArticleSummary } from "@encarta/core";
+import { useGenerateArticle, useArticleStatus } from "../hooks";
 import PageLayout from "../components/PageLayout";
 import SectionHeader from "../components/SectionHeader";
 import PageHero from "../components/PageHero";
@@ -11,15 +13,6 @@ import ArticleCard from "../components/ArticleCard";
 import { CardSkeleton, CardGridSkeleton } from "../components/CardSkeleton";
 import type { AgentEvent } from "../components/ProcessViewer";
 import { IconLightning, IconSearch, IconBook } from "../components/Icons";
-
-interface ArticleSummary {
-  slug: string;
-  title: string;
-  abstract: string;
-  metadata: { status: string; version: number; updated: string };
-  categories: string[];
-  thumbnail?: string;
-}
 
 interface GeneratingEntry {
   slug: string;
@@ -34,28 +27,46 @@ const SEARCH_DEBOUNCE_MS = 400;
 
 export default function ArticlesPage() {
   const router = useRouter();
-  const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
+  const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [generating, setGenerating] = useState<Map<string, GeneratingEntry>>(new Map());
   const [showResults, setShowResults] = useState(false);
   const [visibleCount, setVisibleCount] = useState(6);
   const [infiniteLoading, setInfiniteLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [searching, setSearching] = useState(false);
+  const { mutate: generateArticle } = useGenerateArticle();
   const sseRef = useRef<Map<string, EventSource>>(new Map());
   const mountedRef = useRef(true);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Load from reset — use callback with getArticles in closure
+  const loadArticles = useCallback(async (p: number, reset: boolean) => {
+    const data = await fetchArticles(p * PAGE_SIZE, PAGE_SIZE);
+    if (!mountedRef.current) return;
+    const items = (data as any).data ?? [];
+    const pagination = (data as any).pagination;
+    if (reset) {
+      setArticles(items);
+      setVisibleCount(6);
+    } else {
+      setArticles((prev) => [...prev, ...items]);
+    }
+    setHasMore(pagination ? pagination.hasMore : items.length >= PAGE_SIZE);
+    setInitialLoading(false);
+    setInfiniteLoading(false);
+  }, []);
+
   useEffect(() => {
     mountedRef.current = true;
     loadArticles(0, true);
     return () => { mountedRef.current = false; };
-  }, []);
+  }, [loadArticles]);
 
   useEffect(() => {
     return () => {
@@ -83,52 +94,17 @@ export default function ArticlesPage() {
 
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
-
     observerRef.current = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore && !infiniteLoading && !loading && !showResults) {
+      if (entries[0].isIntersecting && hasMore && !infiniteLoading && !initialLoading && !showResults) {
         setInfiniteLoading(true);
         const nextPage = page + 1;
         loadArticles(nextPage, false);
         setPage(nextPage);
       }
     }, { threshold: 0.1 });
-
-    if (sentinelRef.current) {
-      observerRef.current.observe(sentinelRef.current);
-    }
-
-    return () => {
-      if (observerRef.current) observerRef.current.disconnect();
-    };
-  }, [hasMore, infiniteLoading, loading, page, showResults]);
-
-  async function loadArticles(p: number, reset: boolean) {
-    try {
-      const data = await fetchArticles(p * PAGE_SIZE, PAGE_SIZE);
-      if (!mountedRef.current) return;
-
-      const items = (data as any).data ?? [];
-      const pagination = (data as any).pagination;
-
-      if (reset) {
-        setArticles(items);
-        setVisibleCount(6);
-      } else {
-        setArticles((prev) => [...prev, ...items]);
-      }
-
-      setHasMore(pagination ? pagination.hasMore : items.length >= PAGE_SIZE);
-    } catch (err) {
-      if (mountedRef.current) {
-        setHasMore(false);
-      }
-    } finally {
-      if (mountedRef.current) {
-        setLoading(false);
-        setInfiniteLoading(false);
-      }
-    }
-  }
+    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
+    return () => { if (observerRef.current) observerRef.current.disconnect(); };
+  }, [hasMore, infiniteLoading, initialLoading, page, showResults, loadArticles]);
 
   async function performSearch(searchQuery: string) {
     setSearching(true);
@@ -138,16 +114,10 @@ export default function ArticlesPage() {
         setArticles(results);
         setHasMore(false);
       }
-    } catch (err) {
-      if (mountedRef.current) {
-        setArticles([]);
-        setHasMore(false);
-      }
+    } catch {
+      if (mountedRef.current) { setArticles([]); setHasMore(false); }
     } finally {
-      if (mountedRef.current) {
-        setSearching(false);
-        setLoading(false);
-      }
+      if (mountedRef.current) { setSearching(false); setInitialLoading(false); }
     }
   }
 
@@ -159,21 +129,21 @@ export default function ArticlesPage() {
     e.preventDefault();
     if (!query.trim()) {
       setShowResults(false);
-      setLoading(true);
+      setInitialLoading(true);
       setArticles([]);
       setPage(0);
       loadArticles(0, true);
       return;
     }
     setShowResults(true);
-    setLoading(true);
+    setInitialLoading(true);
     setDebouncedQuery(query.trim());
   }
 
   function handleClear() {
     setQuery("");
     setShowResults(false);
-    setLoading(true);
+    setInitialLoading(true);
     setArticles([]);
     setPage(0);
     setVisibleCount(6);
@@ -189,166 +159,114 @@ export default function ArticlesPage() {
     });
   }
 
-  async function startGenerate(slug: string) {
+  function startGenerate(slug: string) {
     mergeEntry(slug, { phase: "queued", error: undefined, agentEvents: [] });
 
-    try {
-      await generateArticle(slug);
-    } catch (err) {
-      mergeEntry(slug, { phase: "error", error: String(err) });
-      return;
-    }
+    generateArticle({ slug }).then(() => {
+      const existing = sseRef.current.get(slug);
+      if (existing) { existing.close(); sseRef.current.delete(slug); }
 
-    const existing = sseRef.current.get(slug);
-    if (existing) {
-      existing.close();
-      sseRef.current.delete(slug);
-    }
+      const es = new EventSource(progressUrl(slug));
+      sseRef.current.set(slug, es);
 
-    const es = new EventSource(progressUrl(slug));
-    sseRef.current.set(slug, es);
-
-    es.addEventListener("agent_event", (e) => {
-      const eventData: AgentEvent = JSON.parse(e.data);
-      setGenerating((prev) => {
-        const next = new Map(prev);
-        const entry = next.get(slug);
-        if (entry) {
-          next.set(slug, { ...entry, agentEvents: [...(entry.agentEvents || []), eventData] });
-        }
-        return next;
-      });
-    });
-
-    es.addEventListener("progress", (e) => {
-      const data = JSON.parse(e.data);
-      if (data.status === "done") {
-        fetchArticle(slug).then((article) => {
-          if (!article || !mountedRef.current) return;
-          const summary: ArticleSummary = {
-            slug: article.slug,
-            title: article.title,
-            abstract: article.abstract,
-            metadata: { status: article.metadata?.status || "published", version: article.metadata?.version || 1, updated: article.metadata?.updated || "" },
-            categories: article.categories || [],
-            thumbnail: (article.sections?.[0]?.media?.find((m: any) => m.type === "image" && m.src) as any)?.src,
-          };
-          setArticles((prev) => {
-            const filtered = prev.filter((a) => a.slug !== slug);
-            return [summary, ...filtered];
-          });
-          setGenerating((prev) => {
-            const next = new Map(prev);
-            next.delete(slug);
-            return next;
-          });
+      es.addEventListener("agent_event", (e) => {
+        const eventData: AgentEvent = JSON.parse(e.data);
+        setGenerating((prev) => {
+          const next = new Map(prev);
+          const entry = next.get(slug);
+          if (entry) next.set(slug, { ...entry, agentEvents: [...(entry.agentEvents || []), eventData] });
+          return next;
         });
-        es.close();
-        sseRef.current.delete(slug);
-      } else if (data.status === "error") {
-        mergeEntry(slug, { phase: "error", error: data.error || "Unknown error" });
-        es.close();
-        sseRef.current.delete(slug);
-      } else {
-        mergeEntry(slug, { phase: data.phase || data.status });
-      }
-    });
+      });
 
-    es.onerror = () => {
-      es.close();
-      sseRef.current.delete(slug);
-    };
+      es.addEventListener("progress", (e) => {
+        const data = JSON.parse(e.data);
+        if (data.status === "done") {
+          fetchArticle(slug).then((article) => {
+            if (!article || !mountedRef.current) return;
+            const summary: ArticleSummary = {
+              slug: article.slug, title: article.title, abstract: article.abstract,
+              metadata: { status: article.metadata?.status || "published", version: article.metadata?.version || 1, updated: article.metadata?.updated || "" },
+              categories: article.categories || [],
+              thumbnail: (article.sections?.[0]?.media?.find((m: any) => m.type === "image" && m.src) as any)?.src,
+            };
+            setArticles((prev) => [summary, ...prev.filter((a) => a.slug !== slug)]);
+            setGenerating((prev) => { const next = new Map(prev); next.delete(slug); return next; });
+          });
+          es.close(); sseRef.current.delete(slug);
+        } else if (data.status === "error") {
+          mergeEntry(slug, { phase: "error", error: data.error || "Unknown error" });
+          es.close(); sseRef.current.delete(slug);
+        } else {
+          mergeEntry(slug, { phase: data.phase || data.status });
+        }
+      });
+
+      es.onerror = () => { es.close(); sseRef.current.delete(slug); };
+    }).catch((err) => {
+      mergeEntry(slug, { phase: "error", error: String(err) });
+    });
   }
 
   async function handleGenerate() {
     const slug = slugify(query.trim());
-    if (!slug) return;
-    if (generating.has(slug)) return;
-
+    if (!slug || generating.has(slug)) return;
     const existing = await fetchArticleStatus(slug);
     if (existing && "status" in existing && existing.status === "published") {
       router.push(`/article/${slug}`);
       return;
     }
-
     setShowResults(true);
     startGenerate(slug);
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && e.shiftKey) {
-      e.preventDefault();
-      handleGenerate();
-    }
+    if (e.key === "Enter" && e.shiftKey) { e.preventDefault(); handleGenerate(); }
   };
 
   return (
     <PageLayout
       headerSearch={{
-        value: query,
-        onChange: setQuery,
-        onSubmit: handleSearch,
-        onClear: handleClear,
+        value: query, onChange: setQuery, onSubmit: handleSearch, onClear: handleClear,
         placeholder: "Search articles...",
       }}
     >
+      <PageHero title="Articles" subtitle="Browse and search the encyclopedia" gradient="blue" />
 
-      <PageHero
-        title="Articles"
-        subtitle="Browse and search the encyclopedia"
-        gradient="blue"
-      />
-
-      {/* Main content */}
       <main className="flex-1 overflow-y-auto pb-16">
         <div className="max-w-6xl mx-auto w-full px-4">
-          {/* Generate action bar */}
           {query && (
             <div className="py-4 flex items-center gap-3">
-              <button
-                onClick={handleGenerate}
-                onKeyDown={handleKeyDown}
-                className="btn btn-primary"
-              >
+              <button onClick={handleGenerate} onKeyDown={handleKeyDown} className="btn btn-primary">
                 <IconLightning size={16} /> Generate &ldquo;{query}&rdquo;
               </button>
               <span className="text-xs" style={{ color: "var(--subtle)" }}>Press Shift+Enter to generate</span>
             </div>
           )}
-          {/* Generation bars */}
+
           {generating.size > 0 && (
             <div className="mb-6 space-y-2">
               {Array.from(generating.values()).map((gen) => (
                 <GenerationBar
-                  key={gen.slug}
-                  entry={gen}
+                  key={gen.slug} entry={gen}
                   onRetry={(slug) => startGenerate(slug)}
                   onDismiss={(slug) => {
-                    setGenerating((prev) => {
-                      const next = new Map(prev);
-                      next.delete(slug);
-                      return next;
-                    });
+                    setGenerating((prev) => { const next = new Map(prev); next.delete(slug); return next; });
                     const es = sseRef.current.get(slug);
-                    if (es) {
-                      es.close();
-                      sseRef.current.delete(slug);
-                    }
+                    if (es) { es.close(); sseRef.current.delete(slug); }
                   }}
                 />
               ))}
             </div>
           )}
 
-          {/* Result count */}
           {showResults && (
             <div className="text-sm mb-4 px-1" style={{ color: "var(--muted)" }}>
-              {searching ? "Searching..." : loading ? "Loading..." : `${articles.length} results`}
+              {searching ? "Searching..." : initialLoading ? "Loading..." : `${articles.length} results`}
             </div>
           )}
 
-          {/* Article grid */}
-          {loading ? (
+          {initialLoading ? (
             <CardGridSkeleton />
           ) : showResults && articles.length === 0 && generating.size === 0 ? (
             <div className="max-w-lg mx-auto text-center py-8">
@@ -365,7 +283,6 @@ export default function ArticlesPage() {
             </div>
           ) : (
             <>
-              {/* Search results grid */}
               {showResults && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">
                   {articles.map((article) => (
@@ -373,17 +290,14 @@ export default function ArticlesPage() {
                   ))}
                   {infiniteLoading && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4 col-span-full">
-                      {Array.from({ length: 3 }).map((_, i) => (
-                        <CardSkeleton key={`inf-${i}`} />
-                      ))}
+                      {Array.from({ length: 3 }).map((_, i) => <CardSkeleton key={`inf-${i}`} />)}
                     </div>
                   )}
                   <div ref={sentinelRef} className="h-1 col-span-full" />
                 </div>
               )}
 
-              {/* Empty database - no search, no articles */}
-              {!showResults && articles.length === 0 && !loading && (
+              {!showResults && articles.length === 0 && !initialLoading && (
                 <div className="max-w-lg mx-auto text-center py-16">
                   <div className="glass-card-static p-10">
                     <div className="mb-4"><IconBook size={56} /></div>
@@ -393,15 +307,14 @@ export default function ArticlesPage() {
                     </p>
                     <div className="flex items-center justify-center gap-3">
                       <span className="text-xs font-medium" style={{ color: "var(--subtle)" }}>Try:</span>
-                      <button onClick={() => { setQuery("Roman Empire"); setShowResults(true); setLoading(true); setDebouncedQuery("Roman Empire"); }} className="btn btn-secondary btn-sm">Roman Empire</button>
-                      <button onClick={() => { setQuery("Black Holes"); setShowResults(true); setLoading(true); setDebouncedQuery("Black Holes"); }} className="btn btn-secondary btn-sm">Black Holes</button>
-                      <button onClick={() => { setQuery("Silk Road"); setShowResults(true); setLoading(true); setDebouncedQuery("Silk Road"); }} className="btn btn-secondary btn-sm">Silk Road</button>
+                      <button onClick={() => { setQuery("Roman Empire"); setShowResults(true); setInitialLoading(true); setDebouncedQuery("Roman Empire"); }} className="btn btn-secondary btn-sm">Roman Empire</button>
+                      <button onClick={() => { setQuery("Black Holes"); setShowResults(true); setInitialLoading(true); setDebouncedQuery("Black Holes"); }} className="btn btn-secondary btn-sm">Black Holes</button>
+                      <button onClick={() => { setQuery("Silk Road"); setShowResults(true); setInitialLoading(true); setDebouncedQuery("Silk Road"); }} className="btn btn-secondary btn-sm">Silk Road</button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Featured articles - home state */}
               {!showResults && articles.length > 0 && (
                 <section>
                   <div className="flex items-center gap-4 mb-6">

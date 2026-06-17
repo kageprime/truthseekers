@@ -1,37 +1,29 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageLayout from "../components/PageLayout";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../components/ThemeProvider";
-import { BASE } from "@/lib/api";
+import { useQuota } from "../hooks";
+import { BASE } from "@/lib/constants";
 import {
   IconUser, IconLightning, IconPalette, IconLogout,
   IconCheck, IconX
 } from "../components/Icons";
 
-interface QuotaInfo {
-  allowed: boolean;
-  used: number;
-  limit: number;
-  remaining: number;
-  tier: string;
-}
-
 export default function SettingsPage() {
   const { user, loading: authLoading, token, logout } = useAuth();
   const { resolved, toggle, setTheme } = useTheme();
   const router = useRouter();
+  const { data: quota } = useQuota();
 
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-
-  const [quota, setQuota] = useState<QuotaInfo | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
@@ -43,20 +35,6 @@ export default function SettingsPage() {
       setAvatar(user.avatar || "");
     }
   }, [user]);
-
-  const fetchQuota = useCallback(async () => {
-    if (!token) return;
-    try {
-      const res = await fetch(`${BASE}/quota`, {
-        headers: { authorization: `Bearer ${token}` },
-      });
-      if (res.ok) setQuota(await res.json());
-    } catch {}
-  }, [token]);
-
-  useEffect(() => {
-    fetchQuota();
-  }, [fetchQuota]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();

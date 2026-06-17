@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { fetchArticle, generateArticle, refreshArticle, fetchQuota, progressUrl, BASE } from "@/lib/api";
-import type { QuotaInfo } from "@/lib/api";
+import { fetchArticle, progressUrl } from "@/lib/api";
+import { BASE } from "@/lib/constants";
+import { useQuota, useGenerateArticle, useRefreshArticle } from "../../hooks";
 import PageLayout from "../../components/PageLayout";
 import GenerationBar from "../../components/GenerationBar";
 import BlockRenderer, { articleToBlocks } from "../../components/BlockRenderer";
@@ -25,17 +26,12 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   const [generating, setGenerating] = useState(isGenerating);
   const [progress, setProgress] = useState(initialPhase);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
-  const [quota, setQuota] = useState<QuotaInfo | null>(null);
+  const { data: quota } = useQuota();
+  const { mutate: generateArticle } = useGenerateArticle();
+  const { mutate: refreshArticle } = useRefreshArticle();
   const [quotaBlocked, setQuotaBlocked] = useState(false);
   const sseRef = useRef<EventSource | null>(null);
   const trackedRef = useRef(false);
-  const quotaFetchedRef = useRef(false);
-
-  useEffect(() => {
-    if (quotaFetchedRef.current) return;
-    quotaFetchedRef.current = true;
-    fetchQuota().then(setQuota).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (slug && !trackedRef.current) {
@@ -116,9 +112,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     setProgress("queued");
     setQuotaBlocked(false);
     try {
-      const result = await generateArticle(slug);
-      if ((result as any).quota) setQuota((result as any).quota);
-      if (result.status === "already_exists") {
+      const result = await generateArticle({ slug });
+      if (result?.status === "already_exists") {
         try {
           const a = await fetchArticle(slug);
           if (a) setArticle(a);
@@ -129,20 +124,19 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
       setError(err instanceof Error ? err.message : "Failed to generate article");
       setGenerating(false);
     }
-  }, [slug]);
+  }, [slug, generateArticle]);
 
   const handleRefresh = useCallback(async () => {
     setGenerating(true);
     setProgress("queued");
     setQuotaBlocked(false);
     try {
-      const result = await refreshArticle(slug);
-      if ((result as any).quota) setQuota((result as any).quota);
+      await refreshArticle(slug);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to refresh article");
       setGenerating(false);
     }
-  }, [slug]);
+  }, [slug, refreshArticle]);
 
   const handleExport = useCallback((format: "json" | "markdown") => {
     if (!article) return;
@@ -304,7 +298,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           <div className="flex items-center gap-2 mb-8">
             <button
               onClick={handleRefresh}
-              disabled={generating || (quota !== null && quota.remaining <= 0)}
+              disabled={generating || (quota?.remaining != null && quota.remaining <= 0)}
               className="btn btn-primary btn-sm"
             >
               {generating ? <><IconRefresh size={14} /> Refreshing...</> : <><IconRefresh size={14} /> Refresh</>}
@@ -321,7 +315,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             >
               <IconFileText size={14} /> MD
             </button>
-            {quota !== null && quota.remaining <= 3 && (
+            {quota != null && quota.remaining <= 3 && (
               <span className="text-xs ml-auto" style={{ color: quota.remaining === 0 ? "var(--red)" : "var(--accent)" }}>
                 {quota.remaining} / {quota.limit}
               </span>

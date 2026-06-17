@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ErrorBoundary from "./components/ErrorBoundary";
+import QueryProvider from "./components/QueryProvider";
 import ThemeProvider from "./components/ThemeProvider";
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#f0ede6",
+  themeColor: "#0f0f0f",
 };
 
 export const metadata: Metadata = {
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&family=Press+Start+2P&display=swap"
           rel="stylesheet"
         />
+        <script dangerouslySetInnerHTML={{ __html: `document.documentElement.classList.add("dark")` }} />
       </head>
       <body className="antialiased" style={{ margin: 0 }}>
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-white focus:rounded-lg focus:text-sm focus:shadow-lg" style={{ color: "var(--ink)" }}>
@@ -663,7 +665,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
         `}</style>
         <ErrorBoundary>
-          <ThemeProvider>{children}</ThemeProvider>
+          <QueryProvider><ThemeProvider>{children}</ThemeProvider></QueryProvider>
         </ErrorBoundary>
       </body>
     </html>

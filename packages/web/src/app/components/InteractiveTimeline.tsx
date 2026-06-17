@@ -51,8 +51,8 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
   if (sorted.length === 0) {
     return (
       <div className="glass-card-static p-6 my-4 text-center">
-        <div className="text-3xl mb-2">📅</div>
-        <p className="text-xs font-medium" style={{ color: "var(--subtle)" }}>No timeline data available</p>
+        <IconClock size={24} />
+        <p className="text-xs font-medium mt-2" style={{ color: "var(--subtle)" }}>No timeline data available</p>
       </div>
     );
   }
@@ -89,7 +89,6 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
     setActiveIdx(findClosest(year));
   }
 
-  // Auto-advance
   useEffect(() => {
     if (!playing) return;
     const interval = setInterval(() => {
@@ -101,21 +100,18 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
     return () => clearInterval(interval);
   }, [playing, sorted.length]);
 
-  // Sync scrub handle position when playing
   useEffect(() => {
     if (playing && activeIdx !== null) {
       setScrubX(yearToX(sorted[activeIdx].year));
     }
   }, [activeIdx, playing, sorted]);
 
-  // Scroll list to active event
   useEffect(() => {
     if (activeIdx === null || !listRef.current) return;
     const child = listRef.current.children[activeIdx] as HTMLElement | undefined;
     child?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [activeIdx]);
 
-  // Causality edges
   const activeEvent = activeIdx !== null ? sorted[activeIdx] : null;
   const causeEdges: { from: number; to: number }[] = [];
   if (activeEvent?.causes) {
@@ -145,17 +141,17 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
 
   const trackTop = (
     <>
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-3 flex-wrap">
-        <IconClock size={32} />
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <IconClock size={20} />
         <div>
-          <h3 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>TIMELINE</h3>
-          <div className="h-1 w-12 mt-1" style={{ background: "var(--blue)" }} />
+          <h3 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>Timeline</h3>
+          <div className="h-0.5 w-8 mt-1 rounded-full" style={{ background: "var(--accent)" }} />
         </div>
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={togglePlay}
-            className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#1c1917] hover:shadow-[3px_3px_0_#1c1917] active:shadow-[1px_1px_0_#1c1917] transition-all text-xs"
+            className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent-bg)]"
+            style={{ border: "1px solid var(--border)", color: "var(--ink)" }}
             aria-label={playing ? "Pause" : "Play"}
           >
             {playing ? (
@@ -166,67 +162,63 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
           </button>
           <button
             onClick={() => setFullscreen((f) => !f)}
-            className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#1c1917] hover:shadow-[3px_3px_0_#1c1917] active:shadow-[1px_1px_0_#1c1917] transition-all text-xs"
+            className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--accent-bg)]"
+            style={{ border: "1px solid var(--border)", color: "var(--ink)" }}
             aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"}
           >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               {fullscreen
                 ? <><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3" /></>
                 : <><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" /></>}
             </svg>
           </button>
-          <span className="text-xs ml-1 whitespace-nowrap" style={{ color: "var(--subtle)" }}>{minYear} – {maxYear}</span>
+          <span className="text-xs whitespace-nowrap" style={{ color: "var(--subtle)" }}>{minYear} – {maxYear}</span>
         </div>
       </div>
 
-      {/* Category legend */}
       {usedCats.length > 1 && (
-        <div className="flex flex-wrap gap-3 mb-3 text-xs sm:text-[10px]">
+        <div className="flex flex-wrap gap-3 mb-4 text-xs">
           {usedCats.map((cat) => (
-            <span key={cat} className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 border-2 border-black" style={{ background: catColor(cat) }} />
+            <span key={cat} className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: catColor(cat) }} />
               {CATEGORY_LABELS[cat] ?? cat}
             </span>
           ))}
         </div>
       )}
 
-      {/* Scrubber */}
       <div
-        className="relative h-14 cursor-pointer select-none mb-3"
+        className="relative h-12 cursor-pointer select-none mb-3 rounded-lg"
+        style={{ background: "var(--surface-glass)" }}
         onMouseMove={(e) => { if (!playing) scrubFrom(e.clientX, e.currentTarget.getBoundingClientRect()); }}
         onMouseLeave={() => { if (!playing) { setActiveIdx(null); setScrubX(0); } }}
         onClick={(e) => { if (!playing) scrubFrom(e.clientX, e.currentTarget.getBoundingClientRect()); }}
       >
-        {/* Causality arrows */}
         {causeEdges.length > 0 && (
           <svg className="absolute inset-0 w-full h-full pointer-events-none z-20">
             {causeEdges.map((edge, i) => (
               <line key={i} x1={`${edge.from}%`} y1="50%" x2={`${edge.to}%`} y2="50%"
-                stroke="var(--accent)" strokeWidth="2" strokeDasharray="4 2"
+                stroke="var(--accent)" strokeWidth="1.5" strokeDasharray="3 2"
                 markerEnd={`url(#arrow-${uid})`} />
             ))}
             <defs>
-              <marker id={`arrow-${uid}`} markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
-                <polygon points="0 0, 6 2, 0 4" fill="var(--accent)" />
+              <marker id={`arrow-${uid}`} markerWidth="5" markerHeight="3" refX="5" refY="1.5" orient="auto">
+                <polygon points="0 0, 5 1.5, 0 3" fill="var(--accent)" />
               </marker>
             </defs>
           </svg>
         )}
 
-        {/* Track line */}
-        <div className="absolute top-1/2 left-0 right-0 h-2 -translate-y-1/2 border-2 border-black"
-          style={{ background: "var(--blue)", opacity: 0.15 }} />
-        <div className="absolute top-1/2 left-0 h-2 -translate-y-1/2 transition-all duration-150"
-          style={{ width: `${scrubX}%`, background: "var(--blue)", opacity: 0.4 }} />
+        <div className="absolute top-1/2 left-3 right-3 h-1.5 -translate-y-1/2 rounded-full"
+          style={{ background: "var(--border)" }} />
+        <div className="absolute top-1/2 left-3 h-1.5 -translate-y-1/2 rounded-full transition-all duration-150"
+          style={{ width: `calc(3px + ${scrubX}% * (100% - 18px) / 100)`, background: "var(--accent)", opacity: 0.5 }} />
 
-        {/* Scrub handle */}
         <div
-          className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 border-2 border-black shadow-[2px_2px_0_#1c1917] transition-all duration-100 pointer-events-none z-30 ${playing ? "animate-pulse" : ""}`}
-          style={{ left: `${scrubX}%`, background: activeIdx !== null ? catColor(sorted[activeIdx]?.category) : "white" }}
+          className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 transition-all duration-100 pointer-events-none z-30 ${playing ? "animate-pulse" : ""}`}
+          style={{ left: `${scrubX}%`, background: activeIdx !== null ? catColor(sorted[activeIdx]?.category) : "white", borderColor: "var(--accent)" }}
         />
 
-        {/* Event dots */}
         {sorted.filter((_, i) => { const g = yearGroups.get(sorted[i].year)!; return g[0] === i; }).map((ev) => {
           const g = yearGroups.get(ev.year)!;
           const n = g.length;
@@ -234,12 +226,12 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
           const isActive = activeIdx !== null && g.includes(activeIdx);
           return (
             <div key={ev.year}
-              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 border-2 border-black cursor-pointer transition-all duration-150 z-10"
+              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border cursor-pointer transition-all duration-150 z-10"
               style={{
-                left: `${x}%`, width: n > 1 ? 18 : 12, height: n > 1 ? 18 : 12,
+                left: `${x}%`, width: n > 1 ? 16 : 10, height: n > 1 ? 16 : 10,
                 background: isActive ? catColor(ev.category) : "white",
-                boxShadow: isActive ? "2px 2px 0 #1c1917" : "none",
-                borderColor: isActive ? catColor(ev.category) : "black",
+                borderColor: isActive ? catColor(ev.category) : "var(--border)",
+                borderWidth: isActive ? 2 : 1.5,
               }}
               onClick={(e) => {
                 e.stopPropagation(); setPlaying(false);
@@ -249,14 +241,13 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
                 } else { setActiveIdx(g[0]); }
               }}
               title={n > 1 ? `${n} events in ${ev.year}` : String(ev.year)}>
-              {n > 1 && <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold" style={{ color: "var(--ink)" }}>{n}</span>}
+              {n > 1 && <span className="absolute inset-0 flex items-center justify-center text-[6px] font-bold" style={{ color: "var(--ink)" }}>{n}</span>}
             </div>
           );
         })}
       </div>
 
-      {/* Year labels */}
-      <div className="relative mb-2" style={{ height: 32 }}>
+      <div className="relative mb-2" style={{ height: 28 }}>
         {(() => {
           const seen: number[] = [];
           const MIN_GAP_PCT = 8;
@@ -267,12 +258,12 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
             const hidden = overlaps && activeIdx !== i;
             return (
               <div key={i}
-                className="absolute text-xs font-semibold sm:text-[8px] transition-all duration-150"
+                className="absolute text-xs transition-all duration-150"
                 style={{
                   left: `${x}%`, transform: "translateX(-50%)",
-                  top: hidden ? "8px" : (i % 2 === 0 ? "0px" : "16px"),
+                  top: hidden ? "6px" : (i % 2 === 0 ? "0px" : "14px"),
                   color: activeIdx === i ? "var(--ink)" : hidden ? "transparent" : "var(--subtle)",
-                  fontWeight: activeIdx === i ? 700 : 400,
+                  fontWeight: activeIdx === i ? 600 : 400,
                   opacity: hidden ? 0 : 1,
                   pointerEvents: hidden ? "none" : "auto",
                 }}>
@@ -286,24 +277,29 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
   );
 
   const trackList = (
-    <div ref={listRef} className="space-y-1" style={{ scrollBehavior: "smooth" }}>
+    <div ref={listRef} className="space-y-1.5" style={{ scrollBehavior: "smooth" }}>
       {sorted.map((ev, i) => {
         const isActive = activeIdx === i;
         return (
           <div key={i} onClick={() => selectIdx(i)}
-            className={`flex items-start gap-3 p-3 border-2 border-black cursor-pointer transition-all duration-100 ${
-              isActive ? "bg-white shadow-[3px_3px_0_#1c1917]" : "bg-white/70 hover:bg-white hover:shadow-[2px_2px_0_#1c1917]"
+            className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all duration-150 ${
+              isActive ? "" : "hover:bg-[var(--accent-bg)]"
             }`}
-            style={{ borderLeftColor: catColor(ev.category), borderLeftWidth: 4 }}>
-            <span className="text-xs font-semibold font-bold shrink-0 mt-0.5 whitespace-nowrap" style={{ color: catColor(ev.category) }}>
+            style={{
+              background: isActive ? "var(--surface-glass)" : "transparent",
+              border: "1px solid",
+              borderColor: isActive ? "var(--accent)" : "transparent",
+              borderLeft: `3px solid ${catColor(ev.category)}`,
+            }}>
+            <span className="text-xs font-semibold shrink-0 mt-0.5 whitespace-nowrap" style={{ color: catColor(ev.category) }}>
               {ev.year}
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <strong className="text-sm leading-snug">{ev.event}</strong>
+                <strong className="text-sm leading-snug" style={{ color: "var(--ink)" }}>{ev.event}</strong>
                 {ev.category && (
-                  <span className="text-xs sm:text-[9px] px-1.5 py-0.5 border-2 border-black font-medium shrink-0"
-                    style={{ background: `${catColor(ev.category)}20`, color: catColor(ev.category) }}>
+                  <span className="text-xs px-1.5 py-0.5 rounded-md font-medium shrink-0"
+                    style={{ background: `${catColor(ev.category)}15`, color: catColor(ev.category) }}>
                     {CATEGORY_LABELS[ev.category] ?? ev.category}
                   </span>
                 )}
@@ -322,12 +318,13 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
 
   if (fullscreen) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-2 md:p-6">
-        <div className="glass-card-static p-5 md:p-6 w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden">
+      <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-2 md:p-6">
+        <div className="rounded-xl p-5 md:p-6 w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden"
+          style={{ background: "var(--background)", border: "1px solid var(--border)" }}>
           <div className="shrink-0">
             {trackTop}
           </div>
-          <hr className="border-t-2 border-dashed my-2" style={{ borderColor: "var(--border)" }} />
+          <hr className="border-t my-2" style={{ borderColor: "var(--border)" }} />
           <div className="flex-1 overflow-y-auto min-h-0" style={{ scrollBehavior: "smooth" }}>
             {trackList}
           </div>
@@ -337,7 +334,7 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
   }
 
   return (
-    <div className="glass-card-static p-3 sm:p-6 my-4" style={{ background: "var(--border-light)" }}>
+    <div className="rounded-xl p-4 sm:p-5 my-4" style={{ background: "var(--surface-glass)", border: "1px solid var(--border)" }}>
       {trackTop}
       <div className="max-h-64 sm:max-h-48 overflow-y-auto" style={{ scrollBehavior: "smooth" }}>
         {trackList}

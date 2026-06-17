@@ -2,8 +2,10 @@
 
 import ChatMessage from "./ChatMessage";
 import FollowUpSuggestions from "./FollowUpSuggestions";
+import EmptyChatState from "./EmptyChatState";
+import ErrorBanner from "./ErrorBanner";
+import StreamingPreview from "./StreamingPreview";
 import type { AgentEvent } from "./ProcessViewer";
-import { IconXCircle } from "./Icons";
 
 interface Message {
   id: string;
@@ -56,22 +58,7 @@ export default function MessageList({
       )}
 
       {messages.length === 0 && !sending && !error ? (
-        <div className="flex flex-col items-center justify-center h-full px-6 py-16 text-center animate-fade-in">
-          <img src="/logo.png" alt="Truthseekers" className="mb-4" style={{ height: 48, width: "auto", objectFit: "contain" }} />
-          <p className="text-sm mb-8 max-w-md" style={{ color: "var(--muted)" }}>Ask anything — I'll research and build rich, interactive responses with maps, timelines, diagrams, and more.</p>
-          <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-            {suggestedTopics.map((topic) => (
-              <button
-                key={topic}
-                onClick={() => onSetInput(topic)}
-                className="px-4 py-2 text-sm rounded-full border transition-colors hover:bg-[var(--accent-bg)] hover:border-[var(--accent)]"
-                style={{ borderColor: "var(--border)", color: "var(--ink)" }}
-              >
-                {topic}
-              </button>
-            ))}
-          </div>
-        </div>
+        <EmptyChatState suggestedTopics={suggestedTopics} onSetInput={onSetInput} />
       ) : (
         <div className="max-w-3xl mx-auto">
           {messages.map((msg, i) => (
@@ -93,46 +80,14 @@ export default function MessageList({
               <FollowUpSuggestions followUps={followUps} onClick={onSend} />
             </div>
           )}
-          {error && (
-            <div className="mx-6 my-4 p-4 rounded-xl border" style={{ background: "var(--red-subtle)", borderColor: "var(--red)" }}>
-              <div className="flex items-start gap-3">
-                <span className="shrink-0 mt-0.5"><IconXCircle size={20} /></span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold" style={{ color: "var(--red)" }}>Something went wrong</p>
-                  <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>{error}</p>
-                  <button onClick={onRetry} className="btn btn-sm mt-3" style={{ background: "var(--accent)", color: "white" }}>Try Again</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Streaming section — visible throughout the entire send */}
-          {sending && (
-            <div className="px-6 py-3 animate-fade-in">
-              {/* Phase label — shown until blocks/content arrive */}
-              {!streamContent && streamBlocks.length === 0 && (
-                <div className="flex items-center gap-3 text-sm mb-3">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: "var(--accent)" }} />
-                  <span className="text-xs font-medium" style={{ color: "var(--muted)" }}>{phaseLabel}</span>
-                </div>
-              )}
-
-              {/* Agent activity count badge — console handles the details */}
-              {agentEvents.length > 0 && !streamContent && streamBlocks.length === 0 && (
-                <div className="flex items-center gap-2 text-xs mb-3" style={{ color: "var(--muted)" }}>
-                  <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--accent)" }} />
-                  <span>{agentEvents.length} events · {phaseLabel}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Streaming preview — rendered blocks/content appear below agent activity */}
-          {(streamContent || streamBlocks.length > 0) && (
-            <div aria-live="polite" aria-atomic="true" className="px-6">
-              <ChatMessage role="assistant" content={streamContent || ""} blocks={streamBlocks} agentEvents={[]} streaming />
-            </div>
-          )}
+          {error && <ErrorBanner error={error} onRetry={onRetry} />}
+          <StreamingPreview
+            sending={sending}
+            streamContent={streamContent}
+            streamBlocks={streamBlocks}
+            agentEvents={agentEvents}
+            phaseLabel={phaseLabel}
+          />
         </div>
       )}
     </div>
