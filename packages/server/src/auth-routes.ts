@@ -178,18 +178,18 @@ const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || "";
 const GOOGLE_CLIENT_ID_ENV = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 
-export function getApiOrigin(c: any): string {
-  return process.env.OAUTH_REDIRECT_URL || `${c.req.header("x-forwarded-proto") || "http"}://${c.req.header("host") || "localhost:4097"}`;
+export function getApiOrigin(): string {
+  return process.env.API_PUBLIC_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
 }
 
 export function getFrontendOrigin(): string {
-  return process.env.FRONTEND_URL || "http://localhost:3001";
+  return process.env.FRONTEND_URL || process.env.CORS_ORIGIN || "http://localhost:3001";
 }
 
 // GitHub
 auth.get("/github", (c) => {
   if (!GITHUB_CLIENT_ID) return c.json({ error: "GitHub OAuth not configured" }, 503);
-  const redirectUri = `${getApiOrigin(c)}/auth/github/callback`;
+  const redirectUri = `${getApiOrigin()}/auth/github/callback`;
   const url = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`;
   return c.redirect(url);
 });
@@ -200,7 +200,7 @@ auth.get("/github/callback", async (c) => {
   const code = c.req.query("code");
   if (!code) return c.json({ error: "No code provided" }, 400);
 
-  const redirectUri = `${getApiOrigin(c)}/auth/github/callback`;
+  const redirectUri = `${getApiOrigin()}/auth/github/callback`;
 
   try {
     // Exchange code for access token
@@ -233,7 +233,7 @@ auth.get("/github/callback", async (c) => {
 // Google
 auth.get("/google", (c) => {
   if (!GOOGLE_CLIENT_ID_ENV) return c.json({ error: "Google OAuth not configured" }, 503);
-  const redirectUri = `${getApiOrigin(c)}/auth/google/callback`;
+  const redirectUri = `${getApiOrigin()}/auth/google/callback`;
   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID_ENV}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=email&prompt=select_account`;
   return c.redirect(url);
 });
@@ -244,7 +244,7 @@ auth.get("/google/callback", async (c) => {
   const code = c.req.query("code");
   if (!code) return c.json({ error: "No code provided" }, 400);
 
-  const redirectUri = `${getApiOrigin(c)}/auth/google/callback`;
+  const redirectUri = `${getApiOrigin()}/auth/google/callback`;
 
   try {
     // Exchange code for tokens
