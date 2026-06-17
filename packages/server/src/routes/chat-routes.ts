@@ -109,6 +109,8 @@ chat.post("/chat/:id/messages", async (c) => {
       }
     } catch {}
 
+    const agentEvents: any[] = [];
+
     const agent = new Agent({
       model: selectedModel || "deepseek-4-flash",
       systemPrompt: SYSTEM_PROMPT + sessionContext,
@@ -118,6 +120,7 @@ chat.post("/chat/:id/messages", async (c) => {
         execute: toolExecutors[def.function.name] || (async () => ({ result: `Unknown tool: ${def.function.name}` })),
       })),
       onEvent: (event) => {
+        agentEvents.push(event);
         try {
           stream.writeSSE({ data: JSON.stringify(event), event: "agent_event" });
         } catch {}
@@ -136,7 +139,7 @@ chat.post("/chat/:id/messages", async (c) => {
         if (m.role === "user") {
           await addMessage(entryId, conversationId, "user", m.content || " ");
         } else if (m.role === "assistant") {
-          await addMessage(entryId, conversationId, "assistant", m.content || " ", result.blocks.length > 0 ? result.blocks : undefined, m.tool_calls);
+          await addMessage(entryId, conversationId, "assistant", m.content || " ", result.blocks.length > 0 ? result.blocks : undefined, m.tool_calls, undefined, agentEvents);
         } else if (m.role === "tool") {
           await addMessage(entryId, conversationId, "tool", m.content || " ", undefined, undefined, m.tool_call_id);
         }

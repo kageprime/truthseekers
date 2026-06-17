@@ -409,9 +409,12 @@ export interface ConversationDetail extends ConversationSummary {
   messages: Array<{
     id: string;
     conversationId: string;
-    role: "user" | "assistant" | "system";
+    role: "user" | "assistant" | "system" | "tool";
     content: string;
     blocks?: Block[];
+    tool_calls?: any[];
+    tool_call_id?: string;
+    agentEvents?: any[];
     createdAt: string;
   }>;
 }
