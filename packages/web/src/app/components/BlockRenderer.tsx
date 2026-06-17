@@ -174,7 +174,8 @@ function HeadingBlock({ data }: { data: HeadingBlockData }) {
 
 function TextBlock({ data }: { data: TextBlockData }) {
   if (!data) return null;
-  return <MarkdownRenderer content={data.content} />;
+  const content = (data as any).content || (data as any).text || "";
+  return <MarkdownRenderer content={content} />;
 }
 
 function SectionBlock({ data }: { data: SectionBlockData }) {
