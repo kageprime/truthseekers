@@ -7,6 +7,9 @@ import crypto from "node:crypto";
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-in-prod";
 const TOKEN_EXPIRY = "30d";
 
+// In-memory fallback for users when MongoDB is unavailable
+const memUsers = new Map<string, { id: string; email: string; name: string; avatar: string; subscriptionTier: string; onboarded: boolean; createdAt: Date }>();
+
 // In-memory magic link tokens (in production, use DB/Redis)
 const magicTokens = new Map<string, { email: string; expiresAt: number }>();
 
@@ -25,13 +28,25 @@ function userResponse(user: { id: string; email: string; name: string; avatar: s
 
 async function findOrCreateUser(email: string) {
   const normalized = email.toLowerCase().trim();
-  let user = await getUserByEmail(normalized);
-  if (!user) {
+  try {
+    let user = await getUserByEmail(normalized);
+    if (!user) {
+      const id = crypto.randomUUID();
+      const created = await createUser(id, normalized);
+      user = { ...created, avatar: "" };
+    }
+    return user;
+  } catch {
+    // Fallback: in-memory
+    for (const u of memUsers.values()) {
+      if (u.email === normalized) return u;
+    }
     const id = crypto.randomUUID();
-    const created = await createUser(id, normalized);
-    user = { ...created, avatar: "" };
+    const now = new Date();
+    const user = { id, email: normalized, name: "", avatar: "", subscriptionTier: "free", onboarded: false, createdAt: now };
+    memUsers.set(id, user);
+    return user;
   }
-  return user;
 }
 
 const auth = new Hono();
@@ -83,7 +98,12 @@ auth.get("/me", async (c) => {
 
   try {
     const payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as JwtPayload;
-    const user = await getUserById(payload.sub);
+    let user = null;
+    try {
+      user = await getUserById(payload.sub);
+    } catch {
+      user = memUsers.get(payload.sub) || null;
+    }
     if (!user) return c.json({ error: "User not found" }, 404);
     return c.json({ user: { ...user, avatar: user.avatar || "" } });
   } catch {
@@ -102,8 +122,20 @@ auth.put("/me", async (c) => {
     const updates: { name?: string; avatar?: string } = {};
     if (name !== undefined) updates.name = name;
     if (avatar !== undefined) updates.avatar = avatar;
-    if (Object.keys(updates).length > 0) await updateUser(payload.sub, updates);
-    const user = await getUserById(payload.sub);
+    if (Object.keys(updates).length > 0) {
+      try {
+        await updateUser(payload.sub, updates);
+      } catch {
+        const u = memUsers.get(payload.sub);
+        if (u) { Object.assign(u, updates); }
+      }
+    }
+    let user = null;
+    try {
+      user = await getUserById(payload.sub);
+    } catch {
+      user = memUsers.get(payload.sub) || null;
+    }
     if (!user) return c.json({ error: "User not found" }, 404);
     return c.json({ user: { ...user, avatar: user.avatar || "" } });
   } catch {
@@ -119,8 +151,20 @@ auth.post("/onboard", async (c) => {
   try {
     const payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as JwtPayload;
     const { name } = await c.req.json<{ name?: string }>();
-    if (name) await updateUser(payload.sub, { name });
-    await setUserOnboarded(payload.sub);
+    if (name) {
+      try {
+        await updateUser(payload.sub, { name });
+      } catch {
+        const u = memUsers.get(payload.sub);
+        if (u) u.name = name;
+      }
+    }
+    try {
+      await setUserOnboarded(payload.sub);
+    } catch {
+      const u = memUsers.get(payload.sub);
+      if (u) u.onboarded = true;
+    }
     return c.json({ onboarded: true });
   } catch {
     return c.json({ error: "Invalid or expired token" }, 401);
