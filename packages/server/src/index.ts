@@ -781,6 +781,7 @@ Also supports: heading, text, citation, crossref, gallery, diagram (mermaid code
     const toolExecutors: Record<string, ToolExecutor> = {
       ...BUILT_IN_TOOL_EXECUTORS,
       get_article: async (a) => {
+        if (!dbReady) return { result: "Database unavailable — article lookup skipped" };
         const article = await getArticle(a.slug);
         if (!article) return { result: "Article not found" };
         const articleBlocks = article.blocks || articleToBlocks(article.slug, article.title, article.abstract, article.sections, article.timeline, article.crossrefs, article.citations);
@@ -794,11 +795,13 @@ Also supports: heading, text, citation, crossref, gallery, diagram (mermaid code
         return { result: JSON.stringify({ queued: true, slug: a.slug }) };
       },
       article_search: async (a) => {
+        if (!dbReady) return { result: "Database unavailable — article search skipped" };
         const results = await searchArticles(a.query, a.maxResults || 5);
         if (results.length === 0) return { result: "No articles found" };
         return { result: JSON.stringify(results.map((r: any) => ({ slug: r.slug, title: r.title, abstract: r.abstract?.slice(0, 300) }))) };
       },
       get_map: async (a) => {
+        if (!dbReady) return { result: "Database unavailable — map lookup skipped" };
         const map = await getMap(a.slug);
         if (!map) return { result: "Map not found" };
         return {
@@ -819,6 +822,7 @@ Also supports: heading, text, citation, crossref, gallery, diagram (mermaid code
         return { result: JSON.stringify({ url: src, caption: r.caption }), blocks: [{ type: "video", data: { src, caption: r.caption } }] };
       },
       suggest_related: async (a) => {
+        if (!dbReady) return { result: "Database unavailable — related articles skipped" };
         const [edges, backlinks] = await Promise.all([getGraphEdges(a.slug), getBacklinks(a.slug)]);
         if (edges.length === 0 && backlinks.length === 0) return { result: "No related articles found" };
         return { result: JSON.stringify({ outgoing: edges, incoming: backlinks }) };

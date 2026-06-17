@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createChat, fetchChats } from "@/lib/api";
 import type { ConversationSummary } from "@/lib/api";
+import { useApiQuery } from "../hooks/useApiQuery";
 import { IconChat, IconBook, IconMap, IconClock, IconPlus, IconChevronRight } from "./Icons";
 
 interface SidebarProps {
@@ -23,18 +24,13 @@ const NAV_ITEMS = [
 export default function Sidebar({ open, onClose, activeId }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
-
-  useEffect(() => {
-    fetchChats().then((data) => { setConversations(data); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
+  const { data: conversations = [], loading, refetch } = useApiQuery("sidebar-chats", fetchChats);
 
   async function handleNew() {
     const conv = await createChat();
     if (conv) {
-      setConversations((prev) => [{ id: conv.id, title: conv.title, createdAt: conv.createdAt, updatedAt: conv.updatedAt, messageCount: 0 }, ...prev]);
+      refetch();
       router.push(`/chat/${conv.id}`);
     }
     onClose();
