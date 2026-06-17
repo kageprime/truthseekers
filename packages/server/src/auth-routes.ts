@@ -67,7 +67,7 @@ auth.post("/login", async (c) => {
   // In production, send magic link
   const linkToken = crypto.randomBytes(32).toString("hex");
   magicTokens.set(linkToken, { email: user.email, expiresAt: Date.now() + 15 * 60_000 });
-  const link = `${c.req.header("origin") || "http://localhost:3001"}/auth/verify?token=${linkToken}`;
+  const link = `${getFrontendOrigin()}/auth/verify?token=${linkToken}`;
   await sendMagicLink(user.email, link);
   return c.json({ sent: true, email: user.email });
 });
@@ -178,10 +178,18 @@ const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || "";
 const GOOGLE_CLIENT_ID_ENV = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 
+export function getApiOrigin(c: any): string {
+  return `${c.req.header("x-forwarded-proto") || "http"}://${c.req.header("host") || "localhost:4097"}`;
+}
+
+export function getFrontendOrigin(): string {
+  return process.env.FRONTEND_URL || "http://localhost:3001";
+}
+
 // GitHub
 auth.get("/github", (c) => {
   if (!GITHUB_CLIENT_ID) return c.json({ error: "GitHub OAuth not configured" }, 503);
-  const redirectUri = `${c.req.header("origin") || "http://localhost:3001"}/auth/github/callback`;
+  const redirectUri = `${getApiOrigin(c)}/auth/github/callback`;
   const url = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`;
   return c.redirect(url);
 });
@@ -192,7 +200,7 @@ auth.get("/github/callback", async (c) => {
   const code = c.req.query("code");
   if (!code) return c.json({ error: "No code provided" }, 400);
 
-  const redirectUri = `${c.req.header("origin") || "http://localhost:3001"}/auth/github/callback`;
+  const redirectUri = `${getApiOrigin(c)}/auth/github/callback`;
 
   try {
     // Exchange code for access token
@@ -215,7 +223,7 @@ auth.get("/github/callback", async (c) => {
     const user = await findOrCreateUser(primary.email);
     const jwtToken = issueToken(user);
     // Redirect back to frontend with token in hash
-    const frontendUrl = `${c.req.header("origin") || "http://localhost:3001"}/auth/callback#token=${jwtToken}`;
+    const frontendUrl = `${getFrontendOrigin()}/auth/callback#token=${jwtToken}`;
     return c.redirect(frontendUrl);
   } catch {
     return c.json({ error: "OAuth failed" }, 500);
@@ -225,8 +233,8 @@ auth.get("/github/callback", async (c) => {
 // Google
 auth.get("/google", (c) => {
   if (!GOOGLE_CLIENT_ID_ENV) return c.json({ error: "Google OAuth not configured" }, 503);
-  const redirectUri = `${c.req.header("origin") || "http://localhost:3001"}/auth/google/callback`;
-  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID_ENV}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=email`;
+  const redirectUri = `${getApiOrigin(c)}/auth/google/callback`;
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID_ENV}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=email&prompt=select_account`;
   return c.redirect(url);
 });
 
@@ -236,7 +244,7 @@ auth.get("/google/callback", async (c) => {
   const code = c.req.query("code");
   if (!code) return c.json({ error: "No code provided" }, 400);
 
-  const redirectUri = `${c.req.header("origin") || "http://localhost:3001"}/auth/google/callback`;
+  const redirectUri = `${getApiOrigin(c)}/auth/google/callback`;
 
   try {
     // Exchange code for tokens
@@ -257,7 +265,7 @@ auth.get("/google/callback", async (c) => {
 
     const user = await findOrCreateUser(userData.email);
     const jwtToken = issueToken(user);
-    const frontendUrl = `${c.req.header("origin") || "http://localhost:3001"}/auth/callback#token=${jwtToken}`;
+    const frontendUrl = `${getFrontendOrigin()}/auth/callback#token=${jwtToken}`;
     return c.redirect(frontendUrl);
   } catch {
     return c.json({ error: "OAuth failed" }, 500);
