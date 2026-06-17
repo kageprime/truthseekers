@@ -55,7 +55,7 @@ export default function SharedHeader({ onToggleSidebar, sidebarOpen, search }: H
             <>
               <button
                 onClick={onToggleSidebar}
-                className="btn-icon btn-ghost text-lg lg:hidden"
+                className="btn-icon btn-ghost text-lg lg:!hidden"
                 aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
               >
                 {sidebarOpen ? (
