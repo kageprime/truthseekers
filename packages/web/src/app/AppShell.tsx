@@ -13,7 +13,7 @@ const CHAT_ROUTES = ["/chat/"];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { isOpen, toggle, close } = useFloatingChat();
+  const { isOpen, toggle, close, isExpanded } = useFloatingChat();
   const { search } = useHeaderSearch();
   const [isMobile, setIsMobile] = useState(false);
 
@@ -106,6 +106,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
             </div>
             <FloatingChatWidget />
           </div>
+        </div>
+      )}
+
+      {/* Expanded full-screen overlay */}
+      {isExpanded && (
+        <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: "var(--surface)" }}>
+          <FloatingChatWidget />
         </div>
       )}
 

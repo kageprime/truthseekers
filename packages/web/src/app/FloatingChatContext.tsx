@@ -11,6 +11,8 @@ interface FloatingChatValue {
   close: () => void;
   activeConversationId: string | null;
   setActiveConversationId: (id: string | null) => void;
+  isExpanded: boolean;
+  toggleExpanded: () => void;
 }
 
 const FloatingChatContext = createContext<FloatingChatValue | null>(null);
@@ -33,6 +35,7 @@ export function FloatingChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Hydrate localStorage after mount to avoid SSR mismatch
   useEffect(() => {
@@ -69,10 +72,11 @@ export function FloatingChatProvider({ children }: { children: ReactNode }) {
     if (!isHidden) setIsOpen(true);
   }, [isHidden]);
 
-  const close = useCallback(() => setIsOpen(false), []);
+  const close = useCallback(() => { setIsOpen(false); setIsExpanded(false); }, []);
+  const toggleExpanded = useCallback(() => setIsExpanded((o) => !o), []);
 
   return (
-    <FloatingChatContext.Provider value={{ isOpen, panelMode, toggle, open, close, activeConversationId, setActiveConversationId }}>
+    <FloatingChatContext.Provider value={{ isOpen, panelMode, toggle, open, close, activeConversationId, setActiveConversationId, isExpanded, toggleExpanded }}>
       {children}
     </FloatingChatContext.Provider>
   );

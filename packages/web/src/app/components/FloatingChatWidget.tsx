@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useChat } from "../hooks";
+import { useChat, useChats } from "../hooks";
 import { useChatStream } from "../hooks/useChatStream";
 import { useChatContext } from "../chat/ChatContext";
 import { useFloatingChat } from "../FloatingChatContext";
@@ -16,9 +16,12 @@ const CONV_STORAGE_KEY = "truthseekers_floating_conv";
 
 export default function FloatingChatWidget() {
   const queryClient = useQueryClient();
-  const { close, activeConversationId, setActiveConversationId } = useFloatingChat();
+  const { close, activeConversationId, setActiveConversationId, toggleExpanded } = useFloatingChat();
   const { agentEvents, setAgentEvents, setConsoleOpen, consoleOpen } = useChatContext();
   const { send: streamSend, stop: streamStop } = useChatStream();
+  const { data: conversations = [], loading: chatsLoading } = useChats();
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const switcherRef = useRef<HTMLDivElement>(null);
 
   const [input, setInput] = useState("");
   const [streamContent, setStreamContent] = useState("");
@@ -29,6 +32,17 @@ export default function FloatingChatWidget() {
   const [view, setView] = useState<"chat" | "console">("chat");
   const agentEventsRef = useRef<AgentEvent[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Close session switcher on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) {
+        setSwitcherOpen(false);
+      }
+    }
+    if (switcherOpen) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [switcherOpen]);
 
   // Load saved conversation ID
   useEffect(() => {
@@ -152,12 +166,61 @@ export default function FloatingChatWidget() {
 
   const messages = conv?.messages ?? [];
   const hasStreaming = sending && (streamContent || streamBlocks.length > 0);
+  const currentConv = conversations.find((c) => c.id === convId);
 
   return (
     <div className="h-full flex flex-col max-md:max-h-[85vh]">
       {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
-        <div className="flex items-center gap-2">
+      <div className="shrink-0 flex items-center justify-between px-3 py-2.5 border-b gap-2" style={{ borderColor: "var(--border)" }}>
+        <div className="flex items-center gap-1 min-w-0">
+          {/* Session switcher */}
+          <div className="relative" ref={switcherRef}>
+            <button
+              onClick={() => setSwitcherOpen((o) => !o)}
+              className="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded max-w-[140px] hover:bg-[var(--accent-bg)]/30 transition-colors"
+              style={{ color: "var(--muted)" }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              <span className="truncate">{currentConv?.title ?? "Quick Chat"}</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            {switcherOpen && (
+              <div className="absolute left-0 top-full mt-1 w-56 rounded-lg py-1 shadow-xl z-50"
+                style={{ background: "var(--surface)", border: "1px solid var(--border)", maxHeight: 300, overflowY: "auto" }}
+              >
+                {chatsLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
+                  </div>
+                ) : conversations.length === 0 ? (
+                  <div className="px-3 py-2 text-xs" style={{ color: "var(--subtle)" }}>No conversations</div>
+                ) : (
+                  conversations.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        setConvId(c.id);
+                        setActiveConversationId(c.id);
+                        try { localStorage.setItem(CONV_STORAGE_KEY, c.id); } catch {}
+                        setSwitcherOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs transition-colors ${c.id === convId ? "font-medium" : ""}`}
+                      style={{ color: c.id === convId ? "var(--accent)" : "var(--muted)", background: c.id === convId ? "var(--accent-bg)" : "transparent" }}
+                    >
+                      <div className="truncate">{c.title}</div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="w-px h-4" style={{ background: "var(--border)" }} />
+
           <button
             onClick={() => setView("chat")}
             className={`text-xs font-medium px-2 py-1 rounded ${view === "chat" ? "bg-[var(--accent-bg)] text-[var(--accent)]" : "text-[var(--subtle)]"}`}
@@ -172,8 +235,19 @@ export default function FloatingChatWidget() {
           </button>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={close} className="btn-ghost text-xs" aria-label="Close chat">
-            ✕
+          <button onClick={toggleExpanded} className="btn-ghost text-xs p-1.5" aria-label="Expand chat">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 3 21 3 21 9" />
+              <polyline points="9 21 3 21 3 15" />
+              <line x1="21" y1="3" x2="14" y2="10" />
+              <line x1="3" y1="21" x2="10" y2="14" />
+            </svg>
+          </button>
+          <button onClick={close} className="btn-ghost text-xs p-1.5" aria-label="Close chat">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
       </div>
