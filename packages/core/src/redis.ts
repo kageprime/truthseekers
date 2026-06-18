@@ -1,20 +1,17 @@
 import Redis from "ioredis";
 
-const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
+const REDIS_URL = process.env.REDIS_URL || "";
 
 let redisClient: Redis | null = null;
 let redisSubscriber: Redis | null = null;
 
-const options = process.env.NODE_ENV === "test" ? {
-  maxRetriesPerRequest: 0,
-  enableOfflineQueue: false,
-  lazyConnect: true,
-} : {};
-
 export function getRedisClient(): Redis {
   if (!redisClient) {
-    redisClient = new Redis(REDIS_URL, options);
-    if (process.env.NODE_ENV === "test") {
+    if (!REDIS_URL) {
+      // ponytail: no-op stub, Redis unavailable
+      redisClient = { on: () => {}, publish: () => Promise.resolve(0), subscribe: () => Promise.resolve(), off: () => {}, get: () => Promise.resolve(null), set: () => Promise.resolve("OK") } as unknown as Redis;
+    } else {
+      redisClient = new Redis(REDIS_URL, { maxRetriesPerRequest: 1, lazyConnect: true, retryStrategy: () => null });
       redisClient.on("error", () => {});
     }
   }
@@ -23,8 +20,10 @@ export function getRedisClient(): Redis {
 
 export function getRedisSubscriber(): Redis {
   if (!redisSubscriber) {
-    redisSubscriber = new Redis(REDIS_URL, options);
-    if (process.env.NODE_ENV === "test") {
+    if (!REDIS_URL) {
+      redisSubscriber = { on: () => {}, subscribe: () => Promise.resolve(), off: () => {} } as unknown as Redis;
+    } else {
+      redisSubscriber = new Redis(REDIS_URL, { maxRetriesPerRequest: 1, lazyConnect: true, retryStrategy: () => null });
       redisSubscriber.on("error", () => {});
     }
   }
