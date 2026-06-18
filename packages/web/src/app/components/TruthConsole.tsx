@@ -138,7 +138,7 @@ function TextDeltaMini({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-export default function TruthConsole({ events, onClose, loading }: { events: AgentEvent[]; onClose: () => void; loading?: boolean }) {
+export default function TruthConsole({ events, onClose, loading }: { events: AgentEvent[]; onClose?: () => void; loading?: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
@@ -175,9 +175,9 @@ export default function TruthConsole({ events, onClose, loading }: { events: Age
           <Link href="/settings" className="btn-icon btn-ghost" aria-label="Settings" style={{ width: 26, height: 26, minHeight: 26 }}>
             <IconUser size={13} />
           </Link>
-          <button onClick={onClose} className="btn-icon btn-ghost" aria-label="Close console" style={{ width: 26, height: 26, minHeight: 26 }}>
+          {onClose && <button onClick={onClose} className="btn-icon btn-ghost" aria-label="Close console" style={{ width: 26, height: 26, minHeight: 26 }}>
             <IconX size={13} />
-          </button>
+          </button>}
         </div>
       </div>
 

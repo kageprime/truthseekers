@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, use, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useChat } from "../../hooks";
 import type { ConversationDetail } from "../../hooks";
 import { useAuth } from "../../hooks/useAuth";
@@ -59,15 +60,16 @@ function generateFollowUps(userMsg: string): string[] {
   ];
 }
 
-const chatCache = new Map<string, ConversationDetail>();
-
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, loading: authLoading } = useAuth();
   const { data: fetchedData, loading: chatLoading } = useChat(id);
-  const [data, setData] = useState<ConversationDetail | null>(chatCache.get(id) ?? null);
-  const [loading, setLoading] = useState(!chatCache.has(id));
+  
+  const data = fetchedData ?? null;
+  const loading = chatLoading && !data;
+
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [streamContent, setStreamContent] = useState("");
@@ -82,7 +84,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [followUps, setFollowUps] = useState<string[]>([]);
   const [showCommands, setShowCommands] = useState(false);
   const [model, setModel] = useState("deepseek-4-flash");
-  const [consoleOpen, setConsoleOpen] = useState(false);
   const lastMessageRef = useRef("");
   const autoSentRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -94,14 +95,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       router.push("/login");
     }
   }, [user, authLoading, router]);
-
-  useEffect(() => {
-    if (fetchedData !== undefined) {
-      setLoading(false);
-      setData(fetchedData);
-      if (fetchedData) chatCache.set(id, fetchedData);
-    }
-  }, [fetchedData, id]);
 
   useEffect(() => {
     setPhaseLabel(getPhaseLabel(agentEvents));
@@ -119,11 +112,27 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setFollowUps([]);
 
     const tempId = `temp-${Date.now()}`;
-    setData((prev) => {
+    const userMsg = {
+      id: tempId,
+      conversationId: id,
+      role: "user" as const,
+      content: msg,
+      createdAt: new Date().toISOString()
+    };
+
+    // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+    await queryClient.cancelQueries({ queryKey: ["chat", id] });
+
+    // Snapshot the previous value
+    const previousChat = queryClient.getQueryData<ConversationDetail>(["chat", id]);
+
+    // Optimistically update to the new value
+    queryClient.setQueryData<ConversationDetail | null>(["chat", id], (prev) => {
       if (!prev) return prev;
-      const updated = { ...prev, messages: [...prev.messages, { id: tempId, conversationId: id, role: "user" as const, content: msg, createdAt: new Date().toISOString() }] };
-      chatCache.set(id, updated);
-      return updated;
+      return {
+        ...prev,
+        messages: [...prev.messages, userMsg],
+      };
     });
 
     await streamSend(id, msg, {
@@ -147,29 +156,48 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       },
       onDone: (event) => {
         const savedEvents = agentEventsRef.current;
-        // Use event.blocks if available, otherwise fall back to blocks accumulated
-        // during streaming (covers case where done event's blocks key was omitted)
         const finalBlocks = event.blocks ?? streamBlocksRef.current;
         setStreamContent("");
         setStreamBlocks(finalBlocks);
         setFollowUps(generateFollowUps(lastMessageRef.current));
-        setData((prev) => {
+        
+        queryClient.setQueryData<ConversationDetail | null>(["chat", id], (prev) => {
           if (!prev) return prev;
           const real = prev.messages.map((m) =>
             m.id.startsWith("temp-") ? { ...m, id: `user-${Date.now()}`, conversationId: id } : m
           );
-          const updated = { ...prev, messages: [...real, { id: event.msgId ?? `msg-${Date.now()}`, conversationId: id, role: "assistant" as const, content: event.content || "", blocks: finalBlocks, agentEvents: savedEvents, createdAt: new Date().toISOString() }] };
-          chatCache.set(id, updated);
-          return updated;
+          return {
+            ...prev,
+            messages: [
+              ...real,
+              {
+                id: event.msgId ?? `msg-${Date.now()}`,
+                conversationId: id,
+                role: "assistant" as const,
+                content: event.content || "",
+                blocks: finalBlocks,
+                agentEvents: savedEvents,
+                createdAt: new Date().toISOString()
+              }
+            ]
+          };
         });
+
+        // Also invalidate chats so the message count in the sidebar updates
+        queryClient.invalidateQueries({ queryKey: ["chats"] });
       },
-      onError: (errMsg) => setError(errMsg),
+      onError: (errMsg) => {
+        setError(errMsg);
+        if (previousChat) {
+          queryClient.setQueryData(["chat", id], previousChat);
+        }
+      },
     }, model);
   
     // Defer to next macrotask so React can commit the streaming preview
     // (with blocks) before sending becomes false.
     setTimeout(() => setSending(false), 0);
-  }, [id, streamSend, model]);
+  }, [id, streamSend, model, queryClient]);
 
   useEffect(() => {
     if (!loading && data && data.messages.length === 0 && !autoSentRef.current) {
@@ -222,7 +250,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       const msg = input.trim();
       if (!msg || !data) return;
       const newMessages = data.messages.slice(0, editingIndex);
-      setData({ ...data, messages: newMessages });
+      queryClient.setQueryData<ConversationDetail | null>(["chat", id], (prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          messages: newMessages,
+        };
+      });
       setEditingIndex(null);
       doSend(msg);
       return;
@@ -341,17 +375,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           onKeyDown={handleKeyDown}
           model={model}
           onModelChange={setModel}
-          consoleOpen={consoleOpen}
-          onToggleConsole={() => setConsoleOpen((c) => !c)}
+
         />
       </div>
-      {consoleOpen && (
-        <TruthConsole
-          events={agentEvents}
-          loading={sending}
-          onClose={() => setConsoleOpen(false)}
-        />
-      )}
+      <TruthConsole events={agentEvents} loading={sending} />
     </div>
   );
 }
