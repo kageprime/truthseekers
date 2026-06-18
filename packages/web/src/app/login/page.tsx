@@ -24,7 +24,7 @@ export default function LoginPage() {
       fetch(`${BASE}/auth/me`, { headers: { authorization: `Bearer ${token}` } })
         .then((r) => r.json())
         .then((data) => {
-          if (data.user?.onboarded) router.replace("/chat");
+          if (data.user?.onboarded) router.replace("/");
           else router.replace("/onboarding");
         })
         .catch(() => router.replace("/"));
