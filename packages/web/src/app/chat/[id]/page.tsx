@@ -85,6 +85,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [showCommands, setShowCommands] = useState(false);
   const [model, setModel] = useState("deepseek-4-flash");
   const [consoleOpen, setConsoleOpen] = useState(false);
+  const autoOpened = useRef(false);
   const lastMessageRef = useRef("");
   const autoSentRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -101,6 +102,14 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setPhaseLabel(getPhaseLabel(agentEvents));
   }, [agentEvents]);
 
+  // Auto-open Truth Console on first event
+  useEffect(() => {
+    if (agentEvents.length > 0 && !autoOpened.current) {
+      autoOpened.current = true;
+      setConsoleOpen(true);
+    }
+  }, [agentEvents.length]);
+
   const doSend = useCallback(async (msg: string) => {
     setSending(true);
     setError(null);
@@ -109,6 +118,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setStreamContent("");
     setStreamBlocks([]);
     setAgentEvents([]);
+    autoOpened.current = false;
     setPhaseLabel("Thinking...");
     setFollowUps([]);
 
