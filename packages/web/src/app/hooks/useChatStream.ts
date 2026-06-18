@@ -49,6 +49,7 @@ export function useChatStream() {
       let fullText = "";
 
       let receivedDone = false;
+      let needsReset = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -64,10 +65,14 @@ export function useChatStream() {
           try {
             const event: StreamEvent = JSON.parse(payload);
             if (event.type === "text") {
-              fullText += event.data;
+              if (needsReset) { fullText = event.data; needsReset = false; }
+              else { fullText += event.data; }
               callbacks.onText(fullText);
-            } else if (event.type === "tool_use" || event.type === "tool_result") {
-              callbacks.onToolEvent({ type: event.type, data: event.data, timestamp: Date.now() });
+            } else if (event.type === "tool_use" || event.type === "tool_result" || event.type === "trace") {
+              needsReset = true;
+              if (event.type === "tool_use" || event.type === "tool_result") {
+                callbacks.onToolEvent({ type: event.type, data: event.data, timestamp: Date.now() });
+              }
             } else if (event.type === "done") {
               receivedDone = true;
               callbacks.onDone(event);

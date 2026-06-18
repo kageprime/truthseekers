@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { fetchArticles, searchArticles, fetchArticle, fetchArticleStatus, progressUrl } from "@/lib/api";
 import type { ArticleSummary } from "@encarta/core";
 import { useGenerateArticle, useArticleStatus } from "../hooks";
+import { usePageSearch } from "../HeaderSearchContext";
 import PageLayout from "../components/PageLayout";
-import SectionHeader from "../components/SectionHeader";
-import PageHero from "../components/PageHero";
 import GenerationBar from "../components/GenerationBar";
-import ArticleCard from "../components/ArticleCard";
-import { CardSkeleton, CardGridSkeleton } from "../components/CardSkeleton";
 import type { AgentEvent } from "../components/ProcessViewer";
-import { IconLightning, IconSearch, IconBook } from "../components/Icons";
+import { IconLightning, IconSearch, IconBook, IconGrid, IconList } from "../components/Icons";
 
 interface GeneratingEntry {
   slug: string;
@@ -22,61 +20,98 @@ interface GeneratingEntry {
   agentEvents?: AgentEvent[];
 }
 
-const PAGE_SIZE = 10;
-const SEARCH_DEBOUNCE_MS = 400;
+const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 300;
+
+function ArticleRow({ article }: { article: ArticleSummary }) {
+  return (
+    <Link href={`/article/${article.slug}`} className="block py-3 px-4 -mx-4 rounded-lg transition-colors hover:bg-[var(--accent-bg)]/40" style={{ textDecoration: "none", color: "inherit" }}>
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-sm leading-snug mb-0.5" style={{ color: "var(--ink)" }}>
+            {article.title}
+            {article.metadata?.status === "draft" && (
+              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>Draft</span>
+            )}
+          </h3>
+          <p className="text-xs leading-relaxed line-clamp-2" style={{ color: "var(--muted)" }}>{article.abstract || "No description"}</p>
+          <div className="flex items-center gap-2 mt-1.5">
+            {article.categories?.slice(0, 3).map((cat) => (
+              <span key={cat} className="tag tag-subtle text-[10px]">{cat}</span>
+            ))}
+            {article.metadata?.updated && (
+              <span className="text-[10px]" style={{ color: "var(--subtle)" }}>{new Date(article.metadata.updated).toLocaleDateString()}</span>
+            )}
+          </div>
+        </div>
+        {article.thumbnail && (
+          <div className="w-16 h-16 rounded-lg shrink-0 overflow-hidden hidden sm:block" style={{ background: "var(--skeleton-start)" }}>
+            <img src={article.thumbnail} alt="" className="w-full h-full object-cover" loading="lazy" />
+          </div>
+        )}
+      </div>
+    </Link>
+  );
+}
 
 export default function ArticlesPage() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [generating, setGenerating] = useState<Map<string, GeneratingEntry>>(new Map());
-  const [showResults, setShowResults] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(6);
   const [infiniteLoading, setInfiniteLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [searching, setSearching] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { mutate: generateArticle } = useGenerateArticle();
   const sseRef = useRef<Map<string, EventSource>>(new Map());
   const mountedRef = useRef(true);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load from reset — use callback with getArticles in closure
+  useEffect(() => { setMounted(true); }, []);
+
+  usePageSearch(useMemo(() => query || debouncedQuery ? {
+    value: query, onChange: setQuery, onSubmit: (e: FormEvent) => { e.preventDefault(); setDebouncedQuery(query); },
+    onClear: () => { setQuery(""); setDebouncedQuery(""); }, placeholder: "Search articles...",
+  } : null, [query, debouncedQuery]));
+
   const loadArticles = useCallback(async (p: number, reset: boolean) => {
     const data = await fetchArticles(p * PAGE_SIZE, PAGE_SIZE);
     if (!mountedRef.current) return;
     const items = (data as any).data ?? [];
     const pagination = (data as any).pagination;
-    if (reset) {
-      setArticles(items);
-      setVisibleCount(6);
-    } else {
-      setArticles((prev) => [...prev, ...items]);
-    }
+    setArticles(prev => reset ? items : [...prev, ...items]);
     setHasMore(pagination ? pagination.hasMore : items.length >= PAGE_SIZE);
     setInitialLoading(false);
     setInfiniteLoading(false);
   }, []);
 
   useEffect(() => {
+    if (!mounted) return;
     mountedRef.current = true;
     loadArticles(0, true);
     return () => { mountedRef.current = false; };
-  }, [loadArticles]);
+  }, [mounted, loadArticles]);
 
   useEffect(() => {
+    if (!mounted) return;
     return () => {
       sseRef.current.forEach((es) => es.close());
       sseRef.current.clear();
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, []);
+  }, [mounted]);
 
   useEffect(() => {
+    if (!mounted) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
       setDebouncedQuery(query);
@@ -84,18 +119,25 @@ export default function ArticlesPage() {
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [query]);
+  }, [mounted, query]);
 
   useEffect(() => {
-    if (debouncedQuery.trim() && showResults) {
+    if (!mounted) return;
+    if (debouncedQuery.trim()) {
       performSearch(debouncedQuery.trim());
+    } else {
+      setInitialLoading(true);
+      setArticles([]);
+      setPage(0);
+      loadArticles(0, true);
     }
-  }, [debouncedQuery]);
+  }, [mounted, debouncedQuery, loadArticles]);
 
   useEffect(() => {
+    if (!mounted) return;
     if (observerRef.current) observerRef.current.disconnect();
     observerRef.current = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore && !infiniteLoading && !initialLoading && !showResults) {
+      if (entries[0].isIntersecting && hasMore && !infiniteLoading && !initialLoading) {
         setInfiniteLoading(true);
         const nextPage = page + 1;
         loadArticles(nextPage, false);
@@ -104,7 +146,7 @@ export default function ArticlesPage() {
     }, { threshold: 0.1 });
     if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
     return () => { if (observerRef.current) observerRef.current.disconnect(); };
-  }, [hasMore, infiniteLoading, initialLoading, page, showResults, loadArticles]);
+  }, [mounted, hasMore, infiniteLoading, initialLoading, page, loadArticles]);
 
   async function performSearch(searchQuery: string) {
     setSearching(true);
@@ -125,42 +167,9 @@ export default function ArticlesPage() {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   }, []);
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (!query.trim()) {
-      setShowResults(false);
-      setInitialLoading(true);
-      setArticles([]);
-      setPage(0);
-      loadArticles(0, true);
-      return;
-    }
-    setShowResults(true);
-    setInitialLoading(true);
-    setDebouncedQuery(query.trim());
-  }
-
-  function handleClear() {
-    setQuery("");
-    setShowResults(false);
-    setInitialLoading(true);
-    setArticles([]);
-    setPage(0);
-    setVisibleCount(6);
-    loadArticles(0, true);
-  }
-
-  function mergeEntry(slug: string, updates: Partial<GeneratingEntry>) {
-    setGenerating((prev) => {
-      const next = new Map(prev);
-      const current = next.get(slug);
-      next.set(slug, { slug, title: slug.replace(/-/g, " "), phase: "queued", ...current, ...updates });
-      return next;
-    });
-  }
-
   function startGenerate(slug: string) {
-    mergeEntry(slug, { phase: "queued", error: undefined, agentEvents: [] });
+    const entry: GeneratingEntry = { slug, title: slug.replace(/-/g, " "), phase: "queued", agentEvents: [] };
+    setGenerating((prev) => { const next = new Map(prev); next.set(slug, entry); return next; });
 
     generateArticle({ slug }).then(() => {
       const existing = sseRef.current.get(slug);
@@ -195,163 +204,202 @@ export default function ArticlesPage() {
           });
           es.close(); sseRef.current.delete(slug);
         } else if (data.status === "error") {
-          mergeEntry(slug, { phase: "error", error: data.error || "Unknown error" });
+          setGenerating((prev) => {
+            const next = new Map(prev); const e = next.get(slug);
+            if (e) next.set(slug, { ...e, phase: "error", error: data.error || "Unknown error" });
+            return next;
+          });
           es.close(); sseRef.current.delete(slug);
         } else {
-          mergeEntry(slug, {
-            phase: data.status === "paused" ? "paused" : (data.phase || data.status),
-            error: data.status === "paused" ? data.error : undefined,
+          setGenerating((prev) => {
+            const next = new Map(prev); const e = next.get(slug);
+            if (e) next.set(slug, { ...e, phase: data.status === "paused" ? "paused" : (data.phase || data.status), error: data.status === "paused" ? data.error : undefined });
+            return next;
           });
         }
       });
 
       es.onerror = () => { es.close(); sseRef.current.delete(slug); };
     }).catch((err) => {
-      mergeEntry(slug, { phase: "error", error: String(err) });
+      setGenerating((prev) => {
+        const next = new Map(prev); const e = next.get(slug);
+        if (e) next.set(slug, { ...e, phase: "error", error: String(err) });
+        return next;
+      });
     });
   }
 
-  async function handleGenerate() {
-    const slug = slugify(query.trim());
-    if (!slug || generating.has(slug)) return;
-    const existing = await fetchArticleStatus(slug);
-    if (existing && "status" in existing && existing.status === "published") {
-      router.push(`/article/${slug}`);
-      return;
-    }
-    setShowResults(true);
-    startGenerate(slug);
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && e.shiftKey) { e.preventDefault(); handleGenerate(); }
-  };
+  const allCategories = Array.from(new Set(articles.flatMap(a => a.categories ?? []))).sort();
+  const filteredArticles = selectedCategory
+    ? articles.filter(a => a.categories?.includes(selectedCategory))
+    : articles;
+  const categoryFilterLabel = selectedCategory || "All categories";
 
   return (
-    <PageLayout
-      headerSearch={{
-        value: query, onChange: setQuery, onSubmit: handleSearch, onClear: handleClear,
-        placeholder: "Search articles...",
-      }}
-    >
-      <PageHero title="Articles" subtitle="Browse and search the encyclopedia" gradient="blue" />
+    <PageLayout>
+      <div className="max-w-4xl mx-auto w-full px-4 py-8">
+        {/* Search */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold mb-1" style={{ color: "var(--ink)" }}>Articles</h1>
+          <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>Browse the encyclopedia</p>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--subtle)" }} />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search articles..."
+                className="input w-full pl-10 pr-4 py-2.5 text-sm"
+                autoFocus
+              />
+            </div>
+            <button
+              onClick={() => {
+                const slug = slugify(query.trim());
+                if (slug && !generating.has(slug)) {
+                  fetchArticleStatus(slug).then((existing) => {
+                    if (existing && "status" in existing && existing.status === "published") {
+                      router.push(`/article/${slug}`);
+                    } else {
+                      startGenerate(slug);
+                    }
+                  });
+                }
+              }}
+              className="btn btn-primary btn-sm shrink-0"
+              disabled={!query.trim()}
+            >
+              <IconLightning size={14} /> Generate
+            </button>
+          </div>
+        </div>
 
-      <main className="flex-1 overflow-y-auto pb-16">
-        <div className="max-w-6xl mx-auto w-full px-4">
-          {query && (
-            <div className="py-4 flex items-center gap-3">
-              <button onClick={handleGenerate} onKeyDown={handleKeyDown} className="btn btn-primary">
+        {/* Generating entries */}
+        {generating.size > 0 && (
+          <div className="mb-6 space-y-2">
+            {Array.from(generating.values()).map((gen) => (
+              <GenerationBar
+                key={gen.slug} entry={gen}
+                onRetry={(slug) => startGenerate(slug)}
+                onDismiss={(slug) => {
+                  setGenerating((prev) => { const next = new Map(prev); next.delete(slug); return next; });
+                  const es = sseRef.current.get(slug);
+                  if (es) { es.close(); sseRef.current.delete(slug); }
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Filter bar */}
+        {!initialLoading && articles.length > 0 && (
+          <div className="flex items-center gap-2 mb-4">
+            <select
+              value={selectedCategory || ""}
+              onChange={(e) => setSelectedCategory(e.target.value || null)}
+              className="input text-xs py-1.5 px-2 w-auto"
+              style={{ minWidth: 140 }}
+            >
+              <option value="">All categories</option>
+              {allCategories.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            <div className="ml-auto flex gap-1">
+              <button onClick={() => setViewMode("list")} className={`btn-icon btn-sm ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`} title="List view">
+                <IconList size={14} />
+              </button>
+              <button onClick={() => setViewMode("grid")} className={`btn-icon btn-sm ${viewMode === "grid" ? "btn-primary" : "btn-ghost"}`} title="Grid view">
+                <IconGrid size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Status */}
+        {!initialLoading && (
+          <div className="text-xs mb-4" style={{ color: "var(--subtle)" }}>
+            {searching ? "Searching..." : `${filteredArticles.length} article${filteredArticles.length !== 1 ? "s" : ""}`}
+            {selectedCategory ? ` in ${selectedCategory}` : ""}
+          </div>
+        )}
+
+        {/* Results */}
+        {initialLoading ? (
+          <div className="flex justify-center py-16">
+            <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
+          </div>
+        ) : filteredArticles.length > 0 ? (
+          <>
+            {viewMode === "list" ? (
+              <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+                {filteredArticles.map((article) => (
+                  <ArticleRow key={article.slug} article={article} />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {filteredArticles.map((article) => (
+                  <Link key={article.slug} href={`/article/${article.slug}`}
+                    className="block group" style={{ textDecoration: "none", color: "inherit" }}>
+                    <article style={{ border: "1px solid var(--border)", background: "var(--surface-elevated)" }}>
+                      <div className="w-full overflow-hidden" style={{ borderBottom: "1px solid var(--border)", maxHeight: 140 }}>
+                        {article.thumbnail ? (
+                          <img src={article.thumbnail} alt="" className="w-full h-full object-cover transition-opacity duration-300 group-hover:opacity-90" loading="lazy" />
+                        ) : (
+                          <div className="w-full flex items-center justify-center py-8 font-display font-bold text-lg"
+                            style={{ background: "var(--accent-bg)", color: "var(--accent)" }}>
+                            {article.title.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-3 space-y-1.5">
+                        <h3 className="font-display font-bold text-xs leading-snug" style={{ color: "var(--ink)" }}>{article.title}</h3>
+                        <p className="text-xs line-clamp-2 leading-relaxed font-serif" style={{ color: "var(--muted)" }}>{article.abstract}</p>
+                        <div className="flex items-center gap-2 pt-1">
+                          {article.categories?.slice(0, 2).map((cat) => (
+                            <span key={cat} className="text-[10px] uppercase tracking-wider font-medium" style={{ color: "var(--accent)" }}>{cat}</span>
+                          ))}
+                          {article.metadata?.version && (
+                            <span className="text-[10px] ml-auto font-mono" style={{ color: "var(--subtle)" }}>v{article.metadata.version}</span>
+                          )}
+                        </div>
+                      </div>
+                    </article>
+                  </Link>
+                ))}
+              </div>
+            )}
+            <div ref={sentinelRef} className="h-4" />
+            {infiniteLoading && (
+              <div className="text-center py-4">
+                <div className="w-6 h-6 rounded-full border-2 animate-spin mx-auto" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-16">
+            <div className="mb-4"><IconSearch size={48} style={{ color: "var(--subtle)" }} /></div>
+            <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--ink)" }}>No articles found</h2>
+            <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
+              {query ? `No results for "${query}". Generate an article about it.` : "Your encyclopedia is empty."}
+            </p>
+            {query && (
+              <button
+                onClick={() => {
+                  const slug = slugify(query.trim());
+                  if (slug) startGenerate(slug);
+                }}
+                className="btn btn-primary"
+              >
                 <IconLightning size={16} /> Generate &ldquo;{query}&rdquo;
               </button>
-              <span className="text-xs" style={{ color: "var(--subtle)" }}>Press Shift+Enter to generate</span>
-            </div>
-          )}
-
-          {generating.size > 0 && (
-            <div className="mb-6 space-y-2">
-              {Array.from(generating.values()).map((gen) => (
-                <GenerationBar
-                  key={gen.slug} entry={gen}
-                  onRetry={(slug) => startGenerate(slug)}
-                  onDismiss={(slug) => {
-                    setGenerating((prev) => { const next = new Map(prev); next.delete(slug); return next; });
-                    const es = sseRef.current.get(slug);
-                    if (es) { es.close(); sseRef.current.delete(slug); }
-                  }}
-                />
-              ))}
-            </div>
-          )}
-
-          {showResults && (
-            <div className="text-sm mb-4 px-1" style={{ color: "var(--muted)" }}>
-              {searching ? "Searching..." : initialLoading ? "Loading..." : `${articles.length} results`}
-            </div>
-          )}
-
-          {initialLoading ? (
-            <CardGridSkeleton />
-          ) : showResults && articles.length === 0 && generating.size === 0 ? (
-            <div className="max-w-lg mx-auto text-center py-8">
-              <div className="glass-card-static p-8">
-                <div className="mb-4"><IconSearch size={48} /></div>
-                <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>No results found</h2>
-                <p className="text-sm mb-6 leading-relaxed" style={{ color: "var(--muted)" }}>
-                  No articles found for &ldquo;{query}&rdquo;. Would you like to generate one?
-                </p>
-                <button onClick={handleGenerate} className="btn btn-primary btn-lg">
-                  <IconLightning size={18} /> Generate this article
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {showResults && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-                  {articles.map((article) => (
-                    <ArticleCard key={article.slug} article={article} />
-                  ))}
-                  {infiniteLoading && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4 col-span-full">
-                      {Array.from({ length: 3 }).map((_, i) => <CardSkeleton key={`inf-${i}`} />)}
-                    </div>
-                  )}
-                  <div ref={sentinelRef} className="h-1 col-span-full" />
-                </div>
-              )}
-
-              {!showResults && articles.length === 0 && !initialLoading && (
-                <div className="max-w-lg mx-auto text-center py-16">
-                  <div className="glass-card-static p-10">
-                    <div className="mb-4"><IconBook size={56} /></div>
-                    <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>No articles yet</h2>
-                    <p className="text-sm mb-6 leading-relaxed" style={{ color: "var(--muted)" }}>
-                      Your encyclopedia is empty. Search a topic or generate your first article to get started.
-                    </p>
-                    <div className="flex items-center justify-center gap-3">
-                      <span className="text-xs font-medium" style={{ color: "var(--subtle)" }}>Try:</span>
-                      <button onClick={() => { setQuery("Roman Empire"); setShowResults(true); setInitialLoading(true); setDebouncedQuery("Roman Empire"); }} className="btn btn-secondary btn-sm">Roman Empire</button>
-                      <button onClick={() => { setQuery("Black Holes"); setShowResults(true); setInitialLoading(true); setDebouncedQuery("Black Holes"); }} className="btn btn-secondary btn-sm">Black Holes</button>
-                      <button onClick={() => { setQuery("Silk Road"); setShowResults(true); setInitialLoading(true); setDebouncedQuery("Silk Road"); }} className="btn btn-secondary btn-sm">Silk Road</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!showResults && articles.length > 0 && (
-                <section>
-                  <div className="flex items-center gap-4 mb-6">
-                    <SectionHeader icon={IconBook} title="ARTICLES" accent="var(--accent)" />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {articles.slice(0, visibleCount).map((article) => (
-                      <ArticleCard key={article.slug} article={article} />
-                    ))}
-                  </div>
-                  {(hasMore || visibleCount < articles.length) && (
-                    <div className="text-center mt-6">
-                      <button
-                        onClick={() => {
-                          const next = visibleCount + 6;
-                          setVisibleCount(next);
-                          if (next >= articles.length) {
-                            const nextPage = page + 1;
-                            setPage(nextPage);
-                            loadArticles(nextPage, false);
-                          }
-                        }}
-                        className="btn btn-primary"
-                      >
-                        Load More
-                      </button>
-                    </div>
-                  )}
-                </section>
-              )}
-            </>
-          )}
-        </div>
-      </main>
+            )}
+          </div>
+        )}
+      </div>
     </PageLayout>
   );
 }

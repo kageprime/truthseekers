@@ -64,7 +64,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             </button>
             <Link
               href="/"
-              className="block mt-3 text-sm text-[var(--muted)] hover:text-[#ea580c]"
+              className="block mt-3 text-sm text-[var(--muted)] hover:text-[var(--accent)]"
              
             >
               ← Back to home

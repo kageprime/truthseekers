@@ -26,7 +26,7 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center" style={{ background: "var(--surface)" }}>
+      <main className="flex items-center justify-center py-24" style={{ background: "var(--surface)" }}>
         <div className="w-8 h-8 rounded-full border-3 animate-spin"
           style={{ borderColor: "var(--ink)", borderTopColor: "var(--accent)" }} />
       </main>
@@ -35,57 +35,58 @@ export default function HomePage() {
 
   if (!user) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
+      <main className="flex flex-col items-center px-6 pt-24 text-center"
         style={{ background: "var(--surface)" }}>
-        <div className="max-w-xl animate-fade-slide-up">
-          <h1 className="text-5xl sm:text-7xl font-display font-extrabold tracking-tight mb-4 text-transparent bg-clip-text bg-gradient-to-br from-accent to-gold pb-2">
+        <div className="max-w-2xl animate-fade-slide-up">
+          <div className="mb-2 inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-full"
+            style={{ background: "var(--accent-bg)", color: "var(--accent)", border: "1px solid var(--accent-subtle)" }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+            AI-Powered Knowledge
+          </div>
+          <h1 className="text-5xl sm:text-7xl font-display font-bold tracking-tight mb-4 leading-tight"
+            style={{ color: "var(--ink)" }}>
             Truthseekers
           </h1>
-          <p className="text-xl sm:text-2xl mb-10 font-light" style={{ color: "var(--muted)" }}>
-            The Living Encyclopedia — AI-powered knowledge at your fingertips.
+          <p className="text-lg sm:text-xl mb-8 font-serif italic" style={{ color: "var(--muted)" }}>
+            The Living Encyclopedia
+          </p>
+          <p className="text-sm max-w-lg mx-auto mb-10 leading-relaxed" style={{ color: "var(--ink-secondary)" }}>
+            AI agents research, write, verify, and illustrate articles on any topic.
+            Browse the collection or generate a new entry.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
-            <Link href="/login" className="btn btn-primary btn-lg px-8 text-base no-underline">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-16">
+            <Link href="/login" className="btn btn-primary btn-lg px-8 text-base no-underline shadow-sm">
               Sign In to Start
             </Link>
             <Link href="/articles" className="btn btn-secondary btn-lg px-8 text-base no-underline">
-              Browse Public Articles
+              Browse the Encyclopedia
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left mb-12">
-            <div className="glass-card p-6 cursor-default group">
-              <div className="w-10 h-10 rounded-full mb-4 flex items-center justify-center transition-colors" style={{ background: "var(--accent-bg)", color: "var(--accent)" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              </div>
-              <h3 className="text-base font-semibold mb-2 group-hover:text-accent transition-colors" style={{ color: "var(--ink)" }}>AI Research</h3>
-              <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
-                Deep research across web sources, synthesized into structured articles.
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 text-left mb-12">
+            <div className="border-t-2 pt-4" style={{ borderColor: "var(--accent)" }}>
+              <h3 className="font-display text-base font-bold mb-2" style={{ color: "var(--ink)" }}>Research</h3>
+              <p className="text-sm leading-relaxed font-serif" style={{ color: "var(--muted)" }}>
+                Deep research across web sources, synthesized into structured articles with verified citations.
               </p>
             </div>
-            <div className="glass-card p-6 cursor-default group">
-              <div className="w-10 h-10 rounded-full mb-4 flex items-center justify-center transition-colors" style={{ background: "var(--green-subtle)", color: "var(--green)" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-              </div>
-              <h3 className="text-base font-semibold mb-2 group-hover:text-green-500 transition-colors" style={{ color: "var(--ink)" }}>Living Knowledge</h3>
-              <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
-                Articles that grow and update over time with version history.
+            <div className="border-t-2 pt-4" style={{ borderColor: "var(--accent)" }}>
+              <h3 className="font-display text-base font-bold mb-2" style={{ color: "var(--ink)" }}>Write</h3>
+              <p className="text-sm leading-relaxed font-serif" style={{ color: "var(--muted)" }}>
+                Full article generation with rich media — images, maps, timelines, and diagrams.
               </p>
             </div>
-            <div className="glass-card p-6 cursor-default group">
-              <div className="w-10 h-10 rounded-full mb-4 flex items-center justify-center transition-colors" style={{ background: "var(--blue)", color: "white" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
-              </div>
-              <h3 className="text-base font-semibold mb-2 group-hover:text-blue-500 transition-colors" style={{ color: "var(--ink)" }}>Interactive Maps</h3>
-              <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
-                Explore visualized data with 2D and 3D map views.
+            <div className="border-t-2 pt-4" style={{ borderColor: "var(--accent)" }}>
+              <h3 className="font-display text-base font-bold mb-2" style={{ color: "var(--ink)" }}>Verify</h3>
+              <p className="text-sm leading-relaxed font-serif" style={{ color: "var(--muted)" }}>
+                AI cross-checks every citation, corrects errors, and version-controls all changes.
               </p>
             </div>
           </div>
 
           <p className="text-xs" style={{ color: "var(--subtle)" }}>
-            <Link href="/login" className="hover:underline" style={{ color: "var(--accent)" }}>Sign in</Link> to start researching. Already have an account?
+            <Link href="/login" className="font-medium hover:underline" style={{ color: "var(--accent)" }}>Sign in</Link> to start researching. Already have an account?
           </p>
         </div>
       </main>
@@ -93,8 +94,8 @@ export default function HomePage() {
   }
 
   return (
-    <PageLayout sidebar sidebarDefaultCollapsed noHeader noFooter>
-      <main className="flex-1 flex flex-col items-center justify-center px-6 pb-16 relative">
+    <PageLayout sidebar sidebarDefaultCollapsed>
+      <main className="flex-1 flex flex-col items-center px-6 pt-12 relative">
 
         {busy ? (
           /* ── Loading transition ── */
@@ -116,11 +117,16 @@ export default function HomePage() {
         ) : (
           /* ── Hero content ── */
             <div className="flex flex-col items-center animate-fade-slide-up w-full" style={{ animationDelay: "0ms" }}>
-              <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tighter text-center mb-2"
+              <div className="mb-2 inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-full"
+                style={{ background: "var(--accent-bg)", color: "var(--accent)", border: "1px solid var(--accent-subtle)" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                Encyclopedia
+              </div>
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-display font-bold tracking-tight text-center mb-2"
                 style={{ color: "var(--ink)" }}>
                 Truthseekers
               </h1>
-              <p className="text-lg text-center mb-10" style={{ color: "var(--muted)" }}>
+              <p className="text-base font-serif italic text-center mb-10" style={{ color: "var(--muted)" }}>
               The Living Encyclopedia
             </p>
 
@@ -130,21 +136,22 @@ export default function HomePage() {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask about any topic..."
+                  placeholder="Search or ask about any topic..."
                   className="flex-1 input text-base py-4 px-5"
                   autoFocus
                 />
                 <button type="submit" disabled={!input.trim()} className="btn btn-primary btn-lg shrink-0">
-                  Ask
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  Search
                 </button>
               </div>
             </form>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-xs" style={{ color: "var(--subtle)" }}>
-              <Link href="/articles" className="hover:underline" style={{ color: "var(--accent)" }}>Browse Articles</Link>
+              <Link href="/articles" className="font-medium hover:underline" style={{ color: "var(--accent)" }}>Browse Articles</Link>
               <span>&middot;</span>
-              <Link href="/maps" className="hover:underline" style={{ color: "var(--accent)" }}>Maps</Link>
+              <Link href="/maps" className="font-medium hover:underline" style={{ color: "var(--accent)" }}>Maps</Link>
               <span>&middot;</span>
-              <Link href="/queue" className="hover:underline" style={{ color: "var(--accent)" }}>Queue</Link>
+              <Link href="/queue" className="font-medium hover:underline" style={{ color: "var(--accent)" }}>Queue</Link>
             </div>
           </div>
         )}

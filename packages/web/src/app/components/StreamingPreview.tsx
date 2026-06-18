@@ -1,17 +1,15 @@
 "use client";
 
 import ChatMessage from "./ChatMessage";
-import type { AgentEvent } from "./ProcessViewer";
 
 interface StreamingPreviewProps {
   sending: boolean;
   streamContent: string;
   streamBlocks: any[];
-  agentEvents: AgentEvent[];
   phaseLabel: string;
 }
 
-export default function StreamingPreview({ sending, streamContent, streamBlocks, agentEvents, phaseLabel }: StreamingPreviewProps) {
+export default function StreamingPreview({ sending, streamContent, streamBlocks, phaseLabel }: StreamingPreviewProps) {
   if (!sending) return null;
 
   return (
@@ -23,16 +21,9 @@ export default function StreamingPreview({ sending, streamContent, streamBlocks,
         </div>
       )}
 
-      {agentEvents.length > 0 && !streamContent && streamBlocks.length === 0 && (
-        <div className="flex items-center gap-2 text-xs mb-3" style={{ color: "var(--muted)" }}>
-          <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--accent)" }} />
-          <span>{agentEvents.length} events · {phaseLabel}</span>
-        </div>
-      )}
-
       {(streamContent || streamBlocks.length > 0) && (
         <div aria-live="polite" aria-atomic="true">
-          <ChatMessage role="assistant" content={streamContent || ""} blocks={streamBlocks} agentEvents={[]} streaming />
+          <ChatMessage role="assistant" content={streamContent || ""} blocks={streamBlocks} streaming />
         </div>
       )}
     </div>

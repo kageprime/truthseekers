@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMaps, useMapSearch, type MapEntry } from "../hooks";
+import { usePageSearch } from "../HeaderSearchContext";
 import PageLayout from "../components/PageLayout";
 import PageHero from "../components/PageHero";
 import SectionHeader from "../components/SectionHeader";
@@ -18,24 +19,12 @@ export default function MapsPage() {
   const maps: MapEntry[] = isSearching ? (searchResults ?? []) : (allMaps?.maps ?? []);
   const interactive: MapEntry[] = isSearching ? [] : (allMaps?.interactive ?? []);
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-  }
-
-  function handleClear() {
-    setQuery("");
-  }
+  usePageSearch(useMemo(() => ({
+    value: query, onChange: setQuery, onSubmit: () => {}, onClear: () => setQuery(""), placeholder: "Search maps..."
+  }), [query]));
 
   return (
-    <PageLayout
-      headerSearch={{
-        value: query,
-        onChange: setQuery,
-        onSubmit: handleSearch,
-        onClear: handleClear,
-        placeholder: "Search maps...",
-      }}
-    >
+    <PageLayout>
 
       {/* Hero with green wave background */}
       <PageHero
@@ -120,7 +109,7 @@ export default function MapsPage() {
               <div className="text-center py-16">
                 <div className="mb-3"><IconMap size={36} /></div>
                 <p className="text-sm" style={{ color: "var(--muted)" }}>No maps found for &ldquo;{query}&rdquo;</p>
-                <button onClick={handleClear} className="btn btn-secondary mt-4">
+                <button onClick={() => setQuery("")} className="btn btn-secondary mt-4">
                   Clear search
                 </button>
               </div>

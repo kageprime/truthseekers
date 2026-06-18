@@ -165,10 +165,10 @@ function HeadingBlock({ data }: { data: HeadingBlockData }) {
   const level = data.level ?? 3;
   const Tag = level === 1 ? "h1" : level === 2 ? "h2" : "h3";
   const style: React.CSSProperties = level === 1
-    ? { fontFamily: "'Press Start 2P', monospace", fontSize: "1rem", margin: "1.5rem 0 0.75rem", wordBreak: "break-word" }
+    ? { fontFamily: "'Playfair Display', Georgia, serif", fontSize: "1.75rem", fontWeight: 700, margin: "2rem 0 0.75rem", letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.3 }
     : level === 2
-    ? { fontFamily: "'Press Start 2P', monospace", fontSize: "0.8rem", margin: "1.25rem 0 0.5rem", paddingBottom: "0.5rem", borderBottom: "3px solid var(--ink)" }
-    : { fontFamily: "'Press Start 2P', monospace", fontSize: "0.7rem", margin: "1rem 0 0.5rem" };
+    ? { fontFamily: "'Playfair Display', Georgia, serif", fontSize: "1.35rem", fontWeight: 700, margin: "1.5rem 0 0.5rem", paddingBottom: "0.5rem", borderBottom: "1px solid var(--accent)", color: "var(--ink)", letterSpacing: "-0.01em" }
+    : { fontFamily: "'Playfair Display', Georgia, serif", fontSize: "1.1rem", fontWeight: 600, margin: "1.25rem 0 0.5rem", color: "var(--ink)" };
   return <Tag style={style}>{data.text}</Tag>;
 }
 
@@ -181,8 +181,8 @@ function TextBlock({ data }: { data: TextBlockData }) {
 function SectionBlock({ data }: { data: SectionBlockData }) {
   if (!data) return null;
   return (
-    <details className="glass-card-static p-3 mb-3" style={{ border: "2px solid var(--ink)" }}>
-      <summary className="font-bold text-sm cursor-pointer" style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "8px" }}>
+    <details className="glass-card-static p-3 mb-3" style={{ border: "1px solid var(--border)" }}>
+      <summary className="font-bold text-sm cursor-pointer" style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "0.9rem", color: "var(--ink)" }}>
         {data.title}
       </summary>
       {data.blocks && <div className="mt-3">{data.blocks.map((b, i) => <BlockCard key={b.id ?? `section-block-${i}`} block={b} compact={false} />)}</div>}
@@ -311,7 +311,7 @@ function ToolCallBlock({ data }: { data: { name: string; args?: Record<string, u
 }
 
 function DividerBlock() {
-  return <hr style={{ border: "none", borderTop: "2px solid var(--ink)", margin: "1.5rem 0" }} />;
+  return <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "2rem 0" }} />;
 }
 
 function UnknownBlock({ block }: { block: Block }) {

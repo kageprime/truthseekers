@@ -7,39 +7,41 @@ export default function ArticleCard({ article }: { article: ArticleSummary }) {
   return (
     <Link
       href={`/article/${article.slug}`}
-      className="glass-card overflow-hidden block group"
+      className="block group"
       style={{ textDecoration: "none", color: "inherit" }}
-     
     >
-      <div className="w-full aspect-[16/9] overflow-hidden" style={{ background: "var(--skeleton-start)" }}>
-        {article.thumbnail ? (
-          <img
-            src={article.thumbnail}
-            alt=""
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-2xl font-bold"
-            style={{ background: "linear-gradient(135deg, var(--accent-bg), var(--border-light))", color: "var(--subtle)" }}>
-            {article.title.charAt(0).toUpperCase()}
+      <article
+        className="overflow-hidden transition-all duration-200"
+        style={{
+          border: "1px solid var(--border)",
+          background: "var(--surface-elevated)",
+        }}
+      >
+        {article.thumbnail && (
+          <div className="w-full overflow-hidden" style={{ borderBottom: "1px solid var(--border)", maxHeight: 160 }}>
+            <img
+              src={article.thumbnail}
+              alt=""
+              className="w-full h-full object-cover transition-opacity duration-300 group-hover:opacity-90"
+              loading="lazy"
+            />
           </div>
         )}
-      </div>
-      <div className="p-4 space-y-2">
-        <h3 className="font-semibold text-sm leading-snug" style={{ color: "var(--ink)" }}>
-          {article.title}
-        </h3>
-        <p className="text-xs line-clamp-2 leading-relaxed" style={{ color: "var(--muted)" }}>{article.abstract}</p>
-        <div className="flex items-center gap-2 pt-1">
-          {article.categories?.slice(0, 2).map((cat) => (
-            <span key={cat} className="tag tag-subtle text-[10px]">{cat}</span>
-          ))}
-          {article.metadata?.version && (
-            <span className="text-xs ml-auto" style={{ color: "var(--subtle)" }}>v{article.metadata.version}</span>
-          )}
+        <div className="p-4 space-y-1.5">
+          <h3 className="font-display font-bold text-sm leading-snug" style={{ color: "var(--ink)" }}>
+            {article.title}
+          </h3>
+          <p className="text-xs leading-relaxed line-clamp-2 font-serif" style={{ color: "var(--muted)" }}>{article.abstract}</p>
+          <div className="flex items-center gap-2 pt-1.5">
+            {article.categories?.slice(0, 2).map((cat) => (
+              <span key={cat} className="text-[10px] uppercase tracking-wider font-medium" style={{ color: "var(--accent)" }}>{cat}</span>
+            ))}
+            {article.metadata?.version && (
+              <span className="text-[10px] ml-auto font-mono" style={{ color: "var(--subtle)" }}>v{article.metadata.version}</span>
+            )}
+          </div>
         </div>
-      </div>
+      </article>
     </Link>
   );
 }

@@ -72,7 +72,7 @@ export default function SettingsPage() {
   const tierStyle = tierColors[user.subscriptionTier] || tierColors.free;
 
   return (
-    <PageLayout noFooter>
+    <PageLayout>
       <div className="max-w-2xl mx-auto w-full px-4 py-10 space-y-8">
         <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--ink)" }}>Settings</h1>
 

@@ -130,7 +130,7 @@ export default function GenerationBar({
   useEffect(() => { if (isDone) setSmoothPct(100); }, [isDone]);
 
   const displayPct = isDone ? 100 : Math.round(smoothPct);
-  const barColor = isDone ? "var(--green)" : isError ? "var(--red)" : isPaused ? "#f59e0b" : "var(--accent)";
+  const barColor = isDone ? "var(--green)" : isError ? "var(--red)" : isPaused ? "var(--gold)" : "var(--accent)";
   const StatusIcon = isDone ? IconCheckCircle : isError ? IconAlert : isPaused ? IconAlert : IconLightning;
 
   return (

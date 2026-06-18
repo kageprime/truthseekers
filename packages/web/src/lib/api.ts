@@ -114,6 +114,15 @@ export async function fetchChat(id: string): Promise<ConversationDetail | null> 
   return res.json();
 }
 
+export async function updateChatTitle(id: string, title: string): Promise<boolean> {
+  const res = await fetch(`${BASE}/chat/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ title }),
+  });
+  return res.ok;
+}
+
 export function chatProgressUrl(id: string): string {
   return `${BASE}/chat/${id}/messages`;
 }

@@ -5,14 +5,11 @@ import FollowUpSuggestions from "./FollowUpSuggestions";
 import EmptyChatState from "./EmptyChatState";
 import ErrorBanner from "./ErrorBanner";
 import StreamingPreview from "./StreamingPreview";
-import type { AgentEvent } from "./ProcessViewer";
-
 interface Message {
   id: string;
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   blocks?: any[];
-  agentEvents?: AgentEvent[];
   createdAt?: string;
 }
 
@@ -25,7 +22,6 @@ interface MessageListProps {
   followUps: string[];
   showScrollBtn: boolean;
   phaseLabel: string;
-  agentEvents: AgentEvent[];
   lastAssistantIndex: number;
   suggestedTopics: string[];
   onScrollToBottom: () => void;
@@ -40,7 +36,7 @@ interface MessageListProps {
 
 export default function MessageList({
   messages, streamContent, streamBlocks, sending, error, followUps,
-  showScrollBtn, phaseLabel, agentEvents, lastAssistantIndex,
+  showScrollBtn, phaseLabel, lastAssistantIndex,
   suggestedTopics, onScrollToBottom, onRegenerate, onEdit, onCopy,
   onSend, onRetry, onSetInput, scrollRef,
 }: MessageListProps) {
@@ -69,7 +65,6 @@ export default function MessageList({
               blocks={msg.blocks}
               createdAt={msg.createdAt}
               isLastAssistant={i === lastAssistantIndex}
-              agentEvents={msg.agentEvents}
               onEdit={() => onEdit(i)}
               onRegenerate={onRegenerate}
               onCopy={() => onCopy(msg.content)}
@@ -85,7 +80,6 @@ export default function MessageList({
             sending={sending}
             streamContent={streamContent}
             streamBlocks={streamBlocks}
-            agentEvents={agentEvents}
             phaseLabel={phaseLabel}
           />
         </div>

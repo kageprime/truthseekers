@@ -183,7 +183,8 @@ export function getApiOrigin(): string {
 }
 
 export function getFrontendOrigin(): string {
-  return process.env.FRONTEND_URL || process.env.CORS_ORIGIN || "http://localhost:3001";
+  const raw = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || "http://localhost:3001";
+  return raw.split(",")[0].trim();
 }
 
 // GitHub

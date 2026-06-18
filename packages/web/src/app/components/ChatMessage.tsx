@@ -3,9 +3,8 @@
 import { useState } from "react";
 import BlockRenderer from "./BlockRenderer";
 import MarkdownRenderer from "./MarkdownRenderer";
-import { type AgentEvent, ToolUseCard, ToolResultCard, TextDeltaCard, formatTimestamp, AgentActivityFullscreen } from "./ProcessViewer";
 import type { Block } from "@encarta/core";
-import { IconLightning, IconX, IconThumbsUp, IconThumbsDown, IconRefresh, IconPencil, IconCopy, IconCheck } from "./Icons";
+import { IconThumbsUp, IconThumbsDown, IconRefresh, IconPencil, IconCopy, IconCheck } from "./Icons";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -31,40 +30,13 @@ interface ChatMessageProps {
   onRegenerate?: () => void;
   onEdit?: () => void;
   onCopy?: () => void;
-  agentEvents?: AgentEvent[];
   streaming?: boolean;
 }
 
-function AgentEventCard({ event, onClick }: { event: AgentEvent; onClick?: () => void }) {
-  return (
-    <button onClick={onClick} className="w-full text-left rounded-lg transition-colors hover:bg-[var(--border-light)]" style={{ cursor: "pointer", background: "none", border: "none", padding: "0.375rem 0.5rem", font: "inherit", color: "inherit" }}>
-      <div className="flex items-center gap-1.5 text-xs mb-0.5" style={{ color: "var(--subtle)" }}>
-        <span>{formatTimestamp(event.timestamp)}</span>
-        <span className="font-medium uppercase text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--border-light)", color: "var(--muted)" }}>{event.type}</span>
-      </div>
-      {event.type === "tool_use" && <ToolUseCard data={event.data as any} />}
-      {event.type === "tool_result" && <ToolResultCard data={event.data as any} />}
-      {event.type === "text" && <TextDeltaCard data={event.data as any} />}
-      {event.type === "status" && (
-        <div className="text-xs font-medium py-1 px-2.5 border-l-2 rounded-r" style={{ borderColor: "var(--green)", background: "var(--green-subtle)", color: "var(--green)" }}>
-          <IconLightning size={12} /> {String(event.data)}
-        </div>
-      )}
-      {event.type === "error" && (
-        <div className="text-xs font-medium py-1 px-2.5 border-l-2 rounded-r" style={{ borderColor: "var(--red)", background: "var(--red-subtle)", color: "var(--red)" }}>
-          <IconX size={12} /> {String(event.data)}
-        </div>
-      )}
-    </button>
-  );
-}
-
-export default function ChatMessage({ role, content, blocks, createdAt, isLastAssistant, onRegenerate, onEdit, onCopy, agentEvents, streaming }: ChatMessageProps) {
+export default function ChatMessage({ role, content, blocks, createdAt, isLastAssistant, onRegenerate, onEdit, onCopy, streaming }: ChatMessageProps) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
-  const [showActivity, setShowActivity] = useState(true);
-  const [fullscreenEventIdx, setFullscreenEventIdx] = useState<number | undefined>(undefined);
 
   function handleCopy() {
     const text = content || blocks?.map(b => b.data?.text || "").filter(Boolean).join("\n") || "";
@@ -103,30 +75,6 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
           {blocks && blocks.length > 0 && (
             <div className="mt-2">
               <BlockRenderer blocks={blocks} compact />
-            </div>
-          )}
-
-          {/* Agent activity (assistant only) */}
-          {!isUser && agentEvents && agentEvents.length > 0 && (
-            <div className="mt-2 pt-2 border-t" style={{ borderColor: "var(--border-light)" }}>
-              <button
-                onClick={() => setShowActivity(!showActivity)}
-                className="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-lg transition-colors"
-                style={{ color: "var(--muted)" }}
-              >
-                <span className="text-[10px]">{showActivity ? "▾" : "▸"}</span>
-                Agent Activity
-                <span className="text-[10px] ml-0.5 px-1.5 py-0.5 rounded-full" style={{ background: "var(--border-light)", color: "var(--subtle)" }}>
-                  {agentEvents.length}
-                </span>
-              </button>
-              {showActivity && (
-                <div className="mt-1.5 space-y-0.5">
-                  {agentEvents.map((event, i) => (
-                    <AgentEventCard key={`${event.timestamp}-${i}`} event={event} onClick={() => setFullscreenEventIdx(i)} />
-                  ))}
-                </div>
-              )}
             </div>
           )}
 
@@ -192,16 +140,6 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
           </div>
         </div>
       </div>
-
-      {/* Fullscreen activity modal */}
-      {agentEvents && agentEvents.length > 0 && (
-        <AgentActivityFullscreen
-          open={fullscreenEventIdx !== undefined}
-          onClose={() => setFullscreenEventIdx(undefined)}
-          events={agentEvents}
-          scrollToIndex={fullscreenEventIdx}
-        />
-      )}
     </>
   );
 }

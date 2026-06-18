@@ -3,11 +3,15 @@ import "./globals.css";
 import ErrorBoundary from "./components/ErrorBoundary";
 import QueryProvider from "./components/QueryProvider";
 import ThemeProvider from "./components/ThemeProvider";
+import { FloatingChatProvider } from "./FloatingChatContext";
+import { ChatProvider } from "./chat/ChatContext";
+import { HeaderSearchProvider } from "./HeaderSearchContext";
+import AppShell from "./AppShell";
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0f0f0f",
+  themeColor: "#faf8f2",
 };
 
 export const metadata: Metadata = {
@@ -28,10 +32,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&family=Outfit:wght@300..800&family=Press+Start+2P&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&family=Lora:ital,wght@0,400..700;1,400..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Press+Start+2P&display=swap"
           rel="stylesheet"
         />
-        <script dangerouslySetInnerHTML={{ __html: `document.documentElement.classList.add("dark")` }} />
+      <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem("theme")||"light";document.documentElement.classList.toggle("dark",t==="dark")}catch(e){}})()` }} />
       </head>
       <body className="antialiased" style={{ margin: 0 }}>
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-white focus:rounded-lg focus:text-sm focus:shadow-lg" style={{ color: "var(--ink)" }}>
@@ -39,62 +43,68 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
         <style>{`
           :root {
-            --surface: #f8fafc;
+            --surface: #faf8f2;
             --surface-elevated: #ffffff;
-            --ink: #0f172a;
-            --ink-secondary: #334155;
-            --muted: #64748b;
-            --subtle: #cbd5e1;
-            --border: #e2e8f0;
-            --border-light: #f1f5f9;
-            --accent: #ea580c;
-            --accent-dark: #c2410c;
-            --accent-subtle: #ffedd5;
-            --accent-bg: #fff7ed;
-            --green: #10b981;
-            --green-subtle: #d1fae5;
-            --red: #ef4444;
+            --ink: #1a1a1a;
+            --ink-secondary: #4a4a4a;
+            --muted: #6b6b6b;
+            --subtle: #b0ada6;
+            --border: #d9d5cc;
+            --border-light: #ede8df;
+            --accent: #1e40af;
+            --accent-dark: #1e3a8a;
+            --accent-subtle: #bfdbfe;
+            --accent-bg: #eff6ff;
+            --green: #15803d;
+            --green-subtle: #dcfce7;
+            --red: #dc2626;
             --red-subtle: #fee2e2;
-            --blue: #0ea5e9;
-            --gold: #f59e0b;
+            --blue: #2563eb;
+            --gold: #b8860b;
+            --gold-bg: #fef3c7;
             --cream: #fef3c7;
-            --glass: rgba(255, 255, 255, 0.7);
-            --glass-border: rgba(255, 255, 255, 0.4);
-            --glass-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
-            --skeleton-start: #e2e8f0;
-            --skeleton-end: #f1f5f9;
+            --surface-glass: rgba(250, 248, 242, 0.6);
+            --glass: rgba(250, 248, 242, 0.85);
+            --glass-border: rgba(0, 0, 0, 0.06);
+            --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+            --skeleton-start: #e6e1d8;
+            --skeleton-end: #f0ebe3;
           }
           .dark {
-            --surface: #0b0f19;
-            --surface-elevated: #151b2b;
-            --ink: #f8fafc;
-            --ink-secondary: #cbd5e1;
-            --muted: #94a3b8;
-            --subtle: #475569;
-            --border: #1e293b;
-            --border-light: #0f172a;
-            --accent: #fbbf24;
-            --accent-subtle: #b45309;
-            --accent-bg: #451a03;
-            --cream: #1e293b;
-            --glass: rgba(11, 15, 25, 0.65);
-            --glass-border: rgba(255, 255, 255, 0.08);
-            --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            --skeleton-start: #1e293b;
-            --skeleton-end: #334155;
+            --surface: #1a1614;
+            --surface-elevated: #241f1b;
+            --ink: #e8e0d5;
+            --ink-secondary: #c4b9a8;
+            --muted: #8c8273;
+            --subtle: #5a5248;
+            --border: #3a3228;
+            --border-light: #2a241c;
+            --accent: #60a5fa;
+            --accent-dark: #3b82f6;
+            --accent-subtle: #1e3a5f;
+            --accent-bg: #172554;
+            --green: #4ade80;
+            --green-subtle: #14532d;
+            --red: #f87171;
+            --red-subtle: #7f1d1d;
+            --blue: #60a5fa;
+            --gold: #d4a853;
+            --gold-bg: #422006;
+            --cream: #2a241c;
+            --surface-glass: rgba(36, 31, 27, 0.6);
+            --glass: rgba(26, 22, 20, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.06);
+            --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            --skeleton-start: #2a241c;
+            --skeleton-end: #3a3228;
           }
           * { box-sizing: border-box; }
           body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
             background-color: var(--surface);
             color: var(--ink);
-            background-image: radial-gradient(var(--border) 1px, transparent 1px);
-            background-size: 24px 24px;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
-          }
-          .dark body {
-            background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
           }
 
           /* ── Glass Utilities ─────────────────────────────────── */
@@ -121,20 +131,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
           .glass-card {
             background: var(--surface-elevated);
-            border-radius: 16px;
+            border-radius: 4px;
             border: 1px solid var(--border);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
             transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
           }
           .glass-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
           }
           .glass-card-static {
             background: var(--surface-elevated);
-            border-radius: 16px;
+            border-radius: 4px;
             border: 1px solid var(--border);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
           }
           .dark .glass-card,
           .dark .glass-card-static {
@@ -173,7 +182,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
           .btn-primary:hover {
             background: var(--accent-dark);
-            box-shadow: 0 4px 16px rgba(234,88,12,0.3);
+            box-shadow: 0 2px 8px rgba(30,64,175,0.25);
           }
           .btn-secondary {
             background: var(--surface-elevated);
@@ -286,24 +295,29 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
           /* ── Article Prose ───────────────────────────────────── */
           article.prose {
-            font-size: 1.05rem;
-            line-height: 1.8;
+            font-family: 'Lora', Georgia, 'Times New Roman', serif;
+            font-size: 1.1rem;
+            line-height: 1.85;
             color: var(--ink);
           }
           article.prose h2 {
-            font-size: 1.25rem;
-            font-weight: 600;
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 1.5rem;
+            font-weight: 700;
             padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 2px solid var(--accent);
             margin-top: 2.5rem;
             margin-bottom: 1rem;
             letter-spacing: -0.01em;
+            color: var(--ink);
           }
           article.prose h3 {
-            font-size: 1.1rem;
-            font-weight: 600;
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 1.25rem;
+            font-weight: 700;
             margin-top: 1.75rem;
             margin-bottom: 0.75rem;
+            color: var(--ink);
           }
           article.prose p {
             margin-bottom: 1rem;
@@ -311,7 +325,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
           article.prose a {
             color: var(--accent);
-            font-weight: 500;
             text-decoration: underline;
             text-underline-offset: 3px;
             text-decoration-thickness: 1px;
@@ -321,14 +334,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
           article.prose strong {
             color: var(--ink);
-            font-weight: 600;
+            font-weight: 700;
           }
           article.prose blockquote {
             border-left: 3px solid var(--accent);
             padding: 0.75rem 1.25rem;
             margin: 1rem 0;
             background: var(--accent-bg);
-            border-radius: 0 8px 8px 0;
+            border-radius: 4px;
+            font-style: italic;
           }
           article.prose ul, article.prose ol {
             padding-left: 1.5rem;
@@ -336,6 +350,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
           article.prose li {
             margin-bottom: 0.25rem;
+          }
+          article.prose table {
+            font-family: 'Inter', system-ui, sans-serif;
+          }
+          article.prose pre,
+          article.prose code {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
           }
 
           /* ── Generate Page ───────────────────────────────────── */
@@ -668,7 +689,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
         `}</style>
         <ErrorBoundary>
-          <QueryProvider><ThemeProvider>{children}</ThemeProvider></QueryProvider>
+          <QueryProvider>
+            <ThemeProvider>
+              <FloatingChatProvider>
+                <ChatProvider>
+                  <HeaderSearchProvider>
+                    <AppShell>{children}</AppShell>
+                  </HeaderSearchProvider>
+                </ChatProvider>
+              </FloatingChatProvider>
+            </ThemeProvider>
+          </QueryProvider>
         </ErrorBoundary>
       </body>
     </html>
