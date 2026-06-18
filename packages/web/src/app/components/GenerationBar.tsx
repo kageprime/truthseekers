@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import PhaseTimeline from "./PhaseTimeline";
 import type { AgentEvent } from "./ProcessViewer";
-import { IconLightning, IconClipboard, IconChat, IconX, IconCheckCircle, IconAlert } from "./Icons";
+import { IconLightning, IconCheckCircle, IconAlert } from "./Icons";
+import { BASE } from "../../lib/constants";
 
 export interface GeneratingEntry {
   slug: string;
@@ -14,82 +15,11 @@ export interface GeneratingEntry {
   agentEvents?: AgentEvent[];
 }
 
-import type { FC, SVGProps } from "react";
-
-interface Activity {
-  id: number;
-  timestamp: number;
-  type: string;
-  content: string;
-  icon: string | FC<SVGProps<SVGSVGElement> & { size?: number }>;
-  metadata?: string;
-}
-
-function eventToActivity(event: AgentEvent, id: number): Activity {
-  const base = { id, timestamp: event.timestamp };
-  switch (event.type) {
-    case "status":
-      return { ...base, type: "status", content: String(event.data), icon: IconLightning };
-    case "tool_use": {
-      const d = event.data as Record<string, unknown> | undefined;
-      const name = (d?.name as string) ?? "unknown";
-      const args = d?.args as Record<string, unknown> | undefined;
-      return { ...base, type: "tool_use", content: toolLabel(name), icon: toolIcon(name), metadata: args ? JSON.stringify(args).slice(0, 120) : undefined };
-    }
-    case "tool_result": {
-      const d = event.data as Record<string, unknown> | undefined;
-      const result = (d?.result ?? d?.content ?? "") as string;
-      const snippet = typeof result === "string" ? result.slice(0, 200) : JSON.stringify(result).slice(0, 200);
-      return { ...base, type: "tool_result", content: snippet || "Done", icon: IconClipboard };
-    }
-    case "text": {
-      const d = event.data as Record<string, unknown> | undefined;
-      const text = (d?.text ?? d?.delta ?? "") as string;
-      return { ...base, type: "text", content: text.slice(0, 300), icon: IconChat };
-    }
-    case "error":
-      return { ...base, type: "error", content: String(event.data), icon: IconX };
-    default:
-      return { ...base, type: event.type, content: String(event.data), icon: "•" };
-  }
-}
-
-function toolLabel(name: string): string {
-  const labels: Record<string, string> = {
-    firecrawl_search: "Searching the web", websearch: "Searching the web", webfetch: "Fetching a page",
-    read: "Reading a file", write: "Writing content", edit: "Editing content",
-    glob: "Searching files", grep: "Searching code", bash: "Running a command",
-    web_search: "Searching the web", article_search: "Searching articles",
-    get_article: "Looking up article", get_map: "Looking up map",
-    generate_image: "Generating image", verify_citation: "Verifying citation",
-    suggest_related: "Finding related", render_blocks: "Rendering content",
-    create_article: "Generating article", task: "Spawning sub-agent",
-    mem_store: "Remembering", mem_recall: "Recalling",
-    think: "Thinking",
-  };
-  return labels[name] ?? `Using ${name}`;
-}
-
-function toolIcon(name: string): string {
-  const icons: Record<string, string> = {
-    firecrawl_search: "🔍", websearch: "🔍", webfetch: "🌐", read: "📖",
-    write: "✍️", edit: "📝", glob: "📁", grep: "🔎", bash: "💻",
-    web_search: "🔍", article_search: "📚",
-    get_article: "📖", get_map: "🗺️",
-    generate_image: "🎨", verify_citation: "✅",
-    suggest_related: "🔗", render_blocks: "🎨",
-    create_article: "✨", task: "🤖",
-    mem_store: "💾", mem_recall: "🔍",
-    think: "🧠",
-  };
-  return icons[name] ?? "•";
-}
-
 const PHASE_CHECKPOINTS: Record<string, number> = {
   queued: 5, starting: 5, research: 20, researching: 20, outline: 40,
   write: 60, writing: 60, verify: 75, verifying: 75, correcting: 80,
   "generate-media": 90, media: 90, "generating-images": 93, store: 95, storing: 95,
-  complete: 100, done: 100, error: 0,
+  complete: 100, done: 100, error: 0, paused: 75,
 };
 
 function phasePercent(phase: string): number {
@@ -101,6 +31,7 @@ function phaseLabel(phase: string): string {
     queued: "QUEUED", researching: "RESEARCHING", outline: "OUTLINING",
     write: "WRITING", verifying: "VERIFYING", correcting: "CORRECTING",
     media: "GENERATING MEDIA", storing: "STORING", complete: "DONE", done: "DONE", error: "ERROR",
+    paused: "PAUSED FOR REVIEW",
   };
   return m[phase] ?? phase.toUpperCase();
 }
@@ -128,15 +59,40 @@ export default function GenerationBar({
   const [expanded, setExpanded] = useState(true);
   const [smoothPct, setSmoothPct] = useState(5);
   const animRef = useRef<ReturnType<typeof requestAnimationFrame> | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [autoScroll, setAutoScroll] = useState(true);
 
   const targetPct = phasePercent(entry.phase);
   const label = phaseLabel(entry.phase);
   const isDone = entry.phase === "done" || entry.phase === "complete";
   const isError = entry.phase === "error";
+  const isPaused = entry.phase === "paused";
+  const [resolving, setResolving] = useState(false);
 
-  const activities = (entry.agentEvents ?? []).map((e, i) => eventToActivity(e, i));
+  let verifyData: { confidenceScore?: number; issues?: { section: string; claim: string; issue: string; severity: string }[] } | null = null;
+  if (isPaused && entry.error) {
+    try {
+      verifyData = JSON.parse(entry.error);
+    } catch {}
+  }
+
+  async function handleResolve(action: "approve" | "correct") {
+    setResolving(true);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("truthseekers_token") : null;
+      const res = await fetch(`${BASE}/articles/${entry.slug}/resolve`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) throw new Error("Resolve failed");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setResolving(false);
+    }
+  }
 
   // Auto-expand when generation starts
   useEffect(() => {
@@ -162,7 +118,7 @@ export default function GenerationBar({
       const progress = Math.min(elapsed / duration, 1);
       const current = startPct + (creepTarget - startPct) * progress;
       setSmoothPct(Math.min(current, 99));
-      if (progress < 1 && entry.phase !== "done" && entry.phase !== "error") {
+      if (progress < 1 && entry.phase !== "done" && entry.phase !== "error" && entry.phase !== "paused") {
         animRef.current = requestAnimationFrame(tick);
       }
     }
@@ -173,15 +129,9 @@ export default function GenerationBar({
 
   useEffect(() => { if (isDone) setSmoothPct(100); }, [isDone]);
 
-  useEffect(() => {
-    if (autoScroll && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [activities.length, autoScroll]);
-
   const displayPct = isDone ? 100 : Math.round(smoothPct);
-  const barColor = isDone ? "var(--green)" : isError ? "var(--red)" : "var(--accent)";
-  const StatusIcon = isDone ? IconCheckCircle : isError ? IconAlert : IconLightning;
+  const barColor = isDone ? "var(--green)" : isError ? "var(--red)" : isPaused ? "#f59e0b" : "var(--accent)";
+  const StatusIcon = isDone ? IconCheckCircle : isError ? IconAlert : isPaused ? IconAlert : IconLightning;
 
   return (
     <div className="glass-card-static" style={{ transition: "all 0.2s ease-out" }}>
@@ -219,52 +169,83 @@ export default function GenerationBar({
             <PhaseTimeline currentPhase={entry.phase} />
           </div>
 
-          {/* Activity Feed */}
-          {!isDone && !isError && (
-            <div className="px-4 pb-2">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium font-semibold" style={{ color: "var(--muted)" }}>
-                  LIVE ACTIVITY ({activities.length})
-                </span>
-                <button
-                  onClick={() => setAutoScroll(!autoScroll)}
-                  className="btn-ghost"
-                  style={{ color: autoScroll ? "var(--blue)" : "#aaa", fontWeight: autoScroll ? 600 : 400, fontSize: "7px" }}
-                >
-                  {autoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}
-                </button>
+          {/* Paused human-in-the-loop review */}
+          {isPaused && (
+            <div className="px-4 pb-4 pt-2 border-t border-amber-100" style={{ background: "color-mix(in srgb, var(--accent-bg) 50%, transparent)" }}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-amber-500 text-lg">⚠️</span>
+                <div>
+                  <h3 className="text-xs font-bold text-amber-800" style={{ color: "var(--ink)" }}>Verification Issues Detected</h3>
+                  <p className="text-[10px] text-amber-700" style={{ color: "var(--muted)" }}>
+                    The agent's verification scan found conflicting sources or accuracy issues.
+                  </p>
+                </div>
               </div>
-              <div
-                ref={scrollRef}
-                className="activity-feed-inline"
-                onScroll={() => {
-                  if (!scrollRef.current) return;
-                  const el = scrollRef.current;
-                  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
-                  if (atBottom !== autoScroll) setAutoScroll(atBottom);
-                }}
-              >
-                {activities.length === 0 && (
-                  <div className="activity-empty">
-                    <div className="empty-pulse" />
-                    <p>Waiting for agent activity...</p>
+
+              {verifyData && (
+                <div className="space-y-2 mb-4 p-2.5 rounded border max-h-48 overflow-y-auto" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+                  <div className="flex items-center justify-between text-[10px] border-b pb-1.5 mb-1.5" style={{ borderColor: "var(--border)" }}>
+                    <span className="font-semibold text-gray-700" style={{ color: "var(--muted)" }}>Confidence Score</span>
+                    <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] ${
+                      verifyData.confidenceScore && verifyData.confidenceScore >= 0.8
+                        ? "bg-green-100 text-green-800"
+                        : verifyData.confidenceScore && verifyData.confidenceScore >= 0.5
+                        ? "bg-yellow-100 text-yellow-800"
+                        : "bg-red-100 text-red-800"
+                    }`}>
+                      {verifyData.confidenceScore ? Math.round(verifyData.confidenceScore * 100) : 0}%
+                    </span>
                   </div>
-                )}
-                {activities.map((a) => (
-                  <div key={a.id} className={`activity-card ${a.type}`}>
-                    <div className="activity-icon">{typeof a.icon === "function" ? <a.icon size={14} /> : a.icon}</div>
-                    <div className="activity-body">
-                      <div className="activity-content">{a.content}</div>
-                      {a.metadata && <div className="activity-meta"><code>{a.metadata}</code></div>}
+
+                  {verifyData.issues && verifyData.issues.length > 0 ? (
+                    <div className="space-y-2">
+                      {verifyData.issues.map((issue, idx) => (
+                        <div key={idx} className="text-[10px] border-l-2 pl-2" style={{ borderColor: "var(--accent)" }}>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold" style={{ color: "var(--ink)" }}>[{issue.section || "General"}]</span>
+                            <span className={`text-[8px] font-bold px-1 uppercase rounded ${
+                              issue.severity === "high"
+                                ? "bg-red-100 text-red-700"
+                                : issue.severity === "medium"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-blue-100 text-blue-700"
+                            }`}>
+                              {issue.severity}
+                            </span>
+                          </div>
+                          <p className="mt-0.5" style={{ color: "var(--muted)" }}><strong style={{ color: "var(--ink)" }}>Claim:</strong> {issue.claim}</p>
+                          <p className="mt-0.5" style={{ color: "var(--muted)" }}><strong style={{ color: "var(--ink)" }}>Issue:</strong> {issue.issue}</p>
+                        </div>
+                      ))}
                     </div>
-                    <div className="activity-time">
-                      {new Date(a.timestamp).toLocaleTimeString("en-US", { minute: "2-digit", second: "2-digit" })}
-                    </div>
-                  </div>
-                ))}
+                  ) : (
+                    <p className="text-[10px] italic" style={{ color: "var(--subtle)" }}>No specific issues listed.</p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  disabled={resolving}
+                  onClick={() => handleResolve("approve")}
+                  className="btn btn-primary btn-sm"
+                  style={{ background: "var(--green)", color: "var(--surface)", border: "none" }}
+                >
+                  {resolving ? "Processing..." : "Approve & Publish"}
+                </button>
+                <button
+                  disabled={resolving}
+                  onClick={() => handleResolve("correct")}
+                  className="btn btn-secondary btn-sm"
+                  style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+                >
+                  {resolving ? "Processing..." : "Fix Issues (Agent Correction)"}
+                </button>
               </div>
             </div>
           )}
+
+          {/* Agent activity runs in the Truth Console panel — not inline */}
 
           {/* Error detail */}
           {isError && (

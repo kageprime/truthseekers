@@ -33,13 +33,14 @@ interface ChatInputProps {
   suggestions?: string[];
   model?: string;
   onModelChange?: (model: string) => void;
-
+  consoleOpen?: boolean;
+  onToggleConsole?: () => void;
 }
 
 export default function ChatInput({
   input, sending, editingIndex, showCommands, slashCommands,
   onChange, onSend, onStop, onCancelEdit, onSlashCommand, onKeyDown, textareaRef, suggestions = [],
-  model, onModelChange,
+  model, onModelChange, consoleOpen, onToggleConsole,
 }: ChatInputProps) {
   const [modelOpen, setModelOpen] = useState(false);
   const modelRef = useRef<HTMLDivElement>(null);
@@ -90,9 +91,9 @@ export default function ChatInput({
           </div>
         )}
 
-        {/* Model selector */}
-        {model && onModelChange && (
-          <div className="flex items-center gap-2 mb-2" style={{ minHeight: 28 }}>
+        {/* Model selector + Console toggle */}
+        <div className="flex items-center gap-2 mb-2" style={{ minHeight: 28 }}>
+          {model && onModelChange && (
             <div className="relative" ref={modelRef}>
               <button
                 onClick={() => setModelOpen(!modelOpen)}
@@ -124,8 +125,24 @@ export default function ChatInput({
                 </div>
               )}
             </div>
-          </div>
-        )}
+          )}
+          {onToggleConsole && (
+            <button
+              onClick={onToggleConsole}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors"
+              style={{
+                background: consoleOpen ? "var(--accent-bg)" : "var(--border-light)",
+                color: consoleOpen ? "var(--accent)" : "var(--muted)",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              Console
+            </button>
+          )}
+        </div>
 
         {/* Slash commands dropdown */}
         {showCommands && (

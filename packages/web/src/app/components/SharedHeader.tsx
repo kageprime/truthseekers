@@ -47,8 +47,8 @@ export default function SharedHeader({ onToggleSidebar, sidebarOpen, search }: H
   }, [mobileNavOpen]);
 
   return (
-    <header className="sticky top-0 z-50 glass header-bar" style={{ borderBottom: "1px solid var(--border-light)" }}>
-      <div className="px-4 h-14 flex items-center justify-between max-w-[1440px] mx-auto">
+    <header className="sticky top-0 z-50 glass header-bar border-b transition-colors duration-300" style={{ borderColor: "var(--glass-border)" }}>
+      <div className="px-6 h-16 flex items-center justify-between max-w-[1440px] mx-auto">
         <div className="flex items-center gap-3">
           {onToggleSidebar ? (
             // ── Compact: sidebar handles navigation ──

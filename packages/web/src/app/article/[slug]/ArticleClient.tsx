@@ -26,6 +26,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   const [generating, setGenerating] = useState(isGenerating);
   const [progress, setProgress] = useState(initialPhase);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
+  const [pausedError, setPausedError] = useState<string | undefined>(undefined);
   const { data: quota } = useQuota();
   const { mutate: generateArticle } = useGenerateArticle();
   const { mutate: refreshArticle } = useRefreshArticle();
@@ -82,8 +83,13 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         es.close();
         sseRef.current = null;
       } else {
-        const phaseStr = typeof data.phase === "string" ? data.phase : typeof data.status === "string" ? data.status : "unknown";
+        const phaseStr = data.status === "paused" ? "paused" : (typeof data.phase === "string" ? data.phase : typeof data.status === "string" ? data.status : "unknown");
         setProgress(phaseStr);
+        if (data.status === "paused") {
+          setPausedError(data.error as string);
+        } else {
+          setPausedError(undefined);
+        }
       }
     });
 
@@ -236,7 +242,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
       slug,
       title: slug.replace(/-/g, " "),
       phase: progress || "queued",
-      error: hasError ? progress.replace("Error: ", "") : undefined,
+      error: hasError ? progress.replace("Error: ", "") : pausedError,
       agentEvents,
     };
 

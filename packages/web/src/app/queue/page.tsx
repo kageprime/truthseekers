@@ -88,9 +88,10 @@ export default function QueuePage() {
         if (!cancelled && res.ok) {
           const json: QueueData = await res.json();
           // Merge in stored agent events
-          const jobsWithEvents = json.jobs.map((j) => ({
+           const jobsWithEvents = json.jobs.map((j) => ({
             ...j,
-            phase: phaseMapRef.current[j.slug] || j.phase,
+            phase: phaseMapRef.current[j.slug] || (j.status === "paused" ? "paused" : j.phase),
+            error: j.status === "paused" ? j.error : j.error,
             agentEvents: agentEventsMapRef.current[j.slug] || j.agentEvents,
           }));
           setData({ ...json, jobs: jobsWithEvents });
@@ -128,7 +129,12 @@ export default function QueuePage() {
       es.addEventListener("progress", (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data);
-          if (data.phase) handleProgress(job.slug, data.phase);
+          const phase = data.status === "paused" ? "paused" : data.phase;
+          const error = data.status === "paused" ? data.error : undefined;
+          if (phase) {
+            phaseMapRef.current[job.slug] = phase;
+            updateJob(job.slug, { phase, error });
+          }
         } catch { /* skip */ }
       });
 

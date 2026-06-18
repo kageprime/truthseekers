@@ -198,7 +198,10 @@ export default function ArticlesPage() {
           mergeEntry(slug, { phase: "error", error: data.error || "Unknown error" });
           es.close(); sseRef.current.delete(slug);
         } else {
-          mergeEntry(slug, { phase: data.phase || data.status });
+          mergeEntry(slug, {
+            phase: data.status === "paused" ? "paused" : (data.phase || data.status),
+            error: data.status === "paused" ? data.error : undefined,
+          });
         }
       });
 

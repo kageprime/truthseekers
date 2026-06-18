@@ -84,6 +84,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [followUps, setFollowUps] = useState<string[]>([]);
   const [showCommands, setShowCommands] = useState(false);
   const [model, setModel] = useState("deepseek-4-flash");
+  const [consoleOpen, setConsoleOpen] = useState(false);
   const lastMessageRef = useRef("");
   const autoSentRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -375,10 +376,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           onKeyDown={handleKeyDown}
           model={model}
           onModelChange={setModel}
-
+          consoleOpen={consoleOpen}
+          onToggleConsole={() => setConsoleOpen((c) => !c)}
         />
       </div>
-      <TruthConsole events={agentEvents} loading={sending} />
+      {consoleOpen && <TruthConsole events={agentEvents} loading={sending} />}
     </div>
   );
 }

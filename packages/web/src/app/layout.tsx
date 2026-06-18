@@ -28,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&family=Press+Start+2P&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&family=Outfit:wght@300..800&family=Press+Start+2P&display=swap"
           rel="stylesheet"
         />
         <script dangerouslySetInnerHTML={{ __html: `document.documentElement.classList.add("dark")` }} />
@@ -39,62 +39,62 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
         <style>{`
           :root {
-            --surface: oklch(98% 0.01 80);
-            --surface-elevated: oklch(100% 0 0);
-            --ink: oklch(15% 0.02 50);
-            --ink-secondary: oklch(35% 0.02 50);
-            --muted: oklch(45% 0.02 50);
-            --subtle: oklch(60% 0.02 50);
-            --border: oklch(88% 0.01 80);
-            --border-light: oklch(93% 0.01 80);
+            --surface: #f8fafc;
+            --surface-elevated: #ffffff;
+            --ink: #0f172a;
+            --ink-secondary: #334155;
+            --muted: #64748b;
+            --subtle: #cbd5e1;
+            --border: #e2e8f0;
+            --border-light: #f1f5f9;
             --accent: #ea580c;
-            --accent-dark: #f97316;
-            --accent-subtle: oklch(70% 0.15 50);
-            --accent-bg: oklch(95% 0.05 50);
-            --green: #22c55e;
-            --green-subtle: oklch(93% 0.08 140);
-            --red: #dc2626;
-            --red-subtle: oklch(93% 0.08 30);
-            --blue: #0c4a6e;
+            --accent-dark: #c2410c;
+            --accent-subtle: #ffedd5;
+            --accent-bg: #fff7ed;
+            --green: #10b981;
+            --green-subtle: #d1fae5;
+            --red: #ef4444;
+            --red-subtle: #fee2e2;
+            --blue: #0ea5e9;
             --gold: #f59e0b;
             --cream: #fef3c7;
-            --glass: rgba(255,255,255,0.6);
-            --glass-border: rgba(255,255,255,0.2);
-            --glass-shadow: 0 4px 24px rgba(0,0,0,0.06);
-            --skeleton-start: oklch(92% 0.01 80);
-            --skeleton-end: oklch(96% 0.01 80);
+            --glass: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.4);
+            --glass-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+            --skeleton-start: #e2e8f0;
+            --skeleton-end: #f1f5f9;
           }
           .dark {
-            --surface: oklch(15% 0.01 50);
-            --surface-elevated: oklch(19% 0.01 50);
-            --ink: oklch(92% 0.01 80);
-            --ink-secondary: oklch(82% 0.01 80);
-            --muted: oklch(70% 0.01 80);
-            --subtle: oklch(55% 0.01 80);
-            --border: oklch(30% 0.01 50);
-            --border-light: oklch(25% 0.01 50);
-            --accent: #f97316;
-            --accent-subtle: oklch(60% 0.15 50);
-            --accent-bg: oklch(25% 0.08 50);
-            --cream: oklch(25% 0.05 50);
-            --glass: rgba(0,0,0,0.4);
-            --glass-border: rgba(255,255,255,0.06);
-            --glass-shadow: 0 4px 24px rgba(0,0,0,0.2);
-            --skeleton-start: oklch(22% 0.01 50);
-            --skeleton-end: oklch(26% 0.01 50);
+            --surface: #0b0f19;
+            --surface-elevated: #151b2b;
+            --ink: #f8fafc;
+            --ink-secondary: #cbd5e1;
+            --muted: #94a3b8;
+            --subtle: #475569;
+            --border: #1e293b;
+            --border-light: #0f172a;
+            --accent: #fbbf24;
+            --accent-subtle: #b45309;
+            --accent-bg: #451a03;
+            --cream: #1e293b;
+            --glass: rgba(11, 15, 25, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            --skeleton-start: #1e293b;
+            --skeleton-end: #334155;
           }
           * { box-sizing: border-box; }
           body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
             background-color: var(--surface);
             color: var(--ink);
-            background-image: radial-gradient(oklch(85% 0.02 80 / 0.3) 0.5px, transparent 0.5px);
+            background-image: radial-gradient(var(--border) 1px, transparent 1px);
             background-size: 24px 24px;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
           }
           .dark body {
-            background-image: radial-gradient(oklch(30% 0.01 50 / 0.5) 0.5px, transparent 0.5px);
+            background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
           }
 
           /* ── Glass Utilities ─────────────────────────────────── */
@@ -193,8 +193,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             min-height: 32px;
           }
           .btn-ghost:hover {
-            background: oklch(0% 0 0 / 0.05);
+            background: rgba(0,0,0,0.05);
             color: var(--ink);
+          }
+          .dark .btn-ghost:hover {
+            background: rgba(255,255,255,0.05);
           }
           .btn-sm {
             padding: 0.375rem 0.75rem;

@@ -37,11 +37,11 @@ export default function HomePage() {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
         style={{ background: "var(--surface)" }}>
-        <div className="max-w-lg animate-fade-slide-up">
-          <h1 className="text-4xl sm:text-6xl font-bold tracking-tighter mb-3" style={{ color: "var(--ink)" }}>
+        <div className="max-w-xl animate-fade-slide-up">
+          <h1 className="text-5xl sm:text-7xl font-display font-extrabold tracking-tight mb-4 text-transparent bg-clip-text bg-gradient-to-br from-accent to-gold pb-2">
             Truthseekers
           </h1>
-          <p className="text-lg mb-8" style={{ color: "var(--muted)" }}>
+          <p className="text-xl sm:text-2xl mb-10 font-light" style={{ color: "var(--muted)" }}>
             The Living Encyclopedia — AI-powered knowledge at your fingertips.
           </p>
 
@@ -55,21 +55,30 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left mb-12">
-            <div className="glass-card-static p-5">
-              <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--ink)" }}>AI Research</h3>
-              <p className="text-xs" style={{ color: "var(--muted)" }}>
+            <div className="glass-card p-6 cursor-default group">
+              <div className="w-10 h-10 rounded-full mb-4 flex items-center justify-center transition-colors" style={{ background: "var(--accent-bg)", color: "var(--accent)" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </div>
+              <h3 className="text-base font-semibold mb-2 group-hover:text-accent transition-colors" style={{ color: "var(--ink)" }}>AI Research</h3>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
                 Deep research across web sources, synthesized into structured articles.
               </p>
             </div>
-            <div className="glass-card-static p-5">
-              <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--ink)" }}>Living Knowledge</h3>
-              <p className="text-xs" style={{ color: "var(--muted)" }}>
+            <div className="glass-card p-6 cursor-default group">
+              <div className="w-10 h-10 rounded-full mb-4 flex items-center justify-center transition-colors" style={{ background: "var(--green-subtle)", color: "var(--green)" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+              </div>
+              <h3 className="text-base font-semibold mb-2 group-hover:text-green-500 transition-colors" style={{ color: "var(--ink)" }}>Living Knowledge</h3>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
                 Articles that grow and update over time with version history.
               </p>
             </div>
-            <div className="glass-card-static p-5">
-              <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--ink)" }}>Interactive Maps</h3>
-              <p className="text-xs" style={{ color: "var(--muted)" }}>
+            <div className="glass-card p-6 cursor-default group">
+              <div className="w-10 h-10 rounded-full mb-4 flex items-center justify-center transition-colors" style={{ background: "var(--blue)", color: "white" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+              </div>
+              <h3 className="text-base font-semibold mb-2 group-hover:text-blue-500 transition-colors" style={{ color: "var(--ink)" }}>Interactive Maps</h3>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
                 Explore visualized data with 2D and 3D map views.
               </p>
             </div>
