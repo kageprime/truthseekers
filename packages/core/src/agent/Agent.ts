@@ -1,6 +1,6 @@
 import { sendPromptStream } from "../llm.js";
 import type { AgentEvent } from "../types.js";
-import type { Message, ToolDefinition, ToolCall } from "../models.js";
+import type { Message, ToolDefinition, ToolCall, Usage } from "../models.js";
 import type { AgentConfig, AgentResult, AgentTool, ToolResult } from "./types.js";
 
 const DEFAULT_MAX_ITERATIONS = 15;
@@ -67,7 +67,21 @@ export class Agent {
       this.manageContext(MAX_CHARS);
 
       // Get LLM response with tool calls
+      const startTime = Date.now();
       const response = await this.llmCall();
+      const latencyMs = Date.now() - startTime;
+      
+      this.emit({
+        type: "trace",
+        data: {
+          iteration: this.iterationCount,
+          latencyMs,
+          usage: response.usage,
+          promptContext: this.messages.slice(-3), // last few messages
+          toolCalls: response.toolCalls,
+        },
+        timestamp: Date.now(),
+      });
 
       if (this.aborted) break;
 
@@ -139,7 +153,7 @@ export class Agent {
     return this.buildResult(finalText);
   }
 
-  private async llmCall(): Promise<{ text: string; toolCalls?: ToolCall[] }> {
+  private async llmCall(): Promise<{ text: string; toolCalls?: ToolCall[]; usage?: Usage }> {
     const onEvent = this.config.onEvent;
     return sendPromptStream(
       this.messages,

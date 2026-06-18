@@ -28,6 +28,25 @@ interface TextDelta {
   [key: string]: unknown;
 }
 
+interface TraceData {
+  iteration?: number;
+  latencyMs?: number;
+  usage?: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    totalTokens: number;
+    cost?: {
+      input: number;
+      output: number;
+      total: number;
+    };
+  };
+  promptContext?: unknown[];
+  toolCalls?: unknown[];
+}
+
 export function formatTimestamp(ts: number): string {
   return new Date(ts).toLocaleTimeString("en-US", { minute: "2-digit", second: "2-digit" });
 }
@@ -157,6 +176,23 @@ export function TextDeltaCard({ data }: { data: TextDelta }) {
   );
 }
 
+export function TraceCard({ data }: { data: TraceData }) {
+  const usage = data.usage;
+  return (
+    <div className="flex flex-col gap-1 py-1.5 px-2.5 border-l-2 border-[#c084fc] rounded-r" style={{ background: "#faf5ff" }}>
+      <div className="flex items-center gap-2 text-[10px] font-semibold text-purple-800">
+        <span>⚙️ Trace</span>
+        {data.iteration !== undefined && <span>Iter {data.iteration}</span>}
+        {data.latencyMs !== undefined && <span>⏱️ {data.latencyMs}ms</span>}
+        {usage && <span>🪙 {usage.totalTokens}t (↑{usage.input}/↓{usage.output})</span>}
+      </div>
+      <div className="text-[9px] font-mono whitespace-pre-wrap overflow-x-auto text-purple-900 opacity-80 max-h-32">
+        {JSON.stringify(data.promptContext, null, 2)}
+      </div>
+    </div>
+  );
+}
+
 function AgentActivityFeed({ events, compact }: { events: AgentEvent[]; compact?: boolean }) {
   if (events.length === 0) {
     return (
@@ -197,6 +233,7 @@ function AgentActivityFeed({ events, compact }: { events: AgentEvent[]; compact?
 export function AgentActivityFullscreen({ open, onClose, events, scrollToIndex }: { open: boolean; onClose: () => void; events: AgentEvent[]; scrollToIndex?: number }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [devMode, setDevMode] = useState(false);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
@@ -246,14 +283,15 @@ export function AgentActivityFullscreen({ open, onClose, events, scrollToIndex }
           style={{ background: "#fafafa" }}
         >
           <div className="space-y-2">
-            {events.map((event, i) => (
+            {events.filter(e => devMode || e.type !== "trace").map((event, i) => (
               <div key={`${event.timestamp}-${i}`} ref={(el) => { itemRefs.current[i] = el; }}>
                 <div className="flex items-center gap-1.5 text-[9px] mb-1" style={{ color: "var(--subtle)" }}>
                   <span>{formatTimestamp(event.timestamp)}</span>
                   <span className="font-semibold uppercase text-[8px] px-1 border rounded" style={{ borderColor: "var(--border)" }}>{event.type}</span>
                 </div>
-                {event.type === "tool_use" && <ToolUseCard data={event.data as ToolUseData} />}
-                {event.type === "tool_result" && <ToolResultCard data={event.data as ToolResultData} />}
+                {event.type === "trace" && devMode && <TraceCard data={event.data as TraceData} />}
+                {event.type === "tool_use" && (devMode ? <pre className="text-[8px] bg-gray-100 p-1">{JSON.stringify(event.data, null, 2)}</pre> : <ToolUseCard data={event.data as ToolUseData} />)}
+                {event.type === "tool_result" && (devMode ? <pre className="text-[8px] bg-gray-100 p-1 max-h-40 overflow-y-auto">{JSON.stringify(event.data, null, 2)}</pre> : <ToolResultCard data={event.data as ToolResultData} />)}
                 {event.type === "text" && <TextDeltaCard data={event.data as TextDelta} />}
                 {event.type === "status" && (
                   <div className="text-[10px] font-semibold py-1 px-2.5 rounded border-l-2 border-[var(--green)]" style={{ background: "#f0fdf4" }}>
@@ -269,14 +307,23 @@ export function AgentActivityFullscreen({ open, onClose, events, scrollToIndex }
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-2 mt-3 shrink-0">
-          <button
-            onClick={() => setAutoScroll(!autoScroll)}
-            className="btn btn-secondary"
-            style={{ fontSize: "8px", padding: "0.3rem 0.6rem", minHeight: "auto" }}
-          >
-            {autoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}
-          </button>
+        <div className="flex items-center justify-between mt-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setAutoScroll(!autoScroll)}
+              className="btn btn-secondary"
+              style={{ fontSize: "8px", padding: "0.3rem 0.6rem", minHeight: "auto" }}
+            >
+              {autoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}
+            </button>
+            <button
+              onClick={() => setDevMode(!devMode)}
+              className="btn btn-secondary"
+              style={{ fontSize: "8px", padding: "0.3rem 0.6rem", minHeight: "auto", background: devMode ? "var(--ink)" : undefined, color: devMode ? "var(--surface)" : undefined }}
+            >
+              {devMode ? "Dev Mode ON" : "Dev Mode OFF"}
+            </button>
+          </div>
           <span className="text-[9px]" style={{ color: "var(--subtle)" }}>
             {events.length} event{events.length !== 1 ? "s" : ""} · last {formatTimestamp(events[events.length - 1]?.timestamp ?? Date.now())}
           </span>

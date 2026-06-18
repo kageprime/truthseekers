@@ -74,9 +74,25 @@ export interface ToolDefinition {
   };
 }
 
+export interface Usage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  totalTokens: number;
+  cost: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    total: number;
+  };
+}
+
 export interface PromptResult {
   text: string;
   structuredOutput?: unknown;
+  usage?: Usage;
 }
 
 export type ToolChoice = "auto" | "none" | { type: "function"; function: { name: string } };

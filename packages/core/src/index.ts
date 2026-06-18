@@ -1,9 +1,9 @@
 // LLM layer
-export { sendPrompt, sendPromptStream, webSearch, tavilySearch } from "./llm.js";
+export { sendPrompt, sendPromptStream, webSearch, tavilySearch, embedText } from "./llm.js";
 
 // Model routing
 export { resolveModel, buildModel } from "./models.js";
-export type { Message, ToolDefinition, ToolCall, PromptResult, ToolChoice } from "./models.js";
+export type { Message, ToolDefinition, ToolCall, PromptResult, ToolChoice, Usage } from "./models.js";
 
 // Agent (unified loop)
 export { Agent } from "./agent/index.js";
@@ -24,13 +24,16 @@ export {
   verifyPhase,
   applyCorrections,
   mediaPhase,
+  pipelineEvents,
+  pauseAndVerify,
 } from "./pipeline/orchestrator.js";
 
 // Blocks
 export { articleToBlocks } from "./blocks.js";
 
-// Queue
+// Queue & Redis
 export { queue } from "./queue.js";
+export { getRedisClient, getRedisSubscriber } from "./redis.js";
 
 // Prompts
 export {

@@ -1,5 +1,5 @@
 import { resolveModel, buildModel, toPiMessages, toPiTools } from "./models.js";
-import type { Message, ToolDefinition, ToolChoice, PromptResult, ToolCall } from "./models.js";
+import type { Message, ToolDefinition, ToolChoice, PromptResult, ToolCall, Usage } from "./models.js";
 import { complete, stream } from "@earendil-works/pi-ai";
 import type { Context, TextContent } from "@earendil-works/pi-ai";
 import type { AgentEvent } from "./types.js";
@@ -101,6 +101,7 @@ export async function sendPromptStream(
 
   let fullText = "";
   const toolCalls: ToolCall[] = [];
+  let usage: Usage | undefined;
 
   for await (const event of s) {
     switch (event.type) {
@@ -115,12 +116,16 @@ export async function sendPromptStream(
           function: { name: event.toolCall.name, arguments: JSON.stringify(event.toolCall.arguments) },
         });
         break;
+      case "done":
+        usage = event.message.usage;
+        break;
     }
   }
 
   return {
     text: fullText,
     toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+    usage,
   };
 }
 
@@ -189,4 +194,22 @@ export async function tavilySearch(
     url: r.url || "",
     snippet: r.content ? r.content.slice(0, 1000) : "",
   }));
+}
+
+export async function embedText(text: string): Promise<number[]> {
+  const key = process.env.OPENAI_API_KEY || process.env.MODEL_ACCESS_KEY;
+  if (!key) throw new Error("Missing OPENAI_API_KEY or MODEL_ACCESS_KEY for embeddings");
+  
+  const res = await fetch("https://api.openai.com/v1/embeddings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ input: text, model: "text-embedding-3-small" }),
+  });
+  
+  if (!res.ok) {
+    throw new Error(`Embedding failed: ${await res.text()}`);
+  }
+  
+  const data = await res.json();
+  return data.data[0].embedding;
 }
