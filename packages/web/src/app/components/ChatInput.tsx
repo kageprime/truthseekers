@@ -67,7 +67,7 @@ export default function ChatInput({
 
   return (
     <div className="shrink-0 px-4 pb-4 pt-2" style={{ background: "linear-gradient(transparent, var(--surface) 40%)" }}>
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl max-md:max-w-full mx-auto">
         {editingIndex !== null && (
           <div className="flex items-center gap-2 mb-2 text-xs">
             <IconPencil size={14} /> <span style={{ color: "var(--accent)" }}>Editing message</span>

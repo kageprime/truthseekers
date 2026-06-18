@@ -60,7 +60,7 @@ export default function MessageList({
       {messages.length === 0 && !sending && !error ? (
         <EmptyChatState suggestedTopics={suggestedTopics} onSetInput={onSetInput} />
       ) : (
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl max-md:max-w-full mx-auto">
           {messages.map((msg, i) => (
             <ChatMessage
               key={msg.id}
