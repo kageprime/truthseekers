@@ -1,4 +1,5 @@
 import type { JobInfo, JobStatus, AgentEvent } from "./types.js";
+import { getRedisClient, getRedisSubscriber } from "./redis.js";
 
 type JobCallback = (slug: string, status: JobStatus, info: Partial<JobInfo>) => void;
 type AgentEventCallback = (slug: string, event: AgentEvent) => void;
@@ -24,6 +25,29 @@ class AsyncQueue {
   private subscribers: Map<string, JobCallback[]> = new Map();
   private agentEventSubscribers: Map<string, AgentEventCallback[]> = new Map();
   private processor: ((slug: string, meta?: JobMeta) => Promise<void>) | null = null;
+
+  constructor() {
+    try {
+      const sub = getRedisSubscriber();
+      sub.subscribe("encarta:job:update", "encarta:agent:event", (err) => {
+        if (err) console.error("Redis subscribe error", err);
+      });
+      sub.on("message", (channel, message) => {
+        try {
+          const payload = JSON.parse(message);
+          if (channel === "encarta:job:update") {
+            this.notifyLocal(payload.slug, payload.status, payload.info);
+          } else if (channel === "encarta:agent:event") {
+            this.emitAgentEventLocal(payload.slug, payload.event);
+          }
+        } catch (err) {
+          console.error("Redis message parse error", err);
+        }
+      });
+    } catch (err) {
+      console.warn("Redis pub/sub not initialized", err);
+    }
+  }
 
   setProcessor(fn: (slug: string, meta?: JobMeta) => Promise<void>): void {
     this.processor = fn;
@@ -101,6 +125,7 @@ class AsyncQueue {
     }
     try {
       this.notify(slug, status, info);
+      getRedisClient().publish("encarta:job:update", JSON.stringify({ slug, status, info })).catch(() => {});
       for (const cb of this.updateCallbacks) {
         cb(slug, status, info);
       }
@@ -144,6 +169,11 @@ class AsyncQueue {
   }
 
   emitAgentEvent(slug: string, event: AgentEvent): void {
+    getRedisClient().publish("encarta:agent:event", JSON.stringify({ slug, event })).catch(() => {});
+    this.emitAgentEventLocal(slug, event);
+  }
+
+  private emitAgentEventLocal(slug: string, event: AgentEvent): void {
     const callbacks = [
       ...(this.agentEventSubscribers.get(slug) ?? []),
       ...(this.agentEventSubscribers.get("__all__") ?? []),
@@ -195,6 +225,10 @@ class AsyncQueue {
   }
 
   private notify(slug: string, status: JobStatus, info: Partial<JobInfo>): void {
+    this.notifyLocal(slug, status, info);
+  }
+
+  private notifyLocal(slug: string, status: JobStatus, info: Partial<JobInfo>): void {
     const callbacks = [
       ...(this.subscribers.get(slug) ?? []),
       ...(this.subscribers.get("__all__") ?? []),

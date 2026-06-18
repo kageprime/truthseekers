@@ -1,4 +1,5 @@
 import type { Context, Next } from "hono";
+import { getRedisClient } from "@encarta/core";
 
 const WINDOW_MS = 60_000;
 
@@ -10,32 +11,22 @@ const TIER_LIMITS: Record<string, number> = {
   admin: 999_999,
 };
 
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
-
-const store = new Map<string, RateLimitEntry>();
-
-function cleanup(): void {
-  const now = Date.now();
-  for (const [key, entry] of store) {
-    if (now > entry.resetAt) {
-      store.delete(key);
-    }
-  }
-}
-
 async function checkRateLimit(key: string, limit: number): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
-  cleanup();
-
+  const redis = getRedisClient();
+  const redisKey = `ratelimit:${key}`;
+  
+  const current = await redis.get(redisKey);
   const now = Date.now();
-  const entry = store.get(key);
+  
+  if (!current) {
+    await redis.set(redisKey, JSON.stringify({ count: 1, resetAt: now + WINDOW_MS }), "PX", WINDOW_MS);
+    return { allowed: true, remaining: limit - 1, resetAt: now + WINDOW_MS };
+  }
 
-  if (!entry || now > entry.resetAt) {
-    const resetAt = now + WINDOW_MS;
-    store.set(key, { count: 1, resetAt });
-    return { allowed: true, remaining: limit - 1, resetAt };
+  const entry = JSON.parse(current);
+  if (now > entry.resetAt) {
+    await redis.set(redisKey, JSON.stringify({ count: 1, resetAt: now + WINDOW_MS }), "PX", WINDOW_MS);
+    return { allowed: true, remaining: limit - 1, resetAt: now + WINDOW_MS };
   }
 
   entry.count++;
@@ -43,6 +34,7 @@ async function checkRateLimit(key: string, limit: number): Promise<{ allowed: bo
     return { allowed: false, remaining: 0, resetAt: entry.resetAt };
   }
 
+  await redis.set(redisKey, JSON.stringify(entry), "PX", Math.max(1, entry.resetAt - now));
   return { allowed: true, remaining: limit - entry.count, resetAt: entry.resetAt };
 }
 
@@ -73,5 +65,3 @@ export async function rateLimitMiddleware(c: Context, next: Next) {
 
   await next();
 }
-
-setInterval(cleanup, 60_000).unref();

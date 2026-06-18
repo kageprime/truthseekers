@@ -1,6 +1,6 @@
 import { queue, articleToBlocks, runPipeline } from "@encarta/core";
 import type { Article } from "@encarta/core";
-import { upsertArticle, commitArticle } from "@encarta/storage";
+import { upsertArticle, commitArticle, indexArticle } from "@encarta/storage";
 
 export async function processArticle(slug: string, meta?: Record<string, string>): Promise<void> {
   const persona = (meta?.persona || "veritas") as import("@encarta/core").Persona;
@@ -64,6 +64,15 @@ export async function processArticle(slug: string, meta?: Record<string, string>
 
     await upsertArticle(article);
     await commitArticle(article);
+    
+    // Explicitly generate and store embeddings if needed
+    const fullText = [
+      article.title,
+      article.abstract,
+      ...article.sections.map(s => `${s.title}\n${s.content}`)
+    ].join("\n\n");
+    await indexArticle(slug, fullText);
+    
     queue.updateJob(slug, "done", { phase: "complete" });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);

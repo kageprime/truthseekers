@@ -141,10 +141,10 @@ export interface ArticleMetadata {
   generatedBy?: string;
 }
 
-export type JobStatus = "queued" | "researching" | "writing" | "verifying" | "media" | "storing" | "done" | "error" | "removed";
+export type JobStatus = "queued" | "researching" | "writing" | "verifying" | "media" | "storing" | "done" | "error" | "removed" | "paused";
 
 export interface AgentEvent {
-  type: "tool_use" | "tool_result" | "text" | "status" | "error";
+  type: "tool_use" | "tool_result" | "text" | "status" | "error" | "trace";
   data: unknown;
   timestamp: number;
   label?: string;

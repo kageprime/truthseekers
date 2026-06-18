@@ -1,4 +1,5 @@
 import { ArticleModel } from "./db.js";
+import { embedText } from "@encarta/core";
 
 const ATLAS_SEARCH_ENABLED = process.env.ATLAS_SEARCH_ENABLED === "true";
 
@@ -12,8 +13,15 @@ const ATLAS_SEARCH_ENABLED = process.env.ATLAS_SEARCH_ENABLED === "true";
  *
  * This function is a no-op retained for API compatibility.
  */
-export async function indexArticle(_slug: string, _contentText: string): Promise<void> {
-  // no-op — indexing is handled by MongoDB text index / Atlas Search
+export async function indexArticle(slug: string, contentText: string): Promise<void> {
+  if (!ATLAS_SEARCH_ENABLED) {
+    try {
+      const embedding = await embedText(contentText);
+      await ArticleModel.updateOne({ slug }, { $set: { contentEmbedding: embedding } });
+    } catch (err) {
+      console.warn(`Failed to index explicit embedding for ${slug}`, err);
+    }
+  }
 }
 
 /**

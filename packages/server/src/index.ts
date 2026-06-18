@@ -5,6 +5,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, "..", "..", "..", ".env") });
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { compress } from "hono/compress";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { initDb, saveJob, loadAllJobs } from "@encarta/storage";
@@ -37,7 +38,8 @@ const devOrigins = process.env.NODE_ENV !== "production"
 const publicDir = path.resolve(__dirname, "..", "..", "..", "public");
 app.use("/images/*", serveStatic({ root: publicDir, rewriteRequestPath: (p) => p }));
 
-// Request ID + error handling
+// Request ID + error handling + compression
+app.use("*", compress());
 app.use("*", requestIdMiddleware);
 app.onError(errorMiddleware);
 

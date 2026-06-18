@@ -1,7 +1,42 @@
+import { EventEmitter } from "events";
 import { Agent } from "../agent/Agent.js";
 import type { AgentEvent, ResearchResult, ArticleOutline, ArticleContent, VerificationResult, MediaGenerationResult } from "../types.js";
 import { PIPELINE_TOOL_DEFINITIONS, PIPELINE_TOOL_EXECUTORS } from "./tools.js";
 import { articleToBlocks } from "../blocks.js";
+import { getRedisSubscriber } from "../redis.js";
+
+export const pipelineEvents = new EventEmitter();
+
+export async function pauseAndVerify(slug: string, verifyData: any): Promise<string> {
+  const { queue } = await import("../queue.js");
+  queue.updateJob(slug, "paused", { phase: "verify", error: JSON.stringify(verifyData) });
+
+  queue.emitAgentEvent(slug, {
+    type: "status",
+    data: { message: "Verification failed threshold. Paused for human-in-the-loop review." },
+    timestamp: Date.now(),
+  });
+
+  return new Promise<string>((resolve) => {
+    const onResolve = (action: string) => {
+      resolve(action);
+      pipelineEvents.off(`resolve:${slug}`, onResolve);
+    };
+    pipelineEvents.on(`resolve:${slug}`, onResolve);
+
+    try {
+      const sub = getRedisSubscriber();
+      const redisHandler = (channel: string, message: string) => {
+        if (channel === `encarta:job:resolve:${slug}`) {
+          onResolve(message);
+          sub.off("message", redisHandler);
+        }
+      };
+      sub.subscribe(`encarta:job:resolve:${slug}`).catch(() => {});
+      sub.on("message", redisHandler);
+    } catch {}
+  });
+}
 
 type Persona = "veritas" | "pliny";
 
@@ -50,7 +85,22 @@ Persona: ${persona === "pliny" ? "Pliny mode: be sharp, witty, irreverent but ev
       definition: def,
       execute: async (args: any) => {
         const executor = PIPELINE_TOOL_EXECUTORS[def.function.name];
-        return executor(args);
+        const res = await executor(args);
+
+        if (def.function.name === "verify_article") {
+          const verifyData = res.data as any;
+          if (verifyData && (verifyData.confidenceScore < 0.8 || verifyData.verified === false)) {
+            const action = await pauseAndVerify(topic, verifyData);
+            if (action === "approve") {
+              verifyData.verified = true;
+              verifyData.confidenceScore = 1.0;
+              verifyData.issues = [];
+              res.result = JSON.stringify(verifyData);
+            }
+          }
+        }
+
+        return res;
       },
     })),
     maxIterations: 20,

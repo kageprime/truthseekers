@@ -16,8 +16,9 @@ RUN npm install --legacy-peer-deps
 # Source
 COPY . .
 
-# Clean any stale dist before build (avoids workspace-symlink .d.ts ghosting)
-RUN rm -rf packages/core/dist packages/storage/dist packages/server/dist
+# Clean any stale dist + tsbuildinfo before build (avoids workspace-symlink ghosting)
+RUN rm -rf packages/core/dist packages/storage/dist packages/server/dist \
+       packages/core/tsconfig.tsbuildinfo packages/storage/tsconfig.tsbuildinfo packages/server/tsconfig.tsbuildinfo
 
 # Build backend packages
 RUN npx tsc --build --force packages/core packages/storage packages/server

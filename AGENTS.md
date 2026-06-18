@@ -7,7 +7,7 @@ An LLM-powered interactive encyclopedia SDK — build your own AI agent-driven k
 - Monorepo with npm workspaces
 - Agent loop via `@opencode-ai/sdk` (OpenCode server)
 - TypeScript throughout
-- SQLite for serving, git for version history
+- MongoDB for serving, git for version history
 - Next.js web frontend (deployed to Vercel)
 - Hono API server (deployed to Fly.io)
 
@@ -16,7 +16,7 @@ An LLM-powered interactive encyclopedia SDK — build your own AI agent-driven k
 | Package | Path | Purpose |
 |---------|------|---------|
 | @encarta-me/sdk | packages/core | B2B SDK — agent client, pipeline, queue, types |
-| @encarta-me/storage | packages/storage | SQLite DB, git versioning, vector index |
+| @encarta-me/storage | packages/storage | MongoDB, git versioning, vector index |
 | @encarta-me/server | packages/server | Hono API server (reference implementation) |
 | @encarta-me/web | packages/web | Next.js demo app |
 | @encarta-me/cli | packages/cli | Admin CLI (seed, generate) |
@@ -27,7 +27,7 @@ Truthseekers is an SDK for building AI-powered encyclopedias. Third parties inte
 
 ## Deployment Architecture
 
-- **API (Fly.io):** `truthseeker` — Hono API server on port 4097, SQLite DB on persistent volume
+- **API (Fly.io):** `truthseeker` — Hono API server on port 4097, MongoDB on persistent volume
 - **Web (Vercel):** `truthseeker-web` — Next.js static app, calls API via `NEXT_PUBLIC_API_URL`
 - **CORS:** API locked to `https://truthseeker-web.vercel.app` (update to `terranet.tech` when domain ready)
 
@@ -74,11 +74,11 @@ The article generation pipeline has 8 sequential phases, each streaming real-tim
 | Correct | 15-30s | Apply fixes if confidence < 80% |
 | Media | 20-40s | DALL-E prompts, diagram code |
 | Images | 10-30s | Generate DALL-E images (if required) |
-| Store | 2-5s | Persist to SQLite + git commit |
+| Store | 2-5s | Persist to MongoDB + git commit |
 
 ## Concurrency
 
-- In-memory job queue (survives restarts via SQLite backup)
+- In-memory job queue (survives restarts via MongoDB backup)
 - Worker pool for parallel article generation (max 3 concurrent)
 - Session pool limits (max 5 concurrent OpenCode sessions)
 - SSE connection cap (100 concurrent)
@@ -88,7 +88,7 @@ The article generation pipeline has 8 sequential phases, each streaming real-tim
 - API key authentication on all endpoints
 - Rate limiting (20 req/min per IP, 100 req/min per key)
 - Zod input validation on all routes
-- Parameterized SQL queries (no injection)
+- Mongoose schemas for data validation and injection prevention
 - Sanitized error responses
 - Configurable CORS per tenant
 

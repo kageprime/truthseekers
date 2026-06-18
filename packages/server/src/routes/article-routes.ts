@@ -11,10 +11,8 @@ import { getQuota, incrementQuota } from "../quota.js";
 import {
   articleParamsSchema, searchQuerySchema, listQuerySchema,
 } from "../validation.js";
-import {
-  getUserId, computeETag, setCacheHeaders, checkNotModified,
-  buildMarkdown, generationCooldowns,
-} from "../shared.js";
+import { getUserId, computeETag, setCacheHeaders, checkNotModified, buildMarkdown, generationCooldowns } from "../shared.js";
+import { handleArticleGenerate, handleArticleRefresh, streamArticleProgress } from "../services/articleService.js";
 
 const articles = new Hono();
 
@@ -96,10 +94,8 @@ articles.post("/articles/:slug/generate", async (c) => {
       const body = await c.req.json();
       if (body?.persona === "pliny") persona = "pliny";
     } catch {}
-    generationCooldowns.set(genKey, Date.now() + 60_000);
     const userId = getUserId(c);
-    const meta: Record<string, string> = { persona, ...(userId ? { generatedBy: userId } : {}) };
-    queue.enqueue(slug, meta);
+    handleArticleGenerate(slug, persona, userId);
     incrementQuota(c).catch(() => {});
     return c.json({ status: "queued", slug, persona, quota: await getQuota(c) }, 202);
   } catch (err) {
@@ -122,7 +118,7 @@ articles.post("/articles/:slug/refresh", async (c) => {
         quota,
       }, 403);
     }
-    queue.enqueue(slug);
+    handleArticleRefresh(slug);
     incrementQuota(c).catch(() => {});
     return c.json({ status: "queued", slug, quota: await getQuota(c) }, 202);
   } catch (err) {
@@ -136,30 +132,7 @@ articles.get("/articles/:slug/progress", (c) => {
   if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
   const slug = parsed.data.slug;
   return streamSSE(c, async (stream) => {
-    let unsub: (() => void) | null = null;
-    let unsubAgent: (() => void) | null = null;
-    const cleanup = () => {
-      if (unsub) { unsub(); unsub = null; }
-      if (unsubAgent) { unsubAgent(); unsubAgent = null; }
-    };
-    stream.onAbort(cleanup);
-    unsub = queue.subscribe(slug, (s: string, status: string, info: Record<string, unknown>) => {
-      try {
-        stream.writeSSE({ data: JSON.stringify({ slug: s, status, ...info }), event: "progress" });
-      } catch { cleanup(); }
-    });
-    unsubAgent = queue.subscribeAgentEvents(slug, (s: string, event: import("@encarta/core").AgentEvent) => {
-      try {
-        stream.writeSSE({ data: JSON.stringify(event), event: "agent_event" });
-      } catch { cleanup(); }
-    });
-    const job = queue.getJob(slug);
-    try {
-      stream.writeSSE({
-        data: JSON.stringify(job || { slug, status: "not_queued", phase: "idle" }),
-        event: "progress",
-      });
-    } catch { cleanup(); }
+    streamArticleProgress(stream, slug);
   });
 });
 
@@ -235,6 +208,38 @@ articles.delete("/queue/:slug", async (c) => {
     if (!removed) return c.json({ error: "Job not found" }, 404);
     try { await deleteJobDoc(slug); } catch {}
     return c.json({ status: "removed", slug });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : "Internal server error" }, 500);
+  }
+});
+
+// HITL resolve webhook
+articles.post("/articles/:slug/resolve", async (c) => {
+  try {
+    const slug = c.req.param("slug");
+    const body = await c.req.json().catch(() => ({}));
+    const { action } = body as { action?: string };
+
+    if (!action || !["approve", "correct"].includes(action)) {
+      return c.json({ error: "Invalid action. Must be 'approve' or 'correct'." }, 400);
+    }
+
+    // Publish to Redis channel for distributed workers
+    try {
+      const { getRedisClient } = await import("@encarta/core");
+      await getRedisClient().publish(`encarta:job:resolve:${slug}`, action);
+    } catch (e) {
+      console.warn("Redis publish failed", e);
+    }
+
+    // Trigger local event emitter
+    const { pipelineEvents } = await import("@encarta/core");
+    pipelineEvents.emit(`resolve:${slug}`, action);
+
+    // Update the job status back to "verifying" so it shows as active again
+    queue.updateJob(slug, "verifying", { phase: "verify" });
+
+    return c.json({ status: "resolved", action });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : "Internal server error" }, 500);
   }

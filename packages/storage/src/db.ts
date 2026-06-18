@@ -138,6 +138,7 @@ const articleSchema = new Schema({
   threedScenes: { type: [threedSceneSchema], default: [] },
   blocks: { type: [blockSchema], default: [] },
   metadata: { type: metadataSchema, required: true },
+  contentEmbedding: { type: [Number], select: false },
 });
 
 const graphEdgeSchema = new Schema({
@@ -267,7 +268,7 @@ const ArticleViewModel = mongoose.model("ArticleView", articleViewSchema);
 const jobSchema = new Schema({
   slug: { type: String, required: true, unique: true },
   title: { type: String, required: true },
-  status: { type: String, enum: ["queued", "researching", "writing", "outlining", "verifying", "correcting", "media", "images", "storing", "done", "error"], required: true },
+  status: { type: String, enum: ["queued", "researching", "writing", "outlining", "verifying", "correcting", "media", "images", "storing", "done", "error", "paused"], required: true },
   phase: { type: String, default: "pending" },
   createdAt: { type: String, required: true },
   updatedAt: { type: String, required: true },
