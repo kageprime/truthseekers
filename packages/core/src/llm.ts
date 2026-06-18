@@ -199,17 +199,17 @@ export async function tavilySearch(
 export async function embedText(text: string): Promise<number[]> {
   const key = process.env.OPENAI_API_KEY || process.env.MODEL_ACCESS_KEY;
   if (!key) throw new Error("Missing OPENAI_API_KEY or MODEL_ACCESS_KEY for embeddings");
-  
-  const res = await fetch("https://api.openai.com/v1/embeddings", {
+
+  const res = await fetch("https://inference.do-ai.run/v1/embeddings", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({ input: text, model: "text-embedding-3-small" }),
+    body: JSON.stringify({ input: text, model: "qwen3-embedding-0.6b" }),
   });
-  
+
   if (!res.ok) {
     throw new Error(`Embedding failed: ${await res.text()}`);
   }
-  
+
   const data = await res.json();
   return data.data[0].embedding;
 }
