@@ -149,11 +149,14 @@ export default function TruthConsole({ events, onClose, loading }: { events: Age
   }, [events.length, autoScroll]);
 
   return (
-    <div className="w-[40%] shrink-0 border-l flex flex-col min-h-0" style={{ borderColor: "color-mix(in srgb, var(--border) 50%, transparent)", background: "color-mix(in srgb, var(--surface) 80%, transparent)" }}>
+    <div className="flex flex-col min-h-0 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-50 max-md:max-h-[85vh] max-md:rounded-t-2xl max-md:overflow-hidden max-md:shadow-2xl md:w-[40%] md:shrink-0 md:border-l"
+      style={{ background: "var(--surface)", borderColor: "color-mix(in srgb, var(--border) 50%, transparent)" }}>
+      <div className="max-md:bg-black/30 max-md:absolute max-md:inset-0 max-md:-top-[100vh]" onClick={onClose ? () => onClose() : undefined} />
+      <div className="flex flex-col min-h-0 max-md:relative">
       <style>{`.tc-scroll::-webkit-scrollbar { width: 4px; } .tc-scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--border) 40%, transparent); border-radius: 2px; } .tc-scroll::-webkit-scrollbar-track { background: transparent; }`}</style>
 
       {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "color-mix(in srgb, var(--border) 50%, transparent)" }}>
+      <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b max-md:pt-4" style={{ borderColor: "color-mix(in srgb, var(--border) 50%, transparent)" }}>
         <div className="flex items-center gap-2">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--accent)" }}>
             <circle cx="12" cy="12" r="10" />
@@ -172,7 +175,7 @@ export default function TruthConsole({ events, onClose, loading }: { events: Age
           >
             Auto
           </button>
-          <Link href="/settings" className="btn-icon btn-ghost" aria-label="Settings" style={{ width: 26, height: 26, minHeight: 26 }}>
+          <Link href="/settings" className="btn-icon btn-ghost max-md:hidden" aria-label="Settings" style={{ width: 26, height: 26, minHeight: 26 }}>
             <IconUser size={13} />
           </Link>
           {onClose && <button onClick={onClose} className="btn-icon btn-ghost" aria-label="Close console" style={{ width: 26, height: 26, minHeight: 26 }}>
@@ -234,6 +237,7 @@ export default function TruthConsole({ events, onClose, loading }: { events: Age
           </span>
         </div>
       )}
+    </div>
     </div>
   );
 }
