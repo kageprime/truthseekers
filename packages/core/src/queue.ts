@@ -29,10 +29,10 @@ class AsyncQueue {
   constructor() {
     try {
       const sub = getRedisSubscriber();
-      sub.subscribe("encarta:job:update", "encarta:agent:event", (err) => {
+      sub.subscribe("encarta:job:update", "encarta:agent:event", (err: any) => {
         if (err) console.error("Redis subscribe error", err);
       });
-      sub.on("message", (channel, message) => {
+      sub.on("message", (channel: any, message: any) => {
         try {
           const payload = JSON.parse(message);
           if (channel === "encarta:job:update") {

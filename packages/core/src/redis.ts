@@ -1,31 +1,52 @@
-import Redis from "ioredis";
+import { Redis } from "@upstash/redis";
 
 const REDIS_URL = process.env.REDIS_URL || "";
+const REDIS_TOKEN = process.env.REDIS_TOKEN || "";
 
-let redisClient: Redis | null = null;
-let redisSubscriber: Redis | null = null;
+let client: Redis | null = null;
 
-export function getRedisClient(): Redis {
-  if (!redisClient) {
-    if (!REDIS_URL) {
-      // ponytail: no-op stub, Redis unavailable
-      redisClient = { on: () => {}, publish: () => Promise.resolve(0), subscribe: () => Promise.resolve(), off: () => {}, get: () => Promise.resolve(null), set: () => Promise.resolve("OK") } as unknown as Redis;
-    } else {
-      redisClient = new Redis(REDIS_URL, { maxRetriesPerRequest: 1, lazyConnect: true, retryStrategy: () => null });
-      redisClient.on("error", () => {});
+function getUpstashClient(): Redis | null {
+  if (typeof window !== "undefined") return null;
+  if (!REDIS_URL) return null;
+  if (!client) {
+    try {
+      client = new Redis({ url: REDIS_URL, token: REDIS_TOKEN });
+    } catch {
+      return null;
     }
   }
-  return redisClient;
+  return client;
 }
 
-export function getRedisSubscriber(): Redis {
-  if (!redisSubscriber) {
-    if (!REDIS_URL) {
-      redisSubscriber = { on: () => {}, subscribe: () => Promise.resolve(), off: () => {} } as unknown as Redis;
-    } else {
-      redisSubscriber = new Redis(REDIS_URL, { maxRetriesPerRequest: 1, lazyConnect: true, retryStrategy: () => null });
-      redisSubscriber.on("error", () => {});
-    }
+export function getRedisClient() {
+  const c = getUpstashClient();
+  if (c) {
+    return {
+      on: (..._args: any[]) => {},
+      publish: (channel: string, msg: string) => c.publish(channel, msg),
+      subscribe: (..._args: any[]) => Promise.resolve(),
+      off: (..._args: any[]) => {},
+      get: (key: string) => c.get<string>(key),
+      set: (...args: any[]) => c.set(args[0], args[1]),
+    };
   }
-  return redisSubscriber;
+  return {
+    on: (..._args: any[]) => {},
+    publish: (_channel: string, _msg: string) => Promise.resolve(0),
+    subscribe: (..._args: any[]) => Promise.resolve(),
+    off: (..._args: any[]) => {},
+    get: (_key: string) => Promise.resolve(null),
+    set: (..._args: any[]) => Promise.resolve("OK"),
+  };
+}
+
+export function getRedisSubscriber() {
+  // ponytail: Upstash Redis HTTP client doesn't support subscribe.
+  // In-memory pub/sub in queue.ts handles single-instance.
+  // Switch to QStash or Redis Streams for multi-instance sync.
+  return {
+    on: (..._args: any[]) => {},
+    subscribe: (..._args: any[]) => Promise.resolve(),
+    off: (..._args: any[]) => {},
+  };
 }
