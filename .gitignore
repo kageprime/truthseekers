@@ -7,3 +7,4 @@ content/*
 !content/.gitkeep
 .next
 ponytail
+*.tsbuildinfo
