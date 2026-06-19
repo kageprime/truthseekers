@@ -149,7 +149,7 @@ export default function TruthConsole({ events, onClose, loading }: { events: Age
   }, [events.length, autoScroll]);
 
   return (
-    <div className="flex flex-col min-h-0 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-50 max-md:max-h-[85vh] max-md:rounded-t-2xl max-md:overflow-hidden max-md:shadow-2xl md:w-[40%] md:h-full md:shrink-0 md:border-l"
+    <div className="flex flex-col min-h-0 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-50 max-md:max-h-[85vh] max-md:rounded-t-2xl max-md:overflow-hidden max-md:shadow-2xl"
       style={{ background: "var(--surface)", borderColor: "color-mix(in srgb, var(--border) 50%, transparent)" }}>
       <div className="max-md:bg-black/30 max-md:absolute max-md:inset-0 max-md:-top-[100vh]" onClick={onClose ? () => onClose() : undefined} />
       <div className="flex flex-col min-h-0 max-md:relative">

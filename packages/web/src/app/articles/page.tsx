@@ -9,6 +9,7 @@ import { useGenerateArticle, useArticleStatus } from "../hooks";
 import { usePageSearch } from "../HeaderSearchContext";
 import PageLayout from "../components/PageLayout";
 import GenerationBar from "../components/GenerationBar";
+import ArticleCard from "../components/ArticleCard";
 import type { AgentEvent } from "../components/ProcessViewer";
 import { IconLightning, IconSearch, IconBook, IconGrid, IconList } from "../components/Icons";
 
@@ -340,35 +341,9 @@ export default function ArticlesPage() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
                 {filteredArticles.map((article) => (
-                  <Link key={article.slug} href={`/article/${article.slug}`}
-                    className="block group" style={{ textDecoration: "none", color: "inherit" }}>
-                    <article style={{ border: "1px solid var(--border)", background: "var(--surface-elevated)" }}>
-                      <div className="w-full overflow-hidden" style={{ borderBottom: "1px solid var(--border)", maxHeight: 140 }}>
-                        {article.thumbnail ? (
-                          <img src={article.thumbnail} alt="" className="w-full h-full object-cover transition-opacity duration-300 group-hover:opacity-90" loading="lazy" />
-                        ) : (
-                          <div className="w-full flex items-center justify-center py-8 font-display font-bold text-lg"
-                            style={{ background: "var(--accent-bg)", color: "var(--accent)" }}>
-                            {article.title.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-3 space-y-1.5">
-                        <h3 className="font-display font-bold text-xs leading-snug" style={{ color: "var(--ink)" }}>{article.title}</h3>
-                        <p className="text-xs line-clamp-2 leading-relaxed font-serif" style={{ color: "var(--muted)" }}>{article.abstract}</p>
-                        <div className="flex items-center gap-2 pt-1">
-                          {article.categories?.slice(0, 2).map((cat) => (
-                            <span key={cat} className="text-[10px] uppercase tracking-wider font-medium" style={{ color: "var(--accent)" }}>{cat}</span>
-                          ))}
-                          {article.metadata?.version && (
-                            <span className="text-[10px] ml-auto font-mono" style={{ color: "var(--subtle)" }}>v{article.metadata.version}</span>
-                          )}
-                        </div>
-                      </div>
-                    </article>
-                  </Link>
+                  <ArticleCard key={article.slug} article={article} />
                 ))}
               </div>
             )}

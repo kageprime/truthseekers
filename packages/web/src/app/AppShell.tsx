@@ -111,8 +111,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       {/* Expanded full-screen overlay */}
       {isExpanded && (
-        <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: "var(--surface)" }}>
-          <FloatingChatWidget />
+        <div className="fixed inset-0 z-[60] flex flex-col items-center" style={{ background: "var(--surface)" }}>
+          <div className="w-full max-w-4xl h-full flex flex-col">
+            <FloatingChatWidget />
+          </div>
         </div>
       )}
 

@@ -55,16 +55,12 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
         <div className={`space-y-1 ${isUser ? "w-fit max-w-[75%] items-end" : "flex-1 min-w-0"}`}>
           {content && (
             <div className={isUser ? "" : "space-y-1"}>
-              {!isUser && streaming ? (
-                <div className="text-base leading-relaxed streaming-cursor" style={{ color: "var(--ink)" }}>
-                  {content}
-                </div>
-              ) : isUser ? (
+              {isUser ? (
                 <div className="px-4 py-2.5 rounded-2xl text-sm" style={{ background: "var(--accent-bg)", color: "var(--ink)" }}>
                   {content}
                 </div>
               ) : (
-                <div className="text-base leading-relaxed" style={{ color: "var(--ink)" }}>
+                <div className={`text-base leading-relaxed ${streaming ? "streaming-cursor" : ""}`} style={{ color: "var(--ink)" }}>
                   <MarkdownRenderer content={content} />
                 </div>
               )}

@@ -56,6 +56,15 @@ export default function FloatingChatWidget() {
   // Load conversation data
   const { data: conv, loading: convLoading } = useChat(convId ?? undefined);
 
+  // Populate agent events from historical messages on load
+  const prevConvRef = useRef(conv);
+  useEffect(() => {
+    if (!conv || conv === prevConvRef.current) return;
+    prevConvRef.current = conv;
+    const all = (conv.messages ?? []).flatMap((m: any) => m.agentEvents ?? []);
+    if (all.length > 0) setAgentEvents(all);
+  }, [conv, setAgentEvents]);
+
   // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) {
@@ -136,17 +145,23 @@ export default function FloatingChatWidget() {
         setStreamContent("");
         setStreamBlocks(finalBlocks);
 
+        queryClient.cancelQueries({ queryKey: ["chat", cid] });
+
         queryClient.setQueryData(["chat", cid], (prev: any) => {
           if (!prev) return prev;
+          // Guard: concurrent refetch already populated assistant message
+          if (prev.messages.some((m: any) => m.role === "assistant" && !m.id.startsWith("temp-"))) {
+            return prev;
+          }
           const real = prev.messages.map((m: any) =>
-            m.id.startsWith("temp-") ? { ...m, id: `user-${Date.now()}`, conversationId: cid } : m
+            m.id.startsWith("temp-") ? { ...m, id: `${Date.now()}-${Math.random()}`, conversationId: cid } : m
           );
           return {
             ...prev,
             messages: [
               ...real,
               {
-                id: event.msgId ?? `msg-${Date.now()}`,
+                id: event.msgId ?? `msg-${Date.now()}-${Math.random()}`,
                 conversationId: cid,
                 role: "assistant" as const,
                 content: event.content || "",
@@ -164,7 +179,7 @@ export default function FloatingChatWidget() {
     setTimeout(() => setSending(false), 0);
   }, [convId, sending, streamSend, queryClient, setAgentEvents, setActiveConversationId]);
 
-  const messages = conv?.messages ?? [];
+  const messages = (conv?.messages ?? []).filter((m: any) => m.role !== "tool");
   const hasStreaming = sending && (streamContent || streamBlocks.length > 0);
   const currentConv = conversations.find((c) => c.id === convId);
 
