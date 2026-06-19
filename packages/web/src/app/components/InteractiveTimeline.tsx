@@ -287,9 +287,11 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
             }`}
             style={{
               background: isActive ? "var(--surface-glass)" : "transparent",
-              border: "1px solid",
+              borderStyle: "solid",
               borderColor: isActive ? "var(--accent)" : "transparent",
-              borderLeft: `3px solid ${catColor(ev.category)}`,
+              borderWidth: isActive ? 1 : 0,
+              borderLeftWidth: 3,
+              borderLeftColor: catColor(ev.category),
             }}>
             <span className="text-xs font-semibold shrink-0 mt-0.5 whitespace-nowrap" style={{ color: catColor(ev.category) }}>
               {ev.year}

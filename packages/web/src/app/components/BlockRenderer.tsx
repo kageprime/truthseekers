@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import MarkdownRenderer from "./MarkdownRenderer";
 import MermaidDiagram from "./MermaidDiagram";
-import { MediaImage } from "./MediaImage";
+import { MediaImage, MediaLightbox } from "./MediaImage";
 import { BASE } from "@/lib/constants";
 import { IconLink, IconLightning } from "./Icons";
 
@@ -13,6 +13,7 @@ const MapViewer = dynamic(() => import("./MapViewer"), { ssr: false });
 const ThreeDMapViewer = dynamic(() => import("./ThreeDMapViewer"), { ssr: false });
 
 export { articleToBlocks } from "@encarta/core";
+import { useState } from "react";
 import type {
   Block,
   HeadingBlockData,
@@ -122,7 +123,7 @@ function BlockCard({ block, compact }: { block: Block; compact: boolean }) {
 function TableBlock({ data }: { data: TableBlockData }) {
   if (!data?.headers && !data?.rows) return null;
   return (
-    <div style={{ overflowX: "auto", margin: "1rem 0", borderRadius: "0.5rem", border: "1px solid var(--border)" }}>
+    <div className="glass-card-static mb-3" style={{ overflowX: "auto" }}>
       {data.caption && <div className="text-xs font-semibold p-2" style={{ color: "var(--muted)", borderBottom: "1px solid var(--border)" }}>{data.caption}</div>}
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.875rem" }}>
         {data.headers && (
@@ -136,7 +137,7 @@ function TableBlock({ data }: { data: TableBlockData }) {
         )}
         <tbody>
           {data.rows?.map((row: string[], i: number) => (
-            <tr key={i}>
+            <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "var(--accent-bg)/40" }}>
               {row.map((cell: string, j: number) => (
                 <td key={j} style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid var(--border)", fontSize: "0.85rem", color: "var(--ink)" }}>{cell}</td>
               ))}
@@ -144,6 +145,7 @@ function TableBlock({ data }: { data: TableBlockData }) {
           ))}
         </tbody>
       </table>
+      {data.source && <div className="text-[10px] p-2" style={{ color: "var(--subtle)", borderTop: "1px solid var(--border)" }}>Source: {data.source}</div>}
     </div>
   );
 }
@@ -238,30 +240,47 @@ function ImageBlock({ data }: { data: ImageBlockData }) {
 }
 
 function VideoBlock({ data }: { data: VideoBlockData }) {
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   if (!data?.src) return <div className="text-xs" style={{ color: "var(--subtle)" }}>Video not available</div>;
   const videoSrc = data.src.startsWith("/") ? `${BASE}${data.src}` : data.src;
   return (
-    <div className="glass-card-static p-2 mb-3">
-      {data.caption && <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted)" }}>{data.caption}</div>}
-      <video
-        controls
-        className="w-full"
-        style={{ maxHeight: "480px", border: "2px solid var(--ink)" }}
-        poster={data.poster}
-      >
-        <source src={videoSrc} type="video/mp4" />
-      </video>
-    </div>
+    <>
+      <div className="glass-card-static p-2 mb-3 cursor-pointer group" onClick={() => setLightboxOpen(true)}>
+        {data.caption && <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted)" }}>{data.caption}</div>}
+        <div className="relative">
+          <video
+            controls
+            className="w-full"
+            style={{ maxHeight: "480px", border: "2px solid var(--ink)" }}
+            poster={data.poster}
+          >
+            <source src={videoSrc} type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            <span className="bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">Click to expand</span>
+          </div>
+        </div>
+      </div>
+      {lightboxOpen && (
+        <MediaLightbox src={data.src} caption={data.caption} onClose={() => setLightboxOpen(false)} />
+      )}
+    </>
   );
 }
 
 function GalleryBlock({ data }: { data: GalleryBlockData }) {
   if (!data?.images || data.images.length === 0) return null;
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
-      {data.images.filter(Boolean).map((img, i) => (
-        <MediaImage key={i} src={img.src} caption={img.caption} prompt={img.prompt} />
-      ))}
+    <div className="glass-card-static p-3 mb-3">
+      {data.caption && <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted)" }}>{data.caption}</div>}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        {data.images.filter(Boolean).map((img, i) => (
+          <div key={i} className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--border)", aspectRatio: "4/3" }}>
+            <MediaImage src={img.src} caption={img.caption} prompt={img.prompt} />
+          </div>
+        ))}
+      </div>
+      {data.source && <div className="text-[10px] mt-2" style={{ color: "var(--subtle)" }}>Source: {data.source}</div>}
     </div>
   );
 }
@@ -270,14 +289,15 @@ function CitationBlock({ data }: { data: CitationBlockData }) {
   if (!data) return null;
   return (
     <a href={data.url} target="_blank" rel="noopener noreferrer"
-      className="glass-card-static p-2 flex items-center gap-2 mb-2"
-      style={{ textDecoration: "none", color: "inherit", fontSize: "0.85rem" }}
+      className="glass-card-static p-2 flex items-center gap-2 mb-2 border-l-2 transition-colors hover:bg-[var(--accent-bg)]/20"
+      style={{ textDecoration: "none", color: "inherit", fontSize: "0.85rem", borderLeftColor: "var(--accent)" }}
     >
-      <IconLink size={16} />
+      <IconLink size={14} />
       <span className="flex-1 min-w-0">
         <span className="block truncate font-semibold">{data.title || data.url}</span>
         {data.relevance && <span className="block text-xs" style={{ color: "var(--muted)" }}>{data.relevance}</span>}
       </span>
+      <span className="text-[10px]" style={{ color: "var(--subtle)" }}>↗</span>
     </a>
   );
 }

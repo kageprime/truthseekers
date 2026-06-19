@@ -1136,19 +1136,20 @@ export async function getConversation(id: string): Promise<{ id: string; title: 
   return { id: c.id, title: c.title, createdAt: c.createdAt, updatedAt: c.updatedAt };
 }
 
-export async function addMessage(id: string, conversationId: string, role: string, content: string, blocks?: any[], tool_calls?: any[], tool_call_id?: string, agentEvents?: any[]): Promise<{ id: string; conversationId: string; role: string; content: string; blocks?: any[]; tool_calls?: any[]; tool_call_id?: string; agentEvents?: any[]; createdAt: string }> {
+export async function addMessage(id: string, conversationId: string, role: string, content: string, blocks?: any[], tool_calls?: any[], tool_call_id?: string, agentEvents?: any[], tool_name?: string): Promise<{ id: string; conversationId: string; role: string; content: string; blocks?: any[]; tool_calls?: any[]; tool_call_id?: string; tool_name?: string; agentEvents?: any[]; createdAt: string }> {
   const now = new Date().toISOString();
   const doc: Record<string, unknown> = { id, conversationId, role, content, createdAt: now };
   if (blocks) doc.blocks = blocks;
   if (tool_calls) doc.tool_calls = tool_calls;
   if (tool_call_id) doc.tool_call_id = tool_call_id;
   if (agentEvents) doc.agentEvents = agentEvents;
+  if (tool_name) doc.tool_name = tool_name;
   await MessageModel.create(doc);
   await ConversationModel.updateOne({ id: conversationId }, { $set: { updatedAt: now } });
-  return { id, conversationId, role, content, blocks, tool_calls, tool_call_id, agentEvents, createdAt: now };
+  return { id, conversationId, role, content, blocks, tool_calls, tool_call_id, tool_name, agentEvents, createdAt: now };
 }
 
-export async function getMessages(conversationId: string): Promise<Array<{ id: string; conversationId: string; role: string; content: string; blocks?: any[]; tool_calls?: any[]; tool_call_id?: string; agentEvents?: any[]; createdAt: string }>> {
+export async function getMessages(conversationId: string): Promise<Array<{ id: string; conversationId: string; role: string; content: string; blocks?: any[]; tool_calls?: any[]; tool_call_id?: string; tool_name?: string; agentEvents?: any[]; createdAt: string }>> {
   const msgs = await MessageModel.find({ conversationId }).sort({ createdAt: 1 }).lean();
   return msgs.map((m) => {
     const doc = m as Record<string, unknown>;
@@ -1160,6 +1161,7 @@ export async function getMessages(conversationId: string): Promise<Array<{ id: s
       blocks: doc.blocks as any[] | undefined,
       tool_calls: doc.tool_calls as any[] | undefined,
       tool_call_id: doc.tool_call_id as string | undefined,
+      tool_name: doc.tool_name as string | undefined,
       agentEvents: doc.agentEvents as any[] | undefined,
       createdAt: doc.createdAt as string,
     };

@@ -83,7 +83,7 @@ export async function runChatAgent(
       } else if (m.role === "assistant") {
         await addMessage(entryId, conversationId, "assistant", m.content || " ", result.blocks.length > 0 ? result.blocks : undefined, m.tool_calls, undefined, agentEvents);
       } else if (m.role === "tool") {
-        await addMessage(entryId, conversationId, "tool", m.content || " ", undefined, undefined, m.tool_call_id);
+        await addMessage(entryId, conversationId, "tool", m.content || " ", undefined, undefined, m.tool_call_id, undefined, m.tool_name);
       }
     }
 

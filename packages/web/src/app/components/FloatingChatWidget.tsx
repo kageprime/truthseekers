@@ -9,6 +9,8 @@ import { useChatContext } from "../chat/ChatContext";
 import { useFloatingChat } from "../FloatingChatContext";
 import type { AgentEvent } from "./ProcessViewer";
 import ChatMessage from "./ChatMessage";
+import EmptyChatState from "./EmptyChatState";
+import FollowUpSuggestions from "./FollowUpSuggestions";
 import TruthConsole from "./TruthConsole";
 import { BASE } from "@/lib/constants";
 
@@ -61,8 +63,28 @@ export default function FloatingChatWidget() {
   useEffect(() => {
     if (!conv || conv === prevConvRef.current) return;
     prevConvRef.current = conv;
-    const all = (conv.messages ?? []).flatMap((m: any) => m.agentEvents ?? []);
-    if (all.length > 0) setAgentEvents(all);
+    const events: AgentEvent[] = [];
+    for (const m of conv.messages ?? []) {
+      if (m.agentEvents?.length) {
+        events.push(...m.agentEvents);
+      } else if (m.role === "tool") {
+        // Reconstruct tool events from stored tool messages
+        const name = m.tool_name || "tool_call";
+        events.push({
+          type: "tool_use",
+          data: { name, args: {} },
+          timestamp: new Date(m.createdAt).getTime(),
+        });
+        if (m.content?.trim()) {
+          events.push({
+            type: "tool_result",
+            data: { name, result: m.content.slice(0, 1000) },
+            timestamp: new Date(m.createdAt).getTime(),
+          });
+        }
+      }
+    }
+    if (events.length > 0) setAgentEvents(events);
   }, [conv, setAgentEvents]);
 
   // Auto-scroll
@@ -182,6 +204,18 @@ export default function FloatingChatWidget() {
   const messages = (conv?.messages ?? []).filter((m: any) => m.role !== "tool");
   const hasStreaming = sending && (streamContent || streamBlocks.length > 0);
   const currentConv = conversations.find((c) => c.id === convId);
+  const lastAssistantIdx = [...messages].reverse().findIndex((m: any) => m.role === "assistant");
+  const lastAssistantIndex = lastAssistantIdx >= 0 ? messages.length - 1 - lastAssistantIdx : -1;
+  const followUps = lastAssistantIndex >= 0 ? ["Tell me more", "Give me sources", "Summarize this"] : [];
+
+  const suggestedTopics = [
+    "What is quantum computing?",
+    "Explain the history of the Roman Empire",
+    "How does CRISPR gene editing work?",
+    "Show me a timeline of space exploration",
+    "Compare classical vs quantum computing",
+    "What caused the Industrial Revolution?",
+  ];
 
   return (
     <div className="h-full flex flex-col max-md:max-h-[85vh]">
@@ -275,14 +309,9 @@ export default function FloatingChatWidget() {
               <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
             </div>
           ) : messages.length === 0 && !sending ? (
-            <div className="flex flex-col items-center justify-center h-full text-center px-6">
-              <p className="text-sm font-medium mb-2" style={{ color: "var(--muted)" }}>Ask me anything</p>
-              <p className="text-xs" style={{ color: "var(--subtle)" }}>
-                I can search the web, look up articles, generate content, and more.
-              </p>
-            </div>
+            <EmptyChatState suggestedTopics={suggestedTopics} onSetInput={doSend} />
           ) : (
-            <div>
+            <div className="max-w-4xl mx-auto">
               {messages.map((msg: any, i: number) => (
                 <ChatMessage
                   key={msg.id}
@@ -290,8 +319,12 @@ export default function FloatingChatWidget() {
                   content={msg.content}
                   blocks={msg.blocks}
                   createdAt={msg.createdAt}
+                  isLastAssistant={i === lastAssistantIndex}
                 />
               ))}
+              {!sending && lastAssistantIndex >= 0 && followUps.length > 0 && (
+                <FollowUpSuggestions followUps={followUps} onClick={doSend} />
+              )}
               {hasStreaming && (
                 <ChatMessage
                   role="assistant"

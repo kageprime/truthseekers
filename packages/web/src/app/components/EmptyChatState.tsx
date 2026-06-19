@@ -1,5 +1,27 @@
 "use client";
 
+const iconMap: Record<string, string> = {
+  "What": "🔍",
+  "How": "⚙️",
+  "Why": "💡",
+  "Who": "👤",
+  "Where": "📍",
+  "When": "📅",
+  "Explain": "📖",
+  "Compare": "⚖️",
+  "Show": "🖼️",
+  "Tell": "🗣️",
+  "Create": "✨",
+  "Generate": "✨",
+};
+
+function getIcon(topic: string): string {
+  for (const [prefix, icon] of Object.entries(iconMap)) {
+    if (topic.startsWith(prefix)) return icon;
+  }
+  return "💬";
+}
+
 interface EmptyChatStateProps {
   suggestedTopics: string[];
   onSetInput: (val: string) => void;
@@ -8,16 +30,26 @@ interface EmptyChatStateProps {
 export default function EmptyChatState({ suggestedTopics, onSetInput }: EmptyChatStateProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 py-16 text-center animate-fade-in">
-      <img src="/logo.png" alt="Truthseekers" className="mb-4" style={{ height: 48, width: "auto", objectFit: "contain" }} />
-      <p className="text-sm mb-8 max-w-md" style={{ color: "var(--muted)" }}>Ask anything — I'll research and build rich, interactive responses with maps, timelines, diagrams, and more.</p>
-      <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+      <div className="mb-6 w-16 h-16 rounded-2xl flex items-center justify-center text-2xl" style={{ background: "var(--accent-bg)" }}>
+        🧠
+      </div>
+      <p className="text-sm mb-8 max-w-md leading-relaxed" style={{ color: "var(--muted)" }}>
+        Ask anything — I'll research and build rich, interactive responses with maps, timelines, diagrams, and more.
+      </p>
+      <div className="flex flex-wrap gap-2.5 justify-center max-w-lg">
         {suggestedTopics.map((topic) => (
           <button
             key={topic}
             onClick={() => onSetInput(topic)}
-            className="px-4 py-2 text-sm rounded-full border transition-colors hover:bg-[var(--accent-bg)] hover:border-[var(--accent)]"
-            style={{ borderColor: "var(--border)", color: "var(--ink)" }}
+            className="group relative px-4 py-2.5 text-sm rounded-xl border transition-all duration-200 hover:scale-[1.03] hover:shadow-md active:scale-[0.97]"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--ink)",
+              background: "var(--surface-glass)",
+              backdropFilter: "blur(4px)",
+            }}
           >
+            <span className="mr-1.5 opacity-70">{getIcon(topic)}</span>
             {topic}
           </button>
         ))}

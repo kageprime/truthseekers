@@ -94,7 +94,7 @@ export default function HomePage() {
   }
 
   return (
-    <PageLayout sidebar sidebarDefaultCollapsed>
+    <PageLayout>
       <main className="flex-1 flex flex-col items-center px-6 pt-12 relative">
 
         {busy ? (

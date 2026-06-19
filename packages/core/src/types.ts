@@ -337,6 +337,8 @@ export interface VideoBlockData {
 
 export interface GalleryBlockData {
   images: Array<{ src: string; caption?: string; prompt?: string }>;
+  caption?: string;
+  source?: string;
 }
 
 export interface CitationBlockData {
@@ -362,6 +364,7 @@ export interface TableBlockData {
   headers?: string[];
   rows?: string[][];
   caption?: string;
+  source?: string;
 }
 
 export interface ListBlockData {
@@ -414,6 +417,7 @@ export interface ConversationDetail extends ConversationSummary {
     blocks?: Block[];
     tool_calls?: any[];
     tool_call_id?: string;
+    tool_name?: string;
     agentEvents?: any[];
     createdAt: string;
   }>;

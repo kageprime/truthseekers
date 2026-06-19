@@ -57,6 +57,16 @@ chat.get("/chat/:id", async (c) => {
   return c.json({ ...conv, messages });
 });
 
+chat.patch("/chat/:id", async (c) => {
+  const userId = getUserId(c);
+  if (!userId) return c.json({ error: "Authentication required" }, 401);
+  const id = c.req.param("id");
+  const { title } = await c.req.json<{ title: string }>();
+  if (!title) return c.json({ error: "Title required" }, 400);
+  await updateConversationTitle(id, title);
+  return c.json({ success: true });
+});
+
 chat.post("/chat/:id/messages", async (c) => {
   const conversationId = c.req.param("id");
   const { content, model: selectedModel } = await c.req.json<{ content: string; model?: string }>();

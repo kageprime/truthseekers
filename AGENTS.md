@@ -2,6 +2,10 @@
 
 An LLM-powered interactive encyclopedia SDK — build your own AI agent-driven knowledge base.
 
+## Current Sprint
+
+Sprint roadmap lives in `ROADMAP.md`. Currently on **Sprint 1: Floating Chat Shell & Responsive Layout**.
+
 ## Architecture
 
 - Monorepo with npm workspaces
