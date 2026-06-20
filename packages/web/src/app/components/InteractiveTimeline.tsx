@@ -288,10 +288,14 @@ export default function InteractiveTimeline({ events }: { events: TimelineEvent[
             style={{
               background: isActive ? "var(--surface-glass)" : "transparent",
               borderStyle: "solid",
-              borderColor: isActive ? "var(--accent)" : "transparent",
-              borderWidth: isActive ? 1 : 0,
-              borderLeftWidth: 3,
+              borderTopColor: isActive ? "var(--accent)" : "transparent",
+              borderRightColor: isActive ? "var(--accent)" : "transparent",
+              borderBottomColor: isActive ? "var(--accent)" : "transparent",
               borderLeftColor: catColor(ev.category),
+              borderTopWidth: isActive ? 1 : 0,
+              borderRightWidth: isActive ? 1 : 0,
+              borderBottomWidth: isActive ? 1 : 0,
+              borderLeftWidth: 3,
             }}>
             <span className="text-xs font-semibold shrink-0 mt-0.5 whitespace-nowrap" style={{ color: catColor(ev.category) }}>
               {ev.year}

@@ -6,6 +6,7 @@ import QueueIndicator from "./QueueIndicator";
 import { useTheme } from "./ThemeProvider";
 import { IconSearch, IconX } from "./Icons";
 import { useAuth } from "../hooks/useAuth";
+import { CategoryRail } from "./editorial/Masthead";
 
 interface HeaderSearch {
   value: string;
@@ -20,7 +21,6 @@ interface HeaderProps {
 }
 
 const NAV_LINKS = [
-  { label: "Chat", href: "/" },
   { label: "Articles", href: "/articles" },
   { label: "Maps", href: "/maps" },
   { label: "Queue", href: "/queue" },
@@ -45,38 +45,36 @@ export default function SharedHeader({ search }: HeaderProps) {
   }, [mobileNavOpen]);
 
   return (
-    <header className="sticky top-0 z-50 header-bar border-b transition-colors duration-300" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
-      <div className="px-3 md:px-6 h-16 flex items-center justify-between max-w-[1440px] mx-auto">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2.5 no-underline">
-            <img src="/logo-icon.png" alt="Truthseekers" className="w-8 h-8" style={{ objectFit: "contain" }} />
-            <img src="/logo-text.png" alt="Truthseekers" className="hidden sm:inline" style={{ height: 16, width: "auto", objectFit: "contain" }} />
-          </Link>
-          <div className="hidden sm:flex items-center gap-1 ml-4">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="btn-ghost text-sm font-medium"
-                style={{ color: "var(--muted)" }}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
+    <header className="header-bar shrink-0 sticky top-0 z-50" style={{ background: "var(--surface)", borderBottom: "1px solid var(--rule)" }}>
+      {/* Category rail + utility row */}
+      <div className="max-w-[1440px] mx-auto px-3 md:px-6 h-12 flex items-center justify-between gap-3">
+        {/* Left: primary nav (desktop) — understated serif links */}
+        <div className="hidden sm:flex items-center gap-1">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="category-link font-serif text-sm no-underline px-2 py-1"
+              style={{ color: "var(--ink-secondary)" }}
+            >
+              {link.label}
+            </Link>
+          ))}
         </div>
 
-        {search && (
-          <div className="hidden sm:flex flex-1 max-w-md mx-4">
+        {/* Center: search */}
+        {search ? (
+          <div className="flex-1 max-w-md mx-auto hidden sm:block">
             <form onSubmit={search.onSubmit} className="w-full">
               <div className="relative">
-                <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--subtle)" }} />
+                <IconSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--gold)" }} />
                 <input
                   type="text"
                   value={search.value}
                   onChange={(e) => search.onChange(e.target.value)}
-                  placeholder={search.placeholder || "Search..."}
+                  placeholder={search.placeholder || "Search the encyclopedia…"}
                   className="input w-full text-sm py-1.5 pl-9 pr-8"
+                  style={{ background: "transparent", borderColor: "transparent", borderBottom: "1px solid var(--rule)", borderRadius: 0 }}
                 />
                 {search.value && search.onClear && (
                   <button
@@ -91,25 +89,26 @@ export default function SharedHeader({ search }: HeaderProps) {
               </div>
             </form>
           </div>
+        ) : (
+          <div className="hidden sm:block flex-1" />
         )}
 
-        <div className="flex items-center gap-2">
+        {/* Right: utilities */}
+        <div className="flex items-center gap-1.5">
           {user && (
             <Link href="/settings" className="flex items-center gap-2 no-underline">
               <div
                 className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold"
-                style={{
-                  background: "var(--accent)",
-                  color: "white",
-                }}
+                style={{ background: "var(--gold)", color: "#fff" }}
               >
                 {(user.name || user.email)[0].toUpperCase()}
               </div>
               <span
-                className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full"
+                className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-sharp hidden md:inline"
                 style={{
-                  background: user.subscriptionTier === "pro" ? "var(--accent-bg)" : user.subscriptionTier === "enterprise" ? "#fef3c7" : "var(--border-light)",
-                  color: user.subscriptionTier === "pro" ? "var(--accent)" : user.subscriptionTier === "enterprise" ? "#92400e" : "var(--subtle)",
+                  background: user.subscriptionTier === "pro" ? "var(--gold-bg)" : user.subscriptionTier === "enterprise" ? "var(--gold-bg)" : "transparent",
+                  color: user.subscriptionTier === "free" ? "var(--subtle)" : "var(--gold)",
+                  border: "1px solid var(--rule)",
                 }}
               >
                 {user.subscriptionTier}
@@ -119,21 +118,14 @@ export default function SharedHeader({ search }: HeaderProps) {
 
           <QueueIndicator />
 
-          <button onClick={toggle} className="btn-icon btn-ghost text-base" aria-label="Toggle theme">
+          <button onClick={toggle} className="btn-icon btn-ghost" aria-label="Toggle theme">
             {resolved === "dark" ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="5" />
-                <line x1="12" y1="1" x2="12" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" />
-                <line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
               </svg>
             ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
               </svg>
             )}
@@ -143,10 +135,10 @@ export default function SharedHeader({ search }: HeaderProps) {
           <div className="sm:hidden relative" ref={menuRef}>
             <button
               onClick={() => setMobileNavOpen(!mobileNavOpen)}
-              className="btn-icon btn-ghost text-base"
+              className="btn-icon btn-ghost"
               aria-label="Navigation menu"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="3" y1="6" x2="21" y2="6" />
                 <line x1="3" y1="12" x2="21" y2="12" />
                 <line x1="3" y1="18" x2="21" y2="18" />
@@ -154,16 +146,16 @@ export default function SharedHeader({ search }: HeaderProps) {
             </button>
             {mobileNavOpen && (
               <div
-                className="absolute right-0 top-full mt-2 w-48 rounded-xl p-2 shadow-lg"
-                style={{ background: "var(--surface)", border: "1px solid var(--border-light)", zIndex: 60 }}
+                className="absolute right-0 top-full mt-2 w-52 rounded-sharp py-1 shadow-lg"
+                style={{ background: "var(--surface-elevated)", border: "1px solid var(--rule)", zIndex: 60 }}
               >
                 {NAV_LINKS.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
                     onClick={() => setMobileNavOpen(false)}
-                    className="block px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors hover:bg-[var(--border-light)]"
-                    style={{ color: "var(--ink)" }}
+                    className="block px-3 py-2.5 font-serif text-sm no-underline transition-colors"
+                    style={{ color: "var(--ink-secondary)" }}
                   >
                     {link.label}
                   </Link>
@@ -173,17 +165,23 @@ export default function SharedHeader({ search }: HeaderProps) {
           </div>
         </div>
       </div>
+
+      {/* Category rail — the encyclopedia table of contents */}
+      <div className="hidden sm:block border-t" style={{ borderColor: "var(--rule)" }}>
+        <CategoryRail />
+      </div>
+
       {/* Mobile search */}
       {search && (
         <div className="sm:hidden px-4 pb-3">
           <form onSubmit={search.onSubmit}>
             <div className="relative">
-              <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--subtle)" }} />
+              <IconSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--gold)" }} />
               <input
                 type="text"
                 value={search.value}
                 onChange={(e) => search.onChange(e.target.value)}
-                placeholder={search.placeholder || "Search..."}
+                placeholder={search.placeholder || "Search…"}
                 className="input w-full text-sm py-2 pl-9 pr-8"
               />
               {search.value && search.onClear && (
