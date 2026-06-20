@@ -1,0 +1,48 @@
+   ▲ Next.js 15.5.19
+   - Local:        http://localhost:3001
+   - Network:      http://192.168.121.181:3001
+
+ ✓ Starting...
+ ✓ Ready in 4s
+ ○ Compiling /article/[slug] ...
+ ✓ Compiled /article/[slug] in 23.6s (5334 modules)
+ GET /article/ancient-rome 200 in 2077ms
+ │ GET http://localhost:4097/articles/ancient-rome
+ │ │ ⚠ Specified "cache: no-store" and "revalidate: 60", only one should be specified.
+ ○ Compiling / ...
+ ✓ Compiled / in 2.4s (5270 modules)
+ GET / 200 in 2971ms
+ ✓ Compiled in 940ms (2575 modules)
+ ✓ Compiled in 895ms (2575 modules)
+ ✓ Compiled in 570ms (2575 modules)
+ ✓ Compiled in 517ms (2575 modules)
+ GET /article/mh370-plasmoids-zpe-mq9-gorgon-stare-free-scale-semiconductor-hidden-phyics-and-the-black-covert-ops 200 in 2051ms
+ │ GET http://localhost:4097/articles/mh370-plasmoids-zpe-mq9-gorgon-stare-free-scale-semiconductor-hidden-phyics-and-the-black-covert-ops
+ │ │ ⚠ Specified "cache: no-store" and "revalidate: 60", only one should be specified.
+ ○ Compiling /queue ...
+ ✓ Compiled / in 5.7s (5258 modules)
+ GET / 200 in 4534ms
+ GET /article/ancient-rome 200 in 1651ms
+ │ GET http://localhost:4097/articles/ancient-rome
+ │ │ ⚠ Specified "cache: no-store" and "revalidate: 60", only one should be specified.
+ GET / 200 in 171ms
+ GET /article/test-article 200 in 250ms
+ │ GET http://localhost:4097/articles/test-article
+ │ │ ⚠ Specified "cache: no-store" and "revalidate: 60", only one should be specified.
+ GET / 200 in 129ms
+ GET /article/ancient-rome 200 in 418ms
+ │ GET http://localhost:4097/articles/ancient-rome
+ │ │ ⚠ Specified "cache: no-store" and "revalidate: 60", only one should be specified.
+ ○ Compiling /maps ...
+ ✓ Compiled /maps in 8.7s (5264 modules)
+ GET /maps 200 in 9801ms
+ ○ Compiling /maps/[slug] ...
+ ✓ Compiled /maps/[slug] in 28.8s (6390 modules)
+ GET /maps/roman-empire-interactive 200 in 36161ms
+ GET / 200 in 1164ms
+ GET /article/test-article 200 in 2849ms
+ │ GET http://localhost:4097/articles/test-article
+ │ │ ⚠ Specified "cache: no-store" and "revalidate: 60", only one should be specified.
+ ○ Compiling /queue ...
+ ✓ Compiled /queue in 9.2s (3274 modules)
+ GET /queue 200 in 11674ms

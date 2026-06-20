@@ -45,15 +45,6 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
 
   return (
     <div className={`flex gap-3 px-6 py-4 group ${isUser ? "flex-row-reverse" : ""} transition-colors ${streaming ? "bg-[var(--accent-bg)]/5" : "hover:bg-black/[0.02]"}`}>
-      {/* Avatars */}
-      {isUser ? (
-        <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: "var(--accent-bg)", color: "var(--accent)" }}>
-          U
-        </div>
-      ) : (
-        <img src="/logo-icon.png" alt="TS" className="shrink-0 w-8 h-8 rounded-full" style={{ objectFit: "contain" }} />
-      )}
-
       {/* Body */}
       <div className={`space-y-1 min-w-0 ${isUser ? "items-end" : "flex-1"}`}>
         {/* Label */}

@@ -26,27 +26,40 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 function ArticleRow({ article }: { article: ArticleSummary }) {
   return (
-    <Link href={`/article/${article.slug}`} className="block py-3 px-4 -mx-4 rounded-lg transition-colors hover:bg-[var(--accent-bg)]/40" style={{ textDecoration: "none", color: "inherit" }}>
-      <div className="flex items-start gap-3">
+    <Link
+      href={`/article/${article.slug}`}
+      className="block py-4 px-4 -mx-4 transition-colors article-list-row"
+      style={{ textDecoration: "none", color: "inherit", borderBottom: "1px solid var(--rule)" }}
+    >
+      <div className="flex items-start gap-4">
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm leading-snug mb-0.5" style={{ color: "var(--ink)" }}>
+          <h3 className="font-display font-semibold text-[0.95rem] leading-snug mb-1" style={{ color: "var(--ink)" }}>
             {article.title}
             {article.metadata?.status === "draft" && (
-              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>Draft</span>
+              <span className="ml-2 text-[10px] px-1.5 py-0.5 small-caps" style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>Draft</span>
             )}
           </h3>
-          <p className="text-xs leading-relaxed line-clamp-2" style={{ color: "var(--muted)" }}>{article.abstract || "No description"}</p>
-          <div className="flex items-center gap-2 mt-1.5">
+          <p className="text-xs leading-relaxed line-clamp-2 font-serif italic" style={{ color: "var(--muted)" }}>
+            {article.abstract || "No description"}
+          </p>
+          <div className="flex items-center gap-3 mt-2">
             {article.categories?.slice(0, 3).map((cat) => (
-              <span key={cat} className="tag tag-subtle text-[10px]">{cat}</span>
+              <span key={cat} className="small-caps text-[10px]" style={{ color: "var(--gold)", letterSpacing: "0.08em" }}>
+                {cat.replace(/-/g, " ")}
+              </span>
             ))}
             {article.metadata?.updated && (
-              <span className="text-[10px]" style={{ color: "var(--subtle)" }}>{new Date(article.metadata.updated).toLocaleDateString()}</span>
+              <span className="dateline text-[10px] ml-auto" style={{ letterSpacing: "0.1em" }}>
+                {new Date(article.metadata.updated).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+              </span>
             )}
           </div>
         </div>
         {article.thumbnail && (
-          <div className="w-16 h-16 rounded-lg shrink-0 overflow-hidden hidden sm:block" style={{ background: "var(--skeleton-start)" }}>
+          <div
+            className="w-16 h-16 shrink-0 overflow-hidden hidden sm:block"
+            style={{ background: "var(--gold-bg)", border: "1px solid var(--rule)", borderRadius: "var(--radius-sharp)" }}
+          >
             <img src={article.thumbnail} alt="" className="w-full h-full object-cover" loading="lazy" />
           </div>
         )}
@@ -335,7 +348,7 @@ export default function ArticlesPage() {
         ) : filteredArticles.length > 0 ? (
           <>
             {viewMode === "list" ? (
-              <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+              <div>
                 {filteredArticles.map((article) => (
                   <ArticleRow key={article.slug} article={article} />
                 ))}

@@ -5,68 +5,56 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
-        serif: ["Lora", "Georgia", "Times New Roman", "serif"],
-        display: ["'Playfair Display'", "Lora", "Georgia", "serif"],
+        sans: ["var(--font-ui)", "Inter", "system-ui", "sans-serif"],
+        serif: ["var(--font-serif)", "Lora", "Georgia", "serif"],
+        display: ["var(--font-display)", "'Playfair Display'", "Georgia", "serif"],
+        mono: ["var(--font-mono)", "'JetBrains Mono'", "monospace"],
         pixel: ["'Press Start 2P'", "monospace"],
       },
       colors: {
-        surface: {
-          DEFAULT: "#faf8f2",
-          dark: "#1a1614",
-        },
-        ink: {
-          DEFAULT: "#1a1a1a",
-          dark: "#e8e0d5",
-        },
-        muted: {
-          DEFAULT: "#6b6b6b",
-          dark: "#8c8273",
-        },
-        subtle: {
-          DEFAULT: "#b0ada6",
-          dark: "#5a5248",
-        },
-        border: {
-          DEFAULT: "#d9d5cc",
-          dark: "#3a3228",
-        },
-        accent: {
-          DEFAULT: "#1e40af",
-          dark: "#60a5fa",
-        },
+        surface: { DEFAULT: "#f5efe0", elevated: "#fbf6e9", dark: "#1a1714" },
+        paper: { edge: "#e8dcc0" },
+        ink: { DEFAULT: "#1a1612", secondary: "#3d3528", dark: "#ece3d2" },
+        muted: { DEFAULT: "#6b6048", dark: "#948868" },
+        subtle: { DEFAULT: "#a99c7a", dark: "#6b604a" },
+        border: { DEFAULT: "#d4c9ab", light: "#e8dcc0", dark: "#403628" },
+        rule: { DEFAULT: "#d4c9ab", dark: "#403628" },
         gold: {
-          DEFAULT: "#b8860b",
+          DEFAULT: "#a67c2f",
+          soft: "#c9a45f",
+          bg: "#f0e3c4",
           dark: "#d4a853",
         },
-        cream: {
-          DEFAULT: "#fef3c7",
-          dark: "#2a241c",
+        accent: {
+          DEFAULT: "#a67c2f",
+          dark: "#d4a853",
         },
+        oxblood: { DEFAULT: "#6b1d1d", subtle: "#f3d8d8", dark: "#c46666" },
+        forest: { DEFAULT: "#2d4a2b", subtle: "#dde8da", dark: "#6ea368" },
+        cream: { DEFAULT: "#f0e3c4", dark: "#3a2f15" },
         glass: {
-          light: "rgba(250, 248, 242, 0.85)",
-          dark: "rgba(26, 22, 20, 0.85)",
+          light: "rgba(245, 239, 224, 0.85)",
+          dark: "rgba(26, 23, 20, 0.85)",
         },
       },
       borderRadius: {
-        card: "4px",
-        "card-lg": "8px",
+        sharp: "2px",
+        card: "2px",
+        "card-lg": "6px",
       },
       boxShadow: {
-        card: "0 1px 3px rgba(0,0,0,0.06)",
-        "card-hover": "0 2px 12px rgba(0,0,0,0.10)",
-        "card-lg": "0 4px 16px rgba(0,0,0,0.08)",
+        card: "0 1px 2px rgba(26,22,18,0.04)",
+        "card-hover": "0 4px 16px rgba(26,22,18,0.10)",
+        "card-lg": "0 4px 16px rgba(26,22,18,0.08)",
       },
       animation: {
         "spring-in": "spring-in 0.4s cubic-bezier(0.23, 1, 0.32, 1)",
         "fade-in": "fade-in 0.3s ease-out",
+        "fade-slide-up": "fade-slide-up 0.4s cubic-bezier(0.23, 1, 0.32, 1)",
         "slide-up": "slide-up 0.3s ease-out",
         shimmer: "shimmer 1.5s ease-in-out infinite",
         "pulse-cursor": "pulse-cursor 1s ease-in-out infinite",
         float: "float 4s ease-in-out infinite",
-        "wave-1": "wave-drift-1 22s ease-in-out infinite",
-        "wave-2": "wave-drift-2 16s ease-in-out infinite",
-        "wave-3": "wave-drift-3 11s ease-in-out infinite",
       },
       keyframes: {
         "spring-in": {
@@ -76,6 +64,10 @@ module.exports = {
         "fade-in": {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
+        },
+        "fade-slide-up": {
+          "0%": { opacity: "0", transform: "translateY(12px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
         },
         "slide-up": {
           "0%": { opacity: "0", transform: "translateY(16px)" },
@@ -92,18 +84,6 @@ module.exports = {
         float: {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-8px)" },
-        },
-        "wave-drift-1": {
-          "0%": { transform: "translateX(0)" },
-          "100%": { transform: "translateX(-33.33%)" },
-        },
-        "wave-drift-2": {
-          "0%": { transform: "translateX(0)" },
-          "100%": { transform: "translateX(-33.33%)" },
-        },
-        "wave-drift-3": {
-          "0%": { transform: "translateX(0)" },
-          "100%": { transform: "translateX(-33.33%)" },
         },
       },
     },

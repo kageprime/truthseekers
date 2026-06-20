@@ -262,7 +262,8 @@ export type BlockType =
   | "tool_call"
   | "divider"
   | "table"
-  | "list";
+  | "list"
+  | "pullquote";
 
 export interface Block {
   id: string;

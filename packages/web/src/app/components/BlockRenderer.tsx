@@ -72,21 +72,37 @@ export default function BlockRenderer({ blocks, compact = false }: { blocks: Blo
     return <div className="text-sm" style={{ color: "var(--subtle)" }}>No content yet.</div>;
   }
 
+  // Find index of the first text block — that one gets the drop cap.
+  let firstTextIdx = -1;
+  for (let i = 0; i < blocks.length; i++) {
+    if (normalizeBlockData(blocks[i]).type === "text") { firstTextIdx = i; break; }
+  }
+
+  // Auto-number figures across the whole article.
+  let figureNum = 0;
+  const nextFigureNum = () => ++figureNum;
+
   return (
     <div className="block-renderer">
       {blocks.map((block, i) => (
-        <BlockCard key={block.id ?? `block-${i}`} block={normalizeBlockData(block)} compact={compact} />
+        <BlockCard
+          key={block.id ?? `block-${i}`}
+          block={normalizeBlockData(block)}
+          compact={compact}
+          dropCap={i === firstTextIdx}
+          nextFigureNum={nextFigureNum}
+        />
       ))}
     </div>
   );
 }
 
-function BlockCard({ block, compact }: { block: Block; compact: boolean }) {
+function BlockCard({ block, compact, dropCap, nextFigureNum }: { block: Block; compact: boolean; dropCap?: boolean; nextFigureNum?: () => number }) {
   switch (block.type) {
     case "heading":
       return <HeadingBlock data={block.data as unknown as HeadingBlockData} />;
     case "text":
-      return <TextBlock data={block.data as unknown as TextBlockData} />;
+      return <TextBlock data={block.data as unknown as TextBlockData} dropCap={dropCap} />;
     case "section":
       return <SectionBlock data={block.data as unknown as SectionBlockData} />;
     case "timeline":
@@ -96,13 +112,15 @@ function BlockCard({ block, compact }: { block: Block; compact: boolean }) {
     case "map_3d":
       return <Map3DBlock data={block.data as unknown as Map3DBlockData} />;
     case "diagram":
-      return <DiagramBlock data={block.data as unknown as DiagramBlockData} />;
+      return <DiagramBlock data={block.data as unknown as DiagramBlockData} nextFigureNum={nextFigureNum} />;
     case "image":
-      return <ImageBlock data={block.data as unknown as ImageBlockData} />;
+      return <ImageBlock data={block.data as unknown as ImageBlockData} nextFigureNum={nextFigureNum} />;
     case "video":
-      return <VideoBlock data={block.data as unknown as VideoBlockData} />;
+      return <VideoBlock data={block.data as unknown as VideoBlockData} nextFigureNum={nextFigureNum} />;
     case "gallery":
-      return <GalleryBlock data={block.data as unknown as GalleryBlockData} />;
+      return <GalleryBlock data={block.data as unknown as GalleryBlockData} nextFigureNum={nextFigureNum} />;
+    case "pullquote":
+      return <PullQuoteBlock data={block.data as any} />;
     case "citation":
       return <CitationBlock data={block.data as unknown as CitationBlockData} />;
     case "crossref":
@@ -123,29 +141,29 @@ function BlockCard({ block, compact }: { block: Block; compact: boolean }) {
 function TableBlock({ data }: { data: TableBlockData }) {
   if (!data?.headers && !data?.rows) return null;
   return (
-    <div className="glass-card-static mb-3" style={{ overflowX: "auto" }}>
-      {data.caption && <div className="text-xs font-semibold p-2" style={{ color: "var(--muted)", borderBottom: "1px solid var(--border)" }}>{data.caption}</div>}
+    <div className="plate mb-4" style={{ overflowX: "auto" }}>
+      {data.caption && <div className="small-caps p-2" style={{ color: "var(--gold)", borderBottom: "1px solid var(--rule)", fontSize: "0.7rem", letterSpacing: "0.1em" }}>{data.caption}</div>}
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.875rem" }}>
         {data.headers && (
           <thead>
             <tr>
               {data.headers.map((h: string, i: number) => (
-                <th key={i} style={{ padding: "0.5rem 0.75rem", borderBottom: "2px solid var(--border)", background: "var(--surface-glass)", textAlign: "left", fontWeight: 600, fontSize: "0.8rem", color: "var(--ink)" }}>{h}</th>
+                <th key={i} style={{ padding: "0.5rem 0.75rem", borderBottom: "2px solid var(--gold)", background: "var(--surface-glass)", textAlign: "left", fontWeight: 600, fontSize: "0.75rem", color: "var(--ink)", letterSpacing: "0.03em" }}>{h}</th>
               ))}
             </tr>
           </thead>
         )}
         <tbody>
           {data.rows?.map((row: string[], i: number) => (
-            <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "var(--accent-bg)/40" }}>
+            <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "var(--gold-bg)" }}>
               {row.map((cell: string, j: number) => (
-                <td key={j} style={{ padding: "0.4rem 0.75rem", borderBottom: "1px solid var(--border)", fontSize: "0.85rem", color: "var(--ink)" }}>{cell}</td>
+                <td key={j} style={{ padding: "0.45rem 0.75rem", borderBottom: "1px solid var(--rule)", fontSize: "0.85rem", color: "var(--ink-secondary)" }}>{cell}</td>
               ))}
             </tr>
           ))}
         </tbody>
       </table>
-      {data.source && <div className="text-[10px] p-2" style={{ color: "var(--subtle)", borderTop: "1px solid var(--border)" }}>Source: {data.source}</div>}
+      {data.source && <div className="font-serif text-[10px] italic p-2" style={{ color: "var(--subtle)", borderTop: "1px solid var(--rule)" }}>Source: {data.source}</div>}
     </div>
   );
 }
@@ -167,24 +185,28 @@ function HeadingBlock({ data }: { data: HeadingBlockData }) {
   const level = data.level ?? 3;
   const Tag = level === 1 ? "h1" : level === 2 ? "h2" : "h3";
   const style: React.CSSProperties = level === 1
-    ? { fontFamily: "'Playfair Display', Georgia, serif", fontSize: "1.75rem", fontWeight: 700, margin: "2rem 0 0.75rem", letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.3 }
+    ? { fontFamily: "var(--font-display)", fontSize: "1.85rem", fontWeight: 700, margin: "2.25rem 0 0.75rem", letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.25 }
     : level === 2
-    ? { fontFamily: "'Playfair Display', Georgia, serif", fontSize: "1.35rem", fontWeight: 700, margin: "1.5rem 0 0.5rem", paddingBottom: "0.5rem", borderBottom: "1px solid var(--accent)", color: "var(--ink)", letterSpacing: "-0.01em" }
-    : { fontFamily: "'Playfair Display', Georgia, serif", fontSize: "1.1rem", fontWeight: 600, margin: "1.25rem 0 0.5rem", color: "var(--ink)" };
+    ? { fontFamily: "var(--font-display)", fontSize: "1.4rem", fontWeight: 700, margin: "1.75rem 0 0.5rem", paddingBottom: "0.4rem", borderBottom: "1px solid var(--gold)", color: "var(--ink)", letterSpacing: "-0.01em" }
+    : { fontFamily: "var(--font-display)", fontSize: "1.15rem", fontWeight: 600, margin: "1.4rem 0 0.5rem", color: "var(--ink)", fontStyle: "italic" };
   return <Tag style={style}>{data.text}</Tag>;
 }
 
-function TextBlock({ data }: { data: TextBlockData }) {
+function TextBlock({ data, dropCap }: { data: TextBlockData; dropCap?: boolean }) {
   if (!data) return null;
   const content = (data as any).content || (data as any).text || "";
-  return <MarkdownRenderer content={content} />;
+  return (
+    <div className={dropCap ? "drop-cap" : ""}>
+      <MarkdownRenderer content={content} />
+    </div>
+  );
 }
 
 function SectionBlock({ data }: { data: SectionBlockData }) {
   if (!data) return null;
   return (
-    <details className="glass-card-static p-3 mb-3" style={{ border: "1px solid var(--border)" }}>
-      <summary className="font-bold text-sm cursor-pointer" style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "0.9rem", color: "var(--ink)" }}>
+    <details className="plate p-3 mb-4">
+      <summary className="font-display text-[0.95rem] cursor-pointer" style={{ color: "var(--ink)" }}>
         {data.title}
       </summary>
       {data.blocks && <div className="mt-3">{data.blocks.map((b, i) => <BlockCard key={b.id ?? `section-block-${i}`} block={b} compact={false} />)}</div>}
@@ -193,10 +215,10 @@ function SectionBlock({ data }: { data: SectionBlockData }) {
 }
 
 function TimelineBlock({ data }: { data: TimelineBlockData }) {
-  if (!data?.events) return <div className="text-xs" style={{ color: "var(--subtle)" }}>No timeline events</div>;
+  if (!data?.events) return <div className="text-xs italic" style={{ color: "var(--subtle)" }}>No timeline events</div>;
   const events = data.events.map((e) => ({ ...e, year: typeof e.year === "string" ? parseInt(e.year, 10) || 0 : e.year }));
   return (
-    <div className="glass-card-static p-3 mb-3 overflow-hidden">
+    <div className="plate p-3 mb-4 overflow-hidden">
       <InteractiveTimeline events={events} />
     </div>
   );
@@ -205,7 +227,7 @@ function TimelineBlock({ data }: { data: TimelineBlockData }) {
 function Map2DBlock({ data }: { data: Map2DBlockData }) {
   if (!data) return null;
   return (
-    <div className="glass-card-static p-3 mb-3 overflow-hidden" style={{ height: "clamp(250px, 50vh, 400px)" }}>
+    <div className="plate p-3 mb-4 overflow-hidden" style={{ height: "clamp(250px, 50vh, 400px)" }}>
       <MapViewer markers={data.markers} layers={data.layers} centerLat={data.centerLat} centerLng={data.centerLng} zoom={data.zoom} />
     </div>
   );
@@ -214,53 +236,71 @@ function Map2DBlock({ data }: { data: Map2DBlockData }) {
 function Map3DBlock({ data }: { data: Map3DBlockData }) {
   if (!data) return null;
   return (
-    <div className="glass-card-static p-3 mb-3 overflow-hidden" style={{ height: "clamp(250px, 50vh, 400px)" }}>
+    <div className="plate p-3 mb-4 overflow-hidden" style={{ height: "clamp(250px, 50vh, 400px)" }}>
       <ThreeDMapViewer scene={data as any} />
     </div>
   );
 }
 
-function DiagramBlock({ data }: { data: DiagramBlockData }) {
+function DiagramBlock({ data, nextFigureNum }: { data: DiagramBlockData; nextFigureNum?: () => number }) {
   if (!data) return null;
+  const num = nextFigureNum?.();
   return (
-    <div className="glass-card-static p-3 mb-3">
-      {data.caption && <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted)" }}>{data.caption}</div>}
-      <MermaidDiagram code={data.code} />
-    </div>
+    <figure className="figure-plate mb-4">
+      <div className="p-2">
+        <MermaidDiagram code={data.code} />
+      </div>
+      {(num != null || data.caption) && (
+        <figcaption className="figure-caption">
+          {num != null && <span className="figure-num">Fig. {num}</span>}
+          {data.caption}
+        </figcaption>
+      )}
+    </figure>
   );
 }
 
-function ImageBlock({ data }: { data: ImageBlockData }) {
+function ImageBlock({ data, nextFigureNum }: { data: ImageBlockData; nextFigureNum?: () => number }) {
   if (!data) return null;
+  const num = nextFigureNum?.();
   return (
-    <div className="mb-3">
-      <MediaImage src={data.src} caption={data.caption} prompt={data.prompt} />
-    </div>
+    <figure className="figure-plate mb-4">
+      <MediaImage src={data.src} caption={undefined} prompt={data.prompt} />
+      {(num != null || data.caption) && (
+        <figcaption className="figure-caption">
+          {num != null && <span className="figure-num">Fig. {num}</span>}
+          {data.caption}
+        </figcaption>
+      )}
+    </figure>
   );
 }
 
-function VideoBlock({ data }: { data: VideoBlockData }) {
+function VideoBlock({ data, nextFigureNum }: { data: VideoBlockData; nextFigureNum?: () => number }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  if (!data?.src) return <div className="text-xs" style={{ color: "var(--subtle)" }}>Video not available</div>;
+  if (!data?.src) return <div className="text-xs italic" style={{ color: "var(--subtle)" }}>Video not available</div>;
   const videoSrc = data.src.startsWith("/") ? `${BASE}${data.src}` : data.src;
+  const num = nextFigureNum?.();
   return (
     <>
-      <div className="glass-card-static p-2 mb-3 cursor-pointer group" onClick={() => setLightboxOpen(true)}>
-        {data.caption && <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted)" }}>{data.caption}</div>}
+      <figure className="figure-plate mb-4 cursor-pointer" onClick={() => setLightboxOpen(true)}>
         <div className="relative">
           <video
             controls
             className="w-full"
-            style={{ maxHeight: "480px", border: "2px solid var(--ink)" }}
+            style={{ maxHeight: "480px" }}
             poster={data.poster}
           >
             <source src={videoSrc} type="video/mp4" />
           </video>
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-            <span className="bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">Click to expand</span>
-          </div>
         </div>
-      </div>
+        {(num != null || data.caption) && (
+          <figcaption className="figure-caption">
+            {num != null && <span className="figure-num">Fig. {num}</span>}
+            {data.caption}
+          </figcaption>
+        )}
+      </figure>
       {lightboxOpen && (
         <MediaLightbox src={data.src} caption={data.caption} onClose={() => setLightboxOpen(false)} />
       )}
@@ -268,34 +308,56 @@ function VideoBlock({ data }: { data: VideoBlockData }) {
   );
 }
 
-function GalleryBlock({ data }: { data: GalleryBlockData }) {
+function GalleryBlock({ data, nextFigureNum }: { data: GalleryBlockData; nextFigureNum?: () => number }) {
   if (!data?.images || data.images.length === 0) return null;
+  const num = nextFigureNum?.();
   return (
-    <div className="glass-card-static p-3 mb-3">
-      {data.caption && <div className="text-xs font-semibold mb-2" style={{ color: "var(--muted)" }}>{data.caption}</div>}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+    <figure className="figure-plate mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-2">
         {data.images.filter(Boolean).map((img, i) => (
-          <div key={i} className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--border)", aspectRatio: "4/3" }}>
-            <MediaImage src={img.src} caption={img.caption} prompt={img.prompt} />
+          <div key={i} className="overflow-hidden" style={{ border: "1px solid var(--rule)", borderRadius: "var(--radius-sharp)", aspectRatio: "4/3" }}>
+            <MediaImage src={img.src} caption={undefined} prompt={img.prompt} />
           </div>
         ))}
       </div>
-      {data.source && <div className="text-[10px] mt-2" style={{ color: "var(--subtle)" }}>Source: {data.source}</div>}
-    </div>
+      {(num != null || data.caption) && (
+        <figcaption className="figure-caption">
+          {num != null && <span className="figure-num">Plate {num}</span>}
+          {data.caption}
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
+/** PullQuoteBlock — optional block the pipeline may emit. No-op if absent. */
+function PullQuoteBlock({ data }: { data: { text?: string; quote?: string; cite?: string; attribution?: string } }) {
+  const text = data?.text ?? data?.quote ?? "";
+  if (!text) return null;
+  return (
+    <blockquote className="pull-quote">
+      {text}
+      {(data.cite || data.attribution) && (
+        <footer className="dateline" style={{ marginTop: "0.75rem", fontSize: "0.7rem" }}>— {data.cite ?? data.attribution}</footer>
+      )}
+    </blockquote>
   );
 }
 
 function CitationBlock({ data }: { data: CitationBlockData }) {
   if (!data) return null;
   return (
-    <a href={data.url} target="_blank" rel="noopener noreferrer"
-      className="glass-card-static p-2 flex items-center gap-2 mb-2 border-l-2 transition-colors hover:bg-[var(--accent-bg)]/20"
-      style={{ textDecoration: "none", color: "inherit", fontSize: "0.85rem", borderLeftColor: "var(--accent)" }}
+    <a
+      href={data.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="plate flex items-start gap-2 mb-2 transition-colors"
+      style={{ textDecoration: "none", color: "inherit", fontSize: "0.85rem", padding: "0.6rem 0.75rem", borderLeft: "2px solid var(--gold)" }}
     >
-      <IconLink size={14} />
+      <IconLink size={14} style={{ color: "var(--gold)", marginTop: 2 }} />
       <span className="flex-1 min-w-0">
-        <span className="block truncate font-semibold">{data.title || data.url}</span>
-        {data.relevance && <span className="block text-xs" style={{ color: "var(--muted)" }}>{data.relevance}</span>}
+        <span className="block truncate font-display" style={{ fontSize: "0.875rem" }}>{data.title || data.url}</span>
+        {data.relevance && <span className="block font-serif text-xs italic" style={{ color: "var(--muted)" }}>{data.relevance}</span>}
       </span>
       <span className="text-[10px]" style={{ color: "var(--subtle)" }}>↗</span>
     </a>
@@ -305,38 +367,35 @@ function CitationBlock({ data }: { data: CitationBlockData }) {
 function CrossrefBlock({ data }: { data: CrossrefBlockData }) {
   if (!data) return null;
   return (
-    <Link href={`/article/${data.slug}`}
-      className="glass-card-static p-2 flex items-center gap-2 mb-2"
-      style={{ textDecoration: "none", color: "inherit", fontSize: "0.85rem" }}
-     
-    >
-      <IconLink size={16} />
-      <span className="flex-1 min-w-0">
-        <span className="block truncate font-semibold">{data.title || data.slug}</span>
-        {data.relationship && <span className="block text-xs" style={{ color: "var(--muted)" }}>{data.relationship}</span>}
-      </span>
-      <span style={{ color: "var(--accent)", fontSize: "1.2rem" }}>→</span>
-    </Link>
+    <div className="see-also my-4">
+      <span className="see-also-label">See also:</span>{" "}
+      <Link href={`/article/${data.slug}`}>
+        {data.title || data.slug.replace(/-/g, " ")}
+      </Link>
+      {data.relationship && <span className="font-serif italic text-xs" style={{ color: "var(--muted)" }}> — {data.relationship}</span>}
+    </div>
   );
 }
 
 function ToolCallBlock({ data }: { data: { name: string; args?: Record<string, unknown>; result?: string } }) {
   if (!data) return null;
   return (
-    <div className="flex items-start gap-2 text-xs py-1 px-2 rounded mb-1" style={{ background: "#f0f7ff" }}>
-      <IconLightning size={12} /> {data.name}
+    <div className="flex items-start gap-2 text-xs py-1 px-2 mb-1" style={{ background: "var(--gold-bg)", borderRadius: "var(--radius-sharp)" }}>
+      <IconLightning size={12} style={{ color: "var(--gold)", marginTop: 2 }} /> {data.name}
       {data.result && <code className="text-[10px]" style={{ color: "var(--muted)" }}>{data.result.slice(0, 150)}</code>}
     </div>
   );
 }
 
 function DividerBlock() {
-  return <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "2rem 0" }} />;
+  return (
+    <div className="fleuron" aria-hidden="true">❦</div>
+  );
 }
 
 function UnknownBlock({ block }: { block: Block }) {
   return (
-    <div className="text-xs p-2 mb-1 border border-dashed border-[var(--border)]" style={{ color: "var(--subtle)" }}>
+    <div className="text-xs p-2 mb-1" style={{ color: "var(--subtle)", border: "1px dashed var(--rule)", borderRadius: "var(--radius-sharp)" }}>
       Unknown block type: {block.type}
     </div>
   );

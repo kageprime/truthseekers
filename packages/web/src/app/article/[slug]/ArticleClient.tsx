@@ -269,67 +269,68 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
   return (
     <PageLayout>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" style={{ position: "relative", zIndex: 1 }}>
 
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-          {/* Back to articles */}
-          <Link href="/articles" className="inline-flex items-center gap-1 text-sm mb-4 transition-colors hover:underline" style={{ color: "var(--accent)" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <article className="max-w-[42rem] mx-auto px-4 sm:px-6 py-10 sm:py-14">
+          {/* Back link */}
+          <Link href="/articles" className="inline-flex items-center gap-1 dateline mb-8 transition-colors hover:underline" style={{ color: "var(--gold)" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />
             </svg>
-            Back to Articles
+            The Encyclopedia
           </Link>
 
-          {/* Meta bar */}
-          <div className="flex items-center gap-2 text-xs mb-4" style={{ color: "var(--subtle)", fontFamily: "var(--font-mono)" }}>
-            <span>v{article.metadata.version}</span>
-            <span>·</span>
-            <span>{new Date(article.metadata.updated).toLocaleDateString("en-US", {
-              year: "numeric", month: "long", day: "numeric"
-            })}</span>
-            {article.metadata.generatedBy && (
-              <>
-                <span>·</span>
-                <span><IconUser size={12} /> {article.metadata.generatedBy.slice(0, 12)}...</span>
-              </>
-            )}
-          </div>
-
-          {/* Title */}
-          <h1 className="text-lg sm:text-xl font-semibold mb-6 leading-tight" style={{ color: "var(--ink)" }}>
-            {article.title || slug.replace(/-/g, " ")}
-          </h1>
-
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 mb-8">
+          {/* Admin / utility toolbar — demoted to a slim icon row */}
+          <div className="flex items-center justify-end gap-1 mb-6 -mt-12 sm:-mt-16">
             <button
               onClick={handleRefresh}
               disabled={generating || (quota?.remaining != null && quota.remaining <= 0)}
-              className="btn btn-primary btn-sm"
+              className="btn-icon btn-ghost"
+              title={generating ? "Refreshing…" : "Regenerate article"}
+              aria-label="Regenerate article"
             >
-              {generating ? <><IconRefresh size={14} /> Refreshing...</> : <><IconRefresh size={14} /> Refresh</>}
+              <IconRefresh size={15} />
             </button>
-            <button
-              onClick={() => handleExport("json")}
-              className="btn btn-secondary btn-sm"
-            >
-              <IconFile size={14} /> JSON
+            <button onClick={() => handleExport("json")} className="btn-icon btn-ghost" title="Export JSON" aria-label="Export JSON">
+              <IconFile size={15} />
             </button>
-            <button
-              onClick={() => handleExport("markdown")}
-              className="btn btn-secondary btn-sm"
-            >
-              <IconFileText size={14} /> MD
+            <button onClick={() => handleExport("markdown")} className="btn-icon btn-ghost" title="Export Markdown" aria-label="Export Markdown">
+              <IconFileText size={15} />
             </button>
             {quota != null && quota.remaining <= 3 && (
-              <span className="text-xs ml-auto" style={{ color: quota.remaining === 0 ? "var(--red)" : "var(--accent)" }}>
-                {quota.remaining} / {quota.limit}
+              <span className="dateline ml-2" style={{ color: quota.remaining === 0 ? "var(--oxblood)" : "var(--gold)" }}>
+                {quota.remaining}/{quota.limit} left
               </span>
             )}
           </div>
 
-          {/* Article content */}
-          <div className="glass-card-static p-4 sm:p-8">
+          {/* Title block */}
+          <header className="mb-10 text-center">
+            <h1 className="t-display mb-4" style={{ fontSize: "clamp(2rem, 1rem + 4vw, 3rem)", color: "var(--ink)" }}>
+              {article.title || slug.replace(/-/g, " ")}
+            </h1>
+            {/* Gold rule under the title */}
+            <div className="mx-auto" style={{ height: 2, width: "3rem", background: "var(--gold)" }} />
+
+            {/* Dateline — small-caps meta */}
+            <div className="dateline mt-4" style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "0 0.25em" }}>
+              <span>Vol. I</span>
+              {article.metadata?.version != null && (<>
+                <span className="sep">·</span><span>Rev. {article.metadata.version}</span>
+              </>)}
+              {article.metadata?.updated && (<>
+                <span className="sep">·</span>
+                <span>{new Date(article.metadata.updated).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
+              </>)}
+              {article.metadata?.generatedBy && (<>
+                <span className="sep">·</span>
+                <span><IconUser size={11} /> {article.metadata.generatedBy.slice(0, 12)}</span>
+              </>)}
+            </div>
+          </header>
+
+          {/* Article body — reading column */}
+          <div className="reading-column">
             {article.blocks && article.blocks.length > 0 ? (
               <BlockRenderer blocks={article.blocks} />
             ) : (
@@ -344,7 +345,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
               )} />
             )}
           </div>
-        </div>
+        </article>
       </div>
     </PageLayout>
   );

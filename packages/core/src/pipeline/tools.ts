@@ -1,4 +1,4 @@
-import { sendPrompt, webSearch } from "../llm.js";
+import { sendPrompt, tavilySearch } from "../llm.js";
 import type { ToolDefinition } from "../models.js";
 import type { ToolExecutor } from "../agent/types.js";
 import type { AgentEvent, ResearchResult, ArticleOutline, ArticleContent, VerificationResult, MediaGenerationResult } from "../types.js";
@@ -125,7 +125,7 @@ export const PIPELINE_TOOL_EXECUTORS: Record<string, ToolExecutor> = {
     const topic = args.topic;
     const persona: Persona = args.persona || "veritas";
 
-    const searchResults = await webSearch(topic);
+    const searchResults = await tavilySearch(topic);
     const searchContext = searchResults.length > 0
       ? searchResults.map((r, i) => `[${i + 1}] ${r.title}\n    URL: ${r.url}\n    ${r.snippet.slice(0, 500)}`).join("\n\n")
       : "No web search results available.";
