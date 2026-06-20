@@ -55,7 +55,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         } : { display: "flex", overflow: "auto" }}>
         <main className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col" id="main-content"
           style={{ containerType: "inline-size", containerName: "page" }}>
-          {isHidden ? children : (
+          {isHidden || isChatRoute ? children : (
             <div className="max-w-[1400px] mx-auto w-full flex-1 flex flex-col min-h-0">
               {children}
             </div>
