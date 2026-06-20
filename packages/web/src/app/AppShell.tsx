@@ -4,8 +4,11 @@ import { type ReactNode, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import SharedHeader from "./components/SharedHeader";
 import FloatingChatWidget from "./components/FloatingChatWidget";
+import ExploreView from "./components/ExploreView";
+import PressView from "./components/PressView";
+import ViewSwitcher from "./components/ViewSwitcher";
 import { useFloatingChat } from "./FloatingChatContext";
-import { useHeaderSearch } from "./HeaderSearchContext";
+import { useArticleView } from "./ArticleViewContext";
 
 const HIDDEN_ROUTES = ["/login", "/onboarding"];
 const OVERLAY_ROUTES = ["/maps/"];
@@ -14,7 +17,7 @@ const CHAT_ROUTES = ["/chat/"];
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { isOpen, toggle, close, isExpanded } = useFloatingChat();
-  const { search } = useHeaderSearch();
+  const { article, mode } = useArticleView();
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -44,7 +47,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="h-screen overflow-hidden flex flex-col">
-      {!isHidden && <SharedHeader search={search ?? undefined} />}
+      {!isHidden && <SharedHeader />}
 
       <div className="flex-1 flex min-h-0 min-w-0"
         style={showChat && !isOverlay ? {
@@ -55,11 +58,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         } : { display: "flex", overflow: "auto" }}>
         <main className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col" id="main-content"
           style={{ containerType: "inline-size", containerName: "page" }}>
-          {isHidden || isChatRoute ? children : (
-            <div className="max-w-[1400px] mx-auto w-full flex-1 flex flex-col min-h-0">
-              {children}
-            </div>
-          )}
+          {children}
         </main>
 
         {showChat && !isOverlay && (
@@ -115,6 +114,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <div className="w-full max-w-4xl h-full flex flex-col">
             <FloatingChatWidget />
           </div>
+        </div>
+      )}
+
+      {/* Explore overlay */}
+      <ExploreView />
+
+      {/* Press overlay */}
+      <PressView />
+
+      {/* Floating ViewSwitcher for stream mode */}
+      {article && mode === "stream" && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80]">
+          <ViewSwitcher />
         </div>
       )}
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import BlockRenderer from "./BlockRenderer";
+import ArticleBlock from "./ArticleBlock";
 import MarkdownRenderer from "./MarkdownRenderer";
 import type { Block } from "@encarta/core";
 import { IconThumbsUp, IconThumbsDown, IconRefresh, IconPencil, IconCopy, IconCheck } from "./Icons";
@@ -87,7 +88,11 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
         {/* Blocks (maps, timelines, images, etc.) */}
         {blocks && blocks.length > 0 && (
           <div className="mt-2">
-            <BlockRenderer blocks={blocks} compact />
+            {blocks.length > 4 ? (
+              <ArticleBlock blocks={blocks} />
+            ) : (
+              <BlockRenderer blocks={blocks} compact />
+            )}
           </div>
         )}
 

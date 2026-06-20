@@ -692,6 +692,37 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
 ::view-transition-old(root) { animation: vt-fade-out 0.2s ease-out both; }
 ::view-transition-new(root) { animation: vt-fade-in 0.25s ease-out both; }
 @keyframes vt-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.animate-fade-in { animation: fade-in 0.2s ease-out both; }
+
+/* Press View - newspaper columns */
+.newspaper-columns {
+  column-count: 2;
+  column-gap: 1.5rem;
+  column-rule: 1px solid rgba(138, 122, 98, 0.25);
+}
+.newspaper-columns.front-page .block-renderer > *:first-child {
+  margin-top: 0;
+}
+.newspaper-columns > * {
+  break-inside: avoid;
+}
+.newspaper-columns .press-headline {
+  column-span: all;
+}
+.newspaper-columns .fleuron {
+  column-span: all;
+  text-align: center;
+}
+.newspaper-columns .figure-plate,
+.newspaper-columns .plate {
+  break-inside: avoid;
+}
+
+/* Press View — pages rendered by react-pageflip */
+.press-page-inner {
+  overflow: hidden;
+}
 @keyframes vt-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .sidebar-panel { view-transition-name: sidebar; }
 .header-bar { view-transition-name: header; }
