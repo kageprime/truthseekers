@@ -365,7 +365,7 @@ function CitationBlock({ data }: { data: CitationBlockData }) {
 }
 
 function CrossrefBlock({ data }: { data: CrossrefBlockData }) {
-  if (!data) return null;
+  if (!data?.slug) return null;
   return (
     <div className="see-also my-4">
       <span className="see-also-label">See also:</span>{" "}

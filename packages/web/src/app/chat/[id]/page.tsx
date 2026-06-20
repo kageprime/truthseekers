@@ -210,6 +210,29 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         </button>
       </div>
 
+      {/* Platform navigation */}
+      <div className="shrink-0 px-3 pb-2 space-y-0.5">
+        {[
+          { label: "Home", href: "/", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg> },
+          { label: "Articles", href: "/articles", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg> },
+          { label: "Maps", href: "/maps", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" /><line x1="8" y1="2" x2="8" y2="18" /><line x1="16" y1="6" x2="16" y2="22" /></svg> },
+          { label: "Queue", href: "/queue", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></svg> },
+        ].map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            onClick={() => setSidebarOpen(false)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm no-underline transition-colors hover:bg-[var(--accent-bg)]/30"
+            style={{ color: "var(--ink-secondary)" }}
+          >
+            {link.icon}
+            {link.label}
+          </Link>
+        ))}
+      </div>
+
+      <div className="mx-3 border-t" style={{ borderColor: "var(--border)" }} />
+
       {/* Chat sessions */}
       <div className="flex-1 overflow-y-auto min-h-0 px-2 py-1 space-y-0.5">
         {chatsLoading ? (
