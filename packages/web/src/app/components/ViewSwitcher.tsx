@@ -13,18 +13,27 @@ export default function ViewSwitcher() {
   if (!article) return null;
 
   return (
-    <div className="flex items-center gap-0.5 bg-white/10 rounded-full p-0.5">
-      {modes.map((m) => (
-        <button
-          key={m.key}
-          onClick={() => setMode(m.key)}
-          className={`px-2.5 py-1 text-[10px] font-medium rounded-full transition-all ${
-            mode === m.key ? "bg-white/20 text-white" : "text-white/50 hover:text-white/80"
-          }`}
-        >
-          {m.label}
-        </button>
-      ))}
+    <div
+      className="flex items-center gap-0.5 rounded-full p-0.5"
+      style={{ background: "color-mix(in srgb, var(--ink) 10%, transparent)" }}
+    >
+      {modes.map((m) => {
+        const active = mode === m.key;
+        return (
+          <button
+            key={m.key}
+            onClick={() => setMode(m.key)}
+            className="px-2.5 py-1 text-[10px] font-medium rounded-full transition-all"
+            style={{
+              background: active ? "var(--gold)" : "transparent",
+              color: active ? "white" : "var(--ink-secondary)",
+              opacity: active ? 1 : 0.6,
+            }}
+          >
+            {m.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

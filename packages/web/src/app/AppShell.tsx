@@ -125,7 +125,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       {/* Floating ViewSwitcher for stream mode */}
       {article && mode === "stream" && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80]">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] shadow-lg rounded-full p-0.5"
+          style={{ background: "var(--surface-elevated)", border: "1px solid var(--rule)" }}>
           <ViewSwitcher />
         </div>
       )}
