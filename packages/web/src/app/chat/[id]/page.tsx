@@ -152,7 +152,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                 id: event.msgId ?? `msg-${Date.now()}-${Math.random()}`,
                 conversationId: cid,
                 role: "assistant" as const,
-                content: event.content || "",
+                content: finalBlocks.length > 0 ? "" : (event.content || ""),
                 blocks: finalBlocks,
                 agentEvents: savedEvents,
                 createdAt: new Date().toISOString(),
