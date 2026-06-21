@@ -81,7 +81,7 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
               {viewMode === "3d" && map.threedScene ? (
                 <ThreeDMapViewer scene={map.threedScene} height="clamp(300px, 50vh, 500px)" />
               ) : map.type === "static" && map.image ? (
-                <div className="w-full overflow-hidden border-2 border-[var(--border)] bg-white">
+                <div className="w-full overflow-hidden border-2 border-[var(--border)] bg-[var(--surface-elevated)]">
                   <img
                     src={map.image}
                     alt={map.title}

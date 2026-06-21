@@ -27,7 +27,6 @@ export default function FloatingChatWidget() {
 
   const [input, setInput] = useState("");
   const [streamContent, setStreamContent] = useState("");
-  const [streamSteps, setStreamSteps] = useState<{ text: string; createdAt: string }[]>([]);
   const [streamBlocks, setStreamBlocks] = useState<any[]>([]);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -36,6 +35,7 @@ export default function FloatingChatWidget() {
   const agentEventsRef = useRef<AgentEvent[]>([]);
   const finalizedRef = useRef(false);
   const streamContentRef = useRef("");
+  const streamAccumulatorRef = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Close session switcher on outside click
@@ -127,12 +127,12 @@ export default function FloatingChatWidget() {
 
     setSending(true);
     setStreamContent("");
-    setStreamSteps([]);
     setStreamBlocks([]);
     setAgentEvents([]);
     agentEventsRef.current = [];
     finalizedRef.current = false;
     streamContentRef.current = "";
+    streamAccumulatorRef.current = "";
 
     const userMsg = {
       id: `temp-${Date.now()}`,
@@ -152,8 +152,9 @@ export default function FloatingChatWidget() {
 
     await streamSend(cid, msg, {
       onText: (text) => {
-        setStreamContent(text);
         streamContentRef.current = text;
+        const acc = streamAccumulatorRef.current;
+        setStreamContent(acc ? `${acc}\n- ${text}` : `- ${text}`);
       },
       onToolEvent: (event) => {
         setAgentEvents((prev) => {
@@ -161,11 +162,11 @@ export default function FloatingChatWidget() {
           agentEventsRef.current = next;
           return next;
         });
-        // Snapshot completed thinking step at tool boundary
+        // Append completed step text to the accumulator
         const text = streamContentRef.current;
         if (text) {
-          setStreamSteps((prev) => [...prev, { text, createdAt: new Date().toISOString() }]);
-          setStreamContent("");
+          const prev = streamAccumulatorRef.current;
+          streamAccumulatorRef.current = prev ? `${prev}\n- ${text}` : `- ${text}`;
           streamContentRef.current = "";
         }
       },
@@ -174,9 +175,9 @@ export default function FloatingChatWidget() {
         finalizedRef.current = true;
         const savedEvents = agentEventsRef.current;
         const finalBlocks = event.blocks ?? [];
-        setStreamSteps([]);
         setStreamContent("");
         streamContentRef.current = "";
+        streamAccumulatorRef.current = "";
         setStreamBlocks(finalBlocks);
         queryClient.cancelQueries({ queryKey: ["chat", cid] });
         queryClient.setQueryData(["chat", cid], (prev: any) => {
@@ -335,9 +336,6 @@ export default function FloatingChatWidget() {
               {!sending && lastAssistantIndex >= 0 && followUps.length > 0 && (
                 <FollowUpSuggestions followUps={followUps} onClick={doSend} />
               )}
-              {streamSteps.map((step, i) => (
-                <ChatMessage key={`step-${i}`} role="assistant" content={step.text} createdAt={step.createdAt} />
-              ))}
               {hasStreaming && (
                 <ChatMessage role="assistant" content={streamContent} streaming />
               )}

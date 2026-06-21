@@ -190,7 +190,7 @@ export default function MapViewer({
               className={`text-xs px-3 py-2.5 min-h-[44px] sm:py-1.5 border transition-colors ${
                 activeLayerId === layer.id
                   ? "bg-[var(--blue)] text-white border-[var(--blue)]"
-                  : "bg-white text-[var(--muted)] border-[var(--border)] hover:border-[var(--blue)] hover:text-[var(--blue)]"
+                  : "bg-[var(--surface-elevated)] text-[var(--muted)] border-[var(--border)] hover:border-[var(--blue)] hover:text-[var(--blue)]"
               }`}
             >
               {layer.label}{layer.year ? ` (${layer.year})` : ""}

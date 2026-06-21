@@ -10,6 +10,7 @@ import ChatMessage from "../../components/ChatMessage";
 import EmptyChatState from "../../components/EmptyChatState";
 import FollowUpSuggestions from "../../components/FollowUpSuggestions";
 import ChatSidebar from "../../components/ChatSidebar";
+import TruthConsole from "../../components/TruthConsole";
 import { BASE } from "@/lib/constants";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,18 +21,19 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   const [input, setInput] = useState("");
   const [streamContent, setStreamContent] = useState("");
-  const [streamSteps, setStreamSteps] = useState<{ text: string; createdAt: string }[]>([]);
   const [streamBlocks, setStreamBlocks] = useState<any[]>([]);
   const [sending, setSending] = useState(false);
   const [convId, setConvId] = useState<string | null>(id !== "new" ? id : null);
   const [loading, setLoading] = useState(false);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [consoleOpen, setConsoleOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const agentEventsRef = useRef<AgentEvent[]>([]);
   const finalizedRef = useRef(false);
   const streamContentRef = useRef("");
+  const streamAccumulatorRef = useRef("");
 
   const { data: conv, loading: convLoading } = useChat(convId ?? undefined);
   const messages = useMemo(() => (conv?.messages ?? []).filter((m: any) => m.role !== "tool"), [conv?.messages]);
@@ -53,7 +55,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, streamContent, streamSteps]);
+  }, [messages, streamContent]);
 
   const doSend = useCallback(async (msg: string) => {
     if (!msg.trim() || sending) return;
@@ -83,12 +85,12 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
     setSending(true);
     setStreamContent("");
-    setStreamSteps([]);
     setStreamBlocks([]);
     setAgentEvents([]);
     agentEventsRef.current = [];
     finalizedRef.current = false;
     streamContentRef.current = "";
+    streamAccumulatorRef.current = "";
 
     const userMsg = {
       id: `temp-${Date.now()}`,
@@ -108,8 +110,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
     await streamSend(cid!, msg, {
       onText: (text) => {
-        setStreamContent(text);
         streamContentRef.current = text;
+        const acc = streamAccumulatorRef.current;
+        setStreamContent(acc ? `${acc}\n- ${text}` : `- ${text}`);
       },
       onToolEvent: (event) => {
         setAgentEvents((prev) => {
@@ -117,11 +120,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           agentEventsRef.current = next;
           return next;
         });
-        // Snapshot completed thinking step at tool boundary
+        // Append completed step text to the accumulator
         const text = streamContentRef.current;
         if (text) {
-          setStreamSteps((prev) => [...prev, { text, createdAt: new Date().toISOString() }]);
-          setStreamContent("");
+          const prev = streamAccumulatorRef.current;
+          streamAccumulatorRef.current = prev ? `${prev}\n- ${text}` : `- ${text}`;
           streamContentRef.current = "";
         }
       },
@@ -130,9 +133,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         finalizedRef.current = true;
         const savedEvents = agentEventsRef.current;
         const finalBlocks = event.blocks ?? [];
-        setStreamSteps([]);
         setStreamContent("");
         streamContentRef.current = "";
+        streamAccumulatorRef.current = "";
         setStreamBlocks(finalBlocks);
         queryClient.cancelQueries({ queryKey: ["chat", cid] });
         queryClient.setQueryData(["chat", cid], (prev: any) => {
@@ -208,6 +211,16 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setConsoleOpen((o) => !o)}
+              className={`text-xs flex items-center gap-1 px-2 py-1 rounded-md border ${consoleOpen ? "bg-accent-bg text-accent border-accent" : "text-subtle border-[var(--border)]"}`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 17 10 11 4 5" />
+                <line x1="12" y1="19" x2="20" y2="19" />
+              </svg>
+              <span className="hidden sm:inline">Console{agentEvents.length > 0 && <span className="ml-0.5">({agentEvents.length})</span>}</span>
+            </button>
+            <button
               onClick={handleNewChat}
               className="btn-ghost text-xs flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-accent"
             >
@@ -219,9 +232,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           </div>
         </div>
 
-        {/* Messages */}
+        {/* Messages / Console */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
-          {loading || convLoading ? (
+          {consoleOpen ? (
+            <TruthConsole events={agentEvents} loading={sending && agentEvents.length === 0} />
+          ) : loading || convLoading ? (
             <div className="flex items-center justify-center h-full">
               <div className="w-6 h-6 rounded-full border-2 animate-spin border-border border-t-gold" />
             </div>
@@ -242,9 +257,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
               {!sending && lastAssistantIndex >= 0 && followUps.length > 0 && (
                 <FollowUpSuggestions followUps={followUps} onClick={doSend} />
               )}
-              {streamSteps.map((step, i) => (
-                <ChatMessage key={`step-${i}`} role="assistant" content={step.text} createdAt={step.createdAt} />
-              ))}
               {hasStreaming && (
                 <ChatMessage role="assistant" content={streamContent} streaming />
               )}
@@ -253,7 +265,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         </div>
 
         {/* Input */}
-        <div className="shrink-0 px-3 sm:px-6 pb-4 pt-2 border-t border-border bg-surface">
+        <div className="shrink-0 px-3 sm:px-6 pb-4 pt-2 border-t border-border">
           <div className="max-w-3xl mx-auto w-full">
             <div className="flex items-end gap-2 rounded-2xl p-1.5 bg-surface-elevated border border-border">
               <div className="flex-1 min-w-0">

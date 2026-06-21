@@ -54,12 +54,12 @@ export default function MermaidDiagram({ code, caption }: { code?: string; capti
   return (
     <div className="glass-card-static p-4 my-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-[#888]">DIAGRAM</span>
+        <span className="text-xs font-medium" style={{ color: "var(--subtle)" }}>DIAGRAM</span>
         <div className="flex gap-1">
           {state === "error" && (
             <button
               onClick={() => { setState("edit"); setEditCode((code || "").trim()); }}
-              className="text-xs border border-black px-1 py-1 min-h-[44px] sm:min-h-0 cursor-pointer bg-white"
+              className="text-xs border border-[var(--border)] px-1 py-1 min-h-[44px] sm:min-h-0 cursor-pointer bg-[var(--surface-elevated)]"
             >
               EDIT
             </button>
@@ -67,7 +67,7 @@ export default function MermaidDiagram({ code, caption }: { code?: string; capti
           {state === "rendered" && (
             <button
               onClick={() => setZoomed(!zoomed)}
-              className="text-xs border border-black px-1 py-1 min-h-[44px] sm:min-h-0 cursor-pointer bg-white"
+              className="text-xs border border-[var(--border)] px-1 py-1 min-h-[44px] sm:min-h-0 cursor-pointer bg-[var(--surface-elevated)]"
             >
               {zoomed ? "−" : "+"}
             </button>
@@ -77,22 +77,22 @@ export default function MermaidDiagram({ code, caption }: { code?: string; capti
       <p className="text-sm font-medium mb-3">{caption}</p>
 
       {state === "loading" && (
-        <div className="flex items-center justify-center h-32 border-2 border-dashed border-black/20 bg-white/50">
+        <div className="flex items-center justify-center h-32 border-2 border-dashed border-[var(--border)] bg-[var(--surface-elevated)]/50">
           <div className="text-center">
-            <div className="inline-block w-8 h-8 border-3 border-[var(--border)] border-t-[#1c1917] rounded-full"
+            <div className="inline-block w-8 h-8 border-3 border-[var(--border)] border-t-[var(--ink)] rounded-full"
               style={{ animation: "spin 0.8s linear infinite" }} />
-            <p className="text-xs text-[#888] mt-2">Rendering diagram...</p>
+            <p className="text-xs mt-2" style={{ color: "var(--subtle)" }}>Rendering diagram...</p>
           </div>
         </div>
       )}
 
       {state === "error" && (
-        <div className="p-3 text-sm" style={{ background: "#fef2f2", border: "1px solid #dc2626", color: "#dc2626" }}>
+        <div className="p-3 text-sm" style={{ background: "var(--oxblood-subtle)", border: "1px solid var(--oxblood)", color: "var(--oxblood)" }}>
           <p className="font-bold mb-1">Invalid diagram</p>
           <p className="text-xs mb-2">{errorMsg}</p>
           <details className="mt-1">
             <summary className="text-xs cursor-pointer font-medium">View raw code</summary>
-            <pre className="mt-1 p-2 bg-white text-xs overflow-auto max-h-32 border border-[#ccc]">{code}</pre>
+            <pre className="mt-1 p-2 bg-[var(--surface-elevated)] text-xs overflow-auto max-h-32 border border-[var(--border)]">{code}</pre>
           </details>
         </div>
       )}
@@ -102,14 +102,14 @@ export default function MermaidDiagram({ code, caption }: { code?: string; capti
           <textarea
             value={editCode}
             onChange={(e) => setEditCode(e.target.value)}
-            className="w-full h-40 text-xs font-mono p-3 border-2 border-black bg-white resize-y"
+            className="w-full h-40 text-xs font-mono p-3 border-2 border-[var(--border)] bg-[var(--surface-elevated)] resize-y"
             style={{ outline: "none" }}
           />
           <div className="flex gap-2">
-            <button onClick={handleEditSubmit} className="text-xs font-medium bg-[var(--accent)] text-white px-3 py-3 sm:py-1 min-h-[44px] border border-black">
+            <button onClick={handleEditSubmit} className="text-xs font-medium bg-[var(--accent)] text-white px-3 py-3 sm:py-1 min-h-[44px] border border-[var(--border)]">
               RENDER
             </button>
-            <button onClick={() => setState("error")} className="text-xs font-medium border border-black px-3 py-3 sm:py-1 min-h-[44px] bg-white">
+            <button onClick={() => setState("error")} className="text-xs font-medium border border-[var(--border)] px-3 py-3 sm:py-1 min-h-[44px] bg-[var(--surface-elevated)]">
               CANCEL
             </button>
           </div>
@@ -119,12 +119,12 @@ export default function MermaidDiagram({ code, caption }: { code?: string; capti
       {state === "rendered" && (
         <div
           ref={containerRef}
-          className="flex justify-center p-3 bg-white overflow-auto"
+          className="flex justify-center p-3 bg-[var(--surface-elevated)] overflow-auto"
           style={{
             minHeight: 60,
             maxHeight: zoomed ? "none" : "min(400px, 60vh)",
             transition: "max-height 0.3s",
-            border: "1px solid #eee",
+            border: "1px solid var(--border)",
           }}
         />
       )}

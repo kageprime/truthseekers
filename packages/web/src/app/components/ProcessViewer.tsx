@@ -271,7 +271,7 @@ export function AgentActivityFullscreen({ open, onClose, events, scrollToIndex }
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center border-2 border-black bg-white shadow-[2px_2px_0_#1c1917] hover:shadow-[3px_3px_0_#1c1917] active:shadow-[1px_1px_0_#1c1917] transition-all text-xs"
+            className="w-8 h-8 flex items-center justify-center border-2 border-[var(--border)] bg-[var(--surface-elevated)] shadow-[2px_2px_0_var(--ink)] hover:shadow-[3px_3px_0_var(--ink)] active:shadow-[1px_1px_0_var(--ink)] transition-all text-xs"
             aria-label="Close fullscreen"
           >
             ✕
@@ -280,7 +280,7 @@ export function AgentActivityFullscreen({ open, onClose, events, scrollToIndex }
         <div
           ref={scrollRef}
           className="flex-1 overflow-y-auto min-h-0 border-2 border-black p-3 space-y-2"
-          style={{ background: "#fafafa" }}
+          style={{ background: "var(--surface-elevated)" }}
         >
           <div className="space-y-2">
             {events.filter(e => devMode || e.type !== "trace").map((event, i) => (
@@ -290,11 +290,11 @@ export function AgentActivityFullscreen({ open, onClose, events, scrollToIndex }
                   <span className="font-semibold uppercase text-[8px] px-1 border rounded" style={{ borderColor: "var(--border)" }}>{event.type}</span>
                 </div>
                 {event.type === "trace" && devMode && <TraceCard data={event.data as TraceData} />}
-                {event.type === "tool_use" && (devMode ? <pre className="text-[8px] bg-gray-100 p-1">{JSON.stringify(event.data, null, 2)}</pre> : <ToolUseCard data={event.data as ToolUseData} />)}
-                {event.type === "tool_result" && (devMode ? <pre className="text-[8px] bg-gray-100 p-1 max-h-40 overflow-y-auto">{JSON.stringify(event.data, null, 2)}</pre> : <ToolResultCard data={event.data as ToolResultData} />)}
+                {event.type === "tool_use" && (devMode ? <pre className="text-[8px] p-1" style={{ background: "var(--gold-bg)" }}>{JSON.stringify(event.data, null, 2)}</pre> : <ToolUseCard data={event.data as ToolUseData} />)}
+                {event.type === "tool_result" && (devMode ? <pre className="text-[8px] p-1 max-h-40 overflow-y-auto" style={{ background: "var(--gold-bg)" }}>{JSON.stringify(event.data, null, 2)}</pre> : <ToolResultCard data={event.data as ToolResultData} />)}
                 {event.type === "text" && <TextDeltaCard data={event.data as TextDelta} />}
                 {event.type === "status" && (
-                  <div className="text-[10px] font-semibold py-1 px-2.5 rounded border-l-2 border-[var(--green)]" style={{ background: "#f0fdf4" }}>
+                  <div className="text-[10px] font-semibold py-1 px-2.5 rounded border-l-2 border-[var(--green)]" style={{ background: "var(--forest-subtle)" }}>
                     <IconLightning size={10} /> {String(event.data)}
                   </div>
                 )}

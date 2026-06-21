@@ -148,7 +148,7 @@ export default function GenerationBar({
               {isDone ? "DONE" : isError ? "ERROR" : `${label} ${displayPct}%`}
             </span>
           </div>
-          <div className="w-full h-2 border border-black bg-white overflow-hidden">
+          <div className="w-full h-2 border border-[var(--border)] bg-[var(--surface-elevated)] overflow-hidden">
             <div className="h-full" style={{ width: `${displayPct}%`, background: barColor, transition: "width 0.3s linear" }} />
           </div>
         </div>

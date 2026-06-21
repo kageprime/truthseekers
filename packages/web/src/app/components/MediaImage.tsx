@@ -7,10 +7,10 @@ import { IconImage, IconX } from "./Icons";
 export function SkeletonImage({ caption }: { caption?: string }) {
   return (
     <div className="glass-card-static p-3 my-2" style={{ background: "var(--border-light)" }}>
-      <span className="text-xs font-medium text-[#888]">IMAGE</span>
+      <span className="text-xs font-medium" style={{ color: "var(--subtle)" }}>IMAGE</span>
       <div
-        className="h-40 flex items-center justify-center my-2 border-2 border-dashed border-black/20 relative overflow-hidden"
-        style={{ background: "white" }}
+        className="h-40 flex items-center justify-center my-2 border-2 border-dashed border-[var(--border)] relative overflow-hidden"
+        style={{ background: "var(--surface-elevated)" }}
       >
         <div
           className="absolute inset-0"
@@ -21,8 +21,8 @@ export function SkeletonImage({ caption }: { caption?: string }) {
         />
         <span className="opacity-40 relative z-10"><IconImage size={40} /></span>
       </div>
-      {caption && <p className="text-sm text-[#666]">{caption}</p>}
-      <p className="text-xs sm:text-[10px] text-[#aaa] mt-1">Image resolving...</p>
+      {caption && <p className="text-sm" style={{ color: "var(--muted)" }}>{caption}</p>}
+      <p className="text-xs sm:text-[10px] mt-1" style={{ color: "var(--subtle)" }}>Image resolving...</p>
     </div>
   );
 }
@@ -30,15 +30,15 @@ export function SkeletonImage({ caption }: { caption?: string }) {
 export function BlankSlateImage({ caption, prompt }: { caption?: string; prompt?: string }) {
   return (
     <div className="glass-card-static p-3 my-2" style={{ background: "var(--cream)", borderStyle: "dashed" }}>
-      <span className="text-xs font-medium text-[#888]">IMAGE</span>
-      <div className="h-32 flex items-center justify-center text-3xl opacity-50 my-2 border-2 border-dashed border-black/20 bg-white/50">
+      <span className="text-xs font-medium" style={{ color: "var(--subtle)" }}>IMAGE</span>
+      <div className="h-32 flex items-center justify-center text-3xl opacity-50 my-2 border-2 border-dashed border-[var(--border)] bg-[var(--surface-elevated)]/50">
         <IconImage size={16} />
       </div>
       {caption && <p className="text-sm font-medium">{caption}</p>}
       {prompt && (
         <details className="mt-1">
-          <summary className="text-xs sm:text-[10px] cursor-pointer text-[#888]">Search prompt</summary>
-          <p className="text-xs mt-1 p-2 bg-white border">{prompt}</p>
+          <summary className="text-xs sm:text-[10px] cursor-pointer" style={{ color: "var(--subtle)" }}>Search prompt</summary>
+          <p className="text-xs mt-1 p-2 bg-[var(--surface-elevated)] border border-[var(--border)]">{prompt}</p>
         </details>
       )}
     </div>
@@ -53,7 +53,7 @@ export function BlankSlateMedia() {
         <span className="text-2xl opacity-40">📊</span>
         <span className="text-2xl opacity-40">🧊</span>
       </div>
-      <p className="text-xs sm:text-[10px] text-[#aaa] text-center mt-1">Media suggestions pending</p>
+      <p className="text-xs sm:text-[10px] text-center mt-1" style={{ color: "var(--subtle)" }}>Media suggestions pending</p>
     </div>
   );
 }
@@ -117,16 +117,16 @@ export function FigureImage({ src, caption, source, onClick }: { src: string; ca
   return (
     <figure className="glass-card-static p-3 my-2 cursor-pointer group" onClick={onClick}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-[#888]">IMAGE</span>
-        {source && <span className="text-[9px] text-[#888]">via {source}</span>}
+        <span className="text-xs font-medium" style={{ color: "var(--subtle)" }}>IMAGE</span>
+        {source && <span className="text-[9px]" style={{ color: "var(--subtle)" }}>via {source}</span>}
       </div>
-      <div className="bg-white/50 rounded overflow-hidden relative">
+      <div className="bg-[var(--surface-elevated)]/50 rounded overflow-hidden relative">
         <img src={resolvedSrc} alt={caption} className="w-full h-auto max-h-96 object-contain transition-transform duration-300 group-hover:scale-[1.02]" loading="lazy" />
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <span className="bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">Click to expand</span>
         </div>
       </div>
-      <figcaption className="text-sm text-[#555] mt-2">{caption}</figcaption>
+      <figcaption className="text-sm mt-2" style={{ color: "var(--muted)" }}>{caption}</figcaption>
     </figure>
   );
 }
