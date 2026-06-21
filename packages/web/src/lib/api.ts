@@ -126,3 +126,44 @@ export async function updateChatTitle(id: string, title: string): Promise<boolea
 export function chatProgressUrl(id: string): string {
   return `${BASE}/chat/${id}/messages`;
 }
+
+// ── Admin ────────────────────────────────────────────────
+
+export async function fetchSettings(): Promise<Record<string, string>> {
+  const res = await fetch(`${BASE}/admin/settings`, { cache: "no-store", headers: { ...authHeaders() } });
+  if (!res.ok) return {};
+  return res.json();
+}
+
+export async function updateSettings(settings: Record<string, string>): Promise<boolean> {
+  const res = await fetch(`${BASE}/admin/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ settings }),
+  });
+  return res.ok;
+}
+
+export async function fetchFeaturedArticles(): Promise<ArticleSummary[]> {
+  const settings = await fetchSettings();
+  const raw = settings.featured_articles;
+  if (!raw) return [];
+  let slugs: string[];
+  try { slugs = JSON.parse(raw); } catch { return []; }
+  if (!Array.isArray(slugs) || slugs.length === 0) return [];
+  const results = await Promise.allSettled(slugs.map((s) => fetchArticle(s)));
+  const articles: ArticleSummary[] = [];
+  for (const r of results) {
+    if (r.status === "fulfilled" && r.value) {
+      const a = r.value;
+      articles.push({
+        slug: a.slug,
+        title: a.title,
+        abstract: a.abstract,
+        metadata: a.metadata,
+        categories: a.categories,
+      });
+    }
+  }
+  return articles;
+}

@@ -45,20 +45,20 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
   }
 
   return (
-    <div className={`flex gap-3 px-6 py-4 group ${isUser ? "flex-row-reverse" : ""} transition-colors ${streaming ? "bg-[var(--accent-bg)]/5" : "hover:bg-black/[0.02]"}`}>
+    <div className={`flex gap-3 px-3 sm:px-6 py-4 group ${isUser ? "flex-row-reverse" : ""} transition-colors ${streaming ? "bg-accent-bg/5" : "hover:bg-black/[0.02]"}`}>
       {/* Body */}
       <div className={`space-y-1 min-w-0 ${isUser ? "items-end" : "flex-1"}`}>
         {/* Label */}
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--subtle)" }}>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-subtle">
             {isUser ? "You" : "Truthseeker"}
           </span>
           {createdAt && (
-            <span className="text-[10px]" style={{ color: "var(--subtle)" }}>{timeAgo(createdAt)}</span>
+            <span className="text-[10px] text-subtle">{timeAgo(createdAt)}</span>
           )}
           {streaming && (
-            <span className="flex items-center gap-1 text-[10px]" style={{ color: "var(--accent)" }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+            <span className="flex items-center gap-1 text-[10px] text-accent">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
               Generating...
             </span>
           )}
@@ -66,20 +66,20 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
 
         {/* Content */}
         {isUser ? (
-          <div className="px-4 py-2.5 rounded-2xl text-sm w-fit max-w-[75%]" style={{ background: "var(--accent-bg)", color: "var(--ink)" }}>
+          <div className="px-4 py-2.5 rounded-2xl text-sm w-fit max-w-[75%] bg-accent-bg text-ink">
             {content}
           </div>
         ) : (
           <>
             {content ? (
-              <div className={`text-base leading-relaxed ${streaming ? "streaming-cursor" : ""}`} style={{ color: "var(--ink)" }}>
+              <div className={`text-base leading-relaxed text-ink ${streaming ? "streaming-cursor" : ""}`}>
                 <MarkdownRenderer content={content} />
               </div>
             ) : streaming ? (
               <div className="flex items-center gap-1.5 py-2">
-                <span className="w-2 h-2 rounded-full bg-[var(--accent)]/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-2 h-2 rounded-full bg-[var(--accent)]/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-2 h-2 rounded-full bg-[var(--accent)]/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+                <span className="w-2 h-2 rounded-full bg-accent/60 animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-2 h-2 rounded-full bg-accent/60 animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="w-2 h-2 rounded-full bg-accent/60 animate-bounce" style={{ animationDelay: "300ms" }} />
               </div>
             ) : null}
           </>
@@ -102,7 +102,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
             <button
               onClick={handleCopy}
               className="btn-ghost text-xs"
-              style={{ color: copied ? "var(--green)" : "var(--subtle)" }}
+              style={{ color: copied ? "var(--forest)" : "var(--subtle)" }}
               title="Copy"
             >
               {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
@@ -114,7 +114,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
               <button
                 onClick={() => setFeedback(feedback === "up" ? null : "up")}
                 className="btn-ghost text-xs"
-                style={{ color: feedback === "up" ? "var(--green)" : "var(--subtle)" }}
+                style={{ color: feedback === "up" ? "var(--forest)" : "var(--subtle)" }}
                 title="Helpful"
               >
                 <IconThumbsUp size={14} />
@@ -122,7 +122,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
               <button
                 onClick={() => setFeedback(feedback === "down" ? null : "down")}
                 className="btn-ghost text-xs"
-                style={{ color: feedback === "down" ? "var(--red)" : "var(--subtle)" }}
+                style={{ color: feedback === "down" ? "var(--oxblood)" : "var(--subtle)" }}
                 title="Not helpful"
               >
                 <IconThumbsDown size={14} />
@@ -133,8 +133,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
           {!isUser && isLastAssistant && onRegenerate && (
             <button
               onClick={onRegenerate}
-              className="btn-ghost text-xs"
-              style={{ color: "var(--subtle)" }}
+              className="btn-ghost text-xs text-subtle"
               title="Get a different response"
             >
               <IconRefresh size={14} />
@@ -144,8 +143,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
           {isUser && onEdit && (
             <button
               onClick={onEdit}
-              className="btn-ghost text-xs"
-              style={{ color: "var(--subtle)" }}
+              className="btn-ghost text-xs text-subtle"
               title="Edit message"
             >
               <IconPencil size={14} />

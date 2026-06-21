@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
 import type { Context } from "hono";
+import { getUserById } from "@encarta/storage";
 
 
 export const APP_VERSION = "0.1.0";
@@ -18,6 +19,16 @@ export function setDbError(error: string | null) { dbError = error; }
 export const generationCooldowns = new Map<string, number>();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
+
+export async function isAdmin(c: any): Promise<boolean> {
+  if (c.get("tier") === "admin") return true;
+  const userId = getUserId(c);
+  if (!userId) return false;
+  const user = await getUserById(userId);
+  if (!user) return false;
+  const adminEmails = (process.env.ADMIN_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  return adminEmails.includes(user.email.toLowerCase());
+}
 
 export function getUserId(c: any): string | null {
   const auth = c.req.header("authorization");

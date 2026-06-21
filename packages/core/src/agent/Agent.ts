@@ -2,6 +2,7 @@ import { sendPromptStream } from "../llm.js";
 import type { AgentEvent } from "../types.js";
 import type { Message, ToolDefinition, ToolCall, Usage } from "../models.js";
 import type { AgentConfig, AgentResult, AgentTool, ToolResult } from "./types.js";
+import { blockSignature } from "../blocks.js";
 
 const DEFAULT_MAX_ITERATIONS = 15;
 const TOOL_RESULT_TRUNCATION = 1500;
@@ -11,6 +12,7 @@ export class Agent {
   private messages: Message[];
   private toolResults: ToolResult[] = [];
   private blocks: any[] = [];
+  private blockSignatures = new Set<string>();
   private eventSubscribers: Array<(event: AgentEvent) => void> = [];
   private iterationCount = 0;
   private aborted = false;
@@ -49,6 +51,7 @@ export class Agent {
   async run(input: string): Promise<AgentResult> {
     this.iterationCount = 0;
     this.toolResults = [];
+    this.blockSignatures = new Set<string>();
     this.blocks = [];
 
     // Add user message
@@ -122,10 +125,17 @@ export class Agent {
           data: { name: tc.function.name, result: result.result.slice(0, 1000) },
           timestamp: Date.now(),
         });
-
-        // Collect blocks
+        // (deduped by content signature so repeated tool
+        // calls — e.g. multiple get_article / render_blocks invocations —
+        // don't accumulate identical blocks across iterations).
         if (result.blocks) {
-          this.blocks.push(...result.blocks);
+          for (const b of result.blocks) {
+            const sig = blockSignature(b);
+            if (!this.blockSignatures.has(sig)) {
+              this.blockSignatures.add(sig);
+              this.blocks.push(b);
+            }
+          }
         }
 
         // Add tool result message
@@ -242,7 +252,6 @@ export class Agent {
   abort(): void {
     this.aborted = true;
   }
-
   get state(): { messages: Message[]; iterationCount: number } {
     return { messages: this.messages, iterationCount: this.iterationCount };
   }
@@ -251,6 +260,7 @@ export class Agent {
     this.messages = [];
     this.toolResults = [];
     this.blocks = [];
+    this.blockSignatures = new Set<string>();
     this.iterationCount = 0;
     this.aborted = false;
   }

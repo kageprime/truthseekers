@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useChat, useChats } from "../hooks";
@@ -27,12 +27,15 @@ export default function FloatingChatWidget() {
 
   const [input, setInput] = useState("");
   const [streamContent, setStreamContent] = useState("");
+  const [streamSteps, setStreamSteps] = useState<string[]>([]);
   const [streamBlocks, setStreamBlocks] = useState<any[]>([]);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const [convId, setConvId] = useState<string | null>(null);
   const [view, setView] = useState<"chat" | "console">("chat");
   const agentEventsRef = useRef<AgentEvent[]>([]);
+  const finalizedRef = useRef(false);
+  const streamContentRef = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Close session switcher on outside click
@@ -124,9 +127,12 @@ export default function FloatingChatWidget() {
 
     setSending(true);
     setStreamContent("");
+    setStreamSteps([]);
     setStreamBlocks([]);
     setAgentEvents([]);
     agentEventsRef.current = [];
+    finalizedRef.current = false;
+    streamContentRef.current = "";
 
     const userMsg = {
       id: `temp-${Date.now()}`,
@@ -145,36 +151,37 @@ export default function FloatingChatWidget() {
     setInput("");
 
     await streamSend(cid, msg, {
-      onText: (text) => setStreamContent(text),
+      onText: (text) => {
+        setStreamContent(text);
+        streamContentRef.current = text;
+      },
       onToolEvent: (event) => {
         setAgentEvents((prev) => {
           const next = [...prev, event];
           agentEventsRef.current = next;
           return next;
         });
-        const d = event.data as Record<string, unknown> | undefined;
-        if (d?.name === "render_blocks") {
-          const result = d.result as Record<string, unknown> | undefined;
-          const blocks = result?.blocks ?? (d.args as Record<string, unknown> | undefined)?.blocks;
-          if (Array.isArray(blocks)) {
-            setStreamBlocks(blocks);
-          }
+        // Snapshot completed thinking step at tool boundary
+        const text = streamContentRef.current;
+        if (text) {
+          setStreamSteps((prev) => [...prev, text]);
+          setStreamContent("");
+          streamContentRef.current = "";
         }
       },
       onDone: (event) => {
+        if (finalizedRef.current) return;
+        finalizedRef.current = true;
         const savedEvents = agentEventsRef.current;
         const finalBlocks = event.blocks ?? [];
+        setStreamSteps([]);
         setStreamContent("");
+        streamContentRef.current = "";
         setStreamBlocks(finalBlocks);
-
         queryClient.cancelQueries({ queryKey: ["chat", cid] });
-
         queryClient.setQueryData(["chat", cid], (prev: any) => {
           if (!prev) return prev;
-          // Guard: concurrent refetch already populated assistant message
-          if (prev.messages.some((m: any) => m.role === "assistant" && !m.id.startsWith("temp-"))) {
-            return prev;
-          }
+          if (prev.messages.some((m: any) => m.role === "assistant" && !m.id.startsWith("temp-"))) return prev;
           const real = prev.messages.map((m: any) =>
             m.id.startsWith("temp-") ? { ...m, id: `${Date.now()}-${Math.random()}`, conversationId: cid } : m
           );
@@ -201,8 +208,8 @@ export default function FloatingChatWidget() {
     setTimeout(() => setSending(false), 0);
   }, [convId, sending, streamSend, queryClient, setAgentEvents, setActiveConversationId]);
 
-  const messages = (conv?.messages ?? []).filter((m: any) => m.role !== "tool");
-  const hasStreaming = sending && (streamContent || streamBlocks.length > 0);
+  const messages = useMemo(() => (conv?.messages ?? []).filter((m: any) => m.role !== "tool"), [conv?.messages]);
+  const hasStreaming = sending;
   const currentConv = conversations.find((c) => c.id === convId);
   const lastAssistantIdx = [...messages].reverse().findIndex((m: any) => m.role === "assistant");
   const lastAssistantIndex = lastAssistantIdx >= 0 ? messages.length - 1 - lastAssistantIdx : -1;
@@ -220,33 +227,30 @@ export default function FloatingChatWidget() {
   return (
     <div className="h-full flex flex-col max-md:max-h-[85vh]">
       {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-3 py-2.5 border-b gap-2" style={{ borderColor: "var(--border)" }}>
+      <div className="shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-border gap-2">
         <div className="flex items-center gap-1 min-w-0">
           {/* Session switcher */}
           <div className="relative" ref={switcherRef}>
             <button
               onClick={() => setSwitcherOpen((o) => !o)}
-              className="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded max-w-[140px] hover:bg-[var(--accent-bg)]/30 transition-colors"
-              style={{ color: "var(--muted)" }}
+              className="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded max-w-[80px] sm:max-w-[140px] hover:bg-accent-bg/30 transition-colors text-muted"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
-              <span className="truncate">{currentConv?.title ?? "Quick Chat"}</span>
+              <span className="truncate max-w-[60px] sm:max-w-[100px]">{currentConv?.title ?? "Quick Chat"}</span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0">
                 <path d="m6 9 6 6 6-6" />
               </svg>
             </button>
             {switcherOpen && (
-              <div className="absolute left-0 top-full mt-1 w-56 rounded-lg py-1 shadow-xl z-50"
-                style={{ background: "var(--surface)", border: "1px solid var(--border)", maxHeight: 300, overflowY: "auto" }}
-              >
+              <div className="absolute left-0 top-full mt-1 w-56 rounded-lg py-1 shadow-xl z-50 bg-surface border border-border max-h-[300px] overflow-y-auto">
                 {chatsLoading ? (
                   <div className="flex items-center justify-center py-4">
-                    <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
+                    <div className="w-4 h-4 rounded-full border-2 animate-spin border-border border-t-gold" />
                   </div>
                 ) : conversations.length === 0 ? (
-                  <div className="px-3 py-2 text-xs" style={{ color: "var(--subtle)" }}>No conversations</div>
+                  <div className="px-3 py-2 text-xs text-subtle">No conversations</div>
                 ) : (
                   conversations.map((c) => (
                     <button
@@ -257,8 +261,7 @@ export default function FloatingChatWidget() {
                         try { localStorage.setItem(CONV_STORAGE_KEY, c.id); } catch {}
                         setSwitcherOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-2 text-xs transition-colors ${c.id === convId ? "font-medium" : ""}`}
-                      style={{ color: c.id === convId ? "var(--accent)" : "var(--muted)", background: c.id === convId ? "var(--accent-bg)" : "transparent" }}
+                      className={`w-full text-left px-3 py-2 text-xs transition-colors ${c.id === convId ? "font-medium text-accent bg-accent-bg" : "text-muted bg-transparent"}`}
                     >
                       <div className="truncate">{c.title}</div>
                     </button>
@@ -268,19 +271,26 @@ export default function FloatingChatWidget() {
             )}
           </div>
 
-          <div className="w-px h-4" style={{ background: "var(--border)" }} />
+          <div className="w-px h-4 bg-border" />
 
           <button
             onClick={() => setView("chat")}
-            className={`text-xs font-medium px-2 py-1 rounded ${view === "chat" ? "bg-[var(--accent-bg)] text-[var(--accent)]" : "text-[var(--subtle)]"}`}
+            className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded ${view === "chat" ? "bg-accent-bg text-accent" : "text-subtle"}`}
           >
-            Chat
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            <span>Chat</span>
           </button>
           <button
             onClick={() => setView("console")}
-            className={`text-xs font-medium px-2 py-1 rounded ${view === "console" ? "bg-[var(--accent-bg)] text-[var(--accent)]" : "text-[var(--subtle)]"}`}
+            className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded ${view === "console" ? "bg-accent-bg text-accent" : "text-subtle"}`}
           >
-            Console {agentEvents.length > 0 && `(${agentEvents.length})`}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+              <polyline points="4 17 10 11 4 5" />
+              <line x1="12" y1="19" x2="20" y2="19" />
+            </svg>
+            <span>Console{agentEvents.length > 0 && <span className="ml-0.5">({agentEvents.length})</span>}</span>
           </button>
         </div>
         <div className="flex items-center gap-1">
@@ -306,7 +316,7 @@ export default function FloatingChatWidget() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
           {loading || convLoading ? (
             <div className="flex items-center justify-center h-full">
-              <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
+              <div className="w-6 h-6 rounded-full border-2 animate-spin border-border border-t-gold" />
             </div>
           ) : messages.length === 0 && !sending ? (
             <EmptyChatState suggestedTopics={suggestedTopics} onSetInput={doSend} />
@@ -326,12 +336,33 @@ export default function FloatingChatWidget() {
                 <FollowUpSuggestions followUps={followUps} onClick={doSend} />
               )}
               {hasStreaming && (
-                <ChatMessage
-                  role="assistant"
-                  content={streamContent}
-                  blocks={streamBlocks}
-                  streaming
-                />
+                <div className="space-y-2 px-3 sm:px-6 py-4">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-subtle mb-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                    Thinking
+                  </div>
+                  {streamSteps.map((step, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm text-ink">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-forest shrink-0 mt-0.5">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span>{step}</span>
+                    </div>
+                  ))}
+                  {streamContent && (
+                    <div className="flex items-start gap-2 text-sm text-ink/80">
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0 mt-1.5" />
+                      <span>{streamContent}</span>
+                    </div>
+                  )}
+                  {streamSteps.length === 0 && !streamContent && (
+                    <div className="flex items-center gap-1.5 py-1">
+                      <span className="w-2 h-2 rounded-full bg-accent/60 animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-2 h-2 rounded-full bg-accent/60 animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-2 h-2 rounded-full bg-accent/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -343,7 +374,7 @@ export default function FloatingChatWidget() {
       )}
 
       {/* Input */}
-      <div className="shrink-0 border-t px-3 py-3" style={{ borderColor: "var(--border)" }}>
+      <div className="shrink-0 border-t border-border px-3 py-3">
         <div className="flex gap-2">
           <input
             value={input}
@@ -356,8 +387,7 @@ export default function FloatingChatWidget() {
           <button
             onClick={sending ? streamStop : () => doSend(input)}
             disabled={!sending && !input.trim()}
-            className="btn btn-primary btn-sm shrink-0"
-            style={{ minHeight: 38 }}
+            className="btn btn-primary btn-sm shrink-0 min-h-[38px]"
           >
             {sending ? "■" : "→"}
           </button>

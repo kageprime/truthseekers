@@ -111,3 +111,21 @@ export function useCreateChat() {
   );
 }
 
+// ── Admin ────────────────────────────────────────────────────────────
+
+export function useAdminSettings() {
+  const queryClient = useQueryClient();
+  const settings = useApiQuery(["admin", "settings"], () => api.fetchSettings());
+  const mutation = useApiMutation(
+    (s: Record<string, string>) => api.updateSettings(s),
+    {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "settings"] }),
+    }
+  );
+  return { ...settings, updateSettings: mutation.mutate, updating: mutation.loading };
+}
+
+export function useFeaturedArticles() {
+  return useApiQuery(["admin", "featured"], () => api.fetchFeaturedArticles());
+}
+

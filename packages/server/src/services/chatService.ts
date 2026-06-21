@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { SSEStreamingApi } from "hono/streaming";
-import { Agent, CHAT_TOOL_DEFINITIONS, queue, type Message } from "@encarta/core";
+import { Agent, CHAT_TOOL_DEFINITIONS, queue, dedupeBlocks, type Message } from "@encarta/core";
 import { memRecallAll, addMessage, updateConversationTitle } from "@encarta/storage";
 import { createToolExecutors } from "../tools.js";
 
@@ -74,14 +74,22 @@ export async function runChatAgent(
     const result = await agent.run(content);
     const finalMessages = result.messages;
 
-    // Persist new messages
+    // Persist new messages — only the last assistant message is kept
+    const safeBlocks = dedupeBlocks(result.blocks);
+    let assistantMsgId: string | undefined;
+    let lastAssistantIdx = -1;
+    for (let i = existingCount; i < finalMessages.length; i++) {
+      if (finalMessages[i].role === "assistant") lastAssistantIdx = i;
+    }
     for (let i = existingCount; i < finalMessages.length; i++) {
       const m = finalMessages[i];
       const entryId = randomUUID();
       if (m.role === "user") {
         await addMessage(entryId, conversationId, "user", m.content || " ");
       } else if (m.role === "assistant") {
-        await addMessage(entryId, conversationId, "assistant", m.content || " ", result.blocks.length > 0 ? result.blocks : undefined, m.tool_calls, undefined, agentEvents);
+        if (i !== lastAssistantIdx) continue;
+        assistantMsgId = entryId;
+        await addMessage(entryId, conversationId, "assistant", m.content || " ", safeBlocks, m.tool_calls, undefined, agentEvents);
       } else if (m.role === "tool") {
         await addMessage(entryId, conversationId, "tool", m.content || " ", undefined, undefined, m.tool_call_id, undefined, m.tool_name);
       }
@@ -93,9 +101,9 @@ export async function runChatAgent(
       await updateConversationTitle(conversationId, title);
     }
 
-    const blocks = result.blocks.length > 0 ? result.blocks : undefined;
+    const blocks = safeBlocks.length > 0 ? safeBlocks : undefined;
     await stream.writeSSE({
-      data: JSON.stringify({ type: "done", msgId: randomUUID(), content: result.text, blocks }),
+      data: JSON.stringify({ type: "done", msgId: assistantMsgId ?? randomUUID(), content: result.text, blocks }),
       event: "agent_event",
     });
   } catch (err) {

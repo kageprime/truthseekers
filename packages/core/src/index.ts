@@ -29,7 +29,7 @@ export {
 } from "./pipeline/orchestrator.js";
 
 // Blocks
-export { articleToBlocks } from "./blocks.js";
+export { articleToBlocks, dedupeBlocks } from "./blocks.js";
 
 // Queue & Redis
 export { queue } from "./queue.js";

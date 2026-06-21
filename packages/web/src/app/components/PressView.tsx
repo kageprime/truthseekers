@@ -73,10 +73,10 @@ export default function PressView() {
   if (!article || mode !== "press" || !pages.length) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col" style={{ background: "#2c2416" }}>
+    <div className="fixed inset-0 z-[70] flex flex-col bg-surface">
       {/* Top bar */}
-      <div className="shrink-0 flex items-center justify-between px-4 h-12" style={{ background: "#1a1510", borderBottom: "1px solid #3d3224" }}>
-        <button onClick={close} className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline" style={{ color: "#b8a07a" }}>
+      <div className="shrink-0 flex items-center justify-between px-4 h-12 bg-surface border-b border-rule">
+        <button onClick={close} className="inline-flex items-center gap-1.5 text-xs font-medium dateline hover:underline text-gold">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
@@ -84,7 +84,7 @@ export default function PressView() {
         </button>
         <div className="flex items-center gap-3">
           <ViewSwitcher />
-          <span className="text-[10px]" style={{ color: "#6a5a42" }}>
+          <span className="text-[10px] text-subtle">
             {currentIdx + 1} / {totalPages}
           </span>
         </div>
@@ -96,8 +96,8 @@ export default function PressView() {
         <button
           onClick={() => bookRef.current?.pageFlip()?.flipPrev?.()}
           disabled={currentIdx === 0}
-          className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full transition-opacity z-10"
-          style={{ color: "#b8a07a", opacity: currentIdx === 0 ? 0.2 : 0.6 }}
+          className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full transition-opacity z-10 text-gold"
+          style={{ opacity: currentIdx === 0 ? 0.2 : 0.6 }}
           aria-label="Previous page"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -140,10 +140,10 @@ export default function PressView() {
                   <div className={`newspaper-columns ${i === 0 ? "front-page" : ""}`}>
                     {i === 0 && (
                       <>
-                        <h1 className="press-headline font-serif text-2xl sm:text-3xl leading-tight mb-4 text-center" style={{ color: "#1a1510" }}>
+                        <h1 className="press-headline font-serif text-2xl sm:text-3xl leading-tight mb-4 text-center text-ink">
                           {titleText}
                         </h1>
-                        <div className="mx-auto mb-5" style={{ height: 2, width: "3.5rem", background: "#8a7a62" }} />
+                        <div className="mx-auto mb-5 h-[2px] w-14 bg-gold" />
                       </>
                     )}
                     <BlockRenderer blocks={page.blocks} />
@@ -159,8 +159,8 @@ export default function PressView() {
         <button
           onClick={() => bookRef.current?.pageFlip()?.flipNext?.()}
           disabled={currentIdx === totalPages - 1}
-          className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full transition-opacity z-10"
-          style={{ color: "#b8a07a", opacity: currentIdx === totalPages - 1 ? 0.2 : 0.6 }}
+          className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full transition-opacity z-10 text-gold"
+          style={{ opacity: currentIdx === totalPages - 1 ? 0.2 : 0.6 }}
           aria-label="Next page"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

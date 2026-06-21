@@ -120,8 +120,8 @@ export function FigureImage({ src, caption, source, onClick }: { src: string; ca
         <span className="text-xs font-medium text-[#888]">IMAGE</span>
         {source && <span className="text-[9px] text-[#888]">via {source}</span>}
       </div>
-      <div className="flex justify-center my-2 bg-white/50 relative">
-        <img src={resolvedSrc} alt={caption} className="max-w-full max-h-96 object-contain transition-transform duration-300 group-hover:scale-[1.02]" loading="lazy" />
+      <div className="bg-white/50 rounded overflow-hidden relative">
+        <img src={resolvedSrc} alt={caption} className="w-full h-auto max-h-96 object-contain transition-transform duration-300 group-hover:scale-[1.02]" loading="lazy" />
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <span className="bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">Click to expand</span>
         </div>

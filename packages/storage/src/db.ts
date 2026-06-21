@@ -489,6 +489,23 @@ export async function memRecallAll(): Promise<Array<{ key: string; value: string
   return docs.map((d: any) => ({ key: d.key, value: d.value }));
 }
 
+// ── Site Settings (thin wrappers over Memory) ─────────────────────────
+
+export async function getSiteSetting(key: string): Promise<string | null> {
+  return memRecall(key);
+}
+
+export async function setSiteSetting(key: string, value: string): Promise<void> {
+  await memStore(key, value);
+}
+
+export async function getAllSiteSettings(): Promise<Record<string, string>> {
+  const entries = await memRecallAll();
+  const out: Record<string, string> = {};
+  for (const e of entries) out[e.key] = e.value;
+  return out;
+}
+
 // ── API Keys ──────────────────────────────────────────────────────────────
 
 const apiKeySchema = new Schema({

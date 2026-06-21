@@ -273,7 +273,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
         <article className="max-w-[42rem] mx-auto px-4 sm:px-6 py-10 sm:py-14">
           {/* Back link */}
-          <Link href="/articles" className="inline-flex items-center gap-1 dateline mb-8 transition-colors hover:underline" style={{ color: "var(--gold)" }}>
+          <Link href="/chat/new" className="inline-flex items-center gap-1 dateline mb-8 transition-colors hover:underline" style={{ color: "var(--gold)" }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />
             </svg>

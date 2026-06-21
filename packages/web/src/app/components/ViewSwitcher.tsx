@@ -13,10 +13,7 @@ export default function ViewSwitcher() {
   if (!article) return null;
 
   return (
-    <div
-      className="flex items-center gap-0.5 rounded-full p-0.5"
-      style={{ background: "color-mix(in srgb, var(--ink) 10%, transparent)" }}
-    >
+    <div className="flex items-center gap-0.5 rounded-full p-0.5 bg-ink/10 dark:bg-ink-dark/10">
       {modes.map((m) => {
         const active = mode === m.key;
         return (

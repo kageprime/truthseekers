@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import mermaid from "mermaid";
 
-mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+let mermaidInit = false;
+function ensureMermaid() {
+  if (!mermaidInit) {
+    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    mermaidInit = true;
+  }
+}
 
 export default function MermaidDiagram({ code, caption }: { code?: string; caption?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -13,6 +19,7 @@ export default function MermaidDiagram({ code, caption }: { code?: string; capti
   const [zoomed, setZoomed] = useState(false);
 
   async function render(codeStr?: string) {
+    ensureMermaid();
     const trimmed = (codeStr || "").trim();
     if (!containerRef.current || !trimmed) {
       setState("error");

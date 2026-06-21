@@ -112,3 +112,35 @@ export function articleToBlocks(
 
   return blocks;
 }
+
+/**
+ * Stable, content-only signature for a block.
+ *
+ * Ignores the volatile `id` (e.g. `rb-{Date.now()}-{n}` from render_blocks)
+ * so that semantically identical blocks emitted by repeated tool calls
+ * collapse to a single signature. Object keys are sorted so that key order
+ * does not defeat dedup.
+ */
+export function blockSignature(block: Block): string {
+  const { id: _id, ...rest } = block;
+  return JSON.stringify(rest, Object.keys(rest).sort());
+}
+
+/**
+ * Deduplicate an array of blocks by content signature, preserving the first
+ * occurrence of each distinct block. Safe for blocks of the same type with
+ * different content — only exact content duplicates are dropped.
+ */
+export function dedupeBlocks(blocks: Block[] | undefined | null): Block[] {
+  if (!blocks || blocks.length === 0) return [];
+  const seen = new Set<string>();
+  const out: Block[] = [];
+  for (const b of blocks) {
+    const sig = blockSignature(b);
+    if (!seen.has(sig)) {
+      seen.add(sig);
+      out.push(b);
+    }
+  }
+  return out;
+}

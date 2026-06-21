@@ -2,36 +2,85 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useChats } from "../hooks";
 
-export default function ChatSidebar() {
+interface ChatSidebarProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export default function ChatSidebar({ open, onClose }: ChatSidebarProps) {
   const pathname = usePathname();
   const { data: chats, loading } = useChats();
   const currentId = pathname.match(/\/chat\/(.+)/)?.[1] ?? null;
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [scrollLocked, setScrollLocked] = useState(false);
 
-  return (
-    <aside className="w-64 shrink-0 border-r flex flex-col min-h-0" style={{ borderColor: "var(--border)", background: "var(--surface-glass)" }}>
-      {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-3 h-12 border-b" style={{ borderColor: "var(--border)" }}>
-        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--subtle)" }}>History</span>
-        <Link
-          href="/chat/new"
-          className="inline-flex items-center gap-1 text-[10px] font-medium hover:underline"
-          style={{ color: "var(--accent)" }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          New
+  useEffect(() => {
+    if (open && !scrollLocked) {
+      document.body.style.overflow = "hidden";
+      setScrollLocked(true);
+    } else if (!open && scrollLocked) {
+      document.body.style.overflow = "";
+      setScrollLocked(false);
+    }
+    return () => {
+      if (scrollLocked) {
+        document.body.style.overflow = "";
+      }
+    };
+  }, [open, scrollLocked]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [open, onClose]);
+
+  const sidebarContent = (
+    <>
+      <div className="shrink-0 flex items-center justify-between px-3 h-12 border-b border-border">
+        <Link href="/" className="no-underline flex items-center gap-2 shrink-0 min-w-0">
+          <img src="/logo-icon.png" alt="TS" className="shrink-0 h-7 w-auto object-contain" />
+          <span className="masthead-wordmark text-sm leading-none text-ink truncate">Truthseekers</span>
         </Link>
+        <div className="flex items-center gap-1 shrink-0">
+          <Link
+            href="/chat/new"
+            className="inline-flex items-center gap-1 text-[10px] font-medium hover:underline text-accent"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            New
+          </Link>
+          {/* Collapse button — desktop only */}
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="hidden lg:flex btn-ghost p-1 ml-1"
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {sidebarCollapsed
+                ? <><polyline points="9 18 15 12 9 6" /></>
+                : <><polyline points="15 18 9 12 15 6" /></>
+              }
+            </svg>
+          </button>
+        </div>
       </div>
 
-      {/* List */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
+            <div className="w-4 h-4 rounded-full border-2 animate-spin border-border border-t-gold" />
           </div>
         ) : !chats?.length ? (
-          <p className="text-xs text-center py-8" style={{ color: "var(--subtle)" }}>No conversations yet</p>
+          <p className="text-xs text-center py-8 text-subtle">No conversations yet</p>
         ) : (
           <div className="py-1">
             {chats.map((chat) => {
@@ -42,15 +91,12 @@ export default function ChatSidebar() {
                   href={`/chat/${chat.id}`}
                   className={`flex items-center gap-2 px-3 py-2.5 text-xs transition-colors no-underline ${
                     isActive
-                      ? "bg-[var(--accent)]/10 border-l-2"
+                      ? "bg-accent/10 border-l-2 border-accent"
                       : "hover:bg-black/[0.03] border-l-2 border-transparent"
                   }`}
-                  style={{
-                    borderLeftColor: isActive ? "var(--accent)" : "transparent",
-                    color: "var(--ink-secondary)",
-                  }}
+                  style={{ color: "var(--ink-secondary)" }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0" style={{ color: "var(--subtle)" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0 text-subtle">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
                   <span className="truncate">{chat.title ?? "Untitled"}</span>
@@ -60,6 +106,83 @@ export default function ChatSidebar() {
           </div>
         )}
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop: static sidebar (≥1024px) — collapsible */}
+      <aside className={`hidden lg:flex shrink-0 border-r flex-col min-h-0 border-border bg-surface-glass/60 transition-all duration-200 ${sidebarCollapsed ? "w-0 overflow-hidden border-r-0" : "w-64"}`}>
+        {!sidebarCollapsed && sidebarContent}
+      </aside>
+      {/* Desktop collapse/expand tab when collapsed */}
+      {sidebarCollapsed && (
+        <button
+          onClick={() => setSidebarCollapsed(false)}
+          className="hidden lg:flex shrink-0 items-center justify-center w-5 border-r border-border bg-surface-glass/60 hover:bg-surface cursor-pointer text-subtle hover:text-ink transition-colors"
+          aria-label="Expand sidebar"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      )}
+
+      {/* Mobile: overlay drawer (<1024px) */}
+      {open && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+          <aside className="absolute left-0 top-0 bottom-0 w-72 max-w-[85vw] bg-surface border-r border-border flex flex-col min-h-0 shadow-2xl animate-fade-slide-up">
+            <div className="shrink-0 flex items-center justify-between px-3 h-12 border-b border-border">
+              <span className="text-xs font-semibold uppercase tracking-wider text-subtle">History</span>
+              <button
+                onClick={onClose}
+                className="btn-ghost p-1.5"
+                aria-label="Close sidebar"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-4 h-4 rounded-full border-2 animate-spin border-border border-t-gold" />
+                </div>
+              ) : !chats?.length ? (
+                <p className="text-xs text-center py-8 text-subtle">No conversations yet</p>
+              ) : (
+                <div className="py-1">
+                  {chats.map((chat) => {
+                    const isActive = chat.id === currentId;
+                    return (
+                      <Link
+                        key={chat.id}
+                        href={`/chat/${chat.id}`}
+                        onClick={onClose}
+                        className={`flex items-center gap-2 px-3 py-2.5 text-xs transition-colors no-underline ${
+                          isActive
+                            ? "bg-accent/10 border-l-2 border-accent"
+                            : "hover:bg-black/[0.03] border-l-2 border-transparent"
+                        }`}
+                        style={{ color: "var(--ink-secondary)" }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0 text-subtle">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
+                        <span className="truncate">{chat.title ?? "Untitled"}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

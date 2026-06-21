@@ -82,8 +82,8 @@ export default function ArticleBlock({ blocks }: ArticleBlockProps) {
 function extractTitle(blocks: Block[]): string | null {
   for (const b of blocks) {
     if (b.type === "heading") {
-      const d = b.data as Record<string, unknown>;
-      return (d.text as string) ?? null;
+      const d = b.data as Record<string, unknown> | undefined;
+      return (d?.text as string) ?? null;
     }
   }
   return null;
@@ -92,8 +92,8 @@ function extractTitle(blocks: Block[]): string | null {
 function extractImage(blocks: Block[]): string | null {
   for (const b of blocks) {
     if (b.type === "image") {
-      const d = b.data as Record<string, unknown>;
-      return (d.src as string) ?? null;
+      const d = b.data as Record<string, unknown> | undefined;
+      return (d?.src as string) ?? null;
     }
   }
   return null;
@@ -102,8 +102,8 @@ function extractImage(blocks: Block[]): string | null {
 function extractAbstract(blocks: Block[]): string | null {
   for (const b of blocks) {
     if (b.type === "text") {
-      const d = b.data as Record<string, unknown>;
-      const content = (d.content as string) ?? "";
+      const d = b.data as Record<string, unknown> | undefined;
+      const content = (d?.content as string) ?? "";
       const cleaned = content.replace(/<[^>]*>/g, "").trim();
       if (cleaned.length > 0) return cleaned;
     }
