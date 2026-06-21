@@ -47,7 +47,7 @@ export default function ChatMessage({ role, content, blocks, createdAt, isLastAs
   return (
     <div className={`flex gap-3 px-3 sm:px-6 py-4 group ${isUser ? "flex-row-reverse" : ""} transition-colors ${streaming ? "bg-accent-bg/5" : "hover:bg-black/[0.02]"}`}>
       {/* Body */}
-      <div className={`space-y-1 min-w-0 ${isUser ? "items-end" : "flex-1"}`}>
+      <div className={`space-y-1 min-w-0 ${isUser ? "flex flex-col items-end flex-1" : "flex-1"}`}>
         {/* Label */}
         <div className="flex items-center gap-2 mb-1">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-subtle">

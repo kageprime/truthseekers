@@ -27,7 +27,7 @@ export default function FloatingChatWidget() {
 
   const [input, setInput] = useState("");
   const [streamContent, setStreamContent] = useState("");
-  const [streamSteps, setStreamSteps] = useState<string[]>([]);
+  const [streamSteps, setStreamSteps] = useState<{ text: string; createdAt: string }[]>([]);
   const [streamBlocks, setStreamBlocks] = useState<any[]>([]);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -143,10 +143,10 @@ export default function FloatingChatWidget() {
     };
 
     await queryClient.cancelQueries({ queryKey: ["chat", cid] });
-    queryClient.setQueryData(["chat", cid], (prev: any) => {
-      if (!prev) return prev;
-      return { ...prev, messages: [...prev.messages, userMsg] };
-    });
+    queryClient.setQueryData(["chat", cid], (prev: any) => ({
+      ...(prev || { id: cid, title: "Chat", userId: "", createdAt: new Date().toISOString() }),
+      messages: [...(prev?.messages || []), userMsg],
+    }));
 
     setInput("");
 
@@ -164,7 +164,7 @@ export default function FloatingChatWidget() {
         // Snapshot completed thinking step at tool boundary
         const text = streamContentRef.current;
         if (text) {
-          setStreamSteps((prev) => [...prev, text]);
+          setStreamSteps((prev) => [...prev, { text, createdAt: new Date().toISOString() }]);
           setStreamContent("");
           streamContentRef.current = "";
         }
@@ -335,34 +335,11 @@ export default function FloatingChatWidget() {
               {!sending && lastAssistantIndex >= 0 && followUps.length > 0 && (
                 <FollowUpSuggestions followUps={followUps} onClick={doSend} />
               )}
+              {streamSteps.map((step, i) => (
+                <ChatMessage key={`step-${i}`} role="assistant" content={step.text} createdAt={step.createdAt} />
+              ))}
               {hasStreaming && (
-                <div className="space-y-2 px-3 sm:px-6 py-4">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-subtle mb-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                    Thinking
-                  </div>
-                  {streamSteps.map((step, i) => (
-                    <div key={i} className="flex items-start gap-2 text-sm text-ink">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-forest shrink-0 mt-0.5">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      <span>{step}</span>
-                    </div>
-                  ))}
-                  {streamContent && (
-                    <div className="flex items-start gap-2 text-sm text-ink/80">
-                      <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0 mt-1.5" />
-                      <span>{streamContent}</span>
-                    </div>
-                  )}
-                  {streamSteps.length === 0 && !streamContent && (
-                    <div className="flex items-center gap-1.5 py-1">
-                      <span className="w-2 h-2 rounded-full bg-accent/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="w-2 h-2 rounded-full bg-accent/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="w-2 h-2 rounded-full bg-accent/60 animate-bounce" style={{ animationDelay: "300ms" }} />
-                    </div>
-                  )}
-                </div>
+                <ChatMessage role="assistant" content={streamContent} streaming />
               )}
             </div>
           )}
