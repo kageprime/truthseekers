@@ -81,12 +81,12 @@ function argsSummary(name: string, args: Record<string, unknown>): string {
   return JSON.stringify(args).slice(0, 100);
 }
 
-function ToolUseMini({ data, terminal, terminalColors }: { data: Record<string, unknown>; terminal?: boolean; terminalColors?: { bg: string; fg: string; dim: string; accent: string; border: string; surface: string; font: string } | null }) {
+function ToolUseMini({ data, terminal, terminalColors }: { data: Record<string, unknown>; terminal?: boolean; terminalColors?: Record<string, string> | null }) {
   const name = (data.name as string) ?? "";
   const args = (data.args as Record<string, unknown>) ?? {};
   const t = terminalColors;
   return (
-    <div className="flex items-start gap-2 py-1.5 px-3 rounded-lg" style={{ background: t ? `${t.dim}25` : "color-mix(in srgb, var(--accent-bg) 60%, transparent)" }}>
+    <div className="flex items-start gap-2 py-1.5 px-3 rounded-lg" style={{ background: t ? "color-mix(in srgb, var(--gold-bg) 40%, transparent)" : "color-mix(in srgb, var(--accent-bg) 60%, transparent)" }}>
       <span className="shrink-0 mt-0.5" style={{ color: t?.accent ?? "var(--accent)" }}>{toolIcon(name)}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
@@ -98,7 +98,7 @@ function ToolUseMini({ data, terminal, terminalColors }: { data: Record<string, 
   );
 }
 
-function ToolResultMini({ data, terminal, terminalColors }: { data: Record<string, unknown>; terminal?: boolean; terminalColors?: { bg: string; fg: string; dim: string; accent: string; border: string; surface: string; font: string } | null }) {
+function ToolResultMini({ data, terminal, terminalColors }: { data: Record<string, unknown>; terminal?: boolean; terminalColors?: Record<string, string> | null }) {
   const content = (data.result ?? data.content ?? "") as string;
   let display = "";
   if (typeof content === "string") {
@@ -119,7 +119,7 @@ function ToolResultMini({ data, terminal, terminalColors }: { data: Record<strin
   if (!display) return null;
   const t = terminalColors;
   return (
-    <div className="flex items-start gap-2 py-1.5 px-3 ml-5 rounded-lg border-l" style={{ borderColor: t ? `${t.dim}40` : "color-mix(in srgb, var(--border) 40%, transparent)", background: t ? `${t.surface}80` : "color-mix(in srgb, var(--surface) 50%, transparent)" }}>
+    <div className="flex items-start gap-2 py-1.5 px-3 ml-5 rounded-lg border-l" style={{ borderColor: t ? "color-mix(in srgb, var(--muted) 25%, transparent)" : "color-mix(in srgb, var(--border) 40%, transparent)", background: t ? "color-mix(in srgb, var(--surface-elevated) 50%, transparent)" : "color-mix(in srgb, var(--surface) 50%, transparent)" }}>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5" style={{ color: t?.dim ?? "var(--subtle)" }}>
         <polyline points="20 6 9 17 4 12" />
       </svg>
@@ -128,13 +128,13 @@ function ToolResultMini({ data, terminal, terminalColors }: { data: Record<strin
   );
 }
 
-function TextDeltaMini({ data, terminal, terminalColors }: { data: Record<string, unknown>; terminal?: boolean; terminalColors?: { bg: string; fg: string; dim: string; accent: string; border: string; surface: string; font: string } | null }) {
+function TextDeltaMini({ data, terminal, terminalColors }: { data: Record<string, unknown>; terminal?: boolean; terminalColors?: Record<string, string> | null }) {
   const text = (data.text ?? data.delta ?? "") as string;
   if (!text) return null;
   const truncated = text.length > 120 ? text.slice(0, 120) + "..." : text;
   const t = terminalColors;
   return (
-    <div className="flex items-start gap-2 py-1.5 px-3 ml-5 rounded-lg border-l" style={{ borderColor: t ? `${t.accent}30` : "color-mix(in srgb, var(--yellow) 40%, transparent)", background: t ? `${t.dim}10` : "color-mix(in srgb, #fffef5 50%, transparent)" }}>
+    <div className="flex items-start gap-2 py-1.5 px-3 ml-5 rounded-lg border-l" style={{ borderColor: t ? "color-mix(in srgb, var(--gold) 20%, transparent)" : "color-mix(in srgb, var(--yellow) 40%, transparent)", background: t ? "color-mix(in srgb, var(--gold-bg) 15%, transparent)" : "color-mix(in srgb, #fffef5 50%, transparent)" }}>
       <span className="shrink-0 mt-0.5" style={{ color: t?.dim ?? "var(--muted)" }}><IconChat size={12} /></span>
       <span className="text-[11px] leading-relaxed whitespace-pre-wrap" style={{ color: t?.fg ?? "var(--ink)" }}>{truncated}</span>
     </div>
@@ -153,12 +153,12 @@ export default function TruthConsole({ events, onClose, loading, variant }: { ev
   }, [events.length, autoScroll]);
 
   const t = isTerminal ? {
-    bg: "#1a1a1e",
-    fg: "#a8d8a8",
-    dim: "#5a7a5a",
-    accent: "#7ec87e",
-    border: "#2a2a30",
-    surface: "#141418",
+    bg: "var(--surface)",
+    fg: "var(--ink)",
+    dim: "var(--muted)",
+    accent: "var(--gold)",
+    border: "var(--border)",
+    surface: "var(--surface-elevated)",
     font: "'JetBrains Mono', 'Fira Code', ui-monospace, monospace",
   } : null;
 
@@ -167,7 +167,7 @@ export default function TruthConsole({ events, onClose, loading, variant }: { ev
       style={{ background: t?.bg ?? "var(--surface)", borderColor: t?.border ?? "color-mix(in srgb, var(--border) 50%, transparent)" }}>
       <div className="max-md:bg-black/30 max-md:absolute max-md:inset-0 max-md:-top-[100vh]" onClick={onClose ? () => onClose() : undefined} />
       <div className="flex flex-col min-h-0 max-md:relative">
-      <style>{`.tc-scroll::-webkit-scrollbar { width: 4px; } .tc-scroll::-webkit-scrollbar-thumb { background: ${t ? "#3a3a42" : "color-mix(in srgb, var(--border) 40%, transparent)"}; border-radius: 2px; } .tc-scroll::-webkit-scrollbar-track { background: transparent; }`}</style>
+      <style>{`.tc-scroll::-webkit-scrollbar { width: 4px; } .tc-scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--border) 40%, transparent); border-radius: 2px; } .tc-scroll::-webkit-scrollbar-track { background: transparent; }`}</style>
 
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b max-md:pt-4"
@@ -188,7 +188,7 @@ export default function TruthConsole({ events, onClose, loading, variant }: { ev
             </svg>
           )}
           <span className="text-xs font-medium" style={{ color: t?.fg ?? "var(--ink)", fontFamily: t?.font ?? undefined }}>{isTerminal ? "AGENT.exe" : "Console"}</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: t ? `${t.dim}40` : "color-mix(in srgb, var(--border) 30%, transparent)", color: t?.dim ?? "var(--subtle)", fontFamily: t?.font ?? undefined }}>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: t ? "color-mix(in srgb, var(--muted) 25%, transparent)" : "color-mix(in srgb, var(--border) 30%, transparent)", color: t?.dim ?? "var(--subtle)", fontFamily: t?.font ?? undefined }}>
             {events.length}
           </span>
         </div>
@@ -215,35 +215,35 @@ export default function TruthConsole({ events, onClose, loading, variant }: { ev
         {!loading && events.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             <p className="text-xs mt-2" style={{ color: t?.dim ?? "var(--subtle)", fontFamily: t?.font ?? undefined }}>{isTerminal ? "awaiting instruction..." : "No agent activity yet"}</p>
-            <p className="text-[10px]" style={{ color: t ? `${t.dim}80` : "var(--subtle)", opacity: 0.5 }}>Events appear while the agent works</p>
+            <p className="text-[10px]" style={{ color: t ? "color-mix(in srgb, var(--muted) 50%, transparent)" : "var(--subtle)", opacity: 0.5 }}>Events appear while the agent works</p>
           </div>
         )}
         {events.map((event, i) => (
           <div key={`${event.timestamp}-${i}`}>
             <div className="flex items-center gap-1.5 text-[9px] mb-0.5 px-1" style={{ color: t?.dim ?? "var(--subtle)" }}>
               <span>{formatTimestamp(event.timestamp)}</span>
-              <span className="font-semibold uppercase text-[7px] px-1 rounded" style={{ background: t ? `${t.dim}30` : "color-mix(in srgb, var(--accent-bg) 40%, transparent)", color: t?.dim ?? "var(--muted)" }}>{event.type}</span>
+              <span className="font-semibold uppercase text-[7px] px-1 rounded" style={{ background: t ? "color-mix(in srgb, var(--muted) 20%, transparent)" : "color-mix(in srgb, var(--accent-bg) 40%, transparent)", color: t?.dim ?? "var(--muted)" }}>{event.type}</span>
             </div>
             {event.type === "tool_use" && <ToolUseMini data={event.data as Record<string, unknown>} terminal={isTerminal} terminalColors={t} />}
             {event.type === "tool_result" && <ToolResultMini data={event.data as Record<string, unknown>} terminal={isTerminal} terminalColors={t} />}
             {event.type === "text" && <TextDeltaMini data={event.data as Record<string, unknown>} terminal={isTerminal} terminalColors={t} />}
             {event.type === "status" && (
-              <div className="flex items-center gap-2 py-1.5 px-3 rounded-lg" style={{ background: t ? `${t.dim}20` : "color-mix(in srgb, #f0fdf4 50%, transparent)" }}>
+              <div className="flex items-center gap-2 py-1.5 px-3 rounded-lg" style={{ background: t ? "color-mix(in srgb, var(--gold-bg) 40%, transparent)" : "color-mix(in srgb, #f0fdf4 50%, transparent)" }}>
                 <IconLightning size={12} style={{ color: t?.accent ?? "var(--green)" }} />
                 <span className="text-[11px] font-medium" style={{ color: t?.fg ?? "var(--ink)" }}>{String(event.data)}</span>
               </div>
             )}
             {event.type === "error" && (
-              <div className="flex items-center gap-2 py-1.5 px-3 rounded-lg" style={{ background: t ? "#3a1a1a" : "color-mix(in srgb, #fef2f2 50%, transparent)" }}>
-                <IconX size={12} style={{ color: "#e07070" }} />
-                <span className="text-[11px] font-medium" style={{ color: "#e07070" }}>{String(event.data)}</span>
+              <div className="flex items-center gap-2 py-1.5 px-3 rounded-lg" style={{ background: t ? "color-mix(in srgb, var(--oxblood-subtle) 60%, transparent)" : "color-mix(in srgb, #fef2f2 50%, transparent)" }}>
+                <IconX size={12} style={{ color: "var(--oxblood)" }} />
+                <span className="text-[11px] font-medium" style={{ color: "var(--oxblood)" }}>{String(event.data)}</span>
               </div>
             )}
           </div>
         ))}
         {loading && events.length === 0 && (
           <div className="flex items-center justify-center py-8">
-            <div className="w-5 h-5 rounded-full border-2 animate-spin" style={{ borderColor: t ? `${t.dim}40` : "color-mix(in srgb, var(--border) 40%, transparent)", borderTopColor: t?.accent ?? "var(--accent)" }} />
+            <div className="w-5 h-5 rounded-full border-2 animate-spin" style={{ borderColor: t ? "color-mix(in srgb, var(--border) 40%, transparent)" : "color-mix(in srgb, var(--border) 40%, transparent)", borderTopColor: t?.accent ?? "var(--accent)" }} />
           </div>
         )}
       </div>

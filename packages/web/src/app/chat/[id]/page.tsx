@@ -263,7 +263,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
           {consoleOpen && (
-            <div className="hidden md:flex w-[35%] min-w-[300px] max-w-[480px] border-l border-border flex-col min-h-0" style={{ background: "#1a1a1e" }}>
+            <div className="hidden md:flex w-[35%] min-w-[300px] max-w-[480px] border-l border-border flex-col min-h-0" style={{ background: "var(--surface)" }}>
               <TruthConsole events={agentEvents} loading={sending && agentEvents.length === 0} variant="terminal" />
             </div>
           )}
