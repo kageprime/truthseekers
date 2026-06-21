@@ -232,37 +232,51 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           </div>
         </div>
 
-        {/* Messages / Console */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
-          {consoleOpen ? (
-            <TruthConsole events={agentEvents} loading={sending && agentEvents.length === 0} />
-          ) : loading || convLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="w-6 h-6 rounded-full border-2 animate-spin border-border border-t-gold" />
-            </div>
-          ) : messages.length === 0 && !sending && isNew ? (
-            <EmptyChatState suggestedTopics={suggestedTopics} onSetInput={doSend} />
-          ) : (
-            <div className="max-w-3xl mx-auto w-full px-3 sm:px-6">
-              {messages.map((msg: any, i: number) => (
-                <ChatMessage
-                  key={msg.id}
-                  role={msg.role}
-                  content={msg.content}
-                  blocks={msg.blocks}
-                  createdAt={msg.createdAt}
-                  isLastAssistant={i === lastAssistantIndex}
-                />
-              ))}
-              {!sending && lastAssistantIndex >= 0 && followUps.length > 0 && (
-                <FollowUpSuggestions followUps={followUps} onClick={doSend} />
-              )}
-              {hasStreaming && (
-                <ChatMessage role="assistant" content={streamContent} streaming />
-              )}
+        {/* Messages / Console split */}
+        <div className="flex-1 flex min-h-0">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
+            {loading || convLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="w-6 h-6 rounded-full border-2 animate-spin border-border border-t-gold" />
+              </div>
+            ) : messages.length === 0 && !sending && isNew ? (
+              <EmptyChatState suggestedTopics={suggestedTopics} onSetInput={doSend} />
+            ) : (
+              <div className="max-w-3xl mx-auto w-full px-3 sm:px-6">
+                {messages.map((msg: any, i: number) => (
+                  <ChatMessage
+                    key={msg.id}
+                    role={msg.role}
+                    content={msg.content}
+                    blocks={msg.blocks}
+                    createdAt={msg.createdAt}
+                    isLastAssistant={i === lastAssistantIndex}
+                  />
+                ))}
+                {!sending && lastAssistantIndex >= 0 && followUps.length > 0 && (
+                  <FollowUpSuggestions followUps={followUps} onClick={doSend} />
+                )}
+                {hasStreaming && (
+                  <ChatMessage role="assistant" content={streamContent} streaming />
+                )}
+              </div>
+            )}
+          </div>
+          {consoleOpen && (
+            <div className="hidden md:flex w-[35%] min-w-[300px] max-w-[480px] border-l border-border flex-col min-h-0" style={{ background: "#1a1a1e" }}>
+              <TruthConsole events={agentEvents} loading={sending && agentEvents.length === 0} variant="terminal" />
             </div>
           )}
         </div>
+        {/* Mobile console overlay */}
+        {consoleOpen && (
+          <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end pointer-events-none">
+            <div className="absolute inset-0 bg-black/30 pointer-events-auto" onClick={() => setConsoleOpen(false)} />
+            <div className="relative pointer-events-auto rounded-t-2xl shadow-2xl max-h-[85vh] overflow-hidden bg-surface border border-border">
+              <TruthConsole events={agentEvents} loading={sending && agentEvents.length === 0} onClose={() => setConsoleOpen(false)} />
+            </div>
+          </div>
+        )}
 
         {/* Input */}
         <div className="shrink-0 px-3 sm:px-6 pb-4 pt-2 border-t border-border">
