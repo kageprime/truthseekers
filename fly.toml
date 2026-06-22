@@ -2,7 +2,6 @@ app = "truthseeker"
 primary_region = "ams"
 
 [build]
-  dockerfile = "veritas/Dockerfile"
 
 [env]
   PORT = "4097"
