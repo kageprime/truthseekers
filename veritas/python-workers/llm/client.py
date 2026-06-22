@@ -40,15 +40,7 @@ PROVIDERS = [
     },
 ]
 
-MOCK_RESPONSE = {
-    "claims": [
-        {
-            "text": "Lee Harvey Oswald did not fire the fatal shot that killed John F. Kennedy.",
-            "source_doc_id": "doc_jfk_hearings_1979",
-            "passage": "Based on acoustic analysis, the committee concluded there was a high probability of two gunmen firing at the President."
-        }
-    ]
-}
+MOCK_RESPONSE = {"claims": []}
 
 
 def _call(provider: dict, system_prompt: str, user_prompt: str) -> dict | None:
@@ -62,8 +54,7 @@ def _call(provider: dict, system_prompt: str, user_prompt: str) -> dict | None:
         "response_format": {"type": "json_object"},
         "temperature": 0,
     }
-    model_lower = provider["model"].lower()
-    if "qwen" in model_lower or "gpt-oss" in model_lower:
+    if provider["name"] == "groq" and ("qwen" in provider["model"].lower() or "gpt-oss" in provider["model"].lower()):
         kwargs["extra_body"] = {"reasoning_format": "parsed"}
 
     response = client.chat.completions.create(**kwargs)

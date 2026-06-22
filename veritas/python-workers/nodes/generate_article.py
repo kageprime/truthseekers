@@ -58,15 +58,26 @@ OUTPUT FORMAT (return a JSON object with root "article" key):
   }}
 }}
 
-Return JSON only.
+Return JSON only. The title MUST be a specific, concrete article title about the actual topic — never a generic label like "Analysis of Resolved Claims" or "Article Generation Result".
 """
 
 def generate_article_node(resolved_claims: dict) -> dict:
-    """
-    Generates a structured encyclopedia article from the resolved claim graph.
-    Layer 3 — Knowledge Construction. Traces every claim, surfaces uncertainty, preserves provenance.
-    """
     claims = resolved_claims.get("resolved_claims", [])
+    if not claims:
+        return {
+            "article": {
+                "title": resolved_claims.get("topic", "Insufficient Data"),
+                "abstract": "The epistemic pipeline did not produce resolved claims for this topic. Available information was insufficient for structured article generation.",
+                "sections": [],
+                "evidence_gaps": [],
+                "dissenting_perspectives": [],
+                "confidence_note": "No claims were extracted or resolved.",
+                "timeline": [],
+                "categories": [],
+                "crossrefs": [],
+                "citations": [],
+            }
+        }
     user_prompt = NODE_PROMPT + f'\n\nRESOLVED CLAIMS:\n{json.dumps(claims, indent=2)}\n\nReturn JSON only.'
     return llm.invoke(system_prompt=VERITAS_SYSTEM_PROMPT, user_prompt=user_prompt)
 
