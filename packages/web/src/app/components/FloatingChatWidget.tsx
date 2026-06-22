@@ -10,7 +10,6 @@ import { useFloatingChat } from "../FloatingChatContext";
 import type { AgentEvent } from "./ProcessViewer";
 import ChatMessage from "./ChatMessage";
 import EmptyChatState from "./EmptyChatState";
-import FollowUpSuggestions from "./FollowUpSuggestions";
 import TruthConsole from "./TruthConsole";
 import { BASE } from "@/lib/constants";
 
@@ -104,10 +103,14 @@ export default function FloatingChatWidget() {
     if (!id) {
       setLoading(true);
       try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("truthseekers_token") : null;
+        const t = typeof window !== "undefined"
+          ? (document.cookie.match(/(?:^|; )truthseekers_token=([^;]*)/)?.[1]
+            ? decodeURIComponent(document.cookie.match(/(?:^|; )truthseekers_token=([^;]*)/)![1])
+            : localStorage.getItem("truthseekers_token"))
+          : null;
         const res = await fetch(`${BASE}/chat`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+          headers: { "Content-Type": "application/json", ...(t ? { authorization: `Bearer ${t}` } : {}) },
           body: JSON.stringify({ title: "Quick Chat" }),
         });
         const data = await res.json();
@@ -214,16 +217,6 @@ export default function FloatingChatWidget() {
   const currentConv = conversations.find((c) => c.id === convId);
   const lastAssistantIdx = [...messages].reverse().findIndex((m: any) => m.role === "assistant");
   const lastAssistantIndex = lastAssistantIdx >= 0 ? messages.length - 1 - lastAssistantIdx : -1;
-  const followUps = lastAssistantIndex >= 0 ? ["Tell me more", "Give me sources", "Summarize this"] : [];
-
-  const suggestedTopics = [
-    "What is quantum computing?",
-    "Explain the history of the Roman Empire",
-    "How does CRISPR gene editing work?",
-    "Show me a timeline of space exploration",
-    "Compare classical vs quantum computing",
-    "What caused the Industrial Revolution?",
-  ];
 
   return (
     <div className="h-full flex flex-col max-md:max-h-[85vh]">
@@ -295,7 +288,7 @@ export default function FloatingChatWidget() {
           </button>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={toggleExpanded} className="btn-ghost text-xs p-1.5" aria-label="Expand chat">
+          <button onClick={toggleExpanded} className="btn-ghost text-xs p-1.5 hover:scale-105 transition-transform" aria-label="Expand chat">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 3 21 3 21 9" />
               <polyline points="9 21 3 21 3 15" />
@@ -303,7 +296,7 @@ export default function FloatingChatWidget() {
               <line x1="3" y1="21" x2="10" y2="14" />
             </svg>
           </button>
-          <button onClick={close} className="btn-ghost text-xs p-1.5" aria-label="Close chat">
+          <button onClick={close} className="btn-ghost text-xs p-1.5 hover:scale-105 transition-transform" aria-label="Close chat">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
@@ -320,9 +313,9 @@ export default function FloatingChatWidget() {
               <div className="w-6 h-6 rounded-full border-2 animate-spin border-border border-t-gold" />
             </div>
           ) : messages.length === 0 && !sending ? (
-            <EmptyChatState suggestedTopics={suggestedTopics} onSetInput={doSend} />
+            <EmptyChatState onSetInput={doSend} />
           ) : (
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-4xl mx-auto px-3">
               {messages.map((msg: any, i: number) => (
                 <ChatMessage
                   key={msg.id}
@@ -333,9 +326,6 @@ export default function FloatingChatWidget() {
                   isLastAssistant={i === lastAssistantIndex}
                 />
               ))}
-              {!sending && lastAssistantIndex >= 0 && followUps.length > 0 && (
-                <FollowUpSuggestions followUps={followUps} onClick={doSend} />
-              )}
               {hasStreaming && (
                 <ChatMessage role="assistant" content={streamContent} streaming />
               )}
@@ -350,22 +340,42 @@ export default function FloatingChatWidget() {
 
       {/* Input */}
       <div className="shrink-0 border-t border-border px-3 py-3">
-        <div className="flex gap-2">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(input); } }}
-            placeholder={sending ? "Waiting for response..." : "Type a message..."}
-            disabled={sending || loading}
-            className="input flex-1 text-sm py-2"
-          />
-          <button
-            onClick={sending ? streamStop : () => doSend(input)}
-            disabled={!sending && !input.trim()}
-            className="btn btn-primary btn-sm shrink-0 min-h-[38px]"
-          >
-            {sending ? "■" : "→"}
-          </button>
+        <div className="flex items-end gap-2 rounded-2xl p-1.5 bg-surface-elevated border border-border focus-within:border-accent transition-colors">
+          <div className="flex-1 min-w-0">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(input); } }}
+              placeholder={sending ? "Waiting for response..." : "Ask about any topic..."}
+              disabled={sending || loading}
+              rows={1}
+              className="w-full resize-none bg-transparent border-none textarea-ring px-3 py-2 text-sm min-h-[36px] max-h-[120px] text-ink outline-none"
+            />
+          </div>
+          {sending ? (
+            <button
+              onClick={streamStop}
+              aria-label="Stop generating"
+              className="btn btn-sm shrink-0 rounded-[10px] bg-oxblood text-white"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+              Stop
+            </button>
+          ) : (
+            <button
+              onClick={() => doSend(input)}
+              disabled={!input.trim()}
+              aria-label="Send message"
+              className={`btn-icon shrink-0 rounded-[10px] transition-colors ${input.trim() ? "bg-accent text-white" : "bg-border text-subtle"}`}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     </div>

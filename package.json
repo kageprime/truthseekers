@@ -3,33 +3,20 @@
   "private": true,
   "workspaces": [
     "packages/core",
-    "packages/storage",
-    "packages/server",
-    "packages/cli",
     "packages/web"
   ],
   "scripts": {
     "build:core": "tsc --build packages/core",
-    "build:storage": "tsc --build packages/storage",
-    "build:server": "tsc --build packages/server",
-    "build:cli": "tsc --build packages/cli",
-    "build": "tsc --build packages/core packages/storage packages/server packages/cli",
+    "build": "tsc --build packages/core",
     "build:web": "cd packages/web && npm run build",
-    "typecheck": "tsc --build packages/core packages/storage packages/server packages/cli",
-    "seed": "node packages/cli/dist/seed.js",
-    "generate": "node packages/cli/dist/generate.js",
-    "dev": "concurrently -k \"node packages/server/dist/index.js\" \"cd packages/web && npm run dev\"",
-    "opencode:start": "opencode serve --port 4098 --hostname 127.0.0.1 --model opencode/deepseek-v4-flash-free",
-    "opencode:stop": "taskkill /f /im kilo.exe 2>nul & taskkill /f /im opencode.exe 2>nul & echo done",
-    "dev:full": "concurrently -k \"opencode serve --port 4098 --hostname 127.0.0.1 --model opencode/deepseek-v4-flash-free\" \"node packages/server/dist/index.js\" \"cd packages/web && npm run dev\"",
-    "clean": "npx rimraf packages/*/dist packages/*/.next node_modules",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "build:go": "cd veritas/go-orchestrator && \"C:\\Program Files\\Go\\bin\\go.exe\" build -o server.exe ./cmd/server",
+    "typecheck": "tsc --build packages/core && cd packages/web && tsc --noEmit",
+    "dev:go": "cd veritas/go-orchestrator && \"C:\\Program Files\\Go\\bin\\go.exe\" run cmd/server/main.go",
+    "dev:go:web": "concurrently -k \"cd veritas/go-orchestrator && \\\"C:\\Program Files\\Go\\bin\\go.exe\\\" run cmd/server/main.go\" \"cd packages/web && npm run dev\"",
+    "clean": "npx rimraf packages/*/dist packages/*/.next node_modules"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.0",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/nodemailer": "^8.0.1",
     "autoprefixer": "^10.5.0",
     "concurrently": "^9.0.0",
     "postcss": "^8.5.15",
@@ -37,11 +24,5 @@
     "tailwindcss": "^3.4.19",
     "typescript": "^5.7.0",
     "vitest": "^4.1.8"
-  },
-  "dependencies": {
-    "jsonwebtoken": "^9.0.3",
-    "mermaid": "^11.15.0",
-    "nodemailer": "^9.0.0",
-    "stripe": "^22.2.1"
   }
 }

@@ -12,7 +12,7 @@ const InteractiveTimeline = dynamic(() => import("./InteractiveTimeline"), { ssr
 const MapViewer = dynamic(() => import("./MapViewer"), { ssr: false });
 const ThreeDMapViewer = dynamic(() => import("./ThreeDMapViewer"), { ssr: false });
 
-export { articleToBlocks } from "@encarta/core";
+export { articleToBlocks } from "@encarta/core/dist/blocks.js";
 import { useState } from "react";
 import type {
   Block,
@@ -394,9 +394,13 @@ function DividerBlock() {
 }
 
 function UnknownBlock({ block }: { block: Block }) {
+  const text = typeof block.data === "object" && block.data !== null
+    ? ((block.data as Record<string, unknown>).content as string) || ((block.data as Record<string, unknown>).text as string) || ""
+    : "";
+  if (!text) return null;
   return (
-    <div className="text-xs p-2 mb-1" style={{ color: "var(--subtle)", border: "1px dashed var(--rule)", borderRadius: "var(--radius-sharp)" }}>
-      Unknown block type: {block.type}
+    <div className="text-base leading-relaxed text-ink">
+      <MarkdownRenderer content={text} />
     </div>
   );
 }

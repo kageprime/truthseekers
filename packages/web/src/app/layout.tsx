@@ -7,6 +7,7 @@ import { FloatingChatProvider } from "./FloatingChatContext";
 import { ChatProvider } from "./chat/ChatContext";
 import { HeaderSearchProvider } from "./HeaderSearchContext";
 import { ArticleViewProvider } from "./ArticleViewContext";
+import { AuthProvider } from "./components/AuthProvider";
 import AppShell from "./AppShell";
 
 export const viewport: Viewport = {
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ErrorBoundary>
           <QueryProvider>
             <ThemeProvider>
+              <AuthProvider>
               <FloatingChatProvider>
                 <ChatProvider>
                   <HeaderSearchProvider>
@@ -54,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   </HeaderSearchProvider>
                 </ChatProvider>
               </FloatingChatProvider>
+              </AuthProvider>
             </ThemeProvider>
           </QueryProvider>
         </ErrorBoundary>

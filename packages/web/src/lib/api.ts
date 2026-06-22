@@ -87,8 +87,12 @@ export async function fetchMap(slug: string): Promise<MapEntry | null> {
 // ── Chat ──
 
 function authHeaders(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  const token = localStorage.getItem("truthseekers_token");
+  if (typeof document === "undefined") return {};
+  const fromCookie = document.cookie.match(/(?:^|; )truthseekers_token=([^;]*)/);
+  const token = fromCookie ? decodeURIComponent(fromCookie[1]) : localStorage.getItem("truthseekers_token");
+  if (token && !fromCookie) {
+    document.cookie = `truthseekers_token=${encodeURIComponent(token)}; path=/; max-age=${60*60*24*30}; SameSite=Lax`;
+  }
   return token ? { authorization: `Bearer ${token}` } : {};
 }
 

@@ -96,10 +96,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {/* Mobile/Overlay: bottom-sheet backdrop + panel */}
       {showChat && isOverlay && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end pointer-events-none">
-          <div className="absolute inset-0 bg-black/30 pointer-events-auto" onClick={close} />
-          <div className="relative pointer-events-auto rounded-t-2xl shadow-2xl max-h-[85vh] overflow-hidden bg-surface border border-border">
-            <div className="flex justify-center pt-2 pb-1">
-              <div className="w-10 h-1 rounded-full bg-subtle" />
+          <div className="absolute inset-0 bg-black/30 pointer-events-auto animate-appear-blur" onClick={close} />
+          <div className="relative pointer-events-auto rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden bg-surface border border-border chat-shell chat-message-enter">
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-12 h-1.5 rounded-full bg-subtle/50" />
             </div>
             <FloatingChatWidget />
           </div>
@@ -108,8 +108,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       {/* Expanded full-screen overlay */}
       {isExpanded && (
-        <div className="fixed inset-0 z-[60] flex flex-col items-center bg-surface">
-          <div className="w-full max-w-4xl h-full flex flex-col">
+        <div className="fixed inset-0 z-[60] flex flex-col items-center bg-surface glass-lg animate-appear-blur">
+          <div className="w-full max-w-4xl h-full flex flex-col chat-message-enter chat-shell my-4">
             <FloatingChatWidget />
           </div>
         </div>
@@ -123,7 +123,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       {/* Floating ViewSwitcher for stream mode */}
       {article && mode === "stream" && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] shadow-lg rounded-full p-0.5 bg-surface-elevated border border-rule">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] shadow-lg rounded-full p-0.5 bg-surface-elevated border border-rule animate-appear-up">
           <ViewSwitcher />
         </div>
       )}
@@ -132,7 +132,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {!isOpen && !isHidden && !isChatRoute && (
         <button
           onClick={toggle}
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 max-md:w-12 max-md:h-12 max-md:bottom-4 max-md:right-4 rounded-full shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 bg-accent text-white border-none cursor-pointer"
+          className="fixed bottom-6 right-6 z-50 fab-chat"
           aria-label="Open chat"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -2,14 +2,17 @@
 
 An AI-powered interactive encyclopedia. The chat is the universal interface; categories are the browse layer; responsive layout adapts to any device.
 
+> **⚠️ Backend migration note (June 2026):** The backend has migrated from the legacy TypeScript/Hono stack to a Go + Python architecture under `veritas/`. Throughout this roadmap, file references to `packages/server/...`, `packages/storage/...`, `packages/cli/...`, and `packages/core/src/tools.ts` / `pipeline/...` describe the **legacy** Node stack and are pending re-implementation in Go. For the current backend architecture, see [`AGENTS.md`](AGENTS.md) and [`veritas/docs/MIGRATION_STATUS.md`](veritas/docs/MIGRATION_STATUS.md). Frontend (`packages/web/`) references remain accurate.
+
 ---
 
 ## Current State
 
-- **Article pipeline**: Research → Outline → Write → Verify → Correct → Media → Store. SSE streams process. Articles have maps, timelines, 3D models, images as `Block[]`.
-- **Chat agent**: 13 tools, tool-calling loop with planning phase. Streaming via SSE. Agent events captured and displayed in Truth Console. Persisted per message in MongoDB.
+- **Backend**: Go orchestrator (`veritas/go-orchestrator/`) on port 4097 — native agent loop, DAG engine, MongoDB storage with mock-mode fallback. Python epistemic workers under `veritas/python-workers/`. The article-generation HTTP path is currently stubbed (`processArticleStub`); wiring the real DAG is pending.
+- **Article pipeline** (target): Research → Outline → Write → Verify → Correct → Media → Store. The Go DAG engine + 9 Python nodes implement the epistemic version (retrieve → extract_claims → … → generate_article). SSE streams process. Articles have maps, timelines, 3D models, images as `Block[]`.
+- **Chat agent**: 14 tools, tool-calling loop (up to 15 iterations, 90k-token budget). Streaming via SSE. Agent events captured and displayed in Truth Console. Persisted per message in MongoDB.
 - **Web app**: Next.js 15 with App Router. Pages: chat (with sidebar history), article viewer, article grid, maps, login, settings, queue, pricing.
-- **Data**: MongoDB (Mongoose) for serving, git for version history. Redis optional (Upstash in prod).
+- **Data**: MongoDB via `go.mongodb.org/mongo-driver` for serving. Redis and git versioning are not yet wired into the Go server.
 - **Chat context** (`ChatContext`): lives in `chat/layout.tsx`, holds `agentEvents`, `consoleOpen`, `sending`. Resets on navigation.
 - **Responsive**: Basic `max-md:` breakpoints. No container queries. No adaptive layout that responds to chat open/close.
 

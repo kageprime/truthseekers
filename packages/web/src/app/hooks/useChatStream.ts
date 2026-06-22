@@ -77,10 +77,14 @@ export function useChatStream() {
               receivedDone = true;
               callbacks.onDone(event);
               fullText = "";
+              break;
             }
           } catch {}
         }
+        if (receivedDone) break;
       }
+
+      reader.cancel();
 
       // Fallback: if the stream ended without a done event, synthesize one
       if (!receivedDone && fullText) {

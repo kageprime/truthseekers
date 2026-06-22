@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import TruthseekersLogo from "../components/TruthseekersLogo";
 import { BASE } from "@/lib/constants";
 import { IconSend } from "../components/Icons";
+import { storeToken } from "../hooks/useAuth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -19,7 +20,7 @@ export default function LoginPage() {
     const hash = window.location.hash;
     if (hash.startsWith("#token=")) {
       const token = hash.slice(7);
-      localStorage.setItem("truthseekers_token", token);
+      storeToken(token);
       // Fetch user to determine where to redirect
       fetch(`${BASE}/auth/me`, { headers: { authorization: `Bearer ${token}` } })
         .then((r) => r.json())
@@ -47,7 +48,7 @@ export default function LoginPage() {
       if (!res.ok) { setError(data.error || "Login failed"); setLoading(false); return; }
 
       if (data.token) {
-        localStorage.setItem("truthseekers_token", data.token);
+        storeToken(data.token);
         if (data.user?.onboarded) router.push("/");
         else router.push("/onboarding");
       } else if (data.sent) {

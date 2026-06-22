@@ -1,30 +1,51 @@
 version: '3.8'
-services:
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
 
-  mongo:
-    image: mongo:7
+services:
+  db:
+    image: postgres:15
+    container_name: veritas-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: veritas
     ports:
-      - "27017:27017"
+      - "5432:5432"
     volumes:
-      - mongo_data:/data/db
+      - pgdata:/var/lib/postgresql/data
+      # Initialize schema on first run
+      - ./veritas/go-orchestrator/storage/schema.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh --quiet
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres -d veritas"]
+      interval: 5s
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: .
+      dockerfile: veritas/Dockerfile
+    container_name: veritas-backend
+    ports:
+      - "4097:4097"
+    environment:
+      - PORT=4097
+      - DATABASE_URL=postgres://postgres:postgrespassword@db:5432/veritas?sslmode=disable
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: packages/web/Dockerfile
+    container_name: veritas-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:4097
+    depends_on:
+      - backend
+
 volumes:
-  redis_data:
-  mongo_data:
+  pgdata:

@@ -559,6 +559,23 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
 @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
 .animate-slide-in { animation: slideIn 0.2s ease-out; }
 
+/* ── Console drawer transition ──────────────────────────────── */
+/* Smooth expand/collapse for the collapsible agent console. Uses
+   max-height + grid-rows trick for a clean transition that works
+   regardless of content height. */
+.console-drawer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s var(--ease-smooth, ease-out);
+}
+.console-drawer.open {
+  grid-template-rows: 1fr;
+}
+.console-drawer > .console-drawer-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
 /* ── View Transitions ───────────────────────────────────────── */
 @view-transition { navigation: auto; }
 ::view-transition-old(root) { animation: vt-fade-out 0.2s ease-out both; }
@@ -715,5 +732,222 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
   .tag-subtle {
     background: rgba(166,124,47,0.08);
     @apply text-muted;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PREMIUM MOTION SYSTEM — Apple / OpenAI Design Language
+   Fluid spring physics, orchestrated entrances, micro-interactions
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Spring easing curves ────────────────────────────────────── */
+:root {
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-quint: cubic-bezier(0.83, 0, 0.17, 1);
+  --ease-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --duration-enter: 500ms;
+}
+
+/* ── Orchestrated entrance animations ────────────────────────── */
+@keyframes appear {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes appear-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes appear-scale {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes appear-blur {
+  from { opacity: 0; filter: blur(8px); transform: translateY(4px); }
+  to   { opacity: 1; filter: blur(0); transform: translateY(0); }
+}
+@keyframes float-subtle {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(166, 124, 47, 0.4); }
+  70%  { box-shadow: 0 0 0 10px rgba(166, 124, 47, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(166, 124, 47, 0); }
+}
+@keyframes typing-dots {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30%           { opacity: 1; transform: translateY(-4px); }
+}
+
+.animate-appear       { animation: appear var(--duration-enter) var(--ease-out-expo) both; }
+.animate-appear-up    { animation: appear-up var(--duration-enter) var(--ease-out-expo) both; }
+.animate-appear-scale { animation: appear-scale var(--duration-slow) var(--ease-out-expo) both; }
+.animate-appear-blur  { animation: appear-blur var(--duration-enter) var(--ease-out-expo) both; }
+.animate-float        { animation: float-subtle 3s ease-in-out infinite; }
+.animate-pulse-ring   { animation: pulse-ring 2s ease-out infinite; }
+
+/* Stagger children — Apple keynote-style orchestration */
+.stagger-children > * { animation: appear var(--duration-enter) var(--ease-out-expo) both; }
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 350ms; }
+
+/* ── Chat message entrance ───────────────────────────────────── */
+.chat-message-enter {
+  animation: appear-up 400ms var(--ease-out-expo) both;
+}
+
+/* ── Typing indicator — three bouncing dots ──────────────────── */
+.typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+}
+.typing-indicator .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--subtle);
+  animation: typing-dots 1.4s ease-in-out infinite;
+}
+.typing-indicator .dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-indicator .dot:nth-child(3) { animation-delay: 0.3s; }
+
+/* ── Floating Chat Shell — premium surface ───────────────────── */
+.chat-shell {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px var(--glass-border),
+    0 8px 40px -8px rgba(0, 0, 0, 0.15),
+    0 2px 12px -2px rgba(0, 0, 0, 0.08);
+  transition: box-shadow var(--duration-slow) var(--ease-smooth),
+              transform var(--duration-slow) var(--ease-spring);
+}
+.chat-shell:hover {
+  box-shadow:
+    0 0 0 1px var(--glass-border),
+    0 12px 48px -8px rgba(0, 0, 0, 0.18),
+    0 4px 16px -2px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Floating Action Button — the chat toggle ────────────────── */
+.fab-chat {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 4px 14px rgba(166, 124, 47, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: transform var(--duration-normal) var(--ease-spring),
+              box-shadow var(--duration-normal) var(--ease-smooth);
+  animation: appear-scale 600ms var(--ease-out-expo) both;
+}
+.fab-chat:hover {
+  transform: scale(1.08);
+  box-shadow:
+    0 6px 20px rgba(166, 124, 47, 0.45),
+    0 4px 10px rgba(0, 0, 0, 0.1);
+}
+.fab-chat:active {
+  transform: scale(0.95);
+}
+.dark .fab-chat {
+  color: #1a1714;
+}
+
+/* ── Chat input — premium feel ───────────────────────────────── */
+.chat-input-premium {
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 0.9375rem;
+  background: var(--surface-elevated);
+  color: var(--ink);
+  transition: border-color var(--duration-normal) var(--ease-smooth),
+              box-shadow var(--duration-normal) var(--ease-smooth),
+              background-color var(--duration-normal) var(--ease-smooth);
+  outline: none;
+  width: 100%;
+  font-family: var(--font-ui);
+  resize: none;
+}
+.chat-input-premium:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 4px var(--gold-bg);
+  background: var(--surface);
+}
+.chat-input-premium::placeholder {
+  color: var(--subtle);
+  transition: color var(--duration-fast) var(--ease-smooth);
+}
+.chat-input-premium:focus::placeholder {
+  color: var(--border);
+}
+
+/* ── Send button — spring press ──────────────────────────────── */
+.btn-send {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--gold);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--duration-fast) var(--ease-spring),
+              background-color var(--duration-normal) var(--ease-smooth),
+              opacity var(--duration-normal) var(--ease-smooth);
+}
+.btn-send:hover { background: var(--gold-soft); transform: scale(1.05); }
+.btn-send:active { transform: scale(0.9); }
+.btn-send:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+.dark .btn-send { color: #1a1714; }
+
+/* ── Sidebar item — smooth hover state ───────────────────────── */
+.sidebar-item {
+  padding: 10px 14px;
+  border-radius: 10px;
+  transition: background-color var(--duration-fast) var(--ease-smooth),
+              transform var(--duration-fast) var(--ease-smooth);
+  cursor: pointer;
+}
+.sidebar-item:hover {
+  background: var(--gold-bg);
+}
+.sidebar-item:active {
+  transform: scale(0.98);
+}
+.sidebar-item.active {
+  background: var(--gold-bg);
+  font-weight: 600;
+}
+
+/* ── Reduce motion ───────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
