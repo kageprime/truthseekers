@@ -1,15 +1,5 @@
+.git
 node_modules
 dist
 .next
-*.tsbuildinfo
-.git
-.env
-**/__pycache__
-**/*.pyc
-**/server_test.exe
-**/server.exe
-**/agent_trace.log
-**/server_out.log
-**/server_err.log
-public/images
 packages/web/.next
