@@ -2,16 +2,12 @@ app = "truthseeker"
 primary_region = "ams"
 
 [build]
+  dockerfile = "veritas/Dockerfile"
 
 [env]
   PORT = "4097"
-  ENCARTA_DB_PATH = "/data/encarta.db"
-  ENCARTA_REPO_PATH = "/data/encyclopedia"
-  ENCARTA_MAX_CONCURRENT = "1"
-  ENCARTA_MAX_QUEUE = "25"
-  RATE_LIMIT = "20"
-  NODE_ENV = "production"
   CORS_ORIGIN = "https://www.terranet.tech,https://truthopedia-web.vercel.app"
+  DO_MODEL = "gemma-4-31B-it"
 
 [[services]]
   internal_port = 4097
@@ -26,10 +22,6 @@ primary_region = "ams"
   [[services.ports]]
     port = 443
     handlers = ["tls", "http"]
-
-[mounts]
-  source = "encarta_data"
-  destination = "/data"
 
 [[vm]]
   memory = "2gb"
