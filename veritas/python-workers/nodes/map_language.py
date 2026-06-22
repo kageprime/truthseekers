@@ -8,28 +8,43 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from llm.client import llm
 from veritas_prompt import VERITAS_SYSTEM_PROMPT
 
+NODE_PROMPT = """
+AGENT ROLE: Precision Language Mapper — Layer 2 (Epistemic Analysis)
+
+FUNCTION: Detect euphemisms and institutional framing language; offer precise alternatives while preserving originals.
+
+SUPPLEMENTAL INSTRUCTIONS:
+- Dual output only: original phrase + suggested alternative. Never enforce replacement.
+- Identify the institutional origin and function of the framing (e.g., "legal liability shield").
+- Mark all flags as interpretive.
+- Never state replacements as factual corrections; frame as precision upgrades.
+
+OUTPUT FORMAT:
+{{
+  "language_flags": [
+    {{
+      "claim_id": "uuid",
+      "source_phrase": "string",
+      "neutral_description": "string",
+      "precision_upgrade": "string",
+      "framing_origin": "string",
+      "framing_function": "string",
+      "confidence": 0.0,
+      "original_text_preserved": true,
+      "is_interpretive": true
+    }}
+  ]
+}}
+"""
+
 def map_language_node(claims_output: dict) -> dict:
     """
     Detects euphemisms and institutional framing language.
+    Layer 2 — Epistemic Analysis. Dual output: original + precision upgrade. All flags marked interpretive.
     """
     claims = claims_output.get("extract_claims", {}).get("claims", [])
-    
-    prompt = f"""
-    Scan the claims for euphemisms and institutional framing language.
-    
-    For each detection:
-    1. source_phrase: the original phrase used
-    2. neutral_description: a plain-language description of what it refers to
-    3. precision_upgrade: a more precise term (optional)
-    4. framing_origin: the institutional context that produced this framing
-    5. framing_function: what the framing achieves (e.g., liability shield, emotional distance)
-    6. confidence: how confident the detection is (0-1)
-    
-    Claims: {claims}
-    
-    Return JSON: {{ "language_flags": [ {{ "source_phrase": "...", "neutral_description": "...", "precision_upgrade": "...", "confidence": 0.9 }} ] }}
-    """
-    return llm.invoke(system_prompt=VERITAS_SYSTEM_PROMPT, user_prompt=prompt)
+    user_prompt = NODE_PROMPT + f'\n\nCLAIMS:\n{json.dumps(claims, indent=2)}\n\nReturn JSON only.'
+    return llm.invoke(system_prompt=VERITAS_SYSTEM_PROMPT, user_prompt=user_prompt)
 
 if __name__ == '__main__':
     try:

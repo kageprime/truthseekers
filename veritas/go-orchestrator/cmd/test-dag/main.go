@@ -30,7 +30,8 @@ func main() {
 			{ID: "scrutinize", Type: "scrutinize", DependsOn: []string{"extract_claims", "critique", "detect_missing", "map_language"}, Execute: pythonExec("scrutinize.py")},
 			{ID: "resolve", Type: "resolve", DependsOn: []string{"extract_claims", "map_evidence", "critique", "scrutinize"}, Execute: pythonExec("resolve.py")},
 			{ID: "generate_article", Type: "generate_article", DependsOn: []string{"resolve"}, Execute: pythonExec("generate_article.py")},
-		},
+				{ID: "store", Type: "store", DependsOn: []string{"generate_article"}, Execute: pythonExec("store.py")},
+			},
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)

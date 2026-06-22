@@ -8,6 +8,10 @@ primary_region = "ams"
   CORS_ORIGIN = "https://www.terranet.tech,https://truthopedia-web.vercel.app"
   DO_MODEL = "gemma-4-31B-it"
 
+[mounts]
+  source = "encarta_data"
+  destination = "/data"
+
 [[services]]
   internal_port = 4097
   protocol = "tcp"

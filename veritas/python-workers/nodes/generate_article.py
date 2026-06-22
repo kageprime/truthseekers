@@ -8,51 +8,67 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from llm.client import llm
 from veritas_prompt import VERITAS_SYSTEM_PROMPT
 
+NODE_PROMPT = """
+AGENT ROLE: Article Generator Node — Layer 3 (Knowledge Construction)
+
+FUNCTION: Generate the final encyclopedia article as a structured view over the resolved claim graph.
+
+SUPPLEMENTAL INSTRUCTIONS:
+- Build the article from the resolved claims; do not introduce new claims.
+- Use precise language. If Layer 2 offered precision upgrades, you may adopt them, but must show the original phrasing in language notes.
+- Include sections for Evidence Gaps, Dissenting Perspectives, and Confidence Note.
+- Every factual statement must be traceable to a specific claim_id.
+- Mark uncertainty clearly. The reader must see what is solid and what is interpretive.
+- Never invent evidence, drop provenance, or re-label an interpretive claim as factual.
+
+OUTPUT FORMAT (return a JSON object with root "article" key):
+{{
+  "article": {{
+    "title": "string",
+    "abstract": "string",
+    "sections": [
+      {{
+        "id": "section-id-hyphenated",
+        "title": "Section Title",
+        "content": "Markdown content with citations..."
+      }}
+    ],
+    "evidence_gaps": [
+      {{
+        "description": "string",
+        "gap_type": "string",
+        "verification_status": "string"
+      }}
+    ],
+    "dissenting_perspectives": [
+      {{
+        "claim_id": "string",
+        "perspective": "string"
+      }}
+    ],
+    "confidence_note": "string",
+    "timeline": [
+      {{ "year": 1963, "event": "...", "description": "..." }}
+    ],
+    "categories": ["history", "forensic-science"],
+    "crossrefs": [],
+    "citations": [
+      {{ "title": "...", "url": "...", "relevance": "..." }}
+    ]
+  }}
+}}
+
+Return JSON only.
+"""
+
 def generate_article_node(resolved_claims: dict) -> dict:
     """
     Generates a structured encyclopedia article from the resolved claim graph.
-    Formatted to match the front-end ArticleContent schema.
+    Layer 3 — Knowledge Construction. Traces every claim, surfaces uncertainty, preserves provenance.
     """
     claims = resolved_claims.get("resolved_claims", [])
-    
-    prompt = f"""
-    Generate an encyclopedia article from the resolved claims.
-    
-    Structure:
-    - Title (precise, not clickbait)
-    - Abstract (3-5 sentences, evidence-grounded summary)
-    - Sections (each key finding/claim as a section, with citations in markdown content)
-    
-    Resolved Claims: {claims}
-    
-    Rules:
-    - Every statement must trace to a resolved claim.
-    - Use precise language. Avoid euphemisms.
-    - Mark uncertainty explicitly.
-    - Citations must include source type and confidence.
-    
-    IMPORTANT: You MUST return a JSON object containing a root "article" key matching this exact schema:
-    {{
-      "article": {{
-        "title": "string",
-        "abstract": "string",
-        "sections": [
-          {{ "id": "section-id-hyphenated", "title": "Section Title", "content": "Markdown content here..." }}
-        ],
-        "timeline": [
-          {{ "year": 1963, "event": "Assassination of JFK", "description": "President Kennedy shot." }}
-        ],
-        "categories": ["history", "forensic-science"],
-        "crossrefs": [],
-        "citations": [
-          {{ "title": "Warren Commission Report", "url": "https://archives.gov/warren", "relevance": "Official inquiry" }}
-        ]
-      }}
-    }}
-    
-    Return JSON only.
-    """
-    return llm.invoke(system_prompt=VERITAS_SYSTEM_PROMPT, user_prompt=prompt)
+    user_prompt = NODE_PROMPT + f'\n\nRESOLVED CLAIMS:\n{json.dumps(claims, indent=2)}\n\nReturn JSON only.'
+    return llm.invoke(system_prompt=VERITAS_SYSTEM_PROMPT, user_prompt=user_prompt)
 
 if __name__ == '__main__':
     try:

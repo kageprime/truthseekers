@@ -164,19 +164,27 @@ func getMockNodeOutput(scriptName string, input interface{}) (interface{}, error
 		}, nil
 
 	case "generate_article.py":
-		return map[string]interface{}{
-			"article": map[string]interface{}{
-				"title":   "The JFK Assassination: Alternate Forensic Theories",
-				"summary": "This article examines forensic claims regarding the shooting of JFK in 1963.",
-				"sections": []interface{}{
-					map[string]interface{}{
-						"id":      "forensic-evidence",
-						"title":   "Acoustic and Forensic Evidence",
-						"content": "The House Select Committee on Assassinations concluded a conspiracy was probable.",
+			return map[string]interface{}{
+				"article": map[string]interface{}{
+					"title":   "The JFK Assassination: Alternate Forensic Theories",
+					"summary": "This article examines forensic claims regarding the shooting of JFK in 1963.",
+					"sections": []interface{}{
+						map[string]interface{}{
+							"id":      "forensic-evidence",
+							"title":   "Acoustic and Forensic Evidence",
+							"content": "The House Select Committee on Assassinations concluded a conspiracy was probable.",
+						},
 					},
 				},
-			},
-		}, nil
+			}, nil
+
+		case "store.py":
+			return map[string]interface{}{
+				"status":         "stored",
+				"persisted_keys":  []interface{}{"generate_article"},
+				"missing_keys":   []interface{}{},
+				"message":        "All outputs persisted successfully.",
+			}, nil
 	}
 
 	return nil, fmt.Errorf("unknown mock node script: %s", scriptName)

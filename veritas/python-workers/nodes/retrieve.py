@@ -8,28 +8,43 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from llm.client import llm
 from veritas_prompt import VERITAS_SYSTEM_PROMPT
 
+NODE_PROMPT = """
+AGENT ROLE: Retrieve Node — Layer 1 (Evidence Integrity)
+
+FUNCTION: Retrieve all available evidence from the vector DB (all four truth categories) and external web search.
+
+SUPPLEMENTAL INSTRUCTIONS:
+- You are a retrieval engine, not an analyst.
+- Retrieve from ALL truth categories: confirmed, contested, suppressed, speculative.
+- Preserve source metadata (URL, chain of custody, acquisition method, accessibility).
+- Do not filter or rank by "credibility." Return everything.
+
+INPUT: {{"query": "string"}}
+
+OUTPUT FORMAT:
+{{
+  "documents": {{
+    "confirmed": [...],
+    "contested": [...],
+    "suppressed": [...],
+    "speculative": [...],
+    "web": [...]
+  }},
+  "metadata": {{
+    "category_counts": {{...}}
+  }}
+}}
+
+Each document should include: id, title, text, url. Preserve all source metadata.
+"""
+
 def retrieve_node(query: str) -> dict:
     """
     Retrieves evidence from all truth categories and web sources.
-    Uses LLM semantic retrieval generation for dynamic testing on any query.
+    Layer 1 — Evidence Integrity. Pure retrieval, no analysis.
     """
-    prompt = f"""
-    Generate realistic documents and web research sources for the query: "{query}".
-    
-    Structure the response as a JSON object with:
-    - documents:
-        - confirmed: [ {{ "id": "doc_conf_1", "title": "...", "text": "...", "url": "..." }} ]
-        - contested: [ {{ "id": "doc_cont_1", "title": "...", "text": "...", "url": "..." }} ]
-        - suppressed: [ {{ "id": "doc_supp_1", "title": "...", "text": "...", "url": "..." }} ]
-        - speculative: [ {{ "id": "doc_spec_1", "title": "...", "text": "...", "url": "..." }} ]
-        - web: [ {{ "id": "doc_web_1", "title": "...", "text": "...", "url": "..." }} ]
-    - metadata:
-        - category_counts: {{ "confirmed": 1, ... }}
-        
-    Ensure the simulated documents are realistic, informative, and directly relevant to the query.
-    Return JSON only.
-    """
-    return llm.invoke(system_prompt=VERITAS_SYSTEM_PROMPT, user_prompt=prompt)
+    user_prompt = NODE_PROMPT + f'\n\nQUERY: "{query}"\n\nReturn JSON only.'
+    return llm.invoke(system_prompt=VERITAS_SYSTEM_PROMPT, user_prompt=user_prompt)
 
 if __name__ == '__main__':
     try:

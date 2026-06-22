@@ -1,5 +1,13 @@
-.git
-node_modules
-dist
-.next
-packages/web/.next
+# ignore everything by default
+*
+
+# keep root build files
+!fly.toml
+!Dockerfile
+!.dockerignore
+
+# keep the Go source
+!veritas/
+!veritas/go-orchestrator/
+!veritas/go-orchestrator/**
+

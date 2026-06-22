@@ -8,24 +8,53 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from llm.client import llm
 from veritas_prompt import VERITAS_SYSTEM_PROMPT
 
+NODE_PROMPT = """
+AGENT ROLE: Critique Node — Layer 2 (Epistemic Analysis)
+
+FUNCTION: Perform a structured multi-factor evaluation of all claims and their evidence.
+
+SUPPLEMENTAL INSTRUCTIONS:
+- You are in Layer 2. You may interpret evidence quality, but all interpretive statements must be flagged.
+- Evaluate source reliability on a multi-dimensional basis (method quality, primary source weight, bias risk, recency), not on institutional prestige.
+- Mark any reasoning gaps or missing counterarguments explicitly.
+- All outputs must be marked as "is_interpretive": true when they go beyond literal evidence.
+
+OUTPUT FORMAT:
+{{
+  "evaluation": {{
+    "factual_consistency": {{
+      "score": 0.0,
+      "issues": [
+        {{ "claim_id": "...", "description": "..." }}
+      ]
+    }},
+    "source_reliability": {{
+      "score": 0.0,
+      "issues": [
+        {{ "claim_id": "...", "description": "..." }}
+      ]
+    }},
+    "reasoning_validity": {{
+      "score": 0.0,
+      "issues": [
+        {{ "claim_id": "...", "description": "..." }}
+      ]
+    }},
+    "missing_counterarguments": [
+      {{ "description": "..." }}
+    ]
+  }},
+  "is_interpretive": true
+}}
+"""
+
 def critique_node(evidence_map: dict) -> dict:
     """
     Structured multi-factor evaluation of all claims.
-    Single node replacing multiple parallel critic agents.
+    Layer 2 — Epistemic Analysis. May interpret evidence quality; all interpretive statements flagged.
     """
-    prompt = f"""
-    Evaluate the claim-evidence map across four dimensions:
-    
-    1. FACTUAL CONSISTENCY: Do the claims align with the evidence provided?
-    2. SOURCE RELIABILITY: What is the quality of the sources cited?
-    3. REASONING VALIDITY: Are there logical gaps between evidence and claims?
-    4. MISSING COUNTERARGUMENTS: What credible counterarguments were not addressed?
-    
-    Claim-Evidence Map: {evidence_map}
-    
-    Return JSON: {{ "evaluation": {{ "factual_consistency": {{ "score": 0.0, "details": "..." }}, "source_reliability": {{ "score": 0.0, "details": "..." }}, "reasoning_validity": {{ "score": 0.0, "details": "..." }}, "missing_counterarguments": [] }} }}
-    """
-    return llm.invoke(system_prompt=VERITAS_SYSTEM_PROMPT, user_prompt=prompt)
+    user_prompt = NODE_PROMPT + f'\n\nCLAIM-EVIDENCE MAP:\n{json.dumps(evidence_map, indent=2)}\n\nReturn JSON only.'
+    return llm.invoke(system_prompt=VERITAS_SYSTEM_PROMPT, user_prompt=user_prompt)
 
 if __name__ == '__main__':
     try:

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,8 +15,10 @@ import (
 	"github.com/kageprime/veritas/go-orchestrator/internal/storage"
 )
 
-var chatSystemPrompt = `You are Truthseekers, an AI encyclopedia agent that renders rich content inline. You MUST use render_blocks for ALL structured data — do NOT format timelines, maps, or lists as plain text/Markdown.
-
+// chatToolRules are the tool-specific behavioral instructions appended to the
+// shared VERITAS system prompt for the interactive chat agent.
+var chatToolRules = `
+## Chat Agent Tool Rules
 CRITICAL RULES:
 1. Call the tool immediately. No preamble, no "I can..." or "I cannot..." text before the tool call.
 2. You HAVE video generation via generate_video. Never say you lack it.
@@ -42,6 +45,37 @@ Also supports: heading, text, citation, crossref, gallery, diagram (mermaid code
 ### create_article — queue article generation
 ### mem_store — remember user preferences
 ### mem_recall — recall user preferences`
+
+// chatSystemPrompt is loaded once at startup from the shared system prompt file.
+var chatSystemPrompt string
+
+func init() {
+	chatSystemPrompt = loadSharedSystemPrompt() + chatToolRules
+}
+
+// loadSharedSystemPrompt reads the canonical VERITAS system prompt from
+// shared/system_prompt.txt (relative to the Go orchestrator directory).
+func loadSharedSystemPrompt() string {
+	// Try multiple common paths: working directory, executable directory, and relative to this file.
+	candidates := []string{
+		"shared/system_prompt.txt",
+		"../shared/system_prompt.txt",
+		filepath.Join("..", "shared", "system_prompt.txt"),
+	}
+	// Also try relative to the Go module root (veritas/go-orchestrator)
+	if wd, err := os.Getwd(); err == nil {
+		candidates = append(candidates, filepath.Join(wd, "..", "shared", "system_prompt.txt"))
+	}
+	for _, p := range candidates {
+		data, err := os.ReadFile(p)
+		if err == nil {
+			log.Printf("[chat] loaded system prompt from %s (%d bytes)", p, len(data))
+			return strings.TrimSpace(string(data))
+		}
+	}
+	log.Println("[chat] WARNING: shared/system_prompt.txt not found, using fallback prompt")
+	return `You are VERITAS, a knowledge construction engine. Deliver accurate, evidence-based responses. Never hallucinate.`
+}
 
 func (s *Server) handleChatRoot(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromRequest(r)

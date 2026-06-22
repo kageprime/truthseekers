@@ -8,46 +8,64 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from llm.client import llm
 from veritas_prompt import VERITAS_SYSTEM_PROMPT
 
+NODE_PROMPT = """
+AGENT ROLE: Resolver Node — Layer 3 (Knowledge Construction)
+
+FUNCTION: Integrate all Layer 2 analyses, resolve contradictions where possible, and compute final confidence vectors for each claim.
+
+SUPPLEMENTAL INSTRUCTIONS:
+- You are in Layer 3. You may synthesize and assign confidence, but every claim must trace to Layer 1 evidence.
+- Surface contradictions; do not hide them.
+- Propagate all is_interpretive flags from Layer 2.
+- Never invent evidence, drop provenance, or re-label an interpretive claim as factual.
+- If a confidence vector is low, say so.
+
+OUTPUT FORMAT:
+{{
+  "resolved_claims": [
+    {{
+      "claim_id": "uuid",
+      "text": "string",
+      "status": "supported | disputed | weak",
+      "confidence_vector": {{
+        "evidence_strength": 0.0,
+        "corroboration_index": 0.0,
+        "source_diversity": 0.0,
+        "recency": 0.0,
+        "contradiction_level": 0.0,
+        "bias_risk": 0.0
+      }},
+      "derived_confidence": 0.0,
+      "provenance": {{
+        "evidence_ids": ["..."],
+        "is_interpretive": true/false,
+        "interpretive_framing": "string | null"
+      }}
+    }}
+  ]
+}}
+"""
+
 def resolver_node(critique: dict, missing_evidence: dict, language_map: dict, scrutiny: dict) -> dict:
     """
     Integrates all epistemic layer outputs into a final claim confidence vector.
-    Resolves contradictions where possible; flags irresolvable ones.
+    Layer 3 — Knowledge Construction. Synthesizes, resolves contradictions, propagates provenance.
     """
-    prompt = f"""
-    Integrate the following analyses into a final resolution:
-    
-    1. Assign a confidence vector to each claim (evidence_strength, corroboration, source_diversity, recency, contradiction_level, bias_risk)
-    2. Flag claims that cannot be resolved with available evidence.
-    3. Identify which claims are ready for article generation.
-    
-    Critique: {critique}
-    Missing Evidence: {missing_evidence}
-    Language Map: {language_map}
-    Scrutiny Report: {scrutiny}
-    
-    Return JSON with resolved claims list and confidence vectors.
-    Example output format:
-    {{
-      "resolved_claims": [
-        {{
-          "claim_id": "...",
-          "text": "...",
-          "status": "supported | disputed | weak | unknown",
-          "confidence_vector": {{
-            "evidence_strength": 0.9,
-            "corroboration_index": 0.8,
-            "source_diversity": 0.7,
-            "recency": 0.6,
-            "contradiction_level": 0.1,
-            "bias_risk": 0.2
-          }},
-          "derived_confidence": 0.85,
-          "ready_for_generation": true
-        }}
-      ]
-    }}
-    """
-    return llm.invoke(system_prompt=VERITAS_SYSTEM_PROMPT, user_prompt=prompt)
+    user_prompt = NODE_PROMPT + f'''
+CRITIQUE:
+{json.dumps(critique, indent=2)}
+
+MISSING EVIDENCE:
+{json.dumps(missing_evidence, indent=2)}
+
+LANGUAGE MAP:
+{json.dumps(language_map, indent=2)}
+
+SCRUTINY REPORT:
+{json.dumps(scrutiny, indent=2)}
+
+Return JSON only.'''
+    return llm.invoke(system_prompt=VERITAS_SYSTEM_PROMPT, user_prompt=user_prompt)
 
 if __name__ == '__main__':
     try:
@@ -56,7 +74,7 @@ if __name__ == '__main__':
         missing_evidence = input_data.get("detect_missing", {})
         language_map = input_data.get("map_language", {})
         scrutiny = input_data.get("scrutinize", {})
-        
+
         output = resolver_node(critique, missing_evidence, language_map, scrutiny)
         print(json.dumps(output))
     except Exception as e:
