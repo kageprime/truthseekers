@@ -1,53 +1,99 @@
 import os
 import json
+import logging
 from openai import OpenAI
 
-class LLMClient:
-    def __init__(self):
-        # Support Groq API
-        api_key = os.getenv("GROQ_API_KEY", os.getenv("OPENAI_API_KEY", "mock-key"))
-        base_url = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
-        
-        self.is_mock = api_key == "mock-key"
-        self.model = os.getenv("LLM_MODEL", "llama-3.1-8b-instant") # Default Groq model
+logger = logging.getLogger(__name__)
 
-        if not self.is_mock:
-            self.client = OpenAI(api_key=api_key, base_url=base_url)
+_dotenv = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env"))
+if os.path.isfile(_dotenv):
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(_dotenv)
+    except ImportError:
+        pass
 
-    def invoke(self, system_prompt: str, user_prompt: str) -> dict:
-        if self.is_mock:
-            # Safe mock return when no API key is present
-            return {
-                "claims": [
-                    {
-                        "text": "Lee Harvey Oswald did not fire the fatal shot that killed John F. Kennedy.",
-                        "source_doc_id": "doc_jfk_hearings_1979",
-                        "passage": "Based on acoustic analysis, the committee concluded there was a high probability of two gunmen firing at the President."
-                    }
-                ]
-            }
-        
-        kwargs = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            "response_format": {"type": "json_object"}
+PROVIDERS = [
+    {
+        "name": "groq",
+        "api_key": os.getenv("GROQ_API_KEY"),
+        "base_url": os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1"),
+        "model": os.getenv("LLM_MODEL", "qwen/qwen3-32b"),
+    },
+    {
+        "name": "do-inference",
+        "api_key": os.getenv("MODEL_ACCESS_KEY"),
+        "base_url": os.getenv("DO_BASE_URL", "https://inference.do-ai.run/v1"),
+        "model": os.getenv("DO_MODEL", "gemma-4-31B-it"),
+    },
+    {
+        "name": "nvidia-nim",
+        "api_key": os.getenv("NVIDIA_API_KEY"),
+        "base_url": os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1"),
+        "model": os.getenv("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct"),
+    },
+    {
+        "name": "openai",
+        "api_key": os.getenv("OPENAI_API_KEY"),
+        "base_url": os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+        "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+    },
+]
+
+MOCK_RESPONSE = {
+    "claims": [
+        {
+            "text": "Lee Harvey Oswald did not fire the fatal shot that killed John F. Kennedy.",
+            "source_doc_id": "doc_jfk_hearings_1979",
+            "passage": "Based on acoustic analysis, the committee concluded there was a high probability of two gunmen firing at the President."
         }
+    ]
+}
 
-        # Enable reasoning format for Qwen and GPT-OSS reasoning models
-        if "qwen" in self.model or "gpt-oss" in self.model:
-            kwargs["extra_body"] = {"reasoning_format": "parsed"}
 
-        response = self.client.chat.completions.create(**kwargs)
-        
-        # When reasoning is returned parsed, we can safely just take content
-        content = response.choices[0].message.content
-        
-        try:
-            return json.loads(content)
-        except Exception:
-            return {"raw_output": content, "error": "Invalid JSON response from LLM"}
+def _call(provider: dict, system_prompt: str, user_prompt: str) -> dict | None:
+    client = OpenAI(api_key=provider["api_key"], base_url=provider["base_url"])
+    kwargs = {
+        "model": provider["model"],
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0,
+    }
+    model_lower = provider["model"].lower()
+    if "qwen" in model_lower or "gpt-oss" in model_lower:
+        kwargs["extra_body"] = {"reasoning_format": "parsed"}
+
+    response = client.chat.completions.create(**kwargs)
+    content = response.choices[0].message.content
+    if not content:
+        return None
+    return json.loads(content)
+
+
+class LLMClient:
+    def invoke(self, system_prompt: str, user_prompt: str) -> dict:
+        active = [p for p in PROVIDERS if p["api_key"]]
+        if not active:
+            logger.warning("no API keys configured, returning mock response")
+            return MOCK_RESPONSE
+
+        errors = []
+        for provider in active:
+            try:
+                result = _call(provider, system_prompt, user_prompt)
+                if result is not None:
+                    return result
+                errors.append(f"{provider['name']}: empty response")
+            except Exception as e:
+                logger.warning("%s failed: %s", provider["name"], e)
+                errors.append(f"{provider['name']}: {e}")
+
+        logger.error("all providers failed: %s", "; ".join(errors))
+        # ponytail: last-provider fallback to mock, add hitl queue if this becomes noisy
+        return MOCK_RESPONSE
+
 
 llm = LLMClient()
