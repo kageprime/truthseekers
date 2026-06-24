@@ -1,14 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useMaps, useMapSearch, type MapEntry } from "../hooks";
 import { usePageSearch } from "../HeaderSearchContext";
-import PageLayout from "../components/PageLayout";
-import PageHero from "../components/PageHero";
-import SectionHeader from "../components/SectionHeader";
+import ContentCard from "../components/ContentCard";
 import MapViewer from "../components/MapViewer";
 import { CardGridSkeleton } from "../components/CardSkeleton";
-import { IconMap, IconGlobe } from "../components/Icons";
 
 export default function MapsPage() {
   const [query, setQuery] = useState("");
@@ -23,31 +20,30 @@ export default function MapsPage() {
     value: query, onChange: setQuery, onSubmit: () => {}, onClear: () => setQuery(""), placeholder: "Search maps..."
   }), [query]));
 
+
   return (
-    <PageLayout>
-
-      {/* Hero with green wave background */}
-      <PageHero
-        title="World History Maps"
-        subtitle="Explore historical maps spanning civilizations, wars, and empires"
-        gradient="green"
-      />
-
-      <main className="flex-1 overflow-y-auto max-w-6xl mx-auto w-full px-6 py-6 pb-16">
+    <ContentCard
+      header={
+        <div className="px-6 py-5 border-b border-border/40">
+          <h1 className="text-lg font-bold tracking-tight" style={{ color: "var(--ink)" }}>World History Maps</h1>
+          <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>Explore historical maps spanning civilizations, wars, and empires</p>
+        </div>
+      }
+    >
+      <div className="p-4 sm:p-6">
         {loading ? (
           <CardGridSkeleton />
         ) : (
           <>
-            {/* Latest Maps */}
             {maps.length > 0 && (
               <section>
-                <SectionHeader icon={IconMap} title="STATIC MAPS" accent="var(--accent)" />
+                <h2 className="text-[10px] font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--subtle)" }}>Static Maps</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {maps.map((map) => (
                     <a
                       key={map.slug}
                       href={`/maps/${map.slug}`}
-                      className="glass-card-static p-0 overflow-hidden block"
+                      className="block rounded-xl overflow-hidden border border-border/40 bg-surface hover:border-accent/30 transition-colors"
                     >
                       <div className="w-full h-32 overflow-hidden" style={{ background: "var(--skeleton)" }}>
                         {map.image ? (
@@ -62,7 +58,7 @@ export default function MapsPage() {
                               if (t.parentElement) {
                                 const fallback = document.createElement("div");
                                 fallback.className = "w-full h-full flex items-center justify-center text-2xl font-bold";
-                                fallback.style.background = "linear-gradient(135deg, #dbeafe, #e0f2fe)";
+                                fallback.style.background = "linear-gradient(135deg, var(--accent-bg), var(--surface-elevated))";
                                 fallback.style.color = "var(--subtle)";
                                 fallback.textContent = map.title.charAt(0).toUpperCase();
                                 t.parentElement.appendChild(fallback);
@@ -71,7 +67,7 @@ export default function MapsPage() {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-2xl font-bold"
-                            style={{ background: "linear-gradient(135deg, #dbeafe, #e0f2fe)", color: "var(--subtle)" }}>
+                            style={{ background: "linear-gradient(135deg, var(--accent-bg), var(--surface-elevated))", color: "var(--subtle)" }}>
                             {map.title.charAt(0).toUpperCase()}
                           </div>
                         )}
@@ -86,15 +82,13 @@ export default function MapsPage() {
                         <p className="text-xs line-clamp-2 leading-relaxed mt-1" style={{ color: "var(--muted)" }}>{map.description}</p>
                         <div className="flex items-center gap-2 mt-2">
                           {map.region && (
-                            <span className="tag tag-subtle text-[10px]" style={{ fontSize: "9px" }}>{map.region}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "color-mix(in srgb, var(--border) 40%, transparent)", color: "var(--subtle)" }}>{map.region}</span>
                           )}
                           {map.era && (
-                            <span className="tag tag-subtle text-[10px]" style={{ background: "var(--border-light)", fontSize: "9px" }}>{map.era}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "color-mix(in srgb, var(--border) 40%, transparent)", color: "var(--subtle)" }}>{map.era}</span>
                           )}
                           {map.threedScene && (
-                            <span className="tag tag-subtle text-[10px]" style={{ background: "var(--gold)", color: "white", fontSize: "9px" }}>
-                              3D
-                            </span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "var(--gold)", color: "white" }}>3D</span>
                           )}
                         </div>
                       </div>
@@ -104,27 +98,24 @@ export default function MapsPage() {
               </section>
             )}
 
-            {/* Search empty state */}
             {maps.length === 0 && !loading && !searching && (
               <div className="text-center py-16">
-                <div className="mb-3"><IconMap size={36} /></div>
                 <p className="text-sm" style={{ color: "var(--muted)" }}>No maps found for &ldquo;{query}&rdquo;</p>
-                <button onClick={() => setQuery("")} className="btn btn-secondary mt-4">
+                <button onClick={() => setQuery("")} className="btn btn-secondary mt-4 cursor-pointer">
                   Clear search
                 </button>
               </div>
             )}
 
-            {/* Interactive Maps */}
             {interactive.length > 0 && (
-              <section className="mt-12">
-                <SectionHeader icon={IconGlobe} title="INTERACTIVE MAPS" accent="var(--blue)" />
+              <section className="mt-10">
+                <h2 className="text-[10px] font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--subtle)" }}>Interactive Maps</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {interactive.map((map) => (
                     <a
                       key={map.slug}
                       href={`/maps/${map.slug}`}
-                      className="glass-card-static p-0 overflow-hidden block"
+                      className="block rounded-xl overflow-hidden border border-border/40 bg-surface hover:border-accent/30 transition-colors"
                     >
                       <div className="pointer-events-none">
                         <MapViewer
@@ -143,10 +134,10 @@ export default function MapsPage() {
                         <p className="text-xs line-clamp-2 mt-1" style={{ color: "var(--muted)" }}>{map.description}</p>
                         <div className="flex items-center gap-2 mt-2">
                           {map.region && (
-                            <span className="tag tag-subtle text-[10px]" style={{ fontSize: "9px" }}>{map.region}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "color-mix(in srgb, var(--border) 40%, transparent)", color: "var(--subtle)" }}>{map.region}</span>
                           )}
                           {map.era && (
-                            <span className="tag tag-subtle text-[10px]" style={{ background: "var(--border-light)", fontSize: "9px" }}>{map.era}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "color-mix(in srgb, var(--border) 40%, transparent)", color: "var(--subtle)" }}>{map.era}</span>
                           )}
                           <span className="text-xs ml-auto" style={{ color: "var(--accent)" }}>INTERACTIVE →</span>
                         </div>
@@ -158,7 +149,7 @@ export default function MapsPage() {
             )}
           </>
         )}
-      </main>
-    </PageLayout>
+      </div>
+    </ContentCard>
   );
 }

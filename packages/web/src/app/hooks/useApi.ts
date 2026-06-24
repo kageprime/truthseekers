@@ -8,18 +8,27 @@ import * as api from "@/lib/api";
 
 function useApiQuery<T>(key: unknown[], fetcher: () => Promise<T>, options?: { enabled?: boolean }) {
   const result = useQuery<T, Error>({ queryKey: key, queryFn: fetcher, enabled: options?.enabled ?? true });
-  return { data: result.data, loading: result.isLoading || result.isFetching, error: result.error?.message ?? null, refetch: result.refetch };
+  return { data: result.data, loading: result.isLoading, isRefetching: result.isFetching && !result.isPending, error: result.error?.message ?? null, refetch: result.refetch };
 }
 
 // ─── Mutation helper ────────────────────────────────────────────────────
 
 function useApiMutation<TResult, TArgs extends any[] = []>(
   mutator: (...args: TArgs) => Promise<TResult>,
-  options?: { onSuccess?: (data: TResult) => void }
+  options?: {
+    onSuccess?: (data: TResult) => void;
+    onMutate?: (args: TArgs) => Promise<unknown> | unknown;
+    onError?: (error: Error, args: TArgs, context?: unknown) => void;
+    onSettled?: () => void;
+  }
 ) {
+  const queryClient = useQueryClient();
   const mutation = useMutation<TResult, Error, TArgs>({
     mutationFn: (args: TArgs) => mutator(...args),
     onSuccess: options?.onSuccess,
+    onError: options?.onError,
+    onSettled: options?.onSettled,
+    onMutate: options?.onMutate as any,
   });
   const mutate = useCallback(async (...args: TArgs): Promise<TResult | undefined> => {
     try { return await mutation.mutateAsync(args); } catch { return undefined; }
@@ -104,6 +113,18 @@ export function useCreateChat() {
   return useApiMutation(
     (title?: string) => api.createChat(title),
     {
+      onMutate: async ([title]) => {
+        await queryClient.cancelQueries({ queryKey: ["chats"] });
+        const prev = queryClient.getQueryData(["chats"]);
+        queryClient.setQueryData(["chats"], (old: any) => {
+          const optimistic = { id: "new-" + Date.now(), title: title || "New Chat", createdAt: new Date().toISOString() };
+          return [optimistic, ...(old ?? [])];
+        });
+        return { prev };
+      },
+      onError: (_e, _a, context: any) => {
+        if (context?.prev) queryClient.setQueryData(["chats"], context.prev);
+      },
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["chats"] });
       },

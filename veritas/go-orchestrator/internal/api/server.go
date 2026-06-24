@@ -6,11 +6,17 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"runtime"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/kageprime/veritas/go-orchestrator/internal/agent"
 	"github.com/kageprime/veritas/go-orchestrator/internal/storage"
 )
+
+var startTime = time.Now()
 
 // issueToken signs a real HS256 JWT for the given user id (subject).
 // Replaces the old unsigned alg:none mockJWT.
@@ -30,17 +36,58 @@ type Server struct {
 	mux    *http.ServeMux
 	server *http.Server
 	queue  *GenerationQueue
+
+	// inFlightAgents tracks active chat agent runs keyed by conversation id,
+	// so POST /chat/:id/stop (or a client disconnect) can Abort() the loop.
+	agentsMu sync.Mutex
+	agents   map[string]agentRun
+}
+
+// agentRun is a registered in-flight agent run, owned by a single user.
+// userID is checked on stop so one user cannot abort another's conversation.
+type agentRun struct {
+	agt    *agent.Agent
+	userID string
 }
 
 func NewServer(port string, db *storage.DB) *Server {
 	s := &Server{
-		db:   db,
-		port: port,
-		mux:  http.NewServeMux(),
+		db:     db,
+		port:   port,
+		mux:    http.NewServeMux(),
+		agents: make(map[string]agentRun),
 	}
 	s.queue = NewGenerationQueue(s)
 	s.setupRoutes()
 	return s
+}
+
+// registerAgent records an active agent run so it can be aborted by convID.
+func (s *Server) registerAgent(convID string, agt *agent.Agent, userID string) {
+	s.agentsMu.Lock()
+	defer s.agentsMu.Unlock()
+	s.agents[convID] = agentRun{agt: agt, userID: userID}
+}
+
+// unregisterAgent removes an agent run when its Run() completes.
+func (s *Server) unregisterAgent(convID string) {
+	s.agentsMu.Lock()
+	defer s.agentsMu.Unlock()
+	delete(s.agents, convID)
+}
+
+// abortAgent signals an in-flight agent run to stop. It is ownership-checked:
+// only the user who started the run may abort it. Returns whether a run was
+// found and aborted.
+func (s *Server) abortAgent(convID, userID string) bool {
+	s.agentsMu.Lock()
+	run, ok := s.agents[convID]
+	s.agentsMu.Unlock()
+	if !ok || run.userID != userID {
+		return false
+	}
+	run.agt.Abort()
+	return true
 }
 
 // Queue exposes the generation worker pool so main.go can Restore() on boot
@@ -49,7 +96,32 @@ func (s *Server) Queue() *GenerationQueue {
 	return s.queue
 }
 
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	active, queued := s.queue.Stats()
+	uptime := time.Since(startTime).Round(time.Second).String()
+	version := os.Getenv("VERITAS_VERSION")
+	if version == "" {
+		version = "dev"
+	}
+	body, _ := json.Marshal(map[string]interface{}{
+		"status":    "ok",
+		"version":   version,
+		"uptime":    uptime,
+		"mockMode":  s.db.IsMockMode(),
+		"goVersion": runtime.Version(),
+		"queue": map[string]int{
+			"active": active,
+			"queued": queued,
+		},
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	})
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
+}
+
 func (s *Server) setupRoutes() {
+	s.mux.HandleFunc("/health", s.handleHealth)
 	s.mux.HandleFunc("/auth", s.handleAuthStub)
 	s.mux.HandleFunc("/auth/login", s.handleAuthLogin)
 	s.mux.HandleFunc("/auth/me", s.handleAuthMe)
@@ -80,10 +152,21 @@ func (s *Server) setupRoutes() {
 
 func (s *Server) Start() error {
 	s.server = &http.Server{
-		Addr:         ":" + s.port,
-		Handler:      s.corsHandler(s.mux),
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		Addr: ":" + s.port,
+		Handler: s.corsHandler(s.mux),
+		// ReadHeaderTimeout is the only server-level timeout safe to set here:
+		// it protects against slowloris header attacks without bounding the
+		// response. ReadTimeout and WriteTimeout are intentionally omitted
+		// because this server serves long-lived SSE streams
+		// (/chat/:id/messages runs the multi-iteration agent loop,
+		// /articles/:slug/progress streams DAG progress) that routinely
+		// exceed 15s. With WriteTimeout set, net/http forcibly closes the
+		// TCP connection at the deadline WITHOUT emitting the final
+		// chunked-encoding terminator, which the browser reports as
+		// ERR_INCOMPLETE_CHUNKED_ENCODING on a 200 response. Per-handler
+		// deadlines should instead be implemented via request context
+		// cancellation if bounded runtimes are needed.
+		ReadHeaderTimeout: 15 * time.Second,
 	}
 
 	log.Printf("VERITAS API Server running on port %s", s.port)
@@ -106,6 +189,12 @@ type logWriter struct {
 func (w *logWriter) WriteHeader(code int) {
 	w.status = code
 	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *logWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 func (s *Server) corsHandler(next http.Handler) http.Handler {
@@ -344,9 +433,12 @@ func (s *Server) handleArticlesDynamicRoute(w http.ResponseWriter, r *http.Reque
 
 func (s *Server) chatRouter(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/chat/")
-	if strings.HasSuffix(path, "/messages") {
+	switch {
+	case strings.HasSuffix(path, "/messages"):
 		s.handleChatMessages(w, r)
-	} else {
+	case strings.HasSuffix(path, "/stop"):
+		s.handleChatStop(w, r)
+	default:
 		s.handleChatByID(w, r)
 	}
 }

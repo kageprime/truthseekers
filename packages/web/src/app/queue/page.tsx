@@ -96,7 +96,7 @@ export default function QueuePage() {
           }));
           setData({ ...json, jobs: jobsWithEvents });
         }
-      } catch { /* server may be down */ }
+      } catch (e) { console.warn("Queue poll error:", e); }
     }
     poll();
     const interval = setInterval(poll, 2000);
@@ -123,7 +123,7 @@ export default function QueuePage() {
         try {
           const event: AgentEvent = JSON.parse(e.data);
           handleAgentEvent(job.slug, event);
-        } catch { /* skip */ }
+        } catch { /* skip malformed event */ }
       });
 
       es.addEventListener("progress", (e: MessageEvent) => {
@@ -135,7 +135,7 @@ export default function QueuePage() {
             phaseMapRef.current[job.slug] = phase;
             updateJob(job.slug, { phase, error });
           }
-        } catch { /* skip */ }
+        } catch { /* skip malformed progress */ }
       });
 
       es.onerror = () => { es.close(); esRefs.current.delete(job.slug); };
@@ -163,7 +163,7 @@ export default function QueuePage() {
           return { ...prev, jobs: prev.jobs.filter((j) => j.slug !== slug) };
         });
       }
-    } catch { /* ignore */ }
+    } catch (e) { console.warn("Cancel job error:", e); }
   }
 
   async function retryJob(slug: string) {
@@ -173,7 +173,7 @@ export default function QueuePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ persona: "veritas" }),
       });
-    } catch { /* ignore */ }
+    } catch (e) { console.warn("Retry job error:", e); }
   }
 
   if (!data) {

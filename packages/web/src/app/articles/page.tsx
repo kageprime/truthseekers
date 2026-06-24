@@ -7,9 +7,10 @@ import { fetchArticles, searchArticles, fetchArticle, fetchArticleStatus, progre
 import type { ArticleSummary } from "@encarta/core";
 import { useGenerateArticle, useArticleStatus } from "../hooks";
 import { usePageSearch } from "../HeaderSearchContext";
-import PageLayout from "../components/PageLayout";
+import ContentCard from "../components/ContentCard";
 import GenerationBar from "../components/GenerationBar";
 import ArticleCard from "../components/ArticleCard";
+import Spinner from "../components/Spinner";
 import type { AgentEvent } from "../components/ProcessViewer";
 import { IconLightning, IconSearch, IconBook, IconGrid, IconList } from "../components/Icons";
 
@@ -28,12 +29,12 @@ function ArticleRow({ article }: { article: ArticleSummary }) {
   return (
     <Link
       href={`/article/${article.slug}`}
-      className="block py-4 px-4 -mx-4 transition-colors article-list-row"
+      className="block py-5 px-4 -mx-4 transition-colors article-list-row"
       style={{ textDecoration: "none", color: "inherit", borderBottom: "1px solid var(--rule)" }}
     >
       <div className="flex items-start gap-4">
         <div className="flex-1 min-w-0">
-          <h3 className="font-display font-semibold text-[0.95rem] leading-snug mb-1" style={{ color: "var(--ink)" }}>
+          <h3 className="font-display font-semibold text-[0.95rem] leading-snug mb-1.5" style={{ color: "var(--ink)" }}>
             {article.title}
             {article.metadata?.status === "draft" && (
               <span className="ml-2 text-[10px] px-1.5 py-0.5 small-caps" style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>Draft</span>
@@ -42,7 +43,7 @@ function ArticleRow({ article }: { article: ArticleSummary }) {
           <p className="text-xs leading-relaxed line-clamp-2 font-serif italic" style={{ color: "var(--muted)" }}>
             {article.abstract || "No description"}
           </p>
-          <div className="flex items-center gap-3 mt-2">
+          <div className="flex items-center gap-3 mt-3">
             {article.categories?.slice(0, 3).map((cat) => (
               <span key={cat} className="small-caps text-[10px]" style={{ color: "var(--gold)", letterSpacing: "0.08em" }}>
                 {cat.replace(/-/g, " ")}
@@ -250,12 +251,12 @@ export default function ArticlesPage() {
   const categoryFilterLabel = selectedCategory || "All categories";
 
   return (
-    <PageLayout>
-      <div className="max-w-4xl mx-auto w-full px-4 py-8">
+    <ContentCard>
+      <div className="px-6 py-8">
         {/* Search */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold mb-1" style={{ color: "var(--ink)" }}>Articles</h1>
-          <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>Browse the encyclopedia</p>
+          <h1 className="text-lg font-bold tracking-tight mb-1" style={{ color: "var(--ink)" }}>Articles</h1>
+          <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>Browse the encyclopedia</p>
           <div className="flex gap-2">
             <div className="relative flex-1">
               <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--subtle)" }} />
@@ -343,7 +344,7 @@ export default function ArticlesPage() {
         {/* Results */}
         {initialLoading ? (
           <div className="flex justify-center py-16">
-            <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
+            <Spinner size={32} />
           </div>
         ) : filteredArticles.length > 0 ? (
           <>
@@ -363,7 +364,7 @@ export default function ArticlesPage() {
             <div ref={sentinelRef} className="h-4" />
             {infiniteLoading && (
               <div className="text-center py-4">
-                <div className="w-6 h-6 rounded-full border-2 animate-spin mx-auto" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
+                <Spinner size={24} className="mx-auto" />
               </div>
             )}
           </>
@@ -388,6 +389,6 @@ export default function ArticlesPage() {
           </div>
         )}
       </div>
-    </PageLayout>
+    </ContentCard>
   );
 }

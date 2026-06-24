@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { IconChat } from "./Icons";
 
 const topicCategories: { label: string; topics: string[] }[] = [
   {
@@ -42,8 +43,8 @@ export default function EmptyChatState({ onSetInput }: EmptyChatStateProps) {
     <div className="flex flex-col items-center justify-center min-h-full px-4 py-12 text-center animate-fade-in">
       {/* Brand mark */}
       <div className="mb-6 flex items-center gap-3">
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-accent-bg">
-          <span className="text-xl">🧠</span>
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--gold) 15%, transparent)" }}>
+          <IconChat size={24} style={{ color: "var(--gold)" }} />
         </div>
         <div className="text-left">
           <h1 className="font-display-heading text-xl text-ink leading-tight">Truthseekers</h1>

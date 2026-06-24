@@ -4,6 +4,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import QueryProvider from "./components/QueryProvider";
 import ThemeProvider from "./components/ThemeProvider";
 import { FloatingChatProvider } from "./FloatingChatContext";
+import { SidebarProvider } from "./SidebarContext";
 import { ChatProvider } from "./chat/ChatContext";
 import { HeaderSearchProvider } from "./HeaderSearchContext";
 import { ArticleViewProvider } from "./ArticleViewContext";
@@ -48,13 +49,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ThemeProvider>
               <AuthProvider>
               <FloatingChatProvider>
-                <ChatProvider>
-                  <HeaderSearchProvider>
-                    <ArticleViewProvider>
-                      <AppShell>{children}</AppShell>
-                    </ArticleViewProvider>
-                  </HeaderSearchProvider>
-                </ChatProvider>
+                <SidebarProvider>
+                  <ChatProvider>
+                    <HeaderSearchProvider>
+                      <ArticleViewProvider>
+                        <AppShell>{children}</AppShell>
+                      </ArticleViewProvider>
+                    </HeaderSearchProvider>
+                  </ChatProvider>
+                </SidebarProvider>
               </FloatingChatProvider>
               </AuthProvider>
             </ThemeProvider>

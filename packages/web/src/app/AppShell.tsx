@@ -1,13 +1,17 @@
 "use client";
 
 import { type ReactNode, useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import FloatingChatWidget from "./components/FloatingChatWidget";
+import Sidebar from "./components/Sidebar";
 import ExploreView from "./components/ExploreView";
 import PressView from "./components/PressView";
 import ViewSwitcher from "./components/ViewSwitcher";
 import { useFloatingChat } from "./FloatingChatContext";
 import { useArticleView } from "./ArticleViewContext";
+import { useAuth } from "./hooks/useAuth";
+
+const IS_MOCK = process.env.NEXT_PUBLIC_MOCK === "true";
 
 
 const HIDDEN_ROUTES = ["/login", "/onboarding"];
@@ -16,7 +20,9 @@ const CHAT_ROUTES = ["/chat/"];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { isOpen, toggle, close, isExpanded } = useFloatingChat();
+  const { user, logout } = useAuth();
   const { article, mode } = useArticleView();
 
   const [isMobile, setIsMobile] = useState(false);
@@ -47,15 +53,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="h-screen overflow-hidden flex flex-col">
-      <div
-        className="flex-1 flex min-h-0 min-w-0"
-        style={showChat && !isOverlay ? {
-          display: "grid",
-          gridTemplateColumns: "1fr 400px",
-          overflow: "hidden",
-          transition: "grid-template-columns 0.35s cubic-bezier(0.23, 1, 0.32, 1)",
-        } : { display: "flex", overflow: "auto" }}
-      >
+      <div className="flex-1 flex min-h-0 min-w-0 relative overflow-hidden">
+        <Sidebar />
         <main
           className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col"
           id="main-content"
@@ -65,17 +64,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </main>
 
         {showChat && !isOverlay && (
-          <aside className="relative min-h-0 h-full overflow-hidden border-l border-border">
-            {/* Close button inside the aside, desktop only */}
-            <button
-              onClick={close}
-              className="hidden lg:flex absolute -top-1 -left-5 z-10 w-8 h-8 rounded-full items-center justify-center shadow-md bg-surface border border-border text-subtle hover:text-ink transition-colors"
-              aria-label="Close chat"
-            >
-              ✕
-            </button>
-            <FloatingChatWidget />
-          </aside>
+          <>
+            <div className="fixed inset-0 bg-black/20 z-30 lg:hidden" onClick={close} />
+            <aside className="fixed right-0 top-0 bottom-0 z-40 w-[400px] overflow-hidden border-l border-border bg-surface shadow-xl animate-slide-in-right">
+              <FloatingChatWidget />
+            </aside>
+          </>
         )}
       </div>
 
@@ -139,6 +133,29 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
         </button>
+      )}
+
+      {/* Mock mode controls */}
+      {IS_MOCK && user && (
+        <div className="fixed bottom-2 left-2 z-50 flex items-center gap-2 px-2.5 py-1 rounded-full text-[10px] border"
+          style={{ background: "var(--surface-elevated)", borderColor: "var(--border)" }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-forest" />
+          <span style={{ color: "var(--muted)" }}>Mock: {user.name}</span>
+          <button
+            onClick={() => router.push("/settings")}
+            className="font-medium hover:underline cursor-pointer"
+            style={{ color: "var(--gold)", background: "none", border: "none", padding: 0 }}
+          >
+            Settings
+          </button>
+          <button
+            onClick={() => { logout(); router.push("/login"); }}
+            className="font-medium hover:underline cursor-pointer"
+            style={{ color: "var(--gold)", background: "none", border: "none", padding: 0 }}
+          >
+            Logout
+          </button>
+        </div>
       )}
     </div>
   );

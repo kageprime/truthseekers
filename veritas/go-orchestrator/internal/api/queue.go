@@ -130,6 +130,15 @@ func (q *GenerationQueue) Restore() {
 	}
 }
 
+// Stats returns current queue depth and active-job count for observability.
+func (q *GenerationQueue) Stats() (active int, queued int) {
+	q.mu.Lock()
+	active = len(q.active)
+	q.mu.Unlock()
+	queued = len(q.jobs)
+	return
+}
+
 // Stop drains workers on shutdown.
 func (q *GenerationQueue) Stop() {
 	close(q.jobs)

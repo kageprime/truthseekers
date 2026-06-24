@@ -14,14 +14,14 @@ interface TimelineEvent {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  war: "#dc2626",
-  discovery: "#22c55e",
-  politics: "#0c4a6e",
-  culture: "#a21caf",
-  science: "#0284c7",
-  disaster: "#f59e0b",
-  technology: "#ea580c",
-  biography: "#ec4899",
+  war: "var(--event-war)",
+  discovery: "var(--event-discovery)",
+  politics: "var(--event-politics)",
+  culture: "var(--event-culture)",
+  science: "var(--event-science)",
+  disaster: "var(--event-disaster)",
+  technology: "var(--event-technology)",
+  biography: "var(--event-biography)",
 };
 
 const CATEGORY_LABELS: Record<string, string> = {

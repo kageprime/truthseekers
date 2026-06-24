@@ -171,12 +171,12 @@ export default function GenerationBar({
 
           {/* Paused human-in-the-loop review */}
           {isPaused && (
-            <div className="px-4 pb-4 pt-2 border-t border-amber-100" style={{ background: "color-mix(in srgb, var(--accent-bg) 50%, transparent)" }}>
+            <div className="px-4 pb-4 pt-2" style={{ background: "color-mix(in srgb, var(--accent-bg) 50%, transparent)" }}>
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-amber-500 text-lg">⚠️</span>
+                <span className="text-lg">⚠️</span>
                 <div>
-                  <h3 className="text-xs font-bold text-amber-800" style={{ color: "var(--ink)" }}>Verification Issues Detected</h3>
-                  <p className="text-[10px] text-amber-700" style={{ color: "var(--muted)" }}>
+                  <h3 className="text-xs font-bold" style={{ color: "var(--ink)" }}>Verification Issues Detected</h3>
+                  <p className="text-[10px]" style={{ color: "var(--muted)" }}>
                     The agent's verification scan found conflicting sources or accuracy issues.
                   </p>
                 </div>
@@ -186,13 +186,15 @@ export default function GenerationBar({
                 <div className="space-y-2 mb-4 p-2.5 rounded border max-h-48 overflow-y-auto" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
                   <div className="flex items-center justify-between text-[10px] border-b pb-1.5 mb-1.5" style={{ borderColor: "var(--border)" }}>
                     <span className="font-semibold text-gray-700" style={{ color: "var(--muted)" }}>Confidence Score</span>
-                    <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] ${
-                      verifyData.confidenceScore && verifyData.confidenceScore >= 0.8
-                        ? "bg-green-100 text-green-800"
-                        : verifyData.confidenceScore && verifyData.confidenceScore >= 0.5
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-red-100 text-red-800"
-                    }`}>
+                    <span className="font-bold px-1.5 py-0.5 rounded text-[9px]"
+                      style={{
+                        background: verifyData.confidenceScore && verifyData.confidenceScore >= 0.8
+                          ? "var(--badge-success-bg)" : verifyData.confidenceScore && verifyData.confidenceScore >= 0.5
+                          ? "var(--badge-warning-bg)" : "var(--badge-error-bg)",
+                        color: verifyData.confidenceScore && verifyData.confidenceScore >= 0.8
+                          ? "var(--badge-success-text)" : verifyData.confidenceScore && verifyData.confidenceScore >= 0.5
+                          ? "var(--badge-warning-text)" : "var(--badge-error-text)",
+                      }}>
                       {verifyData.confidenceScore ? Math.round(verifyData.confidenceScore * 100) : 0}%
                     </span>
                   </div>
@@ -203,13 +205,15 @@ export default function GenerationBar({
                         <div key={idx} className="text-[10px] border-l-2 pl-2" style={{ borderColor: "var(--accent)" }}>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-semibold" style={{ color: "var(--ink)" }}>[{issue.section || "General"}]</span>
-                            <span className={`text-[8px] font-bold px-1 uppercase rounded ${
-                              issue.severity === "high"
-                                ? "bg-red-100 text-red-700"
-                                : issue.severity === "medium"
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-blue-100 text-blue-700"
-                            }`}>
+                            <span className="text-[8px] font-bold px-1 uppercase rounded"
+                              style={{
+                                background: issue.severity === "high"
+                                  ? "var(--badge-error-bg)" : issue.severity === "medium"
+                                  ? "var(--badge-warning-bg)" : "var(--badge-info-bg)",
+                                color: issue.severity === "high"
+                                  ? "var(--badge-error-text)" : issue.severity === "medium"
+                                  ? "var(--badge-warning-text)" : "var(--badge-info-text)",
+                              }}>
                               {issue.severity}
                             </span>
                           </div>

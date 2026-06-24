@@ -582,8 +582,23 @@ func (d *DB) ListArticles(limit, offset int) ([]*Article, error) {
 	}
 	defer cursor.Close(ctx)
 
+	// Decode one document at a time rather than cursor.All: the collection
+	// holds legacy documents from the old Mongoose/TS backend whose field
+	// shapes (e.g. year as string, confidence_vector as nested array) don't
+	// fit the strict Go struct. cursor.All fails the WHOLE list if even one
+	// document won't decode, which surfaced as a 500 on /articles. We instead
+	// skip the un-decodable docs and log them, so one bad record can't take
+	// down the listing endpoint.
 	var list []*Article
-	if err = cursor.All(ctx, &list); err != nil {
+	for cursor.Next(ctx) {
+		var art Article
+		if err := cursor.Decode(&art); err != nil {
+			fmt.Printf("WARNING: skipping undecodable article document: %v\n", err)
+			continue
+		}
+		list = append(list, &art)
+	}
+	if err := cursor.Err(); err != nil {
 		return nil, fmt.Errorf("scanning listed article failed: %w", err)
 	}
 	return list, nil
@@ -612,8 +627,18 @@ func (d *DB) SearchArticles(searchQuery string, limit int) ([]*Article, error) {
 	}
 	defer cursor.Close(ctx)
 
+	// Decode one document at a time; skip legacy docs that don't fit the struct
+	// (see ListArticles for rationale).
 	var list []*Article
-	if err = cursor.All(ctx, &list); err != nil {
+	for cursor.Next(ctx) {
+		var art Article
+		if err := cursor.Decode(&art); err != nil {
+			fmt.Printf("WARNING: skipping undecodable article document in search: %v\n", err)
+			continue
+		}
+		list = append(list, &art)
+	}
+	if err := cursor.Err(); err != nil {
 		return nil, fmt.Errorf("scanning searched article failed: %w", err)
 	}
 	return list, nil
@@ -857,4 +882,11 @@ func (d *DB) SearchMaps(searchQuery string, limit int) ([]*MapEntry, error) {
 		return nil, fmt.Errorf("scanning searched maps failed: %w", err)
 	}
 	return list, nil
+}
+
+// IsMockMode reports whether the database is running in mock (in-memory) mode.
+// The health endpoint uses this to let operators know the storage layer has no
+// real backing database.
+func (d *DB) IsMockMode() bool {
+	return d.mockMode
 }

@@ -11,6 +11,7 @@ import type { AgentEvent } from "./ProcessViewer";
 import ChatMessage from "./ChatMessage";
 import EmptyChatState from "./EmptyChatState";
 import TruthConsole from "./TruthConsole";
+import Spinner from "./Spinner";
 import { BASE } from "@/lib/constants";
 
 const CONV_STORAGE_KEY = "truthseekers_floating_conv";
@@ -89,11 +90,13 @@ export default function FloatingChatWidget() {
     if (events.length > 0) setAgentEvents(events);
   }, [conv, setAgentEvents]);
 
-  // Auto-scroll
+  // Auto-scroll — defer layout read to avoid forced reflow during render.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    requestAnimationFrame(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    });
   }, [conv?.messages, streamContent, agentEvents.length]);
 
   const doSend = useCallback(async (msg: string) => {
@@ -182,31 +185,26 @@ export default function FloatingChatWidget() {
         streamContentRef.current = "";
         streamAccumulatorRef.current = "";
         setStreamBlocks(finalBlocks);
-        queryClient.cancelQueries({ queryKey: ["chat", cid] });
         queryClient.setQueryData(["chat", cid], (prev: any) => {
           if (!prev) return prev;
-          if (prev.messages.some((m: any) => m.role === "assistant" && !m.id.startsWith("temp-"))) return prev;
           const real = prev.messages.map((m: any) =>
             m.id.startsWith("temp-") ? { ...m, id: `${Date.now()}-${Math.random()}`, conversationId: cid } : m
           );
           return {
             ...prev,
-            messages: [
-              ...real,
-              {
-                id: event.msgId ?? `msg-${Date.now()}-${Math.random()}`,
-                conversationId: cid,
-                role: "assistant" as const,
-                content: finalBlocks.length > 0 ? "" : (event.content || ""),
-                blocks: finalBlocks,
-                agentEvents: savedEvents,
-                createdAt: new Date().toISOString(),
-              },
-            ],
+            messages: [...real, {
+              id: event.msgId ?? `msg-${Date.now()}-${Math.random()}`,
+              conversationId: cid,
+              role: "assistant" as const,
+              content: event.content || "",
+              blocks: finalBlocks,
+              agentEvents: savedEvents,
+              createdAt: new Date().toISOString(),
+            }],
           };
         });
       },
-      onError: () => {},
+      onError: (err: string) => console.warn("Stream error:", err),
     });
 
     setTimeout(() => setSending(false), 0);
@@ -241,7 +239,7 @@ export default function FloatingChatWidget() {
               <div className="absolute left-0 top-full mt-1 w-56 rounded-lg py-1 shadow-xl z-50 bg-surface border border-border max-h-[300px] overflow-y-auto">
                 {chatsLoading ? (
                   <div className="flex items-center justify-center py-4">
-                    <div className="w-4 h-4 rounded-full border-2 animate-spin border-border border-t-gold" />
+                    <Spinner size={16} />
                   </div>
                 ) : conversations.length === 0 ? (
                   <div className="px-3 py-2 text-xs text-subtle">No conversations</div>
@@ -310,7 +308,7 @@ export default function FloatingChatWidget() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
           {loading || convLoading ? (
             <div className="flex items-center justify-center h-full">
-              <div className="w-6 h-6 rounded-full border-2 animate-spin border-border border-t-gold" />
+              <Spinner size={24} />
             </div>
           ) : messages.length === 0 && !sending ? (
             <EmptyChatState onSetInput={doSend} />
@@ -327,7 +325,7 @@ export default function FloatingChatWidget() {
                 />
               ))}
               {hasStreaming && (
-                <ChatMessage role="assistant" content={streamContent} streaming />
+                <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} streaming />
               )}
             </div>
           )}
@@ -354,7 +352,7 @@ export default function FloatingChatWidget() {
           </div>
           {sending ? (
             <button
-              onClick={streamStop}
+              onClick={() => streamStop(convId ?? undefined)}
               aria-label="Stop generating"
               className="btn btn-sm shrink-0 rounded-[10px] bg-oxblood text-white"
             >

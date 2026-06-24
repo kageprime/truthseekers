@@ -5,7 +5,7 @@ import Link from "next/link";
 import { fetchArticle, progressUrl } from "@/lib/api";
 import { BASE } from "@/lib/constants";
 import { useQuota, useGenerateArticle, useRefreshArticle } from "../../hooks";
-import PageLayout from "../../components/PageLayout";
+import ContentCard from "../../components/ContentCard";
 import GenerationBar from "../../components/GenerationBar";
 import BlockRenderer, { articleToBlocks } from "../../components/BlockRenderer";
 import type { AgentEvent } from "../../components/ProcessViewer";
@@ -152,15 +152,15 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
   if (error && !article) {
     return (
-      <PageLayout>
-        <main className="flex-1 flex items-center justify-center px-6 py-16">
-          <div className="max-w-lg mx-auto text-center glass-card-static p-6 sm:p-10" style={{ background: "var(--cream)" }}>
+      <ContentCard>
+        <div className="flex items-center justify-center px-6 py-16">
+          <div className="max-w-lg mx-auto text-center">
             <div className="mb-5"><IconXCircle size={44} /></div>
             <h1 className="text-xs font-semibold mb-2" style={{ color: "var(--red)" }}>Error Loading Article</h1>
             <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>{error}</p>
             <button
               onClick={() => { setError(null); setLoading(true); window.location.reload(); }}
-              className="btn btn-primary"
+              className="btn btn-primary cursor-pointer"
             >
               Try Again
             </button>
@@ -170,32 +170,32 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
               </Link>
             </div>
           </div>
-        </main>
-      </PageLayout>
+        </div>
+      </ContentCard>
     );
   }
 
   if (loading) {
     return (
-      <PageLayout>
-        <main className="flex-1 flex items-center justify-center">
+      <ContentCard>
+        <div className="flex items-center justify-center h-full">
           <div className="flex flex-col items-center gap-3">
             <div className="w-8 h-8 border-[3px] border-[var(--border)] border-t-[var(--ink)]"
               style={{ animation: "spin 0.8s linear infinite" }} />
             <span className="text-xs font-semibold" style={{ color: "var(--subtle)" }}>Loading...</span>
           </div>
-        </main>
-      </PageLayout>
+        </div>
+      </ContentCard>
     );
   }
 
   if (!article && !generating) {
     const atLimit = quota && quota.remaining <= 0;
     return (
-      <PageLayout>
-        <main className="flex-1 px-6 py-12 sm:py-16">
-          <div className="max-w-lg mx-auto text-center glass-card-static p-6 sm:p-10" style={{ background: "var(--cream)" }}>
-            <div className="w-16 h-16 mx-auto mb-5 flex items-center justify-center glass-card-static">
+      <ContentCard>
+        <div className="px-6 py-12 sm:py-16 flex items-center justify-center">
+          <div className="max-w-lg mx-auto text-center">
+            <div className="w-16 h-16 mx-auto mb-5 flex items-center justify-center rounded-xl border border-border/40 bg-surface p-4">
               {atLimit ? <IconAlert size={28} /> : <IconBook size={28} />}
             </div>
             <h1 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>
@@ -219,7 +219,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
                 </p>
                 <button
                   onClick={handleGenerate}
-                  className="btn btn-primary btn-lg"
+                  className="btn btn-primary btn-lg cursor-pointer"
                 >
                   <IconLightning size={18} /> Generate Encyclopedia Article
                 </button>
@@ -231,8 +231,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
               </>
             )}
           </div>
-        </main>
-      </PageLayout>
+        </div>
+      </ContentCard>
     );
   }
 
@@ -247,8 +247,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     };
 
     return (
-      <PageLayout>
-        <main className="flex-1 px-6 py-12 sm:py-16">
+      <ContentCard>
+        <div className="px-6 py-12 sm:py-16">
           <div className="max-w-lg mx-auto">
             <h1 className="text-xs font-semibold text-center mb-8 capitalize" style={{ color: "var(--ink)" }}>
               {slug.replace(/-/g, " ")}
@@ -260,93 +260,90 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
               showWatchLive={false}
             />
           </div>
-        </main>
-      </PageLayout>
+        </div>
+      </ContentCard>
     );
   }
 
   if (!article) return null;
 
   return (
-    <PageLayout>
-      <div className="flex-1 overflow-y-auto" style={{ position: "relative", zIndex: 1 }}>
+    <ContentCard maxWidth="max-w-3xl">
+      <article className="px-4 sm:px-8 py-10 sm:py-14 max-w-[42rem] mx-auto w-full">
+        {/* Back link */}
+        <Link href="/chat/new" className="inline-flex items-center gap-1 dateline mb-8 transition-colors hover:underline" style={{ color: "var(--gold)" }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          The Encyclopedia
+        </Link>
 
-        <article className="max-w-[42rem] mx-auto px-4 sm:px-6 py-10 sm:py-14">
-          {/* Back link */}
-          <Link href="/chat/new" className="inline-flex items-center gap-1 dateline mb-8 transition-colors hover:underline" style={{ color: "var(--gold)" }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-            The Encyclopedia
-          </Link>
+        {/* Admin / utility toolbar — demoted to a slim icon row */}
+        <div className="flex items-center justify-end gap-1 mb-6">
+          <button
+            onClick={handleRefresh}
+            disabled={generating || (quota?.remaining != null && quota.remaining <= 0)}
+            className="btn-icon btn-ghost cursor-pointer"
+            title={generating ? "Refreshing…" : "Regenerate article"}
+            aria-label="Regenerate article"
+          >
+            <IconRefresh size={15} />
+          </button>
+          <button onClick={() => handleExport("json")} className="btn-icon btn-ghost cursor-pointer" title="Export JSON" aria-label="Export JSON">
+            <IconFile size={15} />
+          </button>
+          <button onClick={() => handleExport("markdown")} className="btn-icon btn-ghost cursor-pointer" title="Export Markdown" aria-label="Export Markdown">
+            <IconFileText size={15} />
+          </button>
+          {quota != null && quota.remaining <= 3 && (
+            <span className="dateline ml-2" style={{ color: quota.remaining === 0 ? "var(--oxblood)" : "var(--gold)" }}>
+              {quota.remaining}/{quota.limit} left
+            </span>
+          )}
+        </div>
 
-          {/* Admin / utility toolbar — demoted to a slim icon row */}
-          <div className="flex items-center justify-end gap-1 mb-6 -mt-12 sm:-mt-16">
-            <button
-              onClick={handleRefresh}
-              disabled={generating || (quota?.remaining != null && quota.remaining <= 0)}
-              className="btn-icon btn-ghost"
-              title={generating ? "Refreshing…" : "Regenerate article"}
-              aria-label="Regenerate article"
-            >
-              <IconRefresh size={15} />
-            </button>
-            <button onClick={() => handleExport("json")} className="btn-icon btn-ghost" title="Export JSON" aria-label="Export JSON">
-              <IconFile size={15} />
-            </button>
-            <button onClick={() => handleExport("markdown")} className="btn-icon btn-ghost" title="Export Markdown" aria-label="Export Markdown">
-              <IconFileText size={15} />
-            </button>
-            {quota != null && quota.remaining <= 3 && (
-              <span className="dateline ml-2" style={{ color: quota.remaining === 0 ? "var(--oxblood)" : "var(--gold)" }}>
-                {quota.remaining}/{quota.limit} left
-              </span>
-            )}
+        {/* Title block */}
+        <header className="mb-10 text-center">
+          <h1 className="t-display mb-4" style={{ fontSize: "clamp(2rem, 1rem + 4vw, 3rem)", color: "var(--ink)" }}>
+            {article.title || slug.replace(/-/g, " ")}
+          </h1>
+          {/* Gold rule under the title */}
+          <div className="mx-auto" style={{ height: 2, width: "3rem", background: "var(--gold)" }} />
+
+          {/* Dateline — small-caps meta */}
+          <div className="dateline mt-4" style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "0 0.25em" }}>
+            <span>Vol. I</span>
+            {article.metadata?.version != null && (<>
+              <span className="sep">·</span><span>Rev. {article.metadata.version}</span>
+            </>)}
+            {article.metadata?.updated && (<>
+              <span className="sep">·</span>
+              <span>{new Date(article.metadata.updated).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
+            </>)}
+            {article.metadata?.generatedBy && (<>
+              <span className="sep">·</span>
+              <span><IconUser size={11} /> {article.metadata.generatedBy.slice(0, 12)}</span>
+            </>)}
           </div>
+        </header>
 
-          {/* Title block */}
-          <header className="mb-10 text-center">
-            <h1 className="t-display mb-4" style={{ fontSize: "clamp(2rem, 1rem + 4vw, 3rem)", color: "var(--ink)" }}>
-              {article.title || slug.replace(/-/g, " ")}
-            </h1>
-            {/* Gold rule under the title */}
-            <div className="mx-auto" style={{ height: 2, width: "3rem", background: "var(--gold)" }} />
-
-            {/* Dateline — small-caps meta */}
-            <div className="dateline mt-4" style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "0 0.25em" }}>
-              <span>Vol. I</span>
-              {article.metadata?.version != null && (<>
-                <span className="sep">·</span><span>Rev. {article.metadata.version}</span>
-              </>)}
-              {article.metadata?.updated && (<>
-                <span className="sep">·</span>
-                <span>{new Date(article.metadata.updated).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
-              </>)}
-              {article.metadata?.generatedBy && (<>
-                <span className="sep">·</span>
-                <span><IconUser size={11} /> {article.metadata.generatedBy.slice(0, 12)}</span>
-              </>)}
-            </div>
-          </header>
-
-          {/* Article body — reading column */}
-          <div className="reading-column">
-            {article.blocks && article.blocks.length > 0 ? (
-              <BlockRenderer blocks={article.blocks} />
-            ) : (
-              <BlockRenderer blocks={articleToBlocks(
-                article.slug,
-                article.title,
-                article.abstract,
-                article.sections,
-                article.timeline,
-                article.crossrefs,
-                article.citations,
-              )} />
-            )}
-          </div>
-        </article>
-      </div>
-    </PageLayout>
+        {/* Article body — reading column */}
+        <div className="reading-column">
+          {article.blocks && article.blocks.length > 0 ? (
+            <BlockRenderer blocks={article.blocks} />
+          ) : (
+            <BlockRenderer blocks={articleToBlocks(
+              article.slug,
+              article.title,
+              article.abstract,
+              article.sections,
+              article.timeline,
+              article.crossrefs,
+              article.citations,
+            )} />
+          )}
+        </div>
+      </article>
+    </ContentCard>
   );
 }

@@ -124,7 +124,7 @@ function toolUseSummary(name: string, args: Record<string, unknown>): string {
 
 export function ToolUseCard({ data }: { data: ToolUseData }) {
   return (
-    <div className="flex items-start gap-2 py-1.5 px-2.5 border-l-2 border-[#7dd3fc] rounded-r" style={{ background: "#f0f7ff" }}>
+    <div className="flex items-start gap-2 py-1.5 px-2.5 border-l-2 border-[var(--tool-search)] rounded-r" style={{ background: "var(--badge-info-bg)" }}>
       <span className="text-xs shrink-0 mt-0.5">{toolLabel(data.name ?? "")}</span>
       <span className="text-[10px] leading-relaxed" style={{ color: "var(--muted)" }}>
         {toolUseSummary(data.name ?? "", data.args ?? {})}
@@ -157,9 +157,9 @@ export function ToolResultCard({ data }: { data: ToolResultData }) {
   }
   if (!display) return null;
   return (
-    <div className="flex items-start gap-2 py-1.5 px-2.5 border-l-2 border-[#d0d5dd] rounded-r" style={{ background: "#f6f8fa" }}>
-      <span className="text-[10px] shrink-0 mt-0.5">📋</span>
-      <span className="text-[10px] leading-relaxed" style={{ color: "#3c4043" }}>{display}</span>
+    <div className="flex items-start gap-2 py-1.5 px-2.5 border-l-2 border-[var(--border)] rounded-r" style={{ background: "var(--surface-elevated)" }}>
+      <span className="text-xs shrink-0 mt-0.5 font-mono">{data.isError ? "error" : "result"}</span>
+      <span className="text-[10px] leading-relaxed" style={{ color: "var(--muted)" }}>{display}</span>
     </div>
   );
 }
@@ -169,9 +169,9 @@ export function TextDeltaCard({ data }: { data: TextDelta }) {
   const truncated = text.length > 300 ? text.slice(0, 300) + "..." : text;
   if (!truncated) return null;
   return (
-    <div className="flex items-start gap-2 py-1.5 px-2.5 border-l-2 border-[#fde68a] rounded-r" style={{ background: "#fff8e1" }}>
+    <div className="flex items-start gap-2 py-1.5 px-2.5 border-l-2 border-[var(--badge-warning-text)] rounded-r" style={{ background: "var(--badge-warning-bg)" }}>
       <span className="shrink-0 mt-0.5"><IconChat size={12} /></span>
-      <span className="text-[11px] leading-relaxed whitespace-pre-wrap" style={{ color: "#3c4043" }}>{truncated}</span>
+      <span className="text-[11px] leading-relaxed whitespace-pre-wrap" style={{ color: "var(--ink)" }}>{truncated}</span>
     </div>
   );
 }
@@ -179,8 +179,8 @@ export function TextDeltaCard({ data }: { data: TextDelta }) {
 export function TraceCard({ data }: { data: TraceData }) {
   const usage = data.usage;
   return (
-    <div className="flex flex-col gap-1 py-1.5 px-2.5 border-l-2 border-[#c084fc] rounded-r" style={{ background: "#faf5ff" }}>
-      <div className="flex items-center gap-2 text-[10px] font-semibold text-purple-800">
+    <div className="flex flex-col gap-1 py-1.5 px-2.5 border-l-2 border-[var(--tool-related)] rounded-r" style={{ background: "var(--badge-info-bg)" }}>
+      <div className="flex items-center gap-2 text-[10px] font-semibold" style={{ color: "var(--tool-related)" }}>
         <span>⚙️ Trace</span>
         {data.iteration !== undefined && <span>Iter {data.iteration}</span>}
         {data.latencyMs !== undefined && <span>⏱️ {data.latencyMs}ms</span>}
@@ -215,12 +215,12 @@ function AgentActivityFeed({ events, compact }: { events: AgentEvent[]; compact?
           {event.type === "tool_result" && <ToolResultCard data={event.data as ToolResultData} />}
           {event.type === "text" && <TextDeltaCard data={event.data as TextDelta} />}
           {event.type === "status" && (
-            <div className="text-[10px] font-semibold py-1 px-2.5 rounded border-l-2 border-[var(--green)]" style={{ background: "#f0fdf4" }}>
+            <div className="text-[10px] font-semibold py-1 px-2.5 rounded border-l-2 border-[var(--green)]" style={{ background: "var(--badge-success-bg)" }}>
               <IconLightning size={10} /> {String(event.data)}
             </div>
           )}
           {event.type === "error" && (
-            <div className="text-[10px] font-semibold py-1 px-2.5 rounded border-l-2 border-[var(--red)]" style={{ background: "#fef2f2" }}>
+            <div className="text-[10px] font-semibold py-1 px-2.5 rounded border-l-2 border-[var(--red)]" style={{ background: "var(--badge-error-bg)" }}>
               <IconX size={10} /> {String(event.data)}
             </div>
           )}
@@ -357,7 +357,7 @@ export default function ProcessViewer({ events, maxVisible = 50 }: ProcessViewer
       {fullscreen && (
         <AgentActivityFullscreen open={fullscreen} onClose={() => setFullscreen(false)} events={events} />
       )}
-      <div className="border-2 border-black px-3 py-2.5" style={{ background: "white" }}>
+      <div className="border-2 border-[var(--border)] px-3 py-2.5" style={{ background: "var(--surface)" }}>
         <div className="flex items-center justify-between mb-2">
           <button
             onClick={() => setCollapsed(!collapsed)}
@@ -374,7 +374,7 @@ export default function ProcessViewer({ events, maxVisible = 50 }: ProcessViewer
             <button
               onClick={() => setAutoScroll(!autoScroll)}
               className="text-[9px] px-1.5 py-0.5 rounded hover:bg-[var(--hover)] transition-colors"
-              style={{ color: autoScroll ? "var(--blue)" : "#aaa", fontWeight: autoScroll ? 600 : 400 }}
+              style={{ color: autoScroll ? "var(--blue)" : "var(--subtle)", fontWeight: autoScroll ? 600 : 400 }}
             >
               {autoScroll ? "Auto" : "Manual"}
             </button>

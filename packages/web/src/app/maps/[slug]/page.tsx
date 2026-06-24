@@ -124,7 +124,7 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
               </h1>
 
               {map.subtitle && (
-                <p className="text-sm mb-4" style={{ color: "#5f6368" }}>{map.subtitle}</p>
+                <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>{map.subtitle}</p>
               )}
 
               <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -139,7 +139,7 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
                     3D
                   </span>
                 )}
-                <span className="text-xs ml-auto" style={{ color: "#9aa0a6" }}>
+                <span className="text-xs ml-auto" style={{ color: "var(--subtle)" }}>
                   Created {new Date(map.createdAt).toLocaleDateString()}
                 </span>
               </div>
@@ -151,7 +151,7 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
                 <SectionHeader icon={IconFileText} title="Description" accent="var(--gold)" />
                 <div
                   className="leading-relaxed overflow-x-auto break-words"
-                  style={{ fontSize: "1.05rem", color: "#222", lineHeight: "1.8" }}
+                  style={{ fontSize: "1.05rem", color: "var(--ink)", lineHeight: "1.8" }}
                 >
                   <MarkdownRenderer content={map.content} />
                 </div>
@@ -166,8 +166,8 @@ export default function MapDetailPage({ params }: { params: Promise<{ slug: stri
             {/* Related Article CTA */}
             <div className="glass-card-static p-4 sm:p-6 md:p-8 mb-8" style={{ background: "var(--accent-bg)" }}>
               <SectionHeader icon={IconSearch} title="Related Articles" accent="var(--accent)" />
-              <p className="text-sm mb-2" style={{ color: "#1a1a1a" }}>Explore related articles</p>
-              <p className="text-xs mb-4" style={{ color: "#5f6368" }}>
+              <p className="text-sm mb-2" style={{ color: "var(--ink)" }}>Explore related articles</p>
+              <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
                 Search for articles related to this map&rsquo;s topic and time period.
               </p>
               <Link

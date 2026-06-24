@@ -8,9 +8,10 @@ import { useChatStream } from "../../hooks/useChatStream";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import ChatMessage from "../../components/ChatMessage";
 import EmptyChatState from "../../components/EmptyChatState";
-import HistorySheet from "../../components/HistorySheet";
 import TruthConsole from "../../components/TruthConsole";
-import { useTheme } from "../../components/ThemeProvider";
+import ContentCard from "../../components/ContentCard";
+import Spinner from "../../components/Spinner";
+import { IconPlus } from "../../components/Icons";
 import { BASE } from "@/lib/constants";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
@@ -18,7 +19,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const router = useRouter();
   const queryClient = useQueryClient();
   const { send: streamSend, stop: streamStop } = useChatStream();
-  const { resolved, toggle } = useTheme();
+
 
   const [input, setInput] = useState("");
   const [streamContent, setStreamContent] = useState("");
@@ -29,8 +30,14 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [convId, setConvId] = useState<string | null>(id !== "new" ? id : null);
   const [loading, setLoading] = useState(false);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [consoleOpen, setConsoleOpen] = useState(false);
+  const [model, setModel] = useState("gemma-4-31b-it");
+
+  const MODELS = [
+    { id: "gemma-4-31b-it", label: "Gemma 4 31B" },
+    { id: "deepseek-4-flash", label: "DeepSeek 4 Flash" },
+    { id: "llama-3.1-8b", label: "Llama 3.1 8B" },
+  ];
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const agentEventsRef = useRef<AgentEvent[]>([]);
@@ -45,19 +52,34 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const lastAssistantIndex = lastAssistantIdx >= 0 ? messages.length - 1 - lastAssistantIdx : -1;
   const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user")?.content ?? "";
 
+  // Auto-scroll on new content. requestAnimationFrame defers the layout read
+  // to the next frame so we don't force a synchronous reflow inside a render.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    requestAnimationFrame(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    });
   }, [messages, streamContent, streamSteps]);
 
-  // Auto-resize textarea
+  // Auto-resize textarea. Debounce to avoid a forced reflow on every
+  // keystroke; 16ms (≈1 frame) is imperceptible but batches rapid input.
+  const resizeRAF = useRef(0);
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
-    }
+    cancelAnimationFrame(resizeRAF.current);
+    resizeRAF.current = requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+      }
+    });
+    return () => cancelAnimationFrame(resizeRAF.current);
   }, [input]);
+
+  // Auto-open console on first tool event
+  useEffect(() => {
+    if (agentEvents.length > 0) setConsoleOpen(true);
+  }, [agentEvents.length]);
 
   const doSend = useCallback(
     async (msg: string) => {
@@ -115,22 +137,22 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
       await streamSend(cid!, msg, {
         onText: (text) => {
-          // Accumulate as plain text (no dash prefix) — renders via MarkdownRenderer.
           setStreamContent(text);
         },
         onToolEvent: (event) => {
+          setStreamContent((cur) => {
+            if (cur.trim()) {
+              // Defer the steps update to avoid cascading re-renders inside
+              // a state updater (which blocked the next paint for ~444ms).
+              const step = cur.trim();
+              requestAnimationFrame(() => setStreamSteps((s) => [...s, step]));
+            }
+            return "";
+          });
           setAgentEvents((prev) => {
             const next = [...prev, event];
             agentEventsRef.current = next;
             return next;
-          });
-          // When a tool event fires, save the current streaming text as a completed
-          // step, then reset the streaming buffer for the next paragraph.
-          setStreamContent((cur) => {
-            if (cur.trim()) {
-              setStreamSteps((steps) => [...steps, cur.trim()]);
-            }
-            return "";
           });
         },
         onDone: (event) => {
@@ -141,28 +163,23 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           setStreamContent("");
           setStreamSteps([]);
           setStreamBlocks(finalBlocks);
-          queryClient.cancelQueries({ queryKey: ["chat", cid] });
+          setConsoleOpen(false);
           queryClient.setQueryData(["chat", cid], (prev: any) => {
             if (!prev) return prev;
-            if (prev.messages.some((m: any) => m.role === "assistant" && !m.id.startsWith("temp-")))
-              return prev;
             const real = prev.messages.map((m: any) =>
               m.id.startsWith("temp-") ? { ...m, id: `${Date.now()}-${Math.random()}`, conversationId: cid } : m,
             );
             return {
               ...prev,
-              messages: [
-                ...real,
-                {
-                  id: event.msgId ?? `msg-${Date.now()}-${Math.random()}`,
-                  conversationId: cid,
-                  role: "assistant" as const,
-                  content: finalBlocks.length > 0 ? "" : event.content || "",
-                  blocks: finalBlocks,
-                  agentEvents: savedEvents,
-                  createdAt: new Date().toISOString(),
-                },
-              ],
+              messages: [...real, {
+                id: event.msgId ?? `msg-${Date.now()}-${Math.random()}`,
+                conversationId: cid,
+                role: "assistant" as const,
+                content: event.content || "",
+                blocks: finalBlocks,
+                agentEvents: savedEvents,
+                createdAt: new Date().toISOString(),
+              }],
             };
           });
         },
@@ -191,7 +208,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setStreamBlocks([]);
     setAgentEvents([]);
     setError(null);
-    setHistoryOpen(false);
     router.push("/chat/new");
   }
 
@@ -199,53 +215,115 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const showEmpty = messages.length === 0 && !sending && isNew;
 
   return (
-    <div className="h-full flex flex-row min-h-0">
-      {/* History sidebar */}
-      <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} />
-
-      <div className="flex-1 flex flex-col min-h-0">
-      {/* Slim header */}
-      <div className="shrink-0 flex items-center justify-between px-4 h-9 border-b border-border bg-surface">
-        <div className="flex items-center gap-3 min-w-0">
-          <button
-            onClick={() => setHistoryOpen(true)}
-            className="btn-ghost p-1.5"
-            aria-label="Open history"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          </button>
-          <h1 className="text-sm font-medium truncate text-ink">
-            {isNew ? "New Chat" : conv?.title ?? "Chat"}
-          </h1>
-        </div>
-        <button onClick={toggle} className="btn-ghost p-1.5" aria-label="Toggle theme">
-          {resolved === "dark" ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="5" />
-              <line x1="12" y1="1" x2="12" y2="3" />
-              <line x1="12" y1="21" x2="12" y2="23" />
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-              <line x1="1" y1="12" x2="3" y2="12" />
-              <line x1="21" y1="12" x2="23" y2="12" />
-            </svg>
-          ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-            </svg>
-          )}
-        </button>
-      </div>
-
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col min-h-0">
+    <div className="flex-1 flex flex-col min-h-0">
+      <ContentCard
+        header={
+          <div className="flex items-center justify-between px-3 py-2.5 gap-2">
+            <div className="flex items-center gap-1 min-w-0">
+              <h1 className="text-xs sm:text-sm font-medium truncate text-ink max-w-[120px] sm:max-w-[240px]">
+                {isNew ? "New Chat" : conv?.title ?? "Chat"}
+              </h1>
+              <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded font-mono" style={{ background: "color-mix(in srgb, var(--border) 40%, transparent)", color: "var(--subtle)" }}>
+                Ctrl+/
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={handleNewChat} className="btn-ghost p-1.5 text-subtle hover:text-accent cursor-pointer" aria-label="New chat" title="New chat">
+                <IconPlus size={16} />
+              </button>
+            </div>
+          </div>
+        }
+        footer={
+          <>
+            {!showEmpty && (
+              <div className="shrink-0 flex items-center justify-between px-4 py-1 border-t border-border/40">
+                <div className="relative">
+                  <select
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    aria-label="Select AI model"
+                    className="appearance-none bg-transparent text-[9px] text-subtle border border-border/60 rounded px-1.5 py-0.5 pr-4 cursor-pointer hover:text-ink hover:border-accent/50 transition-colors outline-none focus:ring-2 focus:ring-gold/30 focus:border-accent"
+                  >
+                    {MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>{m.label}</option>
+                    ))}
+                  </select>
+                  <svg width="6" height="6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-subtle">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </div>
+                <button
+                  onClick={() => setConsoleOpen((o) => !o)}
+                  className={`inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded transition-colors cursor-pointer ${consoleOpen ? "bg-accent-bg text-accent" : "text-subtle hover:text-ink"}`}
+                  aria-label="Toggle agent console"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="4 17 10 11 4 5" />
+                    <line x1="12" y1="19" x2="20" y2="19" />
+                  </svg>
+                  <span>Agent</span>
+                  {agentEvents.length > 0 && (
+                    <span className="text-[8px] px-1 py-0.5 rounded-full bg-accent-bg text-accent">{agentEvents.length}</span>
+                  )}
+                </button>
+              </div>
+            )}
+            {!showEmpty && (
+              <div className="shrink-0 px-4 pb-3 pt-1.5">
+                <div className="flex items-end gap-2 rounded-xl p-1 bg-surface-elevated border border-border/70 transition-all focus-within:border-accent/50 focus-within:shadow-[0_0_0_3px_var(--gold-bg)]">
+                  <div className="flex-1 min-w-0">
+                    <textarea
+                      ref={textareaRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder={sending ? "Waiting for response..." : "Ask about any topic..."}
+                      disabled={sending}
+                      rows={1}
+                      className="w-full resize-none bg-transparent border-none px-3 py-2 text-sm min-h-[38px] max-h-[180px] text-ink outline-none placeholder:text-subtle/60"
+                      aria-label="Chat message input"
+                    />
+                  </div>
+                  {sending ? (
+                    <button
+                      onClick={() => streamStop(convId ?? undefined)}
+                      aria-label="Stop generating"
+                      className="btn btn-sm shrink-0 rounded-lg bg-oxblood text-white active:scale-90 h-8"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="6" width="12" height="12" rx="2" />
+                      </svg>
+                      <span className="text-[11px]">Stop</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => doSend(input)}
+                      disabled={!input.trim()}
+                      aria-label="Send message"
+                      className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 ${input.trim() ? "bg-accent text-white" : "bg-border/50 text-subtle cursor-not-allowed"}`}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13" />
+                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <div className="flex justify-between mt-1 px-1">
+                  <span className="text-[8px] text-subtle/60">Enter to send &middot; Shift+Enter for new line</span>
+                </div>
+              </div>
+            )}
+          </>
+        }
+      >
         {loading || convLoading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="w-6 h-6 rounded-full border-2 animate-spin border-border border-t-gold" />
+            <div className="flex flex-col items-center gap-3">
+              <Spinner size={24} />
+              <span className="text-[10px] text-subtle font-mono uppercase tracking-wider">Loading</span>
+            </div>
           </div>
         ) : showEmpty ? (
           <div className="flex-1 overflow-y-auto">
@@ -253,9 +331,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           </div>
         ) : (
           <>
-            {/* Messages */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
-              <div className="max-w-3xl mx-auto w-full">
+              <div>
                 {messages.map((msg: any, i: number) => (
                   <ChatMessage
                     key={msg.id}
@@ -268,7 +345,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                   />
                 ))}
 
-                {/* Error message */}
                 {error && (
                   <div className="mx-3 my-4 px-4 py-3 rounded-xl border border-oxblood/30 bg-oxblood-subtle/30 text-sm text-oxblood flex items-center justify-between gap-3">
                     <span>{error}</span>
@@ -285,124 +361,32 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                   </div>
                 )}
 
-                {/* Streaming message */}
                 {hasStreaming && (
-                  <div className="px-3 sm:px-6 py-4 bg-accent-bg/5">
-                    {/* Completed steps shown as subtle bullets */}
+                  <div className="border-t border-border/40" style={{ background: "color-mix(in srgb, var(--accent-bg) 6%, transparent)" }}>
                     {streamSteps.length > 0 && (
-                      <div className="mb-3 space-y-1">
+                      <div className="px-3 sm:px-6 pt-3 pb-1 space-y-1">
                         {streamSteps.map((step, i) => (
-                          <div key={i} className="flex items-start gap-2 text-xs text-muted">
-                            <span className="mt-1 w-1 h-1 rounded-full bg-accent shrink-0" />
-                            <span className="line-clamp-2">{step}</span>
+                          <div key={i} className="flex items-start gap-2 text-[11px] text-muted">
+                            <span className="mt-1.5 w-1 h-1 rounded-full bg-accent/60 shrink-0" />
+                            <span className="line-clamp-2 font-serif-body">{step}</span>
                           </div>
                         ))}
                       </div>
                     )}
-                    <ChatMessage role="assistant" content={streamContent} streaming />
+                    <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} streaming />
                   </div>
                 )}
               </div>
             </div>
-
-            {/* Collapsible console drawer */}
-            {(agentEvents.length > 0 || sending) && (
-              <div className="shrink-0 border-t border-border">
-                <button
-                  onClick={() => setConsoleOpen((o) => !o)}
-                  className="w-full flex items-center justify-between px-4 py-2 text-xs font-medium text-subtle hover:text-ink transition-colors"
-                >
-                  <span className="flex items-center gap-2">
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className={`transition-transform ${consoleOpen ? "rotate-180" : ""}`}
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                    Agent Console
-                    {agentEvents.length > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-accent-bg text-accent text-[10px]">
-                        {agentEvents.length}
-                      </span>
-                    )}
-                  </span>
-                  {sending && (
-                    <span className="flex items-center gap-1 text-[10px] text-accent">
-                      <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                      working...
-                    </span>
-                  )}
-                </button>
-                <div className={`console-drawer ${consoleOpen ? "open" : ""}`}>
-                  <div className="console-drawer-inner">
-                    <div className="max-h-[300px] overflow-y-auto">
-                      <TruthConsole
-                        events={agentEvents}
-                        loading={sending && agentEvents.length === 0}
-                        variant="terminal"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </>
         )}
+      </ContentCard>
 
-        {/* Input — hidden on empty state (it has its own) */}
-        {!showEmpty && (
-          <div className="shrink-0 px-4 pb-4 pt-2">
-            <div className="max-w-3xl mx-auto w-full">
-              <div className="flex items-end gap-2 rounded-2xl p-1.5 bg-surface-elevated border border-border focus-within:border-accent transition-colors">
-                <div className="flex-1 min-w-0">
-                  <textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={sending ? "Waiting for response..." : "Ask about any topic..."}
-                    disabled={sending}
-                    rows={1}
-                    className="w-full resize-none bg-transparent border-none textarea-ring px-3 py-2.5 text-sm min-h-[40px] max-h-[200px] text-ink outline-none"
-                  />
-                </div>
-                {sending ? (
-                  <button
-                    onClick={streamStop}
-                    aria-label="Stop generating"
-                    className="btn btn-sm shrink-0 rounded-[10px] bg-oxblood text-white"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <rect x="6" y="6" width="12" height="12" rx="2" />
-                    </svg>
-                    Stop
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => doSend(input)}
-                    disabled={!input.trim()}
-                    aria-label="Send message"
-                    className={`btn-icon shrink-0 rounded-[10px] transition-colors ${input.trim() ? "bg-accent text-white" : "bg-border text-subtle"}`}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="22" y1="2" x2="11" y2="13" />
-                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+      {consoleOpen && (
+        <div className="fixed right-0 top-0 bottom-0 z-50 w-[440px] max-w-[92vw] flex flex-col bg-surface border-l border-border/40 animate-slide-in-right">
+          <TruthConsole events={agentEvents} loading={sending && agentEvents.length === 0} onClose={() => setConsoleOpen(false)} />
+        </div>
+      )}
     </div>
   );
 }

@@ -5,6 +5,11 @@
 /* Leaflet */
 @import "leaflet/dist/leaflet.css";
 
+/* View Transitions API — smooth cross-route navigation */
+@view-transition {
+  navigation: auto;
+}
+
 /* ════════════════════════════════════════════════════════════════
    TRUTHSEEKERS — Editorial Hybrid · Antique Gold & Ink
    One source of truth for the design language.
@@ -77,6 +82,37 @@
   --skeleton-start: #e8dcc0;
   --skeleton-end: #f0e7d2;
 
+  /* Agent tool colors */
+  --tool-search: #3b82f6;
+  --tool-fetch: #0891b2;
+  --tool-article: var(--gold);
+  --tool-image: var(--gold-soft);
+  --tool-verify: #16a34a;
+  --tool-related: #7c3aed;
+  --task: #7c3aed;
+  --tool-memory: #6b7280;
+  --tool-think: #9ca3af;
+
+  /* Timeline event colors */
+  --event-war: #dc2626;
+  --event-discovery: #22c55e;
+  --event-politics: #0c4a6e;
+  --event-culture: #a21caf;
+  --event-science: #0284c7;
+  --event-disaster: #f59e0b;
+  --event-technology: #ea580c;
+  --event-biography: #ec4899;
+
+  /* Badge / status colors */
+  --badge-error-bg: #fef2f2;
+  --badge-error-text: #dc2626;
+  --badge-warning-bg: #fffbeb;
+  --badge-warning-text: #d97706;
+  --badge-success-bg: #f0fdf4;
+  --badge-success-text: #16a34a;
+  --badge-info-bg: #eff6ff;
+  --badge-info-text: #2563eb;
+
   /* Radii — unified */
   --radius-sharp: 2px;
   --radius: 6px;
@@ -109,6 +145,23 @@
   --oxblood-subtle: #4a2020;
   --forest: #6ea368;
   --forest-subtle: #243a22;
+
+  --tool-search: #5b9cf6;
+  --tool-fetch: #22b8cf;
+  --tool-verify: #4ade80;
+  --tool-related: #a78bfa;
+  --task: #a78bfa;
+  --tool-memory: #9ca3af;
+  --tool-think: #6b7280;
+
+  --badge-error-bg: #4a1a1a;
+  --badge-error-text: #fca5a5;
+  --badge-warning-bg: #4a3a0a;
+  --badge-warning-text: #fbbf24;
+  --badge-success-bg: #1a3a1a;
+  --badge-success-text: #86efac;
+  --badge-info-bg: #1a2a4a;
+  --badge-info-text: #93c5fd;
 
   --surface-glass: rgba(36, 31, 26, 0.6);
   --glass: rgba(26, 23, 20, 0.85);
@@ -355,11 +408,21 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+/* Thin and recessive: barely visible at rest, darkens on hover. The overlay
+   style keeps the bar from carving a visible gutter into dense layouts. */
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--subtle); }
-html { scrollbar-color: var(--border) transparent; scrollbar-width: thin; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--border) 45%, transparent);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--subtle) 70%, transparent);
+}
+html {
+  scrollbar-color: color-mix(in srgb, var(--border) 45%, transparent) transparent;
+  scrollbar-width: thin;
+}
 
 /* ── Article Prose ──────────────────────────────────────────── */
 article.prose {
@@ -779,6 +842,10 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
   70%  { box-shadow: 0 0 0 10px rgba(166, 124, 47, 0); }
   100% { box-shadow: 0 0 0 0 rgba(166, 124, 47, 0); }
 }
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
 @keyframes typing-dots {
   0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
   30%           { opacity: 1; transform: translateY(-4px); }
@@ -788,6 +855,7 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
 .animate-appear-up    { animation: appear-up var(--duration-enter) var(--ease-out-expo) both; }
 .animate-appear-scale { animation: appear-scale var(--duration-slow) var(--ease-out-expo) both; }
 .animate-appear-blur  { animation: appear-blur var(--duration-enter) var(--ease-out-expo) both; }
+.animate-slide-in-right { animation: slide-in-right 300ms var(--ease-out-expo) both; }
 .animate-float        { animation: float-subtle 3s ease-in-out infinite; }
 .animate-pulse-ring   { animation: pulse-ring 2s ease-out infinite; }
 

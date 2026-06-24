@@ -83,6 +83,7 @@ export default function MapViewer({
       markersLayer.current = ml;
 
       for (const m of markers) {
+        if (m.lat == null || m.lng == null) continue;
         const icon = L.divIcon({
           html: `<div style="font-size:18px;line-height:1;text-align:center;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5))">${TYPE_ICONS[m.type || "other"]}</div>`,
           className: "",
@@ -183,9 +184,9 @@ export default function MapViewer({
       {hasMultipleLayers && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-[var(--muted)]">Period:</span>
-          {layers.map((layer) => (
+          {layers.map((layer, i) => (
             <button
-              key={layer.id}
+              key={layer.id ?? i}
               onClick={() => switchLayer(layer.id)}
               className={`text-xs px-3 py-2.5 min-h-[44px] sm:py-1.5 border transition-colors ${
                 activeLayerId === layer.id

@@ -24,6 +24,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const TOKEN_KEY = "truthseekers_token";
+const MOCK_KEY = "truthseekers_mock";
 const TOKEN_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
 function parseCookie(name: string): string | null {
@@ -67,11 +68,26 @@ export function clearToken(): void {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const token = getStoredToken();
+  const [token, setToken] = useState<string | null>(null);
 
-  const fetchMe = useCallback(async (): Promise<User | null> => {
-    const t = getStoredToken();
+  // Sync token state from storage (catches changes across navigations)
+  useEffect(() => {
+    setToken(getStoredToken());
+    const interval = setInterval(() => {
+      const t = getStoredToken();
+      setToken((prev) => (prev !== t ? t : prev));
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const MOCK_USER: User = {
+    id: "user-mock-1", email: "researcher@example.com", name: "Dr. Alex Researcher",
+    avatar: "", subscriptionTier: "pro", onboarded: true,
+  };
+
+  const fetchMe = useCallback(async (t: string | null): Promise<User | null> => {
     if (!t) return null;
+    if (t === MOCK_KEY) return MOCK_USER;
     try {
       const res = await fetch(`${BASE}/auth/me`, {
         headers: { authorization: `Bearer ${t}` },
@@ -84,8 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetchMe().then((u) => { setUser(u); setLoading(false); });
-  }, [fetchMe]);
+    setLoading(true);
+    fetchMe(token).then((u) => { setUser(u); setLoading(false); });
+  }, [token, fetchMe]);
 
   const login = async (email: string): Promise<{ user: User; token: string } | { error: string }> => {
     try {
@@ -97,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       if (!res.ok) return { error: data.error || "Login failed" };
       storeToken(data.token);
-      setUser(data.user);
+      setToken(data.token);
       return { user: data.user, token: data.token };
     } catch {
       return { error: "Network error" };
@@ -106,12 +123,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     clearToken();
+    setToken(null);
     setUser(null);
   };
 
   const refresh = () => {
-    setLoading(true);
-    fetchMe().then((u) => { setUser(u); setLoading(false); });
+    setToken(getStoredToken());
   };
 
   return (

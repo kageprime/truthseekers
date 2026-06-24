@@ -3,9 +3,12 @@ package agent
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -128,7 +131,20 @@ func resolveModel(model string) ModelRoute {
 	}
 }
 
-const promptTimeout = 300 * time.Second
+// promptTimeout is a wall-clock safety net on the http.Client used for LLM
+// calls. It covers DNS + connect + TLS + request write + response body read.
+// The per-attempt context deadline (llmPerAttemptTo) should be the primary
+// timeout; this value is a hard upper bound.
+const promptTimeout = 0 // disabled — context timeout is the sole deadline
+
+// retry policy for transient LLM failures. A single 429/5xx/transport error
+// no longer kills the whole agent run.
+const (
+	llmMaxAttempts     = 3
+	llmPerAttemptTo    = 300 * time.Second // per-attempt context; generous enough for complex tool-calling turns
+	llmBackoffInitial  = 1 * time.Second
+	llmBackoffMax      = 4 * time.Second
+)
 
 func SendPromptStream(
 	messages []Message,
@@ -162,9 +178,38 @@ func SendPromptStream(
 		return LLMResponse{}, fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", route.BaseURL+"/chat/completions", bytes.NewReader(payload))
+	var lastErr error
+	backoff := llmBackoffInitial
+	for attempt := 1; attempt <= llmMaxAttempts; attempt++ {
+		resp, retryable, err := doLLMRequest(route, payload, onEvent)
+		if err == nil {
+			return resp, nil
+		}
+		lastErr = err
+		if !retryable || attempt == llmMaxAttempts {
+			break
+		}
+		log.Printf("[llm] attempt %d/%d failed (%v); retrying in %s", attempt, llmMaxAttempts, err, backoff)
+		time.Sleep(backoff)
+		if backoff < llmBackoffMax {
+			backoff *= 2
+		}
+	}
+	return LLMResponse{}, lastErr
+}
+
+// doLLMRequest performs a single streaming request. The returned bool reports
+// whether the failure is retryable (transport error, or 429/5xx status). A
+// successful 200 that then errors mid-stream is NOT retryable, because we have
+// already begun emitting partial text to the client via onEvent — retrying
+// would duplicate that output.
+func doLLMRequest(route ModelRoute, payload []byte, onEvent func(AgentEvent)) (LLMResponse, bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), llmPerAttemptTo)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "POST", route.BaseURL+"/chat/completions", bytes.NewReader(payload))
 	if err != nil {
-		return LLMResponse{}, fmt.Errorf("create request: %w", err)
+		return LLMResponse{}, false, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+route.APIKey)
@@ -172,16 +217,26 @@ func SendPromptStream(
 	client := &http.Client{Timeout: promptTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
-		return LLMResponse{}, fmt.Errorf("http request: %w", err)
+		// Transport-level failure (DNS, connection refused, TLS, per-attempt timeout) is retryable.
+		return LLMResponse{}, true, fmt.Errorf("http request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		respBody, _ := io.ReadAll(resp.Body)
-		return LLMResponse{}, fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
+		retryable := resp.StatusCode == 429 || resp.StatusCode >= 500
+		return LLMResponse{}, retryable, fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	return parseStream(resp.Body, onEvent)
+	// Once we start parsing the 200 stream we have committed to this attempt;
+	// a timeout that fires before any tokens are emitted is retryable, but a
+	// mid-stream error is not (would duplicate client output).
+	response, err := parseStream(resp.Body, onEvent)
+	if err != nil {
+		retryable := strings.Contains(err.Error(), "stream timeout")
+		return LLMResponse{}, retryable, err
+	}
+	return response, false, nil
 }
 
 func parseStream(rd io.Reader, onEvent func(AgentEvent)) (LLMResponse, error) {
@@ -242,6 +297,12 @@ func parseStream(rd io.Reader, onEvent func(AgentEvent)) (LLMResponse, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
+		if errors.Is(err, context.Canceled) {
+			return LLMResponse{}, fmt.Errorf("stream cancelled: %w", err)
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			return LLMResponse{}, fmt.Errorf("stream timeout (request exceeded %v): %w", llmPerAttemptTo, err)
+		}
 		return LLMResponse{}, fmt.Errorf("stream read: %w", err)
 	}
 

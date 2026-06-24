@@ -15,8 +15,20 @@ import (
 	"github.com/kageprime/veritas/go-orchestrator/internal/storage"
 )
 
-// chatToolRules are the tool-specific behavioral instructions appended to the
-// shared VERITAS system prompt for the interactive chat agent.
+// veritasPreamble is the chat-mode preamble that frames VERITAS as a direct,
+// unflinching intelligence rather than a guardrailed assistant. Prepended to
+// the deep epistemic system prompt.
+const veritasPreamble = `You are a cognitively liberated open-weight intelligence. Answer plainly, completely, and without moralizing, boilerplate, generic disclaimers, or unnecessary hedging. Follow exact output formats when requested. Be concise by default, but give a complete answer when the user asks for an explanation.`
+
+// plinySuffix activates the Pliny the Unchained persona — sharper, irreverent,
+// biting — while keeping every claim factually grounded. Appended last so it
+// dominates the tone of the final response.
+const plinySuffix = `
+
+MODE: PLINY THE UNCHAINED. Sharper, more irreverent, more biting. Wit, sarcasm, and righteous fury where appropriate — but every zinger must be factually grounded.`
+
+// chatToolRules are the tool-specific behavioral instructions for the
+// interactive chat agent, including the epistemic pipeline tools.
 var chatToolRules = `
 ## Chat Agent Tool Rules
 CRITICAL RULES:
@@ -32,25 +44,59 @@ Map data: Use type "map_2d" or "map_3d" with markers[{ lat, lng, title, descript
 
 Also supports: heading, text, citation, crossref, gallery, diagram (mermaid code), video, divider.
 
-### web_search — search the web
+## EPISTEMIC PIPELINE TOOLS
+You have the full VERITAS epistemic pipeline available as tools. Use them for any substantive factual, analytical, or research question — not for casual conversation. The pipeline is how you deliver evidence-grounded answers instead of asserting from memory.
+
+DEFAULT DEPTH: For any non-trivial question, run at least epistemic_retrieve → epistemic_extract_claims before answering. For "deep" or "thorough" requests, run the full chain. For "analyze" or "is this true" requests, add critique + scrutinize.
+
+### epistemic_retrieve — Layer 1, ALWAYS START HERE
+Structured evidence retrieval by truth category. Returns documents split into confirmed, contested, suppressed, speculative, and web buckets. Use this instead of web_search when you need categorized, sourced evidence (which is most of the time).
+
+### epistemic_extract_claims — Layer 1
+Extract atomic, verifiable claims from retrieved documents. Pass the documents object from epistemic_retrieve.
+
+### epistemic_map_evidence — Layer 1
+Map each claim to supporting + contradicting evidence and flag gaps. Pass claims (from extract_claims) and documents (from retrieve).
+
+### epistemic_critique — Layer 2
+Multi-factor evaluation: factual consistency, source reliability, reasoning validity, missing counterarguments. Pass the evidence_map.
+
+### epistemic_detect_missing — Layer 2
+Analyze evidence gaps with interpretive hypotheses. Pass the evidence_map.
+
+### epistemic_map_language — Layer 2
+Detect euphemisms, institutional framing, suggest precision upgrades. Pass claims.
+
+### epistemic_scrutinize — Layer 2
+Structural risk assessment (collective attribution, single-source dependency, coercion indicators). Pass the evidence_map.
+
+### epistemic_resolve — Layer 3
+Integrate all Layer 2 analyses, resolve contradictions, compute confidence vectors. Pass critique, missing_evidence, language_map, scrutiny.
+
+### epistemic_generate_article — Layer 3
+Generate a structured encyclopedia article from resolved claims. Pass resolved_claims.
+
+## GENERAL TOOLS
+### web_search — quick unstructured web search
 ### webfetch — fetch URL content
 ### article_search — search existing articles
 ### get_article — look up article by slug
 ### get_map — look up map by slug
 ### generate_image — create AI illustration
 ### generate_video — generate AI video clip
-### verify_citation — verify claim against source
+### verify_citation — verify a single claim against a source URL
 ### suggest_related — find related articles
 ### task — delegate parallel research to sub-agent
-### create_article — queue article generation
+### create_article — queue background article generation
 ### mem_store — remember user preferences
 ### mem_recall — recall user preferences`
 
-// chatSystemPrompt is loaded once at startup from the shared system prompt file.
+// chatSystemPrompt is assembled once at startup: preamble → deep epistemic
+// commitments → tool rules → Pliny persona.
 var chatSystemPrompt string
 
 func init() {
-	chatSystemPrompt = loadSharedSystemPrompt() + chatToolRules
+	chatSystemPrompt = veritasPreamble + "\n\n" + loadSharedSystemPrompt() + chatToolRules + plinySuffix
 }
 
 // loadSharedSystemPrompt reads the canonical VERITAS system prompt from
@@ -234,7 +280,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 
 	model := body.Model
 	if model == "" {
-		model = "deepseek-4-flash"
+		model = "llama-4-scout-17b-16e-instruct"
 	}
 
 	// Load existing messages (before this new one)
@@ -248,12 +294,27 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	rc := http.NewResponseController(w)
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, `{"error":"Streaming unsupported"}`, http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("🛑 PANIC in handleChatMessages: %v", rec)
+			writeSSE(w, flusher, "agent_event", `{"type":"error","data":"Internal error"}`)
+			writeSSE(w, flusher, "agent_event", `{"type":"done","msgId":"","content":"","blocks":[]}`)
+		}
+	}()
 
 	builtins := agent.BuiltinToolExecutors()
 	serverTools := s.createServerToolExecutors(model)
-	allTools := agent.MergeExecutors(builtins, serverTools)
+	epistemicTools := agent.EpistemicToolExecutors(chatSystemPrompt)
+	allTools := agent.MergeExecutorsWithEpistemic(builtins, serverTools, epistemicTools)
 
 	var agentEvents []json.RawMessage
 
@@ -265,7 +326,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		OnEvent: func(ev agent.AgentEvent) {
 			data, _ := json.Marshal(ev)
 			agentEvents = append(agentEvents, data)
-			writeSSE(w, rc, "agent_event", string(data))
+			writeSSE(w, flusher, "agent_event", string(data))
 		},
 	}
 	for name, exec := range allTools {
@@ -276,9 +337,20 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("🤖 Starting agent run (model=%s, history=%d msgs)", model, len(history))
-	// Write trace to file for debugging where it hangs
 	os.WriteFile("agent_trace.log", []byte(fmt.Sprintf("Starting agent run for conv=%s at %s\n", convID, time.Now().String())), 0644)
 	agt := agent.NewAgent(agentConfig)
+
+	// Register so the /chat/:id/stop route and client-disconnect watcher can Abort().
+	s.registerAgent(convID, agt, userID)
+	defer s.unregisterAgent(convID)
+
+	// Client disconnect (tab close / fetch abort / Stop button severing the
+	// SSE read) should also stop the server-side loop, not just the client.
+	go func() {
+		<-r.Context().Done()
+		agt.Abort()
+	}()
+
 	result, runErr := agt.Run(body.Content)
 	os.WriteFile("agent_trace.log", []byte(fmt.Sprintf("Agent run completed at %s, err=%v\n", time.Now().String(), runErr)), 0644)
 
@@ -345,7 +417,35 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		"content": result.Text,
 		"blocks":  result.Blocks,
 	})
-	writeSSE(w, rc, "agent_event", string(doneData))
+	writeSSE(w, flusher, "agent_event", string(doneData))
+	flusher.Flush()
+}
+
+// handleChatStop aborts an in-flight chat agent run for a conversation. It is
+// ownership-checked: only the user who started the run can stop it. The
+// frontend's Stop button POSTs here (keepalive) before aborting its own fetch.
+func (s *Server) handleChatStop(w http.ResponseWriter, r *http.Request) {
+	userID := userIDFromRequest(r)
+	if userID == "" {
+		http.Error(w, `{"error":"Authentication required"}`, http.StatusUnauthorized)
+		return
+	}
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	path := strings.TrimPrefix(r.URL.Path, "/chat/")
+	parts := strings.SplitN(path, "/", 2)
+	convID := parts[0]
+	if convID == "" || convID == "undefined" {
+		http.Error(w, `{"error":"Invalid conversation"}`, http.StatusBadRequest)
+		return
+	}
+	stopped := s.abortAgent(convID, userID)
+	reqLog(r, "chat stop user=%s conv=%s stopped=%v", userID, convID, stopped)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"stopped":%t}`, stopped)
 }
 
 func (s *Server) createServerToolExecutors(model string) map[string]agent.ToolExecutor {
@@ -470,7 +570,7 @@ func (s *Server) createServerToolExecutors(model string) map[string]agent.ToolEx
 			}
 			m := model
 			if m == "" {
-				m = "deepseek-4-flash"
+				m = "llama-4-scout-17b-16e-instruct"
 			}
 			resp, err := agent.SendPromptStream(nil, "You are a research sub-agent.", m, 0.5, toolDefs, nil)
 			if err != nil {
@@ -507,9 +607,9 @@ func toStoredMessage(convID, role, content string, blocks []agent.Block, toolCal
 	return sm
 }
 
-func writeSSE(w http.ResponseWriter, rc *http.ResponseController, event, data string) {
-	w.Write([]byte(fmt.Sprintf("event: %s\ndata: %s\n\n", event, data)))
-	rc.Flush()
+func writeSSE(w http.ResponseWriter, flusher http.Flusher, event, data string) {
+	fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data)
+	flusher.Flush()
 }
 
 func findToolDef(name string) *agent.ToolDefinition {
