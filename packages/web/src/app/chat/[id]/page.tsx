@@ -31,12 +31,12 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [loading, setLoading] = useState(false);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
   const [consoleOpen, setConsoleOpen] = useState(false);
-  const [model, setModel] = useState("gemma-4-31b-it");
+  const [model, setModel] = useState("llama-4-scout-17b-16e-instruct");
 
   const MODELS = [
+    { id: "llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout" },
     { id: "gemma-4-31b-it", label: "Gemma 4 31B" },
     { id: "deepseek-4-flash", label: "DeepSeek 4 Flash" },
-    { id: "llama-3.1-8b", label: "Llama 3.1 8B" },
   ];
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -186,11 +186,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         onError: (errMsg) => {
           setError(errMsg || "Something went wrong. Please try again.");
         },
-      });
+      }, model);
 
       setTimeout(() => setSending(false), 0);
     },
-    [convId, sending, streamSend, queryClient, router],
+    [convId, sending, streamSend, queryClient, router, model],
   );
 
   function handleKeyDown(e: React.KeyboardEvent) {

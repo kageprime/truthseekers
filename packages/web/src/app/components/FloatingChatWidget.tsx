@@ -32,6 +32,7 @@ export default function FloatingChatWidget() {
   const [loading, setLoading] = useState(false);
   const [convId, setConvId] = useState<string | null>(null);
   const [view, setView] = useState<"chat" | "console">("chat");
+  const [model, setModel] = useState("llama-4-scout-17b-16e-instruct");
   const agentEventsRef = useRef<AgentEvent[]>([]);
   const finalizedRef = useRef(false);
   const streamContentRef = useRef("");
@@ -205,10 +206,10 @@ export default function FloatingChatWidget() {
         });
       },
       onError: (err: string) => console.warn("Stream error:", err),
-    });
+    }, model);
 
     setTimeout(() => setSending(false), 0);
-  }, [convId, sending, streamSend, queryClient, setAgentEvents, setActiveConversationId]);
+  }, [convId, sending, streamSend, queryClient, setAgentEvents, setActiveConversationId, model]);
 
   const messages = useMemo(() => (conv?.messages ?? []).filter((m: any) => m.role !== "tool"), [conv?.messages]);
   const hasStreaming = sending;
