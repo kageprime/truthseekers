@@ -4,7 +4,6 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import QueryProvider from "./components/QueryProvider";
 import ThemeProvider from "./components/ThemeProvider";
 import { FloatingChatProvider } from "./FloatingChatContext";
-import { SidebarProvider } from "./SidebarContext";
 import { ChatProvider } from "./chat/ChatContext";
 import { HeaderSearchProvider } from "./HeaderSearchContext";
 import { ArticleViewProvider } from "./ArticleViewContext";
@@ -35,13 +34,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&family=Lora:ital,wght@0,400..700;1,400..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Press+Start+2P&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Press+Start+2P&display=swap"
           rel="stylesheet"
         />
       <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem("theme")||"light";document.documentElement.classList.toggle("dark",t==="dark")}catch(e){}})()` }} />
       </head>
       <body className="antialiased" style={{ margin: 0 }}>
-        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-white focus:rounded-lg focus:text-sm focus:shadow-lg" style={{ color: "var(--ink)" }}>
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-white focus:rounded-lg focus:text-sm focus:shadow-lg" style={{ color: "var(--ink)", zIndex: "var(--z-skip-link)" }}>
           Skip to main content
         </a>
         <ErrorBoundary>
@@ -49,7 +48,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ThemeProvider>
               <AuthProvider>
               <FloatingChatProvider>
-                <SidebarProvider>
                   <ChatProvider>
                     <HeaderSearchProvider>
                       <ArticleViewProvider>
@@ -57,7 +55,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       </ArticleViewProvider>
                     </HeaderSearchProvider>
                   </ChatProvider>
-                </SidebarProvider>
               </FloatingChatProvider>
               </AuthProvider>
             </ThemeProvider>

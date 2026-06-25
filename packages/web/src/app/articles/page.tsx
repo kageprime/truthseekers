@@ -251,49 +251,70 @@ export default function ArticlesPage() {
   const categoryFilterLabel = selectedCategory || "All categories";
 
   return (
-    <ContentCard>
-      <div className="px-6 py-8">
-        {/* Search */}
-        <div className="mb-8">
-          <h1 className="text-lg font-bold tracking-tight mb-1" style={{ color: "var(--ink)" }}>Articles</h1>
-          <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>Browse the encyclopedia</p>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--subtle)" }} />
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search articles..."
-                className="input w-full pl-10 pr-4 py-2.5 text-sm"
-                autoFocus
-              />
-            </div>
-            <button
-              onClick={() => {
-                const slug = slugify(query.trim());
-                if (slug && !generating.has(slug)) {
-                  fetchArticleStatus(slug).then((existing) => {
-                    if (existing && "status" in existing && existing.status === "published") {
-                      router.push(`/article/${slug}`);
-                    } else {
-                      startGenerate(slug);
-                    }
-                  });
-                }
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      {/* Double-Bezel outer shell */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden max-w-5xl w-full mx-auto" style={{ padding: "4px" }}>
+        <div
+          className="flex-1 flex flex-col min-h-0 overflow-hidden"
+          style={{
+            borderRadius: "var(--radius-card-lg)",
+            background: "color-mix(in srgb, var(--surface-elevated) 100%, transparent)",
+            border: "1px solid var(--border-light)",
+            boxShadow: "0 1px 3px rgba(26,22,18,0.04)",
+          }}
+        >
+      <div className="px-6 py-8 sm:px-8 sm:py-10">
+        {/* Search — float-island style */}
+        <div className="mb-8 max-w-2xl mx-auto w-full">
+          <h1 className="font-display font-bold mb-1" style={{ fontSize: "clamp(1.25rem, 2vw, 1.5rem)", letterSpacing: "-0.01em", color: "var(--ink)" }}>Articles</h1>
+          <p className="text-xs mb-5" style={{ color: "var(--muted)" }}>Browse the encyclopedia</p>
+          <div className="p-[3px]" style={{ borderRadius: "9999px", background: "color-mix(in srgb, var(--border) 15%, transparent)" }}>
+            <div
+              className="flex items-center gap-2 px-1 py-1"
+              style={{
+                borderRadius: "calc(9999px - 3px)",
+                background: "var(--surface)",
+                border: "1px solid var(--border-light)",
               }}
-              className="btn btn-primary btn-sm shrink-0"
-              disabled={!query.trim()}
             >
-              <IconLightning size={14} /> Generate
-            </button>
+              <div className="relative flex-1">
+                <IconSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--subtle)" }} />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search articles..."
+                  className="w-full bg-transparent border-none outline-none text-sm pl-9 pr-3 py-2"
+                  style={{ color: "var(--ink)" }}
+                  autoFocus
+                />
+              </div>
+              <button
+                onClick={() => {
+                  const slug = slugify(query.trim());
+                  if (slug && !generating.has(slug)) {
+                    fetchArticleStatus(slug).then((existing) => {
+                      if (existing && "status" in existing && existing.status === "published") {
+                        router.push(`/article/${slug}`);
+                      } else {
+                        startGenerate(slug);
+                      }
+                    });
+                  }
+                }}
+                disabled={!query.trim()}
+                className="btn btn-primary btn-sm rounded-full shrink-0 cursor-pointer disabled:opacity-30"
+              >
+                <IconLightning size={13} /> Generate
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Generating entries */}
         {generating.size > 0 && (
-          <div className="mb-6 space-y-2">
+          <div className="mb-6 space-y-2 max-w-2xl mx-auto">
             {Array.from(generating.values()).map((gen) => (
               <GenerationBar
                 key={gen.slug} entry={gen}
@@ -310,32 +331,46 @@ export default function ArticlesPage() {
 
         {/* Filter bar */}
         {!initialLoading && articles.length > 0 && (
-          <div className="flex items-center gap-2 mb-4">
-            <select
-              value={selectedCategory || ""}
-              onChange={(e) => setSelectedCategory(e.target.value || null)}
-              className="input text-xs py-1.5 px-2 w-auto"
-              style={{ minWidth: 140 }}
-            >
-              <option value="">All categories</option>
-              {allCategories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+          <div className="flex items-center gap-3 mb-6 max-w-2xl mx-auto w-full">
+            <div className="p-[2px]" style={{ borderRadius: "9999px", background: "color-mix(in srgb, var(--border) 12%, transparent)" }}>
+              <div
+                className="flex items-center gap-0.5 px-1 py-0.5"
+                style={{
+                  borderRadius: "calc(9999px - 2px)",
+                  background: "var(--surface)",
+                }}
+              >
+                <select
+                  value={selectedCategory || ""}
+                  onChange={(e) => setSelectedCategory(e.target.value || null)}
+                  className="bg-transparent border-none outline-none text-[11px] font-medium px-2 py-1"
+                  style={{ color: "var(--muted)", minWidth: 120 }}
+                >
+                  <option value="">All categories</option>
+                  {allCategories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div className="ml-auto flex gap-1">
-              <button onClick={() => setViewMode("list")} className={`btn-icon btn-sm ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`} title="List view">
-                <IconList size={14} />
-              </button>
-              <button onClick={() => setViewMode("grid")} className={`btn-icon btn-sm ${viewMode === "grid" ? "btn-primary" : "btn-ghost"}`} title="Grid view">
-                <IconGrid size={14} />
-              </button>
+              <div className="p-[2px]" style={{ borderRadius: "9999px", background: "color-mix(in srgb, var(--border) 12%, transparent)" }}>
+                <div className="flex items-center gap-0.5 px-0.5 py-0.5" style={{ borderRadius: "calc(9999px - 2px)", background: "var(--surface)" }}>
+                  <button onClick={() => setViewMode("grid")} className={`w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${viewMode === "grid" ? "bg-accent text-white dark:text-[#1a1714]" : "text-muted hover:text-ink"}`} title="Grid view">
+                    <IconGrid size={12} />
+                  </button>
+                  <button onClick={() => setViewMode("list")} className={`w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${viewMode === "list" ? "bg-accent text-white dark:text-[#1a1714]" : "text-muted hover:text-ink"}`} title="List view">
+                    <IconList size={12} />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {/* Status */}
         {!initialLoading && (
-          <div className="text-xs mb-4" style={{ color: "var(--subtle)" }}>
+          <div className="text-[11px] font-medium mb-5 max-w-2xl mx-auto w-full" style={{ color: "var(--subtle)" }}>
             {searching ? "Searching..." : `${filteredArticles.length} article${filteredArticles.length !== 1 ? "s" : ""}`}
             {selectedCategory ? ` in ${selectedCategory}` : ""}
           </div>
@@ -343,37 +378,61 @@ export default function ArticlesPage() {
 
         {/* Results */}
         {initialLoading ? (
-          <div className="flex justify-center py-16">
-            <Spinner size={32} />
+          <div className="max-w-2xl mx-auto w-full space-y-4 animate-pulse py-8">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 p-4" style={{ borderRadius: "var(--radius-card-lg)", border: "1px solid var(--border-light)" }}>
+                <div className="w-10 h-10 rounded skeleton shrink-0" style={{ borderRadius: "var(--radius-sharp)" }} />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 skeleton w-3/4 rounded" />
+                  <div className="h-3 skeleton w-1/2 rounded" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredArticles.length > 0 ? (
           <>
             {viewMode === "list" ? (
-              <div>
+              <div className="max-w-2xl mx-auto w-full stagger-children">
                 {filteredArticles.map((article) => (
                   <ArticleRow key={article.slug} article={article} />
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-                {filteredArticles.map((article) => (
-                  <ArticleCard key={article.slug} article={article} />
-                ))}
+              /* Asymmetrical bento grid — varying column spans break monotony */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 max-w-5xl mx-auto w-full stagger-children">
+                {filteredArticles.map((article, i) => {
+                  /* Deterministic variation: first card spans 2 cols, every 4th gets featured treatment */
+                  const span = i === 0 ? "sm:col-span-2" : (i % 4 === 3 ? "sm:col-span-2 lg:col-span-2" : "");
+                  return (
+                    <div key={article.slug} className={span}>
+                      <ArticleCard article={article} />
+                    </div>
+                  );
+                })}
               </div>
             )}
-            <div ref={sentinelRef} className="h-4" />
+            <div ref={sentinelRef} className="h-6" />
             {infiniteLoading && (
-              <div className="text-center py-4">
-                <Spinner size={24} className="mx-auto" />
+              <div className="flex justify-center py-6">
+                <div className="w-6 h-6 rounded-full border-2" style={{ borderColor: "color-mix(in srgb, var(--border) 40%, transparent)", borderTopColor: "var(--accent)", animation: "spin 0.8s linear infinite" }} />
               </div>
             )}
           </>
         ) : (
-          <div className="text-center py-16">
-            <div className="mb-4"><IconSearch size={48} style={{ color: "var(--subtle)" }} /></div>
-            <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--ink)" }}>No articles found</h2>
+          <div className="max-w-lg mx-auto w-full text-center py-16 stagger-children">
+            <div
+              className="w-16 h-16 mx-auto mb-5 flex items-center justify-center"
+              style={{
+                borderRadius: "var(--radius-card-lg)",
+                border: "1px solid color-mix(in srgb, var(--accent) 15%, transparent)",
+                background: "color-mix(in srgb, var(--accent) 6%, transparent)",
+              }}
+            >
+              <IconSearch size={24} style={{ color: "var(--accent)" }} />
+            </div>
+            <h2 className="font-display font-semibold mb-2" style={{ fontSize: "1.1rem", color: "var(--ink)" }}>No articles found</h2>
             <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
-              {query ? `No results for "${query}". Generate an article about it.` : "Your encyclopedia is empty."}
+              {query ? `No results for "${query}". Generate one.` : "Your encyclopedia is empty."}
             </p>
             {query && (
               <button
@@ -381,14 +440,17 @@ export default function ArticlesPage() {
                   const slug = slugify(query.trim());
                   if (slug) startGenerate(slug);
                 }}
-                className="btn btn-primary"
+                className="btn btn-primary rounded-full cursor-pointer"
+                style={{ paddingLeft: "1.5rem", paddingRight: "1.5rem" }}
               >
-                <IconLightning size={16} /> Generate &ldquo;{query}&rdquo;
+                <IconLightning size={14} /> Generate &ldquo;{query}&rdquo;
               </button>
             )}
           </div>
         )}
       </div>
-    </ContentCard>
+        </div>
+      </div>
+    </div>
   );
 }

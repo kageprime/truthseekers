@@ -28,7 +28,7 @@
   /* Type */
   --font-display: 'Playfair Display', Lora, Georgia, serif;
   --font-serif: 'Lora', Georgia, 'Times New Roman', serif;
-  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-ui: 'Geist', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
 
   /* Surface — aged paper */
@@ -116,7 +116,25 @@
   /* Radii — unified */
   --radius-sharp: 2px;
   --radius: 6px;
+  --radius-card-lg: 8px;
   --radius-pill: 9999px;
+
+  /* Z-index scale — single source of truth */
+  --z-base: 0;
+  --z-grain: 0;
+  --z-sidebar-toggle: 30;
+  --z-chat-backdrop: 30;
+  --z-chat-panel: 40;
+  --z-island-nav: 45;
+  --z-chat-toggle: 50;
+  --z-mock-controls: 50;
+  --z-island-overlay: 55;
+  --z-overlay: 60;
+  --z-explore-press: 70;
+  --z-view-switcher: 80;
+  --z-tour: 100;
+  --z-skip-link: 100;
+  --z-lightbox: 9999;
 }
 
 .dark {
@@ -184,6 +202,7 @@ body {
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-wrap: pretty;
   /* Contain overscroll so chat/message panes don't bounce the page on mobile */
   overscroll-behavior-y: none;
 }
@@ -473,7 +492,7 @@ article.prose table { font-family: var(--font-ui); }
 article.prose pre, article.prose code { font-family: var(--font-mono); }
 
 /* ── Generate Page ──────────────────────────────────────────── */
-.generate-page { min-height: 100vh; display: flex; flex-direction: column; }
+.generate-page { min-height: 100dvh; display: flex; flex-direction: column; }
 .generate-viewer {
   flex: 1; display: flex; flex-direction: column;
   max-width: 960px; width: 100%; margin: 0 auto; padding: 1rem;
@@ -611,6 +630,9 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
 /* Line clamp */
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Tabular numbers for data-heavy displays */
+.tabular-nums { font-variant-numeric: tabular-nums; }
 
 /* Touch targets */
 @media (max-width: 639px) {
@@ -810,6 +832,7 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out-quint: cubic-bezier(0.83, 0, 0.17, 1);
   --ease-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-premium: cubic-bezier(0.32, 0.72, 0, 1);
   --duration-fast: 150ms;
   --duration-normal: 250ms;
   --duration-slow: 400ms;
@@ -869,6 +892,18 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
 .stagger-children > *:nth-child(6) { animation-delay: 250ms; }
 .stagger-children > *:nth-child(7) { animation-delay: 300ms; }
 .stagger-children > *:nth-child(8) { animation-delay: 350ms; }
+
+/* ── Float-Island Nav item entrance — staggered mask reveal ── */
+@keyframes nav-item-enter {
+  from { opacity: 0; transform: translateY(32px) scale(0.96); filter: blur(6px); }
+  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+/* ── Article gold rule — animated width reveal ─────────────── */
+@keyframes gold-rule-enter {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
 
 /* ── Chat message entrance ───────────────────────────────────── */
 .chat-message-enter {

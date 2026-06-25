@@ -178,11 +178,22 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   if (loading) {
     return (
       <ContentCard>
-        <div className="flex items-center justify-center h-full">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-[3px] border-[var(--border)] border-t-[var(--ink)]"
-              style={{ animation: "spin 0.8s linear infinite" }} />
-            <span className="text-xs font-semibold" style={{ color: "var(--subtle)" }}>Loading...</span>
+        <div className="px-4 sm:px-8 py-10 sm:py-14 max-w-[42rem] mx-auto w-full animate-pulse">
+          <div className="flex justify-center mb-10">
+            <div className="w-16 h-16 rounded-full skeleton" />
+          </div>
+          <div className="text-center mb-8 space-y-3">
+            <div className="h-8 skeleton w-3/4 mx-auto rounded" />
+            <div className="h-7 skeleton w-1/2 mx-auto rounded" />
+            <div className="mx-auto skeleton" style={{ width: "3rem", height: 2 }} />
+            <div className="h-4 skeleton w-1/3 mx-auto rounded mt-4" />
+          </div>
+          <div className="space-y-3 max-w-[38em] mx-auto">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="flex gap-3">
+                <div className="h-4 skeleton flex-1 rounded" style={{ width: `${70 + Math.random() * 30}%` }} />
+              </div>
+            ))}
           </div>
         </div>
       </ContentCard>
@@ -192,47 +203,81 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   if (!article && !generating) {
     const atLimit = quota && quota.remaining <= 0;
     return (
-      <ContentCard>
-        <div className="px-6 py-12 sm:py-16 flex items-center justify-center">
-          <div className="max-w-lg mx-auto text-center">
-            <div className="w-16 h-16 mx-auto mb-5 flex items-center justify-center rounded-xl border border-border/40 bg-surface p-4">
-              {atLimit ? <IconAlert size={28} /> : <IconBook size={28} />}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden max-w-3xl w-full mx-auto" style={{ padding: "4px" }}>
+          <div
+            className="flex-1 flex flex-col min-h-0 overflow-hidden"
+            style={{
+              borderRadius: "var(--radius-card-lg)",
+              background: "color-mix(in srgb, var(--surface-elevated) 100%, transparent)",
+              border: "1px solid var(--border-light)",
+              boxShadow: "0 1px 3px rgba(26,22,18,0.04)",
+            }}
+          >
+        <div className="px-6 py-12 sm:py-16 flex items-center justify-center flex-1">
+          <div className="max-w-lg mx-auto text-center stagger-children">
+            <div
+              className="w-16 h-16 mx-auto mb-6 flex items-center justify-center"
+              style={{
+                borderRadius: "var(--radius-card-lg)",
+                background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+                border: "1px solid color-mix(in srgb, var(--accent) 15%, transparent)",
+              }}
+            >
+              {atLimit ? <IconAlert size={26} style={{ color: "var(--oxblood)" }} /> : <IconBook size={26} style={{ color: "var(--accent)" }} />}
             </div>
-            <h1 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>
-              {slug.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+            <h1 className="font-display font-bold mb-3" style={{ fontSize: "clamp(1.25rem, 2vw, 1.5rem)", letterSpacing: "-0.01em", color: "var(--ink)", textTransform: "capitalize" }}>
+              {slug.replace(/-/g, " ")}
             </h1>
             {atLimit ? (
               <>
-                <p className="text-sm mb-3" style={{ color: "var(--red)" }}>Generation limit reached</p>
-                <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--muted)" }}>
-                  Your {quota.tier} plan allows {quota.limit} article generations. Upgrade to create more articles.
+                <p className="text-sm mb-3 font-medium" style={{ color: "var(--red)" }}>Generation limit reached</p>
+                <p className="text-sm leading-relaxed mb-6 max-w-sm mx-auto" style={{ color: "var(--muted)" }}>
+                  Your {quota.tier} plan allows {quota.limit} article generations. Upgrade to create more.
                 </p>
-                <Link href="/pricing" className="btn btn-primary btn-lg">
-                  Upgrade Plan
+                <Link href="/pricing" className="btn btn-primary btn-lg no-underline">
+                  Upgrade plan
                 </Link>
               </>
             ) : (
               <>
-                <p className="text-sm mb-6" style={{ color: "var(--subtle)" }}>Topic not yet generated</p>
-                <p className="text-sm leading-relaxed mb-8" style={{ color: "var(--muted)" }}>
-                  The AI agent will research the web, outline the content, write a full article, and verify all citations.
+                <p className="text-sm mb-2" style={{ color: "var(--subtle)" }}>Topic not yet in the encyclopedia</p>
+                <p className="text-sm leading-relaxed mb-8 max-w-sm mx-auto" style={{ color: "var(--muted)" }}>
+                  The AI agent will research the web, write a full article, and verify all citations.
                 </p>
                 <button
                   onClick={handleGenerate}
-                  className="btn btn-primary btn-lg cursor-pointer"
+                  className="group btn btn-primary btn-lg cursor-pointer"
+                  style={{ borderRadius: "9999px", paddingLeft: "1.5rem", paddingRight: "1.5rem" }}
                 >
-                  <IconLightning size={18} /> Generate Encyclopedia Article
+                  <span className="flex items-center gap-2">
+                    <IconLightning size={16} />
+                    <span>Generate article</span>
+                    <span
+                      className="w-6 h-6 rounded-full flex items-center justify-center transition-all duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                      style={{
+                        background: "rgba(255,255,255,0.15)",
+                        transitionTimingFunction: "cubic-bezier(0.32, 0.72, 0, 1)",
+                      }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </span>
+                  </span>
                 </button>
                 {quota && (
-                  <p className="text-xs mt-4" style={{ color: "var(--subtle)" }}>
-                    {quota.remaining} of {quota.limit} generations remaining ({quota.tier})
+                  <p className="text-xs mt-5 font-medium" style={{ color: "var(--subtle)" }}>
+                    <span className="tabular-nums">{quota.remaining} of {quota.limit}</span> generations remaining
                   </p>
                 )}
               </>
             )}
           </div>
         </div>
-      </ContentCard>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -268,67 +313,152 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   if (!article) return null;
 
   return (
-    <ContentCard maxWidth="max-w-3xl">
-      <article className="px-4 sm:px-8 py-10 sm:py-14 max-w-[42rem] mx-auto w-full">
-        {/* Back link */}
-        <Link href="/chat/new" className="inline-flex items-center gap-1 dateline mb-8 transition-colors hover:underline" style={{ color: "var(--gold)" }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          The Encyclopedia
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      {/* Double-Bezel Outer Shell */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden max-w-3xl w-full mx-auto" style={{ padding: "4px" }}>
+        <div
+          className="flex-1 flex flex-col min-h-0 overflow-hidden"
+          style={{
+            borderRadius: "var(--radius-card-lg, 8px)",
+            background: "color-mix(in srgb, var(--surface-elevated) 100%, transparent)",
+            border: "1px solid var(--border-light)",
+            boxShadow: "0 1px 3px rgba(26,22,18,0.04)",
+          }}
+        >
+      <article className="px-4 sm:px-8 py-10 sm:py-14 max-w-[42rem] mx-auto w-full animate-appear-up">
+        {/* Back link — gold badge with hover arrow */}
+        <Link
+          href="/chat/new"
+          className="group inline-flex items-center gap-2 mb-10 no-underline"
+          style={{ color: "var(--muted)" }}
+        >
+          <span className="flex items-center justify-center w-7 h-7 rounded-full transition-all duration-500" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)", transitionTimingFunction: "cubic-bezier(0.32, 0.72, 0, 1)" }}>
+            <svg
+              width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              style={{ color: "var(--accent)", transition: "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)" }}
+              className="group-hover:-translate-x-0.5"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </span>
+          <span className="text-[11px] font-medium tracking-wide" style={{ letterSpacing: "0.06em" }}>Back to encyclopedia</span>
         </Link>
 
-        {/* Admin / utility toolbar — demoted to a slim icon row */}
-        <div className="flex items-center justify-end gap-1 mb-6">
-          <button
-            onClick={handleRefresh}
-            disabled={generating || (quota?.remaining != null && quota.remaining <= 0)}
-            className="btn-icon btn-ghost cursor-pointer"
-            title={generating ? "Refreshing…" : "Regenerate article"}
-            aria-label="Regenerate article"
+        {/* Admin float-island — floating pill at top-right */}
+        <div
+          className="flex items-center gap-1 mb-8 ml-auto w-max"
+          style={{
+            padding: "3px",
+            borderRadius: "9999px",
+            background: "color-mix(in srgb, var(--border) 15%, transparent)",
+          }}
+        >
+          <div
+            className="flex items-center gap-0.5 px-2 py-1"
+            style={{
+              borderRadius: "calc(9999px - 3px)",
+              background: "var(--surface-glass)",
+              backdropFilter: "blur(12px) saturate(1.3)",
+              WebkitBackdropFilter: "blur(12px) saturate(1.3)",
+            }}
           >
-            <IconRefresh size={15} />
-          </button>
-          <button onClick={() => handleExport("json")} className="btn-icon btn-ghost cursor-pointer" title="Export JSON" aria-label="Export JSON">
-            <IconFile size={15} />
-          </button>
-          <button onClick={() => handleExport("markdown")} className="btn-icon btn-ghost cursor-pointer" title="Export Markdown" aria-label="Export Markdown">
-            <IconFileText size={15} />
-          </button>
-          {quota != null && quota.remaining <= 3 && (
-            <span className="dateline ml-2" style={{ color: quota.remaining === 0 ? "var(--oxblood)" : "var(--gold)" }}>
-              {quota.remaining}/{quota.limit} left
-            </span>
-          )}
+            <button
+              onClick={handleRefresh}
+              disabled={generating || (quota?.remaining != null && quota.remaining <= 0)}
+              className="group relative w-7 h-7 flex items-center justify-center rounded-full text-muted hover:text-ink hover:bg-accent-bg/40 transition-all duration-200 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              title={generating ? "Refreshing…" : "Regenerate article"}
+              aria-label="Regenerate article"
+            >
+              <IconRefresh size={13} />
+            </button>
+            <button
+              onClick={() => handleExport("json")}
+              className="group relative w-7 h-7 flex items-center justify-center rounded-full text-muted hover:text-ink hover:bg-accent-bg/40 transition-all duration-200 cursor-pointer"
+              title="Export JSON"
+              aria-label="Export JSON"
+            >
+              <IconFile size={13} />
+            </button>
+            <button
+              onClick={() => handleExport("markdown")}
+              className="group relative w-7 h-7 flex items-center justify-center rounded-full text-muted hover:text-ink hover:bg-accent-bg/40 transition-all duration-200 cursor-pointer"
+              title="Export Markdown"
+              aria-label="Export Markdown"
+            >
+              <IconFileText size={13} />
+            </button>
+            {quota != null && quota.remaining <= 3 && (
+              <span
+                className="text-[9px] font-medium ml-1 px-2 py-0.5 rounded-full"
+                style={{
+                  color: quota.remaining === 0 ? "var(--oxblood)" : "var(--accent)",
+                  background: quota.remaining === 0 ? "color-mix(in srgb, var(--oxblood) 10%, transparent)" : "color-mix(in srgb, var(--accent) 10%, transparent)",
+                }}
+              >
+                <span className="tabular-nums">{quota.remaining}/{quota.limit}</span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Title block */}
-        <header className="mb-10 text-center">
-          <h1 className="t-display mb-4" style={{ fontSize: "clamp(2rem, 1rem + 4vw, 3rem)", color: "var(--ink)" }}>
+        <header className="mb-12 text-center">
+          <h1
+            className="font-display font-bold mb-5"
+            style={{
+              fontSize: "clamp(2rem, 1rem + 4vw, 3.25rem)",
+              letterSpacing: "-0.02em",
+              lineHeight: 1.1,
+              color: "var(--ink)",
+            }}
+          >
             {article.title || slug.replace(/-/g, " ")}
           </h1>
-          {/* Gold rule under the title */}
-          <div className="mx-auto" style={{ height: 2, width: "3rem", background: "var(--gold)" }} />
+
+          {/* Animated gold rule */}
+          <div
+            className="mx-auto"
+            style={{
+              height: 2,
+              width: "3rem",
+              background: "var(--gold)",
+              animation: "gold-rule-enter 1s cubic-bezier(0.32, 0.72, 0, 1) 0.2s both",
+              transformOrigin: "left center",
+            }}
+          />
 
           {/* Dateline — small-caps meta */}
-          <div className="dateline mt-4" style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "0 0.25em" }}>
+          <div
+            className="mt-5"
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              flexWrap: "wrap",
+              gap: "0 0.35em",
+              fontFamily: "var(--font-ui)",
+              fontVariant: "all-small-caps",
+              letterSpacing: "0.12em",
+              fontSize: "0.75rem",
+              color: "var(--muted)",
+            }}
+          >
             <span>Vol. I</span>
             {article.metadata?.version != null && (<>
-              <span className="sep">·</span><span>Rev. {article.metadata.version}</span>
+              <span style={{ color: "var(--rule)" }}>·</span><span>Rev. {article.metadata.version}</span>
             </>)}
             {article.metadata?.updated && (<>
-              <span className="sep">·</span>
+              <span style={{ color: "var(--rule)" }}>·</span>
               <span>{new Date(article.metadata.updated).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
             </>)}
             {article.metadata?.generatedBy && (<>
-              <span className="sep">·</span>
+              <span style={{ color: "var(--rule)" }}>·</span>
               <span><IconUser size={11} /> {article.metadata.generatedBy.slice(0, 12)}</span>
             </>)}
           </div>
         </header>
 
         {/* Article body — reading column */}
-        <div className="reading-column">
+        <div className="reading-column stagger-children">
           {article.blocks && article.blocks.length > 0 ? (
             <BlockRenderer blocks={article.blocks} />
           ) : (
@@ -344,6 +474,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           )}
         </div>
       </article>
-    </ContentCard>
+        </div>
+      </div>
+    </div>
   );
 }

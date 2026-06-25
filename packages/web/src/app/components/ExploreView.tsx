@@ -26,7 +26,7 @@ export default function ExploreView() {
   if (!article || mode !== "explore") return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col animate-fade-in bg-surface">
+    <div className="fixed inset-0 flex flex-col animate-fade-in bg-surface" style={{ zIndex: "var(--z-explore-press)" }}>
       {/* Top bar */}
       <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-rule bg-surface">
         <button

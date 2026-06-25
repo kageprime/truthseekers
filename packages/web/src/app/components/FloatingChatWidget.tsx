@@ -11,6 +11,8 @@ import type { AgentEvent } from "./ProcessViewer";
 import ChatMessage from "./ChatMessage";
 import EmptyChatState from "./EmptyChatState";
 import TruthConsole from "./TruthConsole";
+import TruthConsoleDeck from "./truth-console/TruthConsoleDeck";
+import { useTraceSegments } from "./truth-console/useTraceSegments";
 import Spinner from "./Spinner";
 import { BASE } from "@/lib/constants";
 
@@ -19,7 +21,9 @@ const CONV_STORAGE_KEY = "truthseekers_floating_conv";
 export default function FloatingChatWidget() {
   const queryClient = useQueryClient();
   const { close, activeConversationId, setActiveConversationId, toggleExpanded } = useFloatingChat();
-  const { agentEvents, setAgentEvents, setConsoleOpen, consoleOpen } = useChatContext();
+  // Console + sending state now live in ChatContext so this widget and the
+  // chat page share one source of truth (useTraceSegments reads them).
+  const { sending, setSending, setLiveEvents } = useChatContext();
   const { send: streamSend, stop: streamStop } = useChatStream();
   const { data: conversations = [], loading: chatsLoading } = useChats();
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -28,7 +32,6 @@ export default function FloatingChatWidget() {
   const [input, setInput] = useState("");
   const [streamContent, setStreamContent] = useState("");
   const [streamBlocks, setStreamBlocks] = useState<any[]>([]);
-  const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const [convId, setConvId] = useState<string | null>(null);
   const [view, setView] = useState<"chat" | "console">("chat");
@@ -38,6 +41,9 @@ export default function FloatingChatWidget() {
   const streamContentRef = useRef("");
   const streamAccumulatorRef = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Per-response segment derivation (history + live, shared via context).
+  const seg = useTraceSegments(convId);
 
   // Close session switcher on outside click
   useEffect(() => {
@@ -62,34 +68,9 @@ export default function FloatingChatWidget() {
   // Load conversation data
   const { data: conv, loading: convLoading } = useChat(convId ?? undefined);
 
-  // Populate agent events from historical messages on load
-  const prevConvRef = useRef(conv);
-  useEffect(() => {
-    if (!conv || conv === prevConvRef.current) return;
-    prevConvRef.current = conv;
-    const events: AgentEvent[] = [];
-    for (const m of conv.messages ?? []) {
-      if (m.agentEvents?.length) {
-        events.push(...m.agentEvents);
-      } else if (m.role === "tool") {
-        // Reconstruct tool events from stored tool messages
-        const name = m.tool_name || "tool_call";
-        events.push({
-          type: "tool_use",
-          data: { name, args: {} },
-          timestamp: new Date(m.createdAt).getTime(),
-        });
-        if (m.content?.trim()) {
-          events.push({
-            type: "tool_result",
-            data: { name, result: m.content.slice(0, 1000) },
-            timestamp: new Date(m.createdAt).getTime(),
-          });
-        }
-      }
-    }
-    if (events.length > 0) setAgentEvents(events);
-  }, [conv, setAgentEvents]);
+  // NOTE: historical agent events are no longer reconstructed here —
+  // useTraceSegments derives per-response segments directly from the React
+  // Query `["chat", convId]` cache (the same cache both hosts write to).
 
   // Auto-scroll — defer layout read to avoid forced reflow during render.
   useEffect(() => {
@@ -98,7 +79,7 @@ export default function FloatingChatWidget() {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }
     });
-  }, [conv?.messages, streamContent, agentEvents.length]);
+  }, [conv?.messages, streamContent, seg.activeEvents.length]);
 
   const doSend = useCallback(async (msg: string) => {
     if (!msg.trim() || sending) return;
@@ -121,6 +102,7 @@ export default function FloatingChatWidget() {
         id = data.id;
         setConvId(id);
         setActiveConversationId(id);
+        queryClient.invalidateQueries({ queryKey: ["chats"] });
         try { localStorage.setItem(CONV_STORAGE_KEY, id!); } catch {}
       } catch (err) {
         console.error("Failed to create conversation", err);
@@ -135,7 +117,7 @@ export default function FloatingChatWidget() {
     setSending(true);
     setStreamContent("");
     setStreamBlocks([]);
-    setAgentEvents([]);
+    setLiveEvents([]);
     agentEventsRef.current = [];
     finalizedRef.current = false;
     streamContentRef.current = "";
@@ -164,7 +146,7 @@ export default function FloatingChatWidget() {
         setStreamContent(acc ? `${acc}\n- ${text}` : `- ${text}`);
       },
       onToolEvent: (event) => {
-        setAgentEvents((prev) => {
+        setLiveEvents((prev) => {
           const next = [...prev, event];
           agentEventsRef.current = next;
           return next;
@@ -209,7 +191,7 @@ export default function FloatingChatWidget() {
     }, model);
 
     setTimeout(() => setSending(false), 0);
-  }, [convId, sending, streamSend, queryClient, setAgentEvents, setActiveConversationId, model]);
+  }, [convId, sending, streamSend, queryClient, setLiveEvents, setActiveConversationId, model]);
 
   const messages = useMemo(() => (conv?.messages ?? []).filter((m: any) => m.role !== "tool"), [conv?.messages]);
   const hasStreaming = sending;
@@ -275,16 +257,17 @@ export default function FloatingChatWidget() {
             </svg>
             <span>Chat</span>
           </button>
-          <button
-            onClick={() => setView("console")}
-            className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded ${view === "console" ? "bg-accent-bg text-accent" : "text-subtle"}`}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-              <polyline points="4 17 10 11 4 5" />
-              <line x1="12" y1="19" x2="20" y2="19" />
-            </svg>
-            <span>Console{agentEvents.length > 0 && <span className="ml-0.5">({agentEvents.length})</span>}</span>
-          </button>
+          {/* Console tab — the deck IS the clickable control (it's a <button>),
+              so the wrapper is a styled span, not a nested button. */}
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded ${view === "console" ? "bg-accent-bg text-accent" : "text-subtle"}`}>
+            <TruthConsoleDeck
+              variant="tab"
+              segments={seg.segments}
+              liveSegmentId={seg.liveSegmentId}
+              unreadTotal={seg.unreadCount}
+              onClick={() => setView("console")}
+            />
+          </span>
         </div>
         <div className="flex items-center gap-1">
           <button onClick={toggleExpanded} className="btn-ghost text-xs p-1.5 hover:scale-105 transition-transform" aria-label="Expand chat">
@@ -333,7 +316,16 @@ export default function FloatingChatWidget() {
         </div>
       ) : (
         <div className="flex-1 min-h-0">
-          <TruthConsole events={agentEvents} loading={sending && agentEvents.length === 0} />
+          <TruthConsole
+            segments={seg.segments}
+            activeSegmentId={seg.activeSegmentId}
+            liveSegmentId={seg.liveSegmentId}
+            unreadCount={seg.unreadCount}
+            activeEvents={seg.activeEvents}
+            onSelectSegment={seg.selectSegment}
+            onJumpToLive={seg.jumpToLive}
+            loading={sending && seg.activeEvents.length === 0}
+          />
         </div>
       )}
 

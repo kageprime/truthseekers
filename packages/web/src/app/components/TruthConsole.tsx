@@ -1,193 +1,16 @@
 "use client";
 
-import { useRef, useEffect, useState, useMemo } from "react";
+import { useRef, useEffect, useState } from "react";
 import Spinner from "./Spinner";
-import { IconSearch, IconGlobe, IconBook, IconMap, IconImage, IconCheck, IconLink, IconPlus, IconDatabase, IconLightning, IconChat, IconX, IconChevronRight } from "./Icons";
-import type { AgentEvent } from "./ProcessViewer";
+import { IconChat, IconX } from "./Icons";
+import SegmentPills from "./truth-console/SegmentPills";
+import {
+  toolIcon, toolLabel, toolColor, formatTime, argsDisplay, parseRichResult,
+} from "./truth-console/registry";
+import { LIVE_SEGMENT_ID, type AgentEvent, type TraceSegment } from "./truth-console/types";
 
-// ─── Icon / label / color registry ────────────────────────────────
-
-const TOOL_ICONS: Record<string, (size?: number) => React.ReactNode> = {
-  web_search: (s) => <IconSearch size={s ?? 14} />,
-  websearch: (s) => <IconSearch size={s ?? 14} />,
-  tavilySearch: (s) => <IconSearch size={s ?? 14} />,
-  firecrawl_search: (s) => <IconSearch size={s ?? 14} />,
-  webfetch: (s) => <IconGlobe size={s ?? 14} />,
-  get_article: (s) => <IconBook size={s ?? 14} />,
-  article_search: (s) => <IconBook size={s ?? 14} />,
-  get_map: (s) => <IconMap size={s ?? 14} />,
-  generate_image: (s) => <IconImage size={s ?? 14} />,
-  verify_citation: (s) => <IconCheck size={s ?? 14} />,
-  suggest_related: (s) => <IconLink size={s ?? 14} />,
-  create_article: (s) => <IconPlus size={s ?? 14} />,
-  task: (s) => <IconLightning size={s ?? 14} />,
-  mem_store: (s) => <IconDatabase size={s ?? 14} />,
-  mem_recall: (s) => <IconDatabase size={s ?? 14} />,
-  think: (s) => <IconChat size={s ?? 14} />,
-};
-
-const TOOL_COLORS: Record<string, string> = {
-  web_search: "var(--tool-search)",
-  websearch: "var(--tool-search)",
-  tavilySearch: "var(--tool-search)",
-  firecrawl_search: "var(--tool-search)",
-  webfetch: "var(--tool-fetch)",
-  get_article: "var(--tool-article)",
-  article_search: "var(--tool-article)",
-  get_map: "var(--tool-verify)",
-  generate_image: "var(--tool-image)",
-  verify_citation: "var(--tool-verify)",
-  suggest_related: "var(--tool-related)",
-  create_article: "var(--tool-article)",
-  task: "var(--task)",
-  mem_store: "var(--tool-memory)",
-  mem_recall: "var(--tool-memory)",
-  think: "var(--tool-think)",
-};
-
-function toolIcon(name: string, size?: number): React.ReactNode {
-  return TOOL_ICONS[name]?.(size) ?? <IconLightning size={size ?? 14} />;
-}
-function toolLabel(name: string): string {
-  const labels: Record<string, string> = {
-    firecrawl_search: "Web Search", tavilySearch: "Web Search",
-    web_search: "Web Search", websearch: "Web Search",
-    webfetch: "Fetch URL", get_article: "Lookup Article",
-    article_search: "Search Articles", get_map: "Lookup Map",
-    generate_image: "Generate Image", verify_citation: "Verify Citation",
-    suggest_related: "Related Articles", create_article: "Generate Article",
-    task: "Sub-agent", mem_store: "Remember", mem_recall: "Recall",
-    think: "Thinking",
-  };
-  return labels[name] ?? name.replace(/_/g, " ");
-}
-function toolColor(name: string): string {
-  return TOOL_COLORS[name] ?? "var(--accent)";
-}
-function formatTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-}
-
-// ─── Data helpers ──────────────────────────────────────────────────
-
-interface RichResult {
-  kind: "search" | "image" | "verdict" | "article" | "fetch" | "map" | "generic" | "task";
-  text: string;
-  items?: { title: string; snippet: string; url: string }[];
-  imageUrl?: string;
-  imageAlt?: string;
-  verdict?: { label: string; supported: boolean; partial?: boolean };
-  confidence?: number;
-  articleTitle?: string;
-  articleSlug?: string;
-  blockCount?: number;
-  url?: string;
-  contentPreview?: string;
-}
-
-function parseRichResult(name: string, raw: unknown): RichResult {
-  const str = typeof raw === "string" ? raw : JSON.stringify(raw);
-  const fallback: RichResult = { kind: "generic", text: str.slice(0, 300) };
-
-  if (!str) return { kind: "generic", text: "" };
-
-  // Try to parse JSON
-  let parsed: any;
-  try { parsed = JSON.parse(str); } catch { return fallback; }
-  if (!parsed || typeof parsed !== "object") return fallback;
-
-  // Search results
-  const results = parsed.results ?? (Array.isArray(parsed) ? parsed : null);
-  if (Array.isArray(results) && results.length > 0) {
-    return {
-      kind: "search",
-      text: `${results.length} results`,
-      items: results.slice(0, 8).map((r: any) => ({
-        title: r.title || r.name || "Untitled",
-        snippet: r.snippet || r.description || r.content || "",
-        url: r.url || r.link || "",
-      })),
-    };
-  }
-
-  // Image generation
-  if (parsed.url || parsed.imageUrl) {
-    return {
-      kind: "image",
-      text: parsed.alt || "Generated image",
-      imageUrl: parsed.url || parsed.imageUrl,
-      imageAlt: parsed.alt || parsed.prompt || "",
-    };
-  }
-
-  // Citation verdict
-  if (parsed.verdict !== undefined) {
-    const v = String(parsed.verdict).toLowerCase();
-    return {
-      kind: "verdict",
-      text: `Verdict: ${v}`,
-      verdict: {
-        label: v === "supported" ? "Supported" : v === "refuted" ? "Refuted" : v === "partial" ? "Partial" : v,
-        supported: v === "supported",
-        partial: v === "partial" || v === "mixed",
-      },
-      confidence: parsed.confidence ?? parsed.score ?? 0,
-    };
-  }
-
-  // Article lookup
-  if (parsed.title && (parsed.blockCount !== undefined || parsed.blocks)) {
-    return {
-      kind: "article",
-      text: parsed.title,
-      articleTitle: parsed.title,
-      articleSlug: parsed.slug || "",
-      blockCount: parsed.blockCount ?? (Array.isArray(parsed.blocks) ? parsed.blocks.length : 0),
-    };
-  }
-
-  // Content fetch (long text)
-  if (parsed.content || (typeof str === "string" && str.length > 200 && !str.startsWith("{"))) {
-    const content = parsed.content || str;
-    return {
-      kind: "fetch",
-      text: content.slice(0, 150) + (content.length > 150 ? "..." : ""),
-      contentPreview: content,
-      url: parsed.url || "",
-    };
-  }
-
-  // Map lookup
-  if (parsed.lat !== undefined || parsed.coordinates || parsed.region) {
-    return { kind: "map", text: parsed.region || parsed.title || `${parsed.lat}, ${parsed.lng}` };
-  }
-
-  // Task / sub-agent
-  if (parsed.objective || parsed.task) {
-    return { kind: "task", text: parsed.objective || parsed.task };
-  }
-
-  // Block render
-  if (parsed.blockCount) return { kind: "generic", text: `${parsed.blockCount} blocks rendered` };
-  if (parsed.queued) return { kind: "generic", text: `Queued: ${parsed.slug}` };
-
-  return fallback;
-}
-
-function argsDisplay(name: string, args: Record<string, unknown>): string {
-  if (name.includes("search")) return String(args.query ?? "");
-  if (name === "webfetch") return String(args.url ?? "");
-  if (name === "get_article" || name === "get_map") return String(args.slug ?? "");
-  if (name === "generate_image") return String(args.prompt ?? "").slice(0, 100);
-  if (name === "verify_citation") return String(args.claim ?? "").slice(0, 100);
-  if (name === "article_search") return String(args.query ?? "");
-  if (name === "task") return String(args.objective ?? args.task ?? "").slice(0, 100);
-  if (name === "suggest_related") return String(args.slug ?? "");
-  if (name === "mem_store") return `${args.key} = ${String(args.value ?? "").slice(0, 50)}`;
-  if (name === "mem_recall") return String(args.key ?? "");
-  if (name === "render_blocks") return `${(Array.isArray(args.blocks) ? args.blocks.length : 0)} blocks`;
-  return JSON.stringify(args).slice(0, 120);
-}
+// Re-export for any external consumers that imported AgentEvent from here.
+export type { AgentEvent };
 
 // ─── Rich result renderers ─────────────────────────────────────────
 
@@ -197,7 +20,9 @@ function SearchResults({ items }: { items: { title: string; snippet: string; url
       {items.map((item, i) => (
         <div key={i} className="text-[10px] leading-relaxed px-2.5 py-2 rounded-lg cursor-pointer hover:bg-accent-bg/20 transition-colors" style={{ background: "color-mix(in srgb, var(--surface-elevated) 40%, transparent)" }}>
           <div className="flex items-start gap-1.5">
-            <IconChevronRight size={8} style={{ color: "var(--subtle)", marginTop: 3, flexShrink: 0 }} />
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--subtle)", marginTop: 3, flexShrink: 0 }}>
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
             <div className="min-w-0">
               <div className="font-medium text-ink truncate">{item.title}</div>
               <div className="text-muted line-clamp-2 mt-0.5">{item.snippet}</div>
@@ -260,7 +85,9 @@ function ArticleResult({ title, slug, blockCount }: { title: string; slug?: stri
   return (
     <div className="px-3 pb-3">
       <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg" style={{ background: "color-mix(in srgb, var(--gold-bg) 30%, transparent)" }}>
-        <IconBook size={14} style={{ color: "var(--gold)", flexShrink: 0 }} />
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        </svg>
         <div className="flex-1 min-w-0">
           <div className="text-[11px] font-medium text-ink truncate">{title}</div>
           {blockCount !== undefined && <div className="text-[9px] text-muted">{blockCount} blocks</div>}
@@ -398,21 +225,40 @@ function EventEntry({ event, nextEvent }: { event: AgentEvent; nextEvent?: Agent
 
 // ─── Main component ──────────────────────────────────────────────
 
-export default function TruthConsole({ events, onClose, loading }: { events: AgentEvent[]; onClose?: () => void; loading?: boolean }) {
+export interface TruthConsoleProps {
+  segments: TraceSegment[];
+  activeSegmentId: string | null;
+  liveSegmentId: string | null;
+  unreadCount: number;
+  activeEvents: AgentEvent[];
+  onSelectSegment: (id: string) => void;
+  onJumpToLive: () => void;
+  onClose?: () => void;
+  loading?: boolean;
+}
+
+export default function TruthConsole({
+  segments, activeSegmentId, liveSegmentId, unreadCount, activeEvents,
+  onSelectSegment, onJumpToLive, onClose, loading,
+}: TruthConsoleProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
+  const isOnLive = activeSegmentId === LIVE_SEGMENT_ID;
+  const showJumpToLive = liveSegmentId && !isOnLive;
+
+  // Autoscroll pins to bottom ONLY while viewing the live segment.
   useEffect(() => {
-    if (autoScroll && scrollRef.current) {
+    if (isOnLive && autoScroll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [events.length, autoScroll]);
+  }, [activeEvents.length, isOnLive, autoScroll]);
 
   return (
     <div className="flex flex-col min-h-0 h-full">
       <style>{`.tc-scroll::-webkit-scrollbar { width: 4px; } .tc-scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--border) 40%, transparent); border-radius: 2px; } .tc-scroll::-webkit-scrollbar-track { background: transparent; }`}</style>
 
-      {/* Header */}
+      {/* Title row */}
       <div className="shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-border">
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--gold) 15%, transparent)" }}>
@@ -421,17 +267,35 @@ export default function TruthConsole({ events, onClose, loading }: { events: Age
             </svg>
           </div>
           <span className="text-xs font-medium text-ink">Agent</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded-full text-subtle" style={{ background: "color-mix(in srgb, var(--border) 40%, transparent)" }}>{events.length}</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full text-subtle" style={{ background: "color-mix(in srgb, var(--border) 40%, transparent)" }}>{activeEvents.length}</span>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={() => setAutoScroll(!autoScroll)} className="text-[9px] px-1.5 py-0.5 rounded transition-colors" style={{ color: autoScroll ? "var(--accent)" : "var(--subtle)" }}>Auto</button>
+          {showJumpToLive ? (
+            <button
+              onClick={onJumpToLive}
+              className="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded transition-colors"
+              style={{ background: "color-mix(in srgb, var(--accent) 18%, transparent)", color: "var(--accent)" }}
+              title="Jump to the live response"
+            >
+              <span className="relative flex items-center justify-center w-1.5 h-1.5">
+                <span className="absolute inline-flex w-full h-full rounded-full animate-pulse-ring" style={{ background: "var(--accent)" }} />
+                <span className="relative inline-flex w-1.5 h-1.5 rounded-full" style={{ background: "var(--accent)" }} />
+              </span>
+              Jump to Live{unreadCount > 0 && <span className="ml-0.5">({unreadCount})</span>}
+            </button>
+          ) : (
+            <button onClick={() => setAutoScroll(!autoScroll)} className="text-[9px] px-1.5 py-0.5 rounded transition-colors" style={{ color: autoScroll ? "var(--accent)" : "var(--subtle)" }}>Auto</button>
+          )}
           {onClose && <button onClick={onClose} className="btn-ghost p-1" aria-label="Close"><IconX size={12} /></button>}
         </div>
       </div>
 
+      {/* Segment pills */}
+      <SegmentPills segments={segments} activeSegmentId={activeSegmentId} onSelect={onSelectSegment} />
+
       {/* Event feed */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 py-1 space-y-1 tc-scroll">
-        {!loading && events.length === 0 && (
+        {!loading && activeEvents.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center px-6">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--subtle)", opacity: 0.4 }}>
               <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
@@ -440,10 +304,10 @@ export default function TruthConsole({ events, onClose, loading }: { events: Age
             <p className="text-[9px] text-subtle opacity-50 mt-0.5">Tool calls appear while the agent works</p>
           </div>
         )}
-        {events.map((event, i) => (
-          <EventEntry key={`${event.timestamp}-${i}`} event={event} nextEvent={events[i + 1]} />
+        {activeEvents.map((event, i) => (
+          <EventEntry key={`${event.timestamp}-${i}`} event={event} nextEvent={activeEvents[i + 1]} />
         ))}
-        {loading && events.length === 0 && (
+        {loading && activeEvents.length === 0 && (
           <div className="flex items-center justify-center py-12">
             <Spinner size={20} />
           </div>

@@ -3,10 +3,10 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import FloatingChatWidget from "./components/FloatingChatWidget";
-import Sidebar from "./components/Sidebar";
 import ExploreView from "./components/ExploreView";
 import PressView from "./components/PressView";
 import ViewSwitcher from "./components/ViewSwitcher";
+import FloatIslandNav from "./components/FloatIslandNav";
 import { useFloatingChat } from "./FloatingChatContext";
 import { useArticleView } from "./ArticleViewContext";
 import { useAuth } from "./hooks/useAuth";
@@ -52,11 +52,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }, [toggle]);
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col">
+    <div className="h-dvh overflow-hidden flex flex-col">
+      <FloatIslandNav />
       <div className="flex-1 flex min-h-0 min-w-0 relative overflow-hidden">
-        <Sidebar />
         <main
-          className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col"
+          className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col pb-[4.5rem] md:pt-[4.5rem] md:pb-0"
           id="main-content"
           style={{ containerType: "inline-size", containerName: "page" }}
         >
@@ -65,8 +65,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
         {showChat && !isOverlay && (
           <>
-            <div className="fixed inset-0 bg-black/20 z-30 lg:hidden" onClick={close} />
-            <aside className="fixed right-0 top-0 bottom-0 z-40 w-[400px] overflow-hidden border-l border-border bg-surface shadow-xl animate-slide-in-right">
+            <div className="fixed inset-0 bg-black/20 lg:hidden" onClick={close} style={{ zIndex: "var(--z-chat-backdrop)" }} />
+            <aside className="fixed right-0 top-0 bottom-0 w-[400px] overflow-hidden border-l border-border bg-surface shadow-xl animate-slide-in-right" style={{ zIndex: "var(--z-chat-panel)" }}>
               <FloatingChatWidget />
             </aside>
           </>
@@ -102,7 +102,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       {/* Expanded full-screen overlay */}
       {isExpanded && (
-        <div className="fixed inset-0 z-[60] flex flex-col items-center bg-surface glass-lg animate-appear-blur">
+            <div className="fixed inset-0 flex flex-col items-center bg-surface glass-lg animate-appear-blur" style={{ zIndex: "var(--z-overlay)" }}>
           <div className="w-full max-w-4xl h-full flex flex-col chat-message-enter chat-shell my-4">
             <FloatingChatWidget />
           </div>
@@ -117,7 +117,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       {/* Floating ViewSwitcher for stream mode */}
       {article && mode === "stream" && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] shadow-lg rounded-full p-0.5 bg-surface-elevated border border-rule animate-appear-up">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 shadow-lg rounded-full p-0.5 bg-surface-elevated border border-rule animate-appear-up" style={{ zIndex: "var(--z-view-switcher)" }}>
           <ViewSwitcher />
         </div>
       )}
@@ -126,7 +126,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {!isOpen && !isHidden && !isChatRoute && (
         <button
           onClick={toggle}
-          className="fixed bottom-6 right-6 z-50 fab-chat"
+          className="fixed bottom-6 right-6 fab-chat" style={{ zIndex: "var(--z-chat-toggle)" }}
           aria-label="Open chat"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

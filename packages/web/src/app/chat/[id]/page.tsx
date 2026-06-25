@@ -9,6 +9,10 @@ import type { AgentEvent } from "../../components/ProcessViewer";
 import ChatMessage from "../../components/ChatMessage";
 import EmptyChatState from "../../components/EmptyChatState";
 import TruthConsole from "../../components/TruthConsole";
+import TruthConsoleDeck from "../../components/truth-console/TruthConsoleDeck";
+import { useTraceSegments } from "../../components/truth-console/useTraceSegments";
+import { useChatContext } from "../ChatContext";
+import { LIVE_SEGMENT_ID } from "../../components/truth-console/types";
 import ContentCard from "../../components/ContentCard";
 import Spinner from "../../components/Spinner";
 import { IconPlus } from "../../components/Icons";
@@ -21,17 +25,26 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const { send: streamSend, stop: streamStop } = useChatStream();
 
 
+  // Console state lives in ChatContext so the FloatingChatWidget and this page
+  // share one source of truth; `useTraceSegments` derives the per-response
+  // segments from history + the live array in context.
+  const {
+    consoleOpen, setConsoleOpen,
+    sending, setSending,
+    setLiveEvents,
+  } = useChatContext();
+
   const [input, setInput] = useState("");
   const [streamContent, setStreamContent] = useState("");
   const [streamSteps, setStreamSteps] = useState<string[]>([]);
   const [streamBlocks, setStreamBlocks] = useState<any[]>([]);
-  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [convId, setConvId] = useState<string | null>(id !== "new" ? id : null);
   const [loading, setLoading] = useState(false);
-  const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
-  const [consoleOpen, setConsoleOpen] = useState(false);
   const [model, setModel] = useState("llama-4-scout-17b-16e-instruct");
+
+  // Per-response segment derivation — must come after convId is declared.
+  const seg = useTraceSegments(convId ?? id ?? null);
 
   const MODELS = [
     { id: "llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout" },
@@ -76,10 +89,12 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     return () => cancelAnimationFrame(resizeRAF.current);
   }, [input]);
 
-  // Auto-open console on first tool event
+  // Auto-open console when the live run emits its first tool event —
+  // desktop only (the 440px rail doesn't fit on mobile; users open it
+  // manually via the notification deck badge).
   useEffect(() => {
-    if (agentEvents.length > 0) setConsoleOpen(true);
-  }, [agentEvents.length]);
+    if (seg.liveSegmentId && !consoleOpen && window.innerWidth >= 768) setConsoleOpen(true);
+  }, [seg.liveSegmentId, consoleOpen, setConsoleOpen]);
 
   const doSend = useCallback(
     async (msg: string) => {
@@ -100,6 +115,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           cid = data.id;
           setConvId(cid);
           try { localStorage.setItem("truthseekers_floating_conv", cid!); } catch {}
+          queryClient.invalidateQueries({ queryKey: ["chats"] });
           router.replace(`/chat/${cid}`, { scroll: false });
         } catch (err) {
           console.error("Failed to create conversation", err);
@@ -114,7 +130,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       setStreamContent("");
       setStreamSteps([]);
       setStreamBlocks([]);
-      setAgentEvents([]);
+      setLiveEvents([]);
       agentEventsRef.current = [];
       finalizedRef.current = false;
       lastUserMsgRef.current = msg;
@@ -149,7 +165,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             }
             return "";
           });
-          setAgentEvents((prev) => {
+          setLiveEvents((prev) => {
             const next = [...prev, event];
             agentEventsRef.current = next;
             return next;
@@ -163,7 +179,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           setStreamContent("");
           setStreamSteps([]);
           setStreamBlocks(finalBlocks);
-          setConsoleOpen(false);
+          // NOTE: intentionally NOT closing the console here — the segment
+          // cycling model keeps it open so the user can review the just-finished
+          // turn's tool calls. The active segment migrates from "live" to the
+          // committed historical message (handled by useTraceSegments).
           queryClient.setQueryData(["chat", cid], (prev: any) => {
             if (!prev) return prev;
             const real = prev.messages.map((m: any) =>
@@ -206,7 +225,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setStreamContent("");
     setStreamSteps([]);
     setStreamBlocks([]);
-    setAgentEvents([]);
+    setLiveEvents([]);
+    agentEventsRef.current = [];
     setError(null);
     router.push("/chat/new");
   }
@@ -253,20 +273,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                     <path d="m6 9 6 6 6-6" />
                   </svg>
                 </div>
-                <button
+                <TruthConsoleDeck
+                  variant="footer"
+                  segments={seg.segments}
+                  liveSegmentId={seg.liveSegmentId}
+                  unreadTotal={seg.unreadCount}
                   onClick={() => setConsoleOpen((o) => !o)}
-                  className={`inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded transition-colors cursor-pointer ${consoleOpen ? "bg-accent-bg text-accent" : "text-subtle hover:text-ink"}`}
-                  aria-label="Toggle agent console"
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="4 17 10 11 4 5" />
-                    <line x1="12" y1="19" x2="20" y2="19" />
-                  </svg>
-                  <span>Agent</span>
-                  {agentEvents.length > 0 && (
-                    <span className="text-[8px] px-1 py-0.5 rounded-full bg-accent-bg text-accent">{agentEvents.length}</span>
-                  )}
-                </button>
+                />
               </div>
             )}
             {!showEmpty && (
@@ -383,8 +396,18 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       </ContentCard>
 
       {consoleOpen && (
-        <div className="fixed right-0 top-0 bottom-0 z-50 w-[440px] max-w-[92vw] flex flex-col bg-surface border-l border-border/40 animate-slide-in-right">
-          <TruthConsole events={agentEvents} loading={sending && agentEvents.length === 0} onClose={() => setConsoleOpen(false)} />
+        <div className="fixed right-0 top-0 bottom-0 z-[var(--z-overlay)] w-[440px] max-w-[92vw] flex flex-col bg-surface border-l border-border/40 animate-slide-in-right">
+          <TruthConsole
+            segments={seg.segments}
+            activeSegmentId={seg.activeSegmentId}
+            liveSegmentId={seg.liveSegmentId}
+            unreadCount={seg.unreadCount}
+            activeEvents={seg.activeEvents}
+            onSelectSegment={seg.selectSegment}
+            onJumpToLive={seg.jumpToLive}
+            onClose={() => setConsoleOpen(false)}
+            loading={sending && seg.activeEvents.length === 0}
+          />
         </div>
       )}
     </div>

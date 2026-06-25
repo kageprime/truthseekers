@@ -125,7 +125,7 @@ export async function createChat(title?: string): Promise<ConversationSummary | 
 export async function fetchChats(): Promise<ConversationSummary[]> {
   if (MOCK) return mock.MOCK_CONVERSATIONS;
   const res = await fetch(`${BASE}/chat`, { cache: "no-store", headers: { ...authHeaders() } });
-  if (!res.ok) return [];
+  if (!res.ok) { console.warn("fetchChats failed", res.status, res.statusText); return []; }
   return res.json();
 }
 

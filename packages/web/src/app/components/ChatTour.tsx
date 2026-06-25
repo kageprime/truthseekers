@@ -66,8 +66,8 @@ export default function ChatTour({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 sm:p-6"
-      style={{ background: "rgba(0,0,0,0.5)" }}
+      className="fixed inset-0 flex items-end sm:items-center justify-center p-4 sm:p-6"
+      style={{ background: "rgba(0,0,0,0.5)", zIndex: "var(--z-tour)" }}
       onClick={handleDismiss}
     >
       <div

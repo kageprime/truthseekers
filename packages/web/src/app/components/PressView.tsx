@@ -73,7 +73,7 @@ export default function PressView() {
   if (!article || mode !== "press" || !pages.length) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-surface">
+    <div className="fixed inset-0 flex flex-col bg-surface" style={{ zIndex: "var(--z-explore-press)" }}>
       {/* Top bar */}
       <div className="shrink-0 flex items-center justify-between px-4 h-12 bg-surface border-b border-rule">
         <button onClick={close} className="inline-flex items-center gap-1.5 text-xs font-medium dateline hover:underline text-gold">
