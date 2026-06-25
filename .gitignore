@@ -8,3 +8,5 @@ content/*
 .next
 ponytail
 *.tsbuildinfo
+nul
+

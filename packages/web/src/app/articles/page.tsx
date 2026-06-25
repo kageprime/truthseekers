@@ -255,7 +255,7 @@ export default function ArticlesPage() {
       {/* Double-Bezel outer shell */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden max-w-5xl w-full mx-auto" style={{ padding: "4px" }}>
         <div
-          className="flex-1 flex flex-col min-h-0 overflow-hidden"
+          className="flex-1 flex flex-col min-h-0 overflow-y-auto"
           style={{
             borderRadius: "var(--radius-card-lg)",
             background: "color-mix(in srgb, var(--surface-elevated) 100%, transparent)",

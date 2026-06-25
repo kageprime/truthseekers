@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { useChat } from "../../hooks";
+import { useChat, useChats } from "../../hooks";
 import { useChatStream } from "../../hooks/useChatStream";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import ChatMessage from "../../components/ChatMessage";
@@ -56,6 +56,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const agentEventsRef = useRef<AgentEvent[]>([]);
   const finalizedRef = useRef(false);
   const lastUserMsgRef = useRef<string>("");
+  const switcherRef = useRef<HTMLDivElement>(null);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const { data: conversations = [], loading: chatsLoading } = useChats();
 
   const { data: conv, loading: convLoading } = useChat(convId ?? undefined);
   const messages = useMemo(() => (conv?.messages ?? []).filter((m: any) => m.role !== "tool"), [conv?.messages]);
@@ -95,6 +98,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => {
     if (seg.liveSegmentId && !consoleOpen && window.innerWidth >= 768) setConsoleOpen(true);
   }, [seg.liveSegmentId, consoleOpen, setConsoleOpen]);
+
+  // Close session switcher on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) {
+        setSwitcherOpen(false);
+      }
+    }
+    if (switcherOpen) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [switcherOpen]);
 
   const doSend = useCallback(
     async (msg: string) => {
@@ -240,9 +254,50 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         header={
           <div className="flex items-center justify-between px-3 py-2.5 gap-2">
             <div className="flex items-center gap-1 min-w-0">
-              <h1 className="text-xs sm:text-sm font-medium truncate text-ink max-w-[120px] sm:max-w-[240px]">
-                {isNew ? "New Chat" : conv?.title ?? "Chat"}
-              </h1>
+              {/* Session switcher */}
+              <div className="relative" ref={switcherRef}>
+                <button
+                  onClick={() => setSwitcherOpen((o) => !o)}
+                  className="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded hover:bg-accent-bg/30 transition-colors"
+                  style={{ color: "var(--muted)" }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span className="truncate max-w-[80px] sm:max-w-[180px]">{isNew ? "New Chat" : conv?.title ?? "Chat"}</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+                {switcherOpen && (
+                  <div className="absolute left-0 top-full mt-1 w-56 rounded-lg py-1 shadow-xl z-50 bg-surface border border-border max-h-[300px] overflow-y-auto">
+                    {chatsLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Spinner size={16} />
+                      </div>
+                    ) : conversations.length === 0 ? (
+                      <div className="px-3 py-2 text-xs" style={{ color: "var(--subtle)" }}>No conversations</div>
+                    ) : (
+                      conversations.map((c: any) => (
+                        <button
+                          key={c.id}
+                          onClick={() => {
+                            router.push(`/chat/${c.id}`);
+                            setSwitcherOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs transition-colors"
+                          style={{
+                            color: c.id === convId ? "var(--accent)" : "var(--muted)",
+                            background: c.id === convId ? "var(--accent-bg)" : "transparent",
+                          }}
+                        >
+                          <div className="truncate">{c.title}</div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
               <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded font-mono" style={{ background: "color-mix(in srgb, var(--border) 40%, transparent)", color: "var(--subtle)" }}>
                 Ctrl+/
               </span>

@@ -102,7 +102,7 @@ function DockInner({ pathname, horizontal }: {
         border: "1px solid rgba(255,255,255,0.06)",
         boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 24px rgba(0,0,0,0.06)",
       }}>
-        <img src="/logo-icon.png" alt="Truthseekers" height={24} style={{ height: 24, width: "auto", objectFit: "contain", padding: "0.375rem" }} />
+        <a href="/" className="block"><img src="/logo-icon.png" alt="Truthseekers" height={24} style={{ height: 24, width: "auto", objectFit: "contain", padding: "0.375rem" }} /></a>
 
         <div className="w-px h-5 mx-0.5 shrink-0" style={{ background: "var(--glass-border)" }} />
 
