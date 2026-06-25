@@ -22,7 +22,7 @@ interface GeneratingEntry {
   agentEvents?: AgentEvent[];
 }
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
 
 function ArticleRow({ article }: { article: ArticleSummary }) {

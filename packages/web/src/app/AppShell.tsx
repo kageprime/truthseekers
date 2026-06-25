@@ -56,9 +56,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <FloatIslandNav />
       <div className="flex-1 flex min-h-0 min-w-0 relative overflow-hidden">
         <main
-          className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col pb-[4.5rem] md:pt-[4.5rem] md:pb-0"
+          className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col pb-[5.5rem] md:pt-[4.5rem] md:pb-0"
           id="main-content"
-          style={{ containerType: "inline-size", containerName: "page" }}
+          style={{ 
+            containerType: "inline-size", 
+            containerName: "page",
+          }}
         >
           {children}
         </main>
@@ -122,11 +125,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {/* Floating toggle button */}
+      {/* Floating toggle button — hidden on mobile (bottom dock provides nav) */}
       {!isOpen && !isHidden && !isChatRoute && (
         <button
           onClick={toggle}
-          className="fixed bottom-6 right-6 fab-chat" style={{ zIndex: "var(--z-chat-toggle)" }}
+          className={`fixed bottom-6 right-6 fab-chat ${isMobile ? "hidden md:flex" : ""}`} style={{ zIndex: "var(--z-chat-toggle)" }}
           aria-label="Open chat"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
