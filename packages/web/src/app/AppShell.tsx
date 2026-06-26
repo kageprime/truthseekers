@@ -53,10 +53,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="h-dvh overflow-hidden flex flex-col">
-      <FloatIslandNav />
+      {!isOverlayRoute && <FloatIslandNav />}
       <div className="flex-1 flex min-h-0 min-w-0 relative overflow-hidden">
         <main
-          className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col pb-[5.5rem] md:pt-[4.5rem] md:pb-0"
+          className={`flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col pb-[5.5rem] md:pb-0${isOverlayRoute ? "" : " md:pl-[4.5rem]"}`}
           id="main-content"
           style={{ 
             containerType: "inline-size", 
@@ -76,7 +76,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         )}
       </div>
 
-      {!isHidden && !isChatRoute && (
+      {!isHidden && !isChatRoute && !isOverlayRoute && (
         <footer className="border-t border-border shrink-0 h-9 leading-9 bg-surface">
           <div className="max-w-[1400px] mx-auto px-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -118,9 +118,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {/* Press overlay */}
       <PressView />
 
-      {/* Floating ViewSwitcher for stream mode */}
+      {/* Floating ViewSwitcher for stream mode — clear mobile nav */}
       {article && mode === "stream" && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 shadow-lg rounded-full p-0.5 bg-surface-elevated border border-rule animate-appear-up" style={{ zIndex: "var(--z-view-switcher)" }}>
+        <div className="fixed md:bottom-6 bottom-24 left-1/2 -translate-x-1/2 shadow-lg rounded-full p-0.5 bg-surface-elevated border border-rule animate-appear-up" style={{ zIndex: "var(--z-view-switcher)" }}>
           <ViewSwitcher />
         </div>
       )}

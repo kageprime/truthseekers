@@ -1,19 +1,9 @@
-import ContentCard from "../components/ContentCard";
-import { CardGridSkeleton } from "../components/CardSkeleton";
-
-export default function Loading() {
+export default function MapsLoading() {
   return (
-    <ContentCard
-      header={
-        <div className="px-6 py-5 border-b border-border/40">
-          <div className="h-5 skeleton w-56" />
-          <div className="h-3 skeleton w-80 mt-2" />
-        </div>
-      }
-    >
-      <div className="p-4 sm:p-6">
-        <CardGridSkeleton count={6} />
+    <div className="fixed inset-0 bg-[#0b0906] flex items-center justify-center" style={{ fontFamily: "Cinzel, serif" }}>
+      <div style={{ color: "#f0ddb3", fontSize: 14, letterSpacing: 3, textTransform: "uppercase", opacity: 0.6 }}>
+        Loading Atlas…
       </div>
-    </ContentCard>
+    </div>
   );
 }
