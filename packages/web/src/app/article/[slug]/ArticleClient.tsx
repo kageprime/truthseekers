@@ -2,9 +2,11 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { fetchArticle, progressUrl } from "@/lib/api";
 import { BASE } from "@/lib/constants";
-import { useQuota, useGenerateArticle, useRefreshArticle } from "../../hooks";
+import { useQuota, useGenerateArticle, useRefreshArticle, useTrackView } from "../../hooks";
+import PageLayout from "../../components/PageLayout";
 import ContentCard from "../../components/ContentCard";
 import GenerationBar from "../../components/GenerationBar";
 import BlockRenderer, { articleToBlocks } from "../../components/BlockRenderer";
@@ -33,17 +35,15 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   const [quotaBlocked, setQuotaBlocked] = useState(false);
   const sseRef = useRef<EventSource | null>(null);
   const trackedRef = useRef(false);
+  const router = useRouter();
+  const trackView = useTrackView();
 
   useEffect(() => {
     if (slug && !trackedRef.current) {
       trackedRef.current = true;
-      fetch(`${BASE}/track`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, event: "view" }),
-      }).catch(() => {});
+      trackView(slug);
     }
-  }, [slug]);
+  }, [slug, trackView]);
 
   useEffect(() => {
     if (initialArticle || generating || isGenerating) return;
@@ -189,9 +189,9 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             <div className="h-4 skeleton w-1/3 mx-auto rounded mt-4" />
           </div>
           <div className="space-y-3 max-w-[38em] mx-auto">
-            {[...Array(6)].map((_, i) => (
+            {[85, 70, 92, 78, 65, 88].map((w, i) => (
               <div key={i} className="flex gap-3">
-                <div className="h-4 skeleton flex-1 rounded" style={{ width: `${70 + Math.random() * 30}%` }} />
+                <div className="h-4 skeleton flex-1 rounded" style={{ width: `${w}%` }} />
               </div>
             ))}
           </div>
@@ -203,18 +203,16 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   if (!article && !generating) {
     const atLimit = quota && quota.remaining <= 0;
     return (
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden max-w-3xl w-full mx-auto" style={{ padding: "4px" }}>
-          <div
-            className="flex-1 flex flex-col min-h-0 overflow-hidden"
-            style={{
-              borderRadius: "var(--radius-card-lg)",
-              background: "color-mix(in srgb, var(--surface-elevated) 100%, transparent)",
-              border: "1px solid var(--border-light)",
-              boxShadow: "0 1px 3px rgba(26,22,18,0.04)",
-            }}
-          >
-        <div className="px-6 py-12 sm:py-16 flex items-center justify-center flex-1">
+      <PageLayout maxWidthClass="max-w-3xl">
+        <div
+          style={{
+            borderRadius: "var(--radius-card-lg)",
+            background: "color-mix(in srgb, var(--surface-elevated) 100%, transparent)",
+            border: "1px solid var(--border-light)",
+            boxShadow: "0 1px 3px rgba(26,22,18,0.04)",
+          }}
+        >
+        <div className="px-6 py-12 sm:py-16 flex items-center justify-center">
           <div className="max-w-lg mx-auto text-center stagger-children">
             <div
               className="w-16 h-16 mx-auto mb-6 flex items-center justify-center"
@@ -275,9 +273,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             )}
           </div>
         </div>
-          </div>
         </div>
-      </div>
+      </PageLayout>
     );
   }
 
@@ -313,24 +310,21 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   if (!article) return null;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      {/* Double-Bezel Outer Shell */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden max-w-3xl w-full mx-auto" style={{ padding: "4px" }}>
-        <div
-          className="flex-1 flex flex-col min-h-0 overflow-hidden"
-          style={{
-            borderRadius: "var(--radius-card-lg, 8px)",
-            background: "color-mix(in srgb, var(--surface-elevated) 100%, transparent)",
-            border: "1px solid var(--border-light)",
-            boxShadow: "0 1px 3px rgba(26,22,18,0.04)",
-          }}
-        >
+    <PageLayout maxWidthClass="max-w-3xl">
+      <div
+        style={{
+          borderRadius: "var(--radius-card-lg, 8px)",
+          background: "color-mix(in srgb, var(--surface-elevated) 100%, transparent)",
+          border: "1px solid var(--border-light)",
+          boxShadow: "0 1px 3px rgba(26,22,18,0.04)",
+        }}
+      >
       <article className="px-4 sm:px-8 py-10 sm:py-14 max-w-[42rem] mx-auto w-full animate-appear-up">
         {/* Back link — gold badge with hover arrow */}
-        <Link
-          href="/chat/new"
-          className="group inline-flex items-center gap-2 mb-10 no-underline"
-          style={{ color: "var(--muted)" }}
+        <button
+          onClick={() => router.back()}
+          className="group inline-flex items-center gap-2 mb-10 no-underline cursor-pointer"
+          style={{ color: "var(--muted)", background: "none", border: "none", padding: 0 }}
         >
           <span className="flex items-center justify-center w-7 h-7 rounded-full transition-all duration-500" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)", transitionTimingFunction: "cubic-bezier(0.32, 0.72, 0, 1)" }}>
             <svg
@@ -342,7 +336,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             </svg>
           </span>
           <span className="text-[11px] font-medium tracking-wide" style={{ letterSpacing: "0.06em" }}>Back to encyclopedia</span>
-        </Link>
+        </button>
 
         {/* Admin float-island — floating pill at top-right */}
         <div
@@ -474,8 +468,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           )}
         </div>
       </article>
-        </div>
       </div>
-    </div>
+    </PageLayout>
   );
 }

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../components/ThemeProvider";
-import { useQuota } from "../hooks";
+import { useQuota, useUpdateProfile } from "../hooks";
+import PageLayout from "../components/PageLayout";
 import { BASE } from "@/lib/constants";
 import { IconUser, IconLightning, IconPalette, IconLogout, IconCheck, IconX, IconTrash } from "../components/Icons";
 
@@ -28,6 +29,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const updateProfile = useUpdateProfile();
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
@@ -40,27 +42,51 @@ export default function SettingsPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true); setError(""); setSaved(false);
-    if (MOCK) {
-      await new Promise((r) => setTimeout(r, 400));
-      setSaved(true); setSaving(false);
-      setTimeout(() => setSaved(false), 2000);
-      return;
-    }
-    try {
-      const res = await fetch(`${BASE}/auth/me`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name, avatar: avatar || undefined }),
-      });
-      if (!res.ok) { const data = await res.json(); setError(data.error || "Failed to save"); }
-      else { setSaved(true); setTimeout(() => setSaved(false), 2000); }
-    } catch { setError("Network error"); }
+    const ok = await updateProfile(name, avatar || undefined);
+    if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2000); }
+    else { setError("Failed to save"); }
     setSaving(false);
   }
 
   const tier = tierMeta[user?.subscriptionTier ?? "free"] || tierMeta.free;
 
-  if (authLoading || !user) return null;
+  if (authLoading || !user) {
+    return (
+      <PageLayout maxWidthClass="max-w-2xl" className="space-y-5 stagger-children">
+        <div className="mb-8">
+          <div className="h-8 skeleton w-32 rounded mb-2" />
+          <div className="h-4 skeleton w-56 rounded" />
+        </div>
+        {[1, 2, 3].map((i) => (
+          <div key={i}>
+            <div
+              className="p-[3px]"
+              style={{ borderRadius: "var(--radius-card-lg)", background: "var(--border-light)" }}
+            >
+              <div
+                className="p-6 sm:p-8"
+                style={{
+                  borderRadius: "calc(var(--radius-card-lg) - 3px)",
+                  background: "var(--surface-elevated)",
+                  border: "1px solid var(--border-light)",
+                }}
+              >
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-9 h-9 rounded-full skeleton" />
+                  <div className="h-5 skeleton w-24 rounded" />
+                </div>
+                <div className="space-y-3">
+                  <div className="h-4 skeleton w-full rounded" />
+                  <div className="h-4 skeleton w-3/4 rounded" />
+                  <div className="h-4 skeleton w-1/2 rounded" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </PageLayout>
+    );
+  }
 
   const panels = [
     // Profile
@@ -163,8 +189,7 @@ export default function SettingsPage() {
   ];
 
   return (
-    <main className="min-h-dvh" style={{ background: "color-mix(in srgb, var(--surface) 100%, transparent)" }}>
-      <div className="max-w-2xl mx-auto px-6 py-16 md:py-20 space-y-5 stagger-children">
+    <PageLayout maxWidthClass="max-w-2xl" className="space-y-5 stagger-children">
         <div className="mb-8">
           <h1 className="font-display font-bold tracking-tight mb-1" style={{ fontSize: "clamp(1.5rem, 3vw, 2rem)", color: "var(--ink)" }}>Settings</h1>
           <p className="text-sm font-serif italic" style={{ color: "var(--muted)" }}>Manage your account and preferences</p>
@@ -215,8 +240,7 @@ export default function SettingsPage() {
             </div>
           );
         })}
-      </div>
-    </main>
+    </PageLayout>
   );
 }
 

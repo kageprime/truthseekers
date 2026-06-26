@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useChat, useChats } from "../hooks";
+import { useChat, useChats, useCreateChat } from "../hooks";
 import { useChatStream } from "../hooks/useChatStream";
 import { useChatContext } from "../chat/ChatContext";
 import { useFloatingChat } from "../FloatingChatContext";
@@ -14,7 +14,6 @@ import TruthConsole from "./TruthConsole";
 import TruthConsoleDeck from "./truth-console/TruthConsoleDeck";
 import { useTraceSegments } from "./truth-console/useTraceSegments";
 import Spinner from "./Spinner";
-import { BASE } from "@/lib/constants";
 
 const CONV_STORAGE_KEY = "truthseekers_floating_conv";
 
@@ -26,6 +25,7 @@ export default function FloatingChatWidget() {
   const { sending, setSending, setLiveEvents } = useChatContext();
   const { send: streamSend, stop: streamStop } = useChatStream();
   const { data: conversations = [], loading: chatsLoading } = useChats();
+  const { mutate: createChat } = useCreateChat();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
 
@@ -88,21 +88,11 @@ export default function FloatingChatWidget() {
     if (!id) {
       setLoading(true);
       try {
-        const t = typeof window !== "undefined"
-          ? (document.cookie.match(/(?:^|; )truthseekers_token=([^;]*)/)?.[1]
-            ? decodeURIComponent(document.cookie.match(/(?:^|; )truthseekers_token=([^;]*)/)![1])
-            : localStorage.getItem("truthseekers_token"))
-          : null;
-        const res = await fetch(`${BASE}/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...(t ? { authorization: `Bearer ${t}` } : {}) },
-          body: JSON.stringify({ title: "Quick Chat" }),
-        });
-        const data = await res.json();
-        id = data.id;
+        const conv = await createChat("Quick Chat");
+        if (!conv) throw new Error("No conversation returned");
+        id = conv.id;
         setConvId(id);
         setActiveConversationId(id);
-        queryClient.invalidateQueries({ queryKey: ["chats"] });
         try { localStorage.setItem(CONV_STORAGE_KEY, id!); } catch {}
       } catch (err) {
         console.error("Failed to create conversation", err);

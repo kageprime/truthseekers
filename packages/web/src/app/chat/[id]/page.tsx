@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { useChat, useChats } from "../../hooks";
+import { useChat, useChats, useCreateChat } from "../../hooks";
 import { useChatStream } from "../../hooks/useChatStream";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import ChatMessage from "../../components/ChatMessage";
@@ -12,11 +12,9 @@ import TruthConsole from "../../components/TruthConsole";
 import TruthConsoleDeck from "../../components/truth-console/TruthConsoleDeck";
 import { useTraceSegments } from "../../components/truth-console/useTraceSegments";
 import { useChatContext } from "../ChatContext";
-import { LIVE_SEGMENT_ID } from "../../components/truth-console/types";
 import ContentCard from "../../components/ContentCard";
 import Spinner from "../../components/Spinner";
 import { IconPlus } from "../../components/Icons";
-import { BASE } from "@/lib/constants";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -42,6 +40,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [convId, setConvId] = useState<string | null>(id !== "new" ? id : null);
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState("llama-4-scout-17b-16e-instruct");
+  const { mutate: createChat } = useCreateChat();
 
   // Per-response segment derivation — must come after convId is declared.
   const seg = useTraceSegments(convId ?? id ?? null);
@@ -119,17 +118,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       if (!cid) {
         setLoading(true);
         try {
-          const token = typeof window !== "undefined" ? localStorage.getItem("truthseekers_token") : null;
-          const res = await fetch(`${BASE}/chat`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-            body: JSON.stringify({ title: msg.slice(0, 60) }),
-          });
-          const data = await res.json();
-          cid = data.id;
+          const conv = await createChat(msg.slice(0, 60));
+          if (!conv) throw new Error("No conversation returned");
+          cid = conv.id;
           setConvId(cid);
           try { localStorage.setItem("truthseekers_floating_conv", cid!); } catch {}
-          queryClient.invalidateQueries({ queryKey: ["chats"] });
           router.replace(`/chat/${cid}`, { scroll: false });
         } catch (err) {
           console.error("Failed to create conversation", err);
@@ -298,9 +291,23 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                   </div>
                 )}
               </div>
-              <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded font-mono" style={{ background: "color-mix(in srgb, var(--border) 40%, transparent)", color: "var(--subtle)" }}>
-                Ctrl+/
-              </span>
+
+              {/* Model picker */}
+              <div className="relative">
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  aria-label="Select AI model"
+                  className="appearance-none bg-transparent text-[10px] text-subtle border border-border/50 rounded px-1.5 py-1 pr-4 cursor-pointer hover:text-ink hover:border-accent/40 transition-colors outline-none"
+                >
+                  {MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
+                <svg width="6" height="6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-subtle">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </div>
             </div>
             <div className="flex items-center gap-1">
               <button onClick={handleNewChat} className="btn-ghost p-1.5 text-subtle hover:text-accent cursor-pointer" aria-label="New chat" title="New chat">
@@ -312,22 +319,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         footer={
           <>
             {!showEmpty && (
-              <div className="shrink-0 flex items-center justify-between px-4 py-1 border-t border-border/40">
-                <div className="relative">
-                  <select
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    aria-label="Select AI model"
-                    className="appearance-none bg-transparent text-[9px] text-subtle border border-border/60 rounded px-1.5 py-0.5 pr-4 cursor-pointer hover:text-ink hover:border-accent/50 transition-colors outline-none focus:ring-2 focus:ring-gold/30 focus:border-accent"
-                  >
-                    {MODELS.map((m) => (
-                      <option key={m.id} value={m.id}>{m.label}</option>
-                    ))}
-                  </select>
-                  <svg width="6" height="6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-subtle">
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </div>
+              <div className="shrink-0 flex items-center justify-end px-4 py-1 border-t border-border/40">
                 <TruthConsoleDeck
                   variant="footer"
                   segments={seg.segments}
@@ -387,10 +379,39 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         }
       >
         {loading || convLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex flex-col items-center gap-3">
-              <Spinner size={24} />
-              <span className="text-[10px] text-subtle font-mono uppercase tracking-wider">Loading</span>
+          <div className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 space-y-5">
+            {/* User message skeleton — right-aligned */}
+            <div className="flex justify-end">
+              <div className="rounded-2xl rounded-br-md p-3 sm:p-4 max-w-[70%]" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>
+                <div className="h-3 skeleton rounded w-40" />
+              </div>
+            </div>
+            {/* Assistant message skeleton — left-aligned */}
+            <div className="flex justify-start">
+              <div className="rounded-2xl rounded-bl-md p-3 sm:p-4 max-w-[80%]" style={{ background: "color-mix(in srgb, var(--border) 15%, transparent)" }}>
+                <div className="space-y-2.5">
+                  <div className="h-3 skeleton rounded w-56" />
+                  <div className="h-3 skeleton rounded w-44" />
+                  <div className="h-3 skeleton rounded w-36" />
+                  <div className="h-3 skeleton rounded w-52" />
+                </div>
+              </div>
+            </div>
+            {/* Another user message */}
+            <div className="flex justify-end">
+              <div className="rounded-2xl rounded-br-md p-3 sm:p-4 max-w-[60%]" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>
+                <div className="h-3 skeleton rounded w-32" />
+              </div>
+            </div>
+            {/* Assistant typing skeleton */}
+            <div className="flex justify-start">
+              <div className="rounded-2xl rounded-bl-md p-3 sm:p-4 max-w-[40%]" style={{ background: "color-mix(in srgb, var(--border) 15%, transparent)" }}>
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 rounded-full skeleton" />
+                  <div className="w-2 h-2 rounded-full skeleton" />
+                  <div className="w-2 h-2 rounded-full skeleton" />
+                </div>
+              </div>
             </div>
           </div>
         ) : showEmpty ? (

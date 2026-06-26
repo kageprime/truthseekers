@@ -7,6 +7,7 @@ import { fetchArticles, searchArticles, fetchArticle, fetchArticleStatus, progre
 import type { ArticleSummary } from "@encarta/core";
 import { useGenerateArticle, useArticleStatus } from "../hooks";
 import { usePageSearch } from "../HeaderSearchContext";
+import PageLayout from "../components/PageLayout";
 import ContentCard from "../components/ContentCard";
 import GenerationBar from "../components/GenerationBar";
 import ArticleCard from "../components/ArticleCard";
@@ -251,18 +252,15 @@ export default function ArticlesPage() {
   const categoryFilterLabel = selectedCategory || "All categories";
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      {/* Double-Bezel outer shell */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden max-w-5xl w-full mx-auto" style={{ padding: "4px" }}>
-        <div
-          className="flex-1 flex flex-col min-h-0 overflow-y-auto"
-          style={{
-            borderRadius: "var(--radius-card-lg)",
-            background: "color-mix(in srgb, var(--surface-elevated) 100%, transparent)",
-            border: "1px solid var(--border-light)",
-            boxShadow: "0 1px 3px rgba(26,22,18,0.04)",
-          }}
-        >
+    <PageLayout maxWidthClass="max-w-5xl">
+      <div
+        style={{
+          borderRadius: "var(--radius-card-lg)",
+          background: "color-mix(in srgb, var(--surface-elevated) 100%, transparent)",
+          border: "1px solid var(--border-light)",
+          boxShadow: "0 1px 3px rgba(26,22,18,0.04)",
+        }}
+      >
       <div className="px-6 py-8 sm:px-8 sm:py-10">
         {/* Search — float-island style */}
         <div className="mb-8 max-w-2xl mx-auto w-full">
@@ -356,10 +354,10 @@ export default function ArticlesPage() {
             <div className="ml-auto flex gap-1">
               <div className="p-[2px]" style={{ borderRadius: "9999px", background: "color-mix(in srgb, var(--border) 12%, transparent)" }}>
                 <div className="flex items-center gap-0.5 px-0.5 py-0.5" style={{ borderRadius: "calc(9999px - 2px)", background: "var(--surface)" }}>
-                  <button onClick={() => setViewMode("grid")} className={`w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${viewMode === "grid" ? "bg-accent text-white dark:text-[#1a1714]" : "text-muted hover:text-ink"}`} title="Grid view">
+                  <button onClick={() => setViewMode("grid")} className={`w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${viewMode === "grid" ? "bg-accent text-white dark:text-surface" : "text-muted hover:text-ink"}`} title="Grid view">
                     <IconGrid size={12} />
                   </button>
-                  <button onClick={() => setViewMode("list")} className={`w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${viewMode === "list" ? "bg-accent text-white dark:text-[#1a1714]" : "text-muted hover:text-ink"}`} title="List view">
+                  <button onClick={() => setViewMode("list")} className={`w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${viewMode === "list" ? "bg-accent text-white dark:text-surface" : "text-muted hover:text-ink"}`} title="List view">
                     <IconList size={12} />
                   </button>
                 </div>
@@ -449,8 +447,7 @@ export default function ArticlesPage() {
           </div>
         )}
       </div>
-        </div>
       </div>
-    </div>
-  );
-}
+    </PageLayout>
+    );
+  }

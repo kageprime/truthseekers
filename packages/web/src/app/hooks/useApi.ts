@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/lib/api";
+import { BASE } from "@/lib/constants";
 
 // ─── Query helper ───────────────────────────────────────────────────────
 
@@ -148,5 +149,39 @@ export function useAdminSettings() {
 
 export function useFeaturedArticles() {
   return useApiQuery(["admin", "featured"], () => api.fetchFeaturedArticles());
+}
+
+// ── Profile ──────────────────────────────────────────────────
+
+function authHeaders(): Record<string, string> {
+  if (typeof document === "undefined") return {};
+  const fromCookie = document.cookie.match(/(?:^|; )truthseekers_token=([^;]*)/);
+  const token = fromCookie ? decodeURIComponent(fromCookie[1]) : localStorage.getItem("truthseekers_token");
+  return token ? { authorization: `Bearer ${token}` } : {};
+}
+
+export function useUpdateProfile() {
+  return useCallback(async (name: string, avatar?: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${BASE}/auth/me`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ name, avatar: avatar || undefined }),
+      });
+      return res.ok;
+    } catch { return false; }
+  }, []);
+}
+
+// ── Tracking ─────────────────────────────────────────────────
+
+export function useTrackView() {
+  return useCallback((slug: string) => {
+    fetch(`${BASE}/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug, event: "view" }),
+    }).catch(() => {});
+  }, []);
 }
 

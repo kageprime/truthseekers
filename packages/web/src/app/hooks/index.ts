@@ -5,6 +5,7 @@ export {
   useMaps, useMapSearch, useMap,
   useChats, useChat, useCreateChat,
   useAdminSettings, useFeaturedArticles,
+  useTrackView, useUpdateProfile,
 } from "./useApi";
 export type {
   ArticleSummary, ConversationSummary, ConversationDetail, QuotaInfo, MapEntry,

@@ -178,14 +178,12 @@ export default function QueuePage() {
 
   if (!data) {
     return (
-      <PageLayout>
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="inline-block w-8 h-8 border-4 border-[var(--border)] border-t-[#1a1a1a] rounded-full"
-              style={{ animation: "spin 0.8s linear infinite" }} />
-            <p className="mt-4 text-sm" style={{ color: "var(--muted)" }}>Connecting to queue...</p>
-          </div>
-        </main>
+      <PageLayout className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center">
+          <div className="inline-block w-8 h-8 border-4 border-[var(--border)] border-t-[#1a1a1a] rounded-full"
+            style={{ animation: "spin 0.8s linear infinite" }} />
+          <p className="mt-4 text-sm" style={{ color: "var(--muted)" }}>Connecting to queue...</p>
+        </div>
       </PageLayout>
     );
   }
@@ -198,8 +196,7 @@ export default function QueuePage() {
 
   return (
     <PageLayout>
-      <main className="flex-1 overflow-y-auto max-w-5xl mx-auto w-full px-6 py-10">
-        {/* Header */}
+      {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-2">
           <div>
             <h1 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>QUEUE MANAGER</h1>
@@ -318,7 +315,6 @@ export default function QueuePage() {
             <div>Set via env: <span className="font-mono text-xs">ENCARTA_MAX_QUEUE</span></div>
           </div>
         </div>
-      </main>
     </PageLayout>
   );
 }
