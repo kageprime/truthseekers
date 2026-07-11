@@ -33,17 +33,22 @@
 
   /* Surface — aged paper */
   --surface: #f5efe0;
+  --surface-rgb: 245, 239, 224;
   --surface-elevated: #fbf6e9;
+  --surface-elevated-rgb: 251, 246, 233;
   --paper-edge: #e8dcc0;
 
   /* Ink */
   --ink: #1a1612;
+  --ink-rgb: 26, 22, 18;
   --ink-secondary: #3d3528;
   --muted: #6b6048;
   --subtle: #a99c7a;
+  --subtle-rgb: 169, 156, 122;
 
   /* Rules */
   --border: #d4c9ab;
+  --border-rgb: 212, 201, 171;
   --border-light: #e8dcc0;
   --rule: #d4c9ab;
 
@@ -54,13 +59,17 @@
   /* `--accent` is an alias for gold so all existing var(--accent)
      references upgrade automatically without a find-replace sweep. */
   --accent: #a67c2f;
+  --accent-rgb: 166, 124, 47;
   --accent-dark: #8a6520;
   --accent-subtle: #d4b87a;
   --accent-bg: #f0e3c4;
+  --accent-bg-rgb: 240, 227, 196;
 
   /* Secondary accents */
   --oxblood: #6b1d1d;
+  --oxblood-rgb: 107, 29, 29;
   --oxblood-subtle: #f3d8d8;
+  --oxblood-subtle-rgb: 243, 216, 216;
   --forest: #2d4a2b;
   --forest-subtle: #dde8da;
 
@@ -132,6 +141,9 @@
   --z-overlay: 60;
   --z-explore-press: 70;
   --z-view-switcher: 80;
+  --z-toast: 9999;
+  --z-modal: 9998;
+  --z-header: 50;
   --z-tour: 100;
   --z-skip-link: 100;
   --z-lightbox: 9999;
@@ -139,15 +151,20 @@
 
 .dark {
   --surface: #1a1714;
+  --surface-rgb: 26, 23, 20;
   --surface-elevated: #241f1a;
+  --surface-elevated-rgb: 36, 31, 26;
   --paper-edge: #3a3228;
 
   --ink: #ece3d2;
+  --ink-rgb: 236, 227, 210;
   --ink-secondary: #c4b69a;
   --muted: #948868;
   --subtle: #6b604a;
+  --subtle-rgb: 107, 96, 74;
 
   --border: #403628;
+  --border-rgb: 64, 54, 40;
   --border-light: #2e2820;
   --rule: #403628;
 
@@ -155,12 +172,16 @@
   --gold-soft: #b88a35;
   --gold-bg: #3a2f15;
   --accent: #d4a853;
+  --accent-rgb: 212, 168, 83;
   --accent-dark: #b88a35;
   --accent-subtle: #4a3a18;
   --accent-bg: #3a2f15;
+  --accent-bg-rgb: 58, 47, 21;
 
   --oxblood: #c46666;
+  --oxblood-rgb: 196, 102, 102;
   --oxblood-subtle: #4a2020;
+  --oxblood-subtle-rgb: 74, 32, 32;
   --forest: #6ea368;
   --forest-subtle: #243a22;
 
@@ -1076,6 +1097,99 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
 .reveal:nth-child(8) { transition-delay: 560ms; }
 .reveal:nth-child(9) { transition-delay: 640ms; }
 .reveal:nth-child(10) { transition-delay: 720ms; }
+
+/* ── Reduce motion ───────────────────────────────────────────── */
+/* ── Prism syntax highlighting (editorial theme) ──────────────── */
+:root {
+  --prism-text: #1a1612;
+  --prism-bg: rgba(240, 227, 196, 0.25);
+  --prism-keyword: #7c3aed;
+  --prism-string: #2d4a2b;
+  --prism-number: #a67c2f;
+  --prism-function: #6b1d1d;
+  --prism-comment: #a99c7a;
+  --prism-operator: #3d3528;
+  --prism-class: #0891b2;
+  --prism-builtin: #6b1d1d;
+  --prism-punctuation: #6b6048;
+  --prism-property: #a67c2f;
+  --prism-constant: #a67c2f;
+  --prism-deleted: #6b1d1d;
+  --prism-inserted: #2d4a2b;
+}
+.dark {
+  --prism-text: #ece3d2;
+  --prism-bg: rgba(58, 47, 21, 0.3);
+  --prism-keyword: #a78bfa;
+  --prism-string: #6ea368;
+  --prism-number: #d4a853;
+  --prism-function: #c46666;
+  --prism-comment: #6b604a;
+  --prism-operator: #c4b69a;
+  --prism-class: #22b8cf;
+  --prism-builtin: #c46666;
+  --prism-punctuation: #948868;
+  --prism-property: #d4a853;
+  --prism-constant: #d4a853;
+  --prism-deleted: #c46666;
+  --prism-inserted: #6ea368;
+}
+pre[class*="language-"] {
+  color: var(--prism-text);
+  background: var(--prism-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin: 0.75rem 0;
+  direction: ltr;
+  text-align: left;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  tab-size: 2;
+}
+code[class*="language-"] {
+  color: var(--prism-text);
+  font-family: var(--font-mono);
+}
+.token.keyword,
+.token.control,
+.token.directive { color: var(--prism-keyword); }
+.token.string,
+.token.char,
+.token.doc-string { color: var(--prism-string); }
+.token.number,
+.token.boolean { color: var(--prism-number); }
+.token.function,
+.token.macro { color: var(--prism-function); }
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata { color: var(--prism-comment); font-style: italic; }
+.token.operator { color: var(--prism-operator); }
+.token.class-name,
+.token.module { color: var(--prism-class); }
+.token.builtin { color: var(--prism-builtin); }
+.token.punctuation,
+.token.delimiter { color: var(--prism-punctuation); }
+.token.property,
+.token.tag,
+.token.selector { color: var(--prism-property); }
+.token.constant,
+.token.symbol { color: var(--prism-constant); }
+.token.deleted { color: var(--prism-deleted); }
+.token.inserted { color: var(--prism-inserted); }
+.token.atrule,
+.token.attr-value { color: var(--prism-string); }
+.token.regex,
+.token.important { color: var(--prism-number); }
+.token.url { color: var(--prism-class); }
+.token.variable { color: var(--prism-text); }
+.token.bold { font-weight: 700; }
+.token.italic { font-style: italic; }
 
 /* ── Reduce motion ───────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {

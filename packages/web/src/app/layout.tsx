@@ -8,6 +8,7 @@ import { ChatProvider } from "./chat/ChatContext";
 import { HeaderSearchProvider } from "./HeaderSearchContext";
 import { ArticleViewProvider } from "./ArticleViewContext";
 import { AuthProvider } from "./components/AuthProvider";
+import { ToastProvider } from "./components/Toast";
 import AppShell from "./AppShell";
 
 export const viewport: Viewport = {
@@ -43,23 +44,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-white focus:rounded-lg focus:text-sm focus:shadow-lg" style={{ color: "var(--ink)", zIndex: "var(--z-skip-link)" }}>
           Skip to main content
         </a>
-        <ErrorBoundary>
-          <QueryProvider>
-            <ThemeProvider>
-              <AuthProvider>
-              <FloatingChatProvider>
-                  <ChatProvider>
-                    <HeaderSearchProvider>
-                      <ArticleViewProvider>
-                        <AppShell>{children}</AppShell>
-                      </ArticleViewProvider>
-                    </HeaderSearchProvider>
-                  </ChatProvider>
-              </FloatingChatProvider>
-              </AuthProvider>
-            </ThemeProvider>
-          </QueryProvider>
-        </ErrorBoundary>
+                <ErrorBoundary>
+            <QueryProvider>
+              <ThemeProvider>
+                <AuthProvider>
+                <FloatingChatProvider>
+                    <ChatProvider>
+                      <HeaderSearchProvider>
+                        <ArticleViewProvider>
+                          <ToastProvider>
+                          <AppShell>{children}</AppShell>
+                          </ToastProvider>
+                        </ArticleViewProvider>
+                      </HeaderSearchProvider>
+                    </ChatProvider>
+                </FloatingChatProvider>
+                </AuthProvider>
+              </ThemeProvider>
+            </QueryProvider>
+          </ErrorBoundary>
       </body>
     </html>
   );

@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import rehypePrism from "rehype-prism-plus";
 import "katex/dist/katex.min.css";
 
 interface MarkdownRendererProps {
@@ -32,7 +33,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
-      rehypePlugins={[rehypeKatex]}
+      rehypePlugins={[rehypeKatex, rehypePrism]}
       components={{
         p({ children }) {
           return <p style={{ margin: "0.5rem 0", lineHeight: "1.7", color: "var(--ink)" }}>{children}</p>;

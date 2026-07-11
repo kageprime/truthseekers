@@ -53,10 +53,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="h-dvh overflow-hidden flex flex-col">
-      {!isOverlayRoute && <FloatIslandNav />}
+      {!isOverlayRoute && !isHidden && <FloatIslandNav />}
       <div className="flex-1 flex min-h-0 min-w-0 relative overflow-hidden">
         <main
-          className={`flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col pb-[5.5rem] md:pb-0${isOverlayRoute ? "" : " md:pl-[4.5rem]"}`}
+          className={`flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col pb-[5.5rem] md:pb-0 md:pt-14${isOverlayRoute ? "" : ""}`}
           id="main-content"
           style={{ 
             containerType: "inline-size", 
