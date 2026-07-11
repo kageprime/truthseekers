@@ -392,7 +392,7 @@ export default function ArticlesPage() {
             {viewMode === "list" ? (
               <div className="max-w-2xl mx-auto w-full stagger-children">
                 {filteredArticles.map((article) => (
-                  <ArticleRow key={article.slug} article={article} />
+                  <ArticleRow key={`${article.slug}-${article.id || article.title}`} article={article} />
                 ))}
               </div>
             ) : (
@@ -402,7 +402,7 @@ export default function ArticlesPage() {
                   /* Deterministic variation: first card spans 2 cols, every 4th gets featured treatment */
                   const span = i === 0 ? "sm:col-span-2" : (i % 4 === 3 ? "sm:col-span-2 lg:col-span-2" : "");
                   return (
-                    <div key={article.slug} className={span}>
+                    <div key={`${article.slug}-${article.id || article.title}`} className={span}>
                       <ArticleCard article={article} />
                     </div>
                   );
