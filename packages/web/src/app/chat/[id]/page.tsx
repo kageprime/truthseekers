@@ -34,25 +34,14 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [error, setError] = useState<string | null>(null);
   const [convId, setConvId] = useState<string | null>(id !== "new" ? id : null);
   const [loading, setLoading] = useState(false);
-  const [model, setModel] = useState("deepseek-4-flash");
-  const [modelOpen, setModelOpen] = useState(false);
   const { mutate: createChat } = useCreateChat();
-  const { data: apiModels } = useModels();
 
   const seg = useTraceSegments(convId ?? id ?? null);
-
-  const MODELS = (apiModels && apiModels.length > 0)
-    ? apiModels.filter((m: any) => m.toolCall).map((m: any) => ({ id: m.name, label: m.displayName }))
-    : [
-        { id: "deepseek-4-flash", label: "DeepSeek 4 Flash" },
-        { id: "gemma-4-31b-it", label: "Gemma 4 31B" },
-      ];
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const agentEventsRef = useRef<AgentEvent[]>([]);
   const finalizedRef = useRef(false);
   const lastUserMsgRef = useRef<string>("");
-  const modelRef = useRef<HTMLDivElement>(null);
   const { data: conversations = [], loading: chatsLoading } = useChats();
 
   const { data: conv, loading: convLoading } = useChat(convId ?? undefined);
@@ -86,18 +75,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => {
     if (seg.liveSegmentId && !consoleOpen && window.innerWidth >= 768) setConsoleOpen(true);
   }, [seg.liveSegmentId, consoleOpen, setConsoleOpen]);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (modelRef.current && !modelRef.current.contains(e.target as Node)) {
-        setModelOpen(false);
-      }
-    }
-    if (modelOpen) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [modelOpen]);
-
-  const currentModelLabel = MODELS.find((m) => m.id === model)?.label || model;
 
   const doSend = useCallback(
     async (msg: string) => {
@@ -196,11 +173,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         onError: (errMsg) => {
           setError(errMsg || "Something went wrong. Please try again.");
         },
-      }, model);
+      }, "deepseek-4-flash");
 
       setTimeout(() => setSending(false), 0);
     },
-    [convId, sending, streamSend, queryClient, router, model],
+    [convId, sending, streamSend, queryClient, router],
   );
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -262,49 +239,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
       {/* ── Main chat area ── */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* ── Header bar ── */}
-        <div className="shrink-0 flex items-center justify-between px-4 h-11 border-b border-border/30">
-          <div className="text-xs font-medium truncate" style={{ color: "var(--ink)" }}>
-            {isNew ? "New Chat" : conv?.title ?? "Chat"}
-          </div>
-          <div className="flex items-center gap-1.5">
-            {/* Model picker */}
-            <div className="relative" ref={modelRef}>
-              <button
-                onClick={() => setModelOpen((o) => !o)}
-                className="flex items-center gap-1.5 text-[10px] font-medium px-2 py-1 rounded-md transition-colors cursor-pointer"
-                style={{ color: "var(--subtle)", background: "none", border: "1px solid var(--border)" }}
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
-                <span className="hidden sm:inline">{currentModelLabel}</span>
-              </button>
-              {modelOpen && (
-                <div
-                  className="absolute right-0 top-full mt-1 rounded-lg py-1 shadow-xl z-50 min-w-[160px]"
-                  style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-                >
-                  {MODELS.map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => { setModel(m.id); setModelOpen(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-left transition-colors hover:bg-accent-bg/20"
-                      style={{
-                        color: m.id === model ? "var(--accent)" : "var(--ink)",
-                      }}
-                    >
-                      <span className="w-1 h-1 rounded-full shrink-0" style={{ background: m.id === model ? "var(--accent)" : "var(--border)" }} />
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* ── Messages area ── */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
           {loading || convLoading ? (
