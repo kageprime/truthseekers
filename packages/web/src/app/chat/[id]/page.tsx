@@ -389,23 +389,24 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           </div>
         )}
 
-        {/* ── Truth Console overlay ── */}
-        {consoleOpen && (
-          <div className="fixed right-0 top-0 bottom-0 z-[var(--z-overlay)] w-[440px] max-w-[92vw] flex flex-col bg-surface border-l border-border/30 animate-slide-in-right">
-            <TruthConsole
-              segments={seg.segments}
-              activeSegmentId={seg.activeSegmentId}
-              liveSegmentId={seg.liveSegmentId}
-              unreadCount={seg.unreadCount}
-              activeEvents={seg.activeEvents}
-              onSelectSegment={seg.selectSegment}
-              onJumpToLive={seg.jumpToLive}
-              onClose={() => setConsoleOpen(false)}
-              loading={sending && seg.activeEvents.length === 0}
-            />
-          </div>
-        )}
       </div>
+
+      {/* ── Truth Console panel ── */}
+      {consoleOpen && (
+        <div className="hidden md:flex shrink-0 w-[400px] flex-col bg-surface border-l border-border/30">
+          <TruthConsole
+            segments={seg.segments}
+            activeSegmentId={seg.activeSegmentId}
+            liveSegmentId={seg.liveSegmentId}
+            unreadCount={seg.unreadCount}
+            activeEvents={seg.activeEvents}
+            onSelectSegment={seg.selectSegment}
+            onJumpToLive={seg.jumpToLive}
+            onClose={() => setConsoleOpen(false)}
+            loading={sending && seg.activeEvents.length === 0}
+          />
+        </div>
+      )}
     </div>
   );
 }
