@@ -7,8 +7,8 @@ import { BASE } from "@/lib/constants";
 
 // ─── Query helper ───────────────────────────────────────────────────────
 
-function useApiQuery<T>(key: unknown[], fetcher: () => Promise<T>, options?: { enabled?: boolean }) {
-  const result = useQuery<T, Error>({ queryKey: key, queryFn: fetcher, enabled: options?.enabled ?? true });
+function useApiQuery<T>(key: unknown[], fetcher: () => Promise<T>, options?: { enabled?: boolean; staleTime?: number }) {
+  const result = useQuery<T, Error>({ queryKey: key, queryFn: fetcher, enabled: options?.enabled ?? true, staleTime: options?.staleTime });
   return { data: result.data, loading: result.isLoading, isRefetching: result.isFetching && !result.isPending, error: result.error?.message ?? null, refetch: result.refetch };
 }
 
@@ -106,7 +106,7 @@ export function useChats() {
 }
 
 export function useChat(id: string | undefined) {
-  return useApiQuery(["chat", id], () => api.fetchChat(id!), { enabled: !!id });
+  return useApiQuery(["chat", id], () => api.fetchChat(id!), { enabled: !!id, staleTime: 30000 });
 }
 
 export function useCreateChat() {
