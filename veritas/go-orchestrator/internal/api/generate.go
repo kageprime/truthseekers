@@ -196,6 +196,15 @@ func transformGeneratedArticle(slug string, raw interface{}) *storage.Article {
 		abstract = payload.Article.Summary
 	}
 
+	sections := payload.Article.Sections
+	if len(sections) == 0 && abstract != "" {
+		sections = []storage.Section{{
+			ID:      "overview",
+			Title:   "Overview",
+			Content: abstract,
+		}}
+	}
+
 	derived := payload.Article.Derived
 	if derived == 0 {
 		derived = 0.85 // sensible default when the node omits a score
@@ -205,7 +214,7 @@ func transformGeneratedArticle(slug string, raw interface{}) *storage.Article {
 		Slug:              slug,
 		Title:             payload.Article.Title,
 		Abstract:          abstract,
-		Sections:          payload.Article.Sections,
+		Sections:          sections,
 		Timeline:          payload.Article.Timeline,
 		Categories:        payload.Article.Categories,
 		Crossrefs:         payload.Article.Crossrefs,

@@ -103,7 +103,13 @@ export default function ArticlesPage() {
     const items = (data as any).data ?? [];
     const pagination = (data as any).pagination;
     setArticles(items);
-    setTotalPages(pagination ? Math.ceil(pagination.total / PAGE_SIZE) : items.length < PAGE_SIZE ? p + 1 : p + 2);
+    if (pagination?.total != null) {
+      setTotalPages(Math.ceil(pagination.total / PAGE_SIZE));
+    } else if (pagination) {
+      setTotalPages(p + (pagination.hasMore ? 2 : 1));
+    } else {
+      setTotalPages(items.length < PAGE_SIZE ? p + 1 : p + 2);
+    }
     setLoading(false);
   }, []);
 
