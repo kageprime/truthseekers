@@ -13,6 +13,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	llmgateway "github.com/kageprime/veritas/go-orchestrator/internal/llm-gateway"
 )
 
 type ChatMessage struct {
@@ -117,17 +119,20 @@ func defaultRoute() ModelRoute {
 }
 
 func resolveModel(model string) ModelRoute {
-	switch model {
-	case "gemma-4-31B-it":
-		return ModelRoute{ModelID: model, ModelName: model, BaseURL: "https://inference.do-ai.run/v1", APIKey: os.Getenv("MODEL_ACCESS_KEY"), Reasoning: true}
-	case "deepseek-4-flash":
-		return ModelRoute{ModelID: model, ModelName: model, BaseURL: "https://inference.do-ai.run/v1", APIKey: os.Getenv("MODEL_ACCESS_KEY"), Reasoning: false}
-	case "deepseek-v4-pro":
-		return ModelRoute{ModelID: model, ModelName: model, BaseURL: "https://inference.do-ai.run/v1", APIKey: os.Getenv("MODEL_ACCESS_KEY"), Reasoning: true}
-	case "llama-4-scout-17b-16e-instruct":
-		return ModelRoute{ModelID: model, ModelName: model, BaseURL: "https://api.groq.com/openai/v1", APIKey: os.Getenv("GROQ_API_KEY"), Reasoning: false}
-	default:
-		return ModelRoute{ModelID: model, ModelName: model, BaseURL: "https://api.groq.com/openai/v1", APIKey: os.Getenv("GROQ_API_KEY"), Reasoning: false}
+	doKey := os.Getenv("MODEL_ACCESS_KEY")
+	groqKey := os.Getenv("GROQ_API_KEY")
+	catalog := llmgateway.DefaultCatalog()
+
+	// Use the catalog to resolve the provider.
+	provider := llmgateway.ResolveProvider(model, doKey, groqKey)
+	isReasoning := llmgateway.IsReasoningModel(model, catalog)
+
+	return ModelRoute{
+		ModelID:   model,
+		ModelName: model,
+		BaseURL:   provider.BaseURL,
+		APIKey:    provider.APIKey,
+		Reasoning: isReasoning,
 	}
 }
 

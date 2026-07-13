@@ -7,13 +7,19 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	sessionlifecycle "github.com/kageprime/veritas/go-orchestrator/internal/session-lifecycle"
 )
 
 // Active SSE channel registries for real-time progress updates
 var (
 	progressChannels   = make(map[string][]chan string)
 	progressChannelsMu sync.RWMutex
+	progressRing       = make(map[string][]string) // ring buffer per slug, replayed to late joiners
+	progressRingMu     sync.RWMutex
 )
+
+const maxRingEvents = 50
 
 // BroadcastProgress sends an SSE payload to all listening clients for a slug.
 func BroadcastProgress(slug string, event string, data interface{}) {
@@ -31,6 +37,16 @@ func BroadcastProgress(slug string, event string, data interface{}) {
 	}
 
 	payload := fmt.Sprintf("event: %s\ndata: %s\n\n", event, string(rawJSON))
+
+	// Store in ring buffer for late-joining subscribers
+	progressRingMu.Lock()
+	ring := progressRing[slug]
+	ring = append(ring, payload)
+	if len(ring) > maxRingEvents {
+		ring = ring[len(ring)-maxRingEvents:]
+	}
+	progressRing[slug] = ring
+	progressRingMu.Unlock()
 
 	// Send to all subscribers non-blockingly
 	for _, ch := range chans {
@@ -59,6 +75,9 @@ func unregisterProgressChannel(slug string, ch chan string) {
 	}
 	if len(progressChannels[slug]) == 0 {
 		delete(progressChannels, slug)
+		progressRingMu.Lock()
+		delete(progressRing, slug)
+		progressRingMu.Unlock()
 	}
 }
 
@@ -188,12 +207,20 @@ func (s *Server) handleGenerateArticle(w http.ResponseWriter, r *http.Request, s
 		return
 	}
 
-	// Enqueue through the bounded worker pool. Submit dedupes and writes the
-	// initial "queued" job row, so it replaces the old standalone SaveJob + goroutine.
-	if !s.queue.Submit(slug, req.Persona) {
+	userID := userIDFromRequest(r)
+
+	// Enqueue through the session lifecycle engine. CreateSession dedupes by
+	// slug and applies backpressure.
+	_, err := s.sessionEngine.CreateSession(sessionlifecycle.CreateCommand{
+		Slug:    slug,
+		UserID:  userID,
+		Persona: req.Persona,
+		Source:  "ui",
+	})
+	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(fmt.Sprintf(`{"status":"busy","slug":"%s","error":"already queued or queue full"}`, slug)))
+		w.Write([]byte(fmt.Sprintf(`{"status":"busy","slug":"%s","error":"%s"}`, slug, err.Error())))
 		return
 	}
 
@@ -204,10 +231,17 @@ func (s *Server) handleGenerateArticle(w http.ResponseWriter, r *http.Request, s
 
 func (s *Server) handleRefreshArticle(w http.ResponseWriter, r *http.Request, slug string) {
 	reqLog(r, "refresh article slug=%s", slug)
-	if !s.queue.Submit(slug, "veritas") {
+	userID := userIDFromRequest(r)
+	_, err := s.sessionEngine.CreateSession(sessionlifecycle.CreateCommand{
+		Slug:    slug,
+		UserID:  userID,
+		Persona: "veritas",
+		Source:  "ui",
+	})
+	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(fmt.Sprintf(`{"status":"busy","slug":"%s","error":"already queued or queue full"}`, slug)))
+		w.Write([]byte(fmt.Sprintf(`{"status":"busy","slug":"%s","error":"%s"}`, slug, err.Error())))
 		return
 	}
 
@@ -359,6 +393,15 @@ func (s *Server) handleGetArticleProgress(w http.ResponseWriter, r *http.Request
 	ch := make(chan string, 10)
 	registerProgressChannel(slug, ch)
 	defer unregisterProgressChannel(slug, ch)
+
+	// Replay ring buffer for late-joining subscribers
+	progressRingMu.RLock()
+	ring := progressRing[slug]
+	progressRingMu.RUnlock()
+	for _, msg := range ring {
+		w.Write([]byte(msg))
+		flusher.Flush()
+	}
 
 	// Stream initial heartbeat or status
 	fmt.Fprintf(w, "event: heartbeat\ndata: {\"time\": %d}\n\n", time.Now().Unix())

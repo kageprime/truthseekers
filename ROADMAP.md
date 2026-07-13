@@ -8,7 +8,7 @@ An AI-powered interactive encyclopedia. The chat is the universal interface; cat
 
 ## Current State
 
-- **Backend**: Go orchestrator (`veritas/go-orchestrator/`) on port 4097 — native agent loop, DAG engine, MongoDB storage with mock-mode fallback. Python epistemic workers under `veritas/python-workers/`. The article-generation HTTP path is currently stubbed (`processArticleStub`); wiring the real DAG is pending.
+- **Backend**: Go orchestrator (`veritas/go-orchestrator/`) on port 4097 — native agent loop, DAG engine, MongoDB storage with mock-mode fallback. Native Go epistemic pipeline (`internal/agent/pipeline.go`) for all 9 DAG nodes, wired into both the chat agent and article generation HTTP path.
 - **Article pipeline** (target): Research → Outline → Write → Verify → Correct → Media → Store. The Go DAG engine + 9 Python nodes implement the epistemic version (retrieve → extract_claims → … → generate_article). SSE streams process. Articles have maps, timelines, 3D models, images as `Block[]`.
 - **Chat agent**: 14 tools, tool-calling loop (up to 15 iterations, 90k-token budget). Streaming via SSE. Agent events captured and displayed in Truth Console. Persisted per message in MongoDB.
 - **Web app**: Next.js 15 with App Router. Pages: chat (with sidebar history), article viewer, article grid, maps, login, settings, queue, pricing.

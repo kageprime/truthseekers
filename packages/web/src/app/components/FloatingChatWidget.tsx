@@ -35,7 +35,7 @@ export default function FloatingChatWidget() {
   const [loading, setLoading] = useState(false);
   const [convId, setConvId] = useState<string | null>(null);
   const [view, setView] = useState<"chat" | "console">("chat");
-  const [model, setModel] = useState("llama-4-scout-17b-16e-instruct");
+  const [model, setModel] = useState("deepseek-4-flash");
   const agentEventsRef = useRef<AgentEvent[]>([]);
   const finalizedRef = useRef(false);
   const streamContentRef = useRef("");

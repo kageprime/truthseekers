@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { PointerLockControls, Sky, Html } from "@react-three/drei";
+import { Sky, Html } from "@react-three/drei";
 import * as THREE from "three";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -46,6 +46,7 @@ export default function SiteViewer3D({ siteId, siteName, onClose }: Props) {
         <SiteScene siteId={siteId} />
 
         <FPCamera onLockChange={setLocked} />
+        <LockOnClick onLockChange={setLocked} />
       </Canvas>
 
       {/* HUD */}
@@ -163,15 +164,33 @@ export default function SiteViewer3D({ siteId, siteName, onClose }: Props) {
 // ─── First-person camera with WASD ───────────────────────────────────
 
 function FPCamera({ onLockChange }: { onLockChange: (l: boolean) => void }) {
-  const controls = useRef<any>(null);
   const keys = useRef<Set<string>>(new Set());
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
   const speed = 40;
+  const lockedRef = useRef(false);
 
+  // Manual pointer lock with try/catch to prevent DOM removal errors
+  useEffect(() => {
+    const canvas = gl.domElement;
+
+    function onPointerLockChange() {
+      const locked = document.pointerLockElement === canvas;
+      lockedRef.current = locked;
+      onLockChange(locked);
+    }
+
+    document.addEventListener("pointerlockchange", onPointerLockChange);
+    return () => {
+      document.removeEventListener("pointerlockchange", onPointerLockChange);
+      if (document.pointerLockElement) document.exitPointerLock();
+    };
+  }, [gl, onLockChange]);
+
+  // WASD movement
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       keys.current.add(e.code);
-      if (e.code === "KeyW" || e.code === "KeyA" || e.code === "KeyS" || e.code === "KeyD" || e.code === "Space" || e.code === "ShiftLeft") {
+      if (e.code === "KeyW" || e.code === "KeyA" || e.code === "KeyS" || e.code === "KeyD") {
         e.preventDefault();
       }
     };
@@ -198,17 +217,27 @@ function FPCamera({ onLockChange }: { onLockChange: (l: boolean) => void }) {
     if (keys.current.has("KeyA")) camera.position.add(right.clone().multiplyScalar(-speedMs));
     if (keys.current.has("KeyD")) camera.position.add(right.clone().multiplyScalar(speedMs));
 
-    // Clamp y to ground
     if (camera.position.y < 2) camera.position.y = 2;
   });
 
-  return (
-    <PointerLockControls
-      ref={controls}
-      onLock={() => onLockChange(true)}
-      onUnlock={() => onLockChange(false)}
-    />
-  );
+  return null;
+}
+
+function LockOnClick({ onLockChange }: { onLockChange: (l: boolean) => void }) {
+  const { gl } = useThree();
+
+  const handleClick = useCallback(() => {
+    const canvas = gl.domElement;
+    if (document.pointerLockElement !== canvas) {
+      try {
+        canvas.requestPointerLock();
+      } catch (e) {
+        console.warn("pointer lock failed", e);
+      }
+    }
+  }, [gl]);
+
+  return <group onPointerMissed={handleClick} />;
 }
 
 // ─── Site scene ──────────────────────────────────────────────────────

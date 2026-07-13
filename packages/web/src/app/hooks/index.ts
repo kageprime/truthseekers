@@ -6,6 +6,7 @@ export {
   useChats, useChat, useCreateChat,
   useAdminSettings, useFeaturedArticles,
   useTrackView, useUpdateProfile,
+  useModels, useConnectors, useUpdateCredential, useUsageStats,
 } from "./useApi";
 export type {
   ArticleSummary, ConversationSummary, ConversationDetail, QuotaInfo, MapEntry,

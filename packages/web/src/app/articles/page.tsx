@@ -23,7 +23,7 @@ interface GeneratingEntry {
   agentEvents?: AgentEvent[];
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
 
 function ArticleRow({ article }: { article: ArticleSummary }) {
@@ -77,18 +77,15 @@ export default function ArticlesPage() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
   const [generating, setGenerating] = useState<Map<string, GeneratingEntry>>(new Map());
-  const [infiniteLoading, setInfiniteLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { mutate: generateArticle } = useGenerateArticle();
   const sseRef = useRef<Map<string, EventSource>>(new Map());
   const mountedRef = useRef(true);
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -99,23 +96,26 @@ export default function ArticlesPage() {
     onClear: () => { setQuery(""); setDebouncedQuery(""); }, placeholder: "Search articles...",
   } : null, [query, debouncedQuery]));
 
-  const loadArticles = useCallback(async (p: number, reset: boolean) => {
+  const loadArticles = useCallback(async (p: number) => {
+    setLoading(true);
     const data = await fetchArticles(p * PAGE_SIZE, PAGE_SIZE);
     if (!mountedRef.current) return;
     const items = (data as any).data ?? [];
     const pagination = (data as any).pagination;
-    setArticles(prev => reset ? items : [...prev, ...items]);
-    setHasMore(pagination ? pagination.hasMore : items.length >= PAGE_SIZE);
-    setInitialLoading(false);
-    setInfiniteLoading(false);
+    setArticles(items);
+    setTotalPages(pagination ? Math.ceil(pagination.total / PAGE_SIZE) : items.length < PAGE_SIZE ? p + 1 : p + 2);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
   }, []);
 
   useEffect(() => {
     if (!mounted) return;
-    mountedRef.current = true;
-    loadArticles(0, true);
-    return () => { mountedRef.current = false; };
-  }, [mounted, loadArticles]);
+    loadArticles(page);
+  }, [mounted, page, loadArticles]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -142,27 +142,10 @@ export default function ArticlesPage() {
     if (debouncedQuery.trim()) {
       performSearch(debouncedQuery.trim());
     } else {
-      setInitialLoading(true);
-      setArticles([]);
       setPage(0);
-      loadArticles(0, true);
+      loadArticles(0);
     }
   }, [mounted, debouncedQuery, loadArticles]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    if (observerRef.current) observerRef.current.disconnect();
-    observerRef.current = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore && !infiniteLoading && !initialLoading) {
-        setInfiniteLoading(true);
-        const nextPage = page + 1;
-        loadArticles(nextPage, false);
-        setPage(nextPage);
-      }
-    }, { threshold: 0.1 });
-    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
-    return () => { if (observerRef.current) observerRef.current.disconnect(); };
-  }, [mounted, hasMore, infiniteLoading, initialLoading, page, loadArticles]);
 
   async function performSearch(searchQuery: string) {
     setSearching(true);
@@ -170,12 +153,12 @@ export default function ArticlesPage() {
       const results = await searchArticles(searchQuery);
       if (mountedRef.current) {
         setArticles(results);
-        setHasMore(false);
+        setTotalPages(1);
       }
     } catch {
-      if (mountedRef.current) { setArticles([]); setHasMore(false); }
+      if (mountedRef.current) { setArticles([]); setTotalPages(1); }
     } finally {
-      if (mountedRef.current) { setSearching(false); setInitialLoading(false); }
+      if (mountedRef.current) { setSearching(false); setLoading(false); }
     }
   }
 
@@ -328,7 +311,7 @@ export default function ArticlesPage() {
         )}
 
         {/* Filter bar */}
-        {!initialLoading && articles.length > 0 && (
+        {!loading && articles.length > 0 && (
           <div className="flex items-center gap-3 mb-6 max-w-2xl mx-auto w-full">
             <div className="p-[2px]" style={{ borderRadius: "9999px", background: "color-mix(in srgb, var(--border) 12%, transparent)" }}>
               <div
@@ -367,7 +350,7 @@ export default function ArticlesPage() {
         )}
 
         {/* Status */}
-        {!initialLoading && (
+        {!loading && (
           <div className="text-[11px] font-medium mb-5 max-w-2xl mx-auto w-full" style={{ color: "var(--subtle)" }}>
             {searching ? "Searching..." : `${filteredArticles.length} article${filteredArticles.length !== 1 ? "s" : ""}`}
             {selectedCategory ? ` in ${selectedCategory}` : ""}
@@ -375,7 +358,7 @@ export default function ArticlesPage() {
         )}
 
         {/* Results */}
-        {initialLoading ? (
+        {loading ? (
           <div className="max-w-2xl mx-auto w-full space-y-4 animate-pulse py-8">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="flex items-center gap-4 p-4" style={{ borderRadius: "var(--radius-card-lg)", border: "1px solid var(--border-light)" }}>
@@ -391,29 +374,78 @@ export default function ArticlesPage() {
           <>
             {viewMode === "list" ? (
               <div className="max-w-2xl mx-auto w-full stagger-children">
-                {filteredArticles.map((article) => (
-                  <ArticleRow key={`${article.slug}-${article.id || article.title}`} article={article} />
+                {filteredArticles.map((article, i) => (
+                  <ArticleRow key={`${article.slug}-${i}`} article={article} />
                 ))}
               </div>
             ) : (
-              /* Asymmetrical bento grid — varying column spans break monotony */
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 max-w-5xl mx-auto w-full stagger-children">
                 {filteredArticles.map((article, i) => {
-                  /* Deterministic variation: first card spans 2 cols, every 4th gets featured treatment */
                   const span = i === 0 ? "sm:col-span-2" : (i % 4 === 3 ? "sm:col-span-2 lg:col-span-2" : "");
                   return (
-                    <div key={`${article.slug}-${article.id || article.title}`} className={span}>
+                    <div key={`${article.slug}-${i}`} className={span}>
                       <ArticleCard article={article} />
                     </div>
                   );
                 })}
               </div>
             )}
-            <div ref={sentinelRef} className="h-6" />
-            {infiniteLoading && (
-              <div className="flex justify-center py-6">
-                <div className="w-6 h-6 rounded-full border-2" style={{ borderColor: "color-mix(in srgb, var(--border) 40%, transparent)", borderTopColor: "var(--accent)", animation: "spin 0.8s linear infinite" }} />
-              </div>
+
+            {/* Side pagination */}
+            {!debouncedQuery.trim() && totalPages > 1 && (
+              <>
+                <button
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="fixed z-40 hidden md:flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200 disabled:opacity-0 disabled:pointer-events-none cursor-pointer"
+                  style={{
+                    top: "50%",
+                    left: "1rem",
+                    transform: "translateY(-50%)",
+                    background: "var(--surface-glass)",
+                    backdropFilter: "blur(16px)",
+                    border: "1px solid var(--border)",
+                    color: "var(--muted)",
+                    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+                  }}
+                  title="Previous page"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="fixed z-40 hidden md:flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200 disabled:opacity-0 disabled:pointer-events-none cursor-pointer"
+                  style={{
+                    top: "50%",
+                    right: "1rem",
+                    transform: "translateY(-50%)",
+                    background: "var(--surface-glass)",
+                    backdropFilter: "blur(16px)",
+                    border: "1px solid var(--border)",
+                    color: "var(--muted)",
+                    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+                  }}
+                  title="Next page"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+                </button>
+                <div className="fixed z-40 hidden md:flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium select-none"
+                  style={{
+                    bottom: "1.5rem",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    background: "var(--surface-glass)",
+                    backdropFilter: "blur(16px)",
+                    border: "1px solid var(--border)",
+                    color: "var(--subtle)",
+                    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /></svg>
+                  {page + 1} / {totalPages}
+                </div>
+              </>
             )}
           </>
         ) : (

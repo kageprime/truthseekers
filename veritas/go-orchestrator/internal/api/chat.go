@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/kageprime/veritas/go-orchestrator/internal/agent"
+	"github.com/kageprime/veritas/go-orchestrator/internal/manifest"
+	sessionlifecycle "github.com/kageprime/veritas/go-orchestrator/internal/session-lifecycle"
 	"github.com/kageprime/veritas/go-orchestrator/internal/storage"
 )
 
@@ -280,7 +282,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 
 	model := body.Model
 	if model == "" {
-		model = "llama-4-scout-17b-16e-instruct"
+		model = "deepseek-4-flash"
 	}
 
 	// Load existing messages (before this new one)
@@ -315,6 +317,9 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	serverTools := s.createServerToolExecutors(model)
 	epistemicTools := agent.EpistemicToolExecutors(chatSystemPrompt)
 	allTools := agent.MergeExecutorsWithEpistemic(builtins, serverTools, epistemicTools)
+
+	// Filter tools by manifest agent grants (if configured).
+	allTools = filterToolsByManifest(allTools, s.manifest)
 
 	var agentEvents []json.RawMessage
 
@@ -471,9 +476,14 @@ func (s *Server) createServerToolExecutors(model string) map[string]agent.ToolEx
 			if existing, _ := s.db.GetArticle(p.Slug); existing != nil && existing.Metadata.Status == "published" {
 				return agent.ToolResult{Result: fmt.Sprintf(`{"status":"already_exists","slug":"%s"}`, p.Slug)}, nil
 			}
-			// Enqueue through the same bounded worker pool as the HTTP path.
-			if !s.queue.Submit(p.Slug, "veritas") {
-				return agent.ToolResult{Result: fmt.Sprintf(`{"status":"busy","slug":"%s","error":"already queued or queue full"}`, p.Slug)}, nil
+			// Enqueue through the session lifecycle engine.
+			_, err := s.sessionEngine.CreateSession(sessionlifecycle.CreateCommand{
+				Slug:    p.Slug,
+				Persona: "veritas",
+				Source:  "chat",
+			})
+			if err != nil {
+				return agent.ToolResult{Result: fmt.Sprintf(`{"status":"busy","slug":"%s","error":"%s"}`, p.Slug, err.Error())}, nil
 			}
 			return agent.ToolResult{Result: fmt.Sprintf(`{"queued":true,"slug":"%s"}`, p.Slug)}, nil
 		},
@@ -570,7 +580,7 @@ func (s *Server) createServerToolExecutors(model string) map[string]agent.ToolEx
 			}
 			m := model
 			if m == "" {
-				m = "llama-4-scout-17b-16e-instruct"
+				m = "deepseek-4-flash"
 			}
 			resp, err := agent.SendPromptStream(nil, "You are a research sub-agent.", m, 0.5, toolDefs, nil)
 			if err != nil {
@@ -628,23 +638,28 @@ func uuidV4() string {
 }
 
 func userIDFromRequest(r *http.Request) string {
+	uid, _ := userAuthFromRequest(r)
+	return uid
+}
+
+func userAuthFromRequest(r *http.Request) (string, string) {
 	auth := r.Header.Get("Authorization")
 	if auth == "" {
 		log.Printf("🛑 auth: no Authorization header")
-		return ""
+		return "", ""
 	}
 	if !strings.HasPrefix(auth, "Bearer ") {
 		log.Printf("🛑 auth: Authorization header missing Bearer prefix: %q", auth[:min(len(auth), 20)])
-		return ""
+		return "", ""
 	}
 	tokenStr := strings.TrimPrefix(auth, "Bearer ")
-	userID, err := verifyJWT(tokenStr)
+	userID, role, err := verifyJWT(tokenStr)
 	if err != nil {
 		log.Printf("🛑 auth: verifyJWT failed: %v (token preview: %q)", err, tokenStr[:min(len(tokenStr), 40)])
-		return ""
+		return "", ""
 	}
-	log.Printf("✓ auth: user=%s", userID)
-	return userID
+	log.Printf("✓ auth: user=%s role=%s", userID, role)
+	return userID, role
 }
 
 func min(a, b int) int {
@@ -679,4 +694,29 @@ func storageToAgentMsg(m *storage.StoredMessage) agent.Message {
 		})
 	}
 	return msg
+}
+
+// filterToolsByManifest restricts tools to those listed in the manifest's
+// default agent's tool list. When the manifest has no agents or no tool list,
+// all tools are available (current behavior).
+func filterToolsByManifest(tools map[string]agent.ToolExecutor, m *manifest.Manifest) map[string]agent.ToolExecutor {
+	if m == nil {
+		return tools
+	}
+	def := manifest.DefaultAgent(m)
+	if def == nil || len(def.Tools) == 0 {
+		return tools
+	}
+	allowed := make(map[string]bool, len(def.Tools))
+	for _, name := range def.Tools {
+		allowed[name] = true
+	}
+	filtered := make(map[string]agent.ToolExecutor, len(allowed))
+	for name, exec := range tools {
+		if allowed[name] {
+			filtered[name] = exec
+		}
+	}
+	log.Printf("[manifest] filtered %d tools → %d for agent %q", len(tools), len(filtered), def.Name)
+	return filtered
 }

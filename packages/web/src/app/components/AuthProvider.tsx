@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { BASE } from "@/lib/constants";
+import { decodeJwt } from "@/lib/api";
+import type { JwtPayload } from "@/lib/api";
 
 interface User {
   id: string;
@@ -10,12 +12,14 @@ interface User {
   avatar: string;
   subscriptionTier: string;
   onboarded: boolean;
+  role: string;
 }
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
   token: string | null;
+  tokenPayload: JwtPayload | null;
   login: (email: string) => Promise<{ user: User; token: string } | { error: string }>;
   logout: () => void;
   refresh: () => void;
@@ -80,9 +84,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
+  const [tokenPayload, setTokenPayload] = useState<JwtPayload | null>(null);
+  useEffect(() => {
+    setTokenPayload(token ? decodeJwt(token) : null);
+  }, [token]);
+
   const MOCK_USER: User = {
     id: "user-mock-1", email: "researcher@example.com", name: "Dr. Alex Researcher",
-    avatar: "", subscriptionTier: "pro", onboarded: true,
+    avatar: "", subscriptionTier: "pro", onboarded: true, role: "admin",
   };
 
   const fetchMe = useCallback(async (t: string | null): Promise<User | null> => {
@@ -95,7 +104,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (!res.ok) { clearToken(); return null; }
       const data = await res.json();
-      return data.user;
+      const u = data.user;
+      // Decode role from JWT payload — the server includes it in the token.
+      const payload = decodeJwt(t);
+      if (u && payload?.role) u.role = payload.role;
+      return u;
     } catch { return null; }
   }, []);
 
@@ -132,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, token, login, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, token, tokenPayload, login, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

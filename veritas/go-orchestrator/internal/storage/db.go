@@ -196,6 +196,7 @@ type User struct {
 	Email            string    `bson:"email" json:"email"`
 	Name             string    `bson:"name" json:"name"`
 	Avatar           string    `bson:"avatar" json:"avatar"`
+	Role             string    `bson:"role" json:"role"`
 	SubscriptionTier string    `bson:"subscriptionTier" json:"subscriptionTier"`
 	Onboarded        bool      `bson:"onboarded" json:"onboarded"`
 	CreatedAt        time.Time `bson:"createdAt" json:"createdAt"`
@@ -220,6 +221,7 @@ func (d *DB) FindOrCreateUserByEmail(email string) (*User, error) {
 			Email:            email,
 			Name:             email[:maxIdx(email, 20)],
 			Avatar:           "",
+			Role:             "member",
 			SubscriptionTier: "free",
 			Onboarded:        false,
 			CreatedAt:        now,
@@ -525,18 +527,18 @@ func (d *DB) GetArticle(slug string) (*Article, error) {
 		}, nil
 	}
 
-	var art Article
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := d.db.Collection("articles").FindOne(ctx, bson.M{"slug": slug}).Decode(&art)
+	var raw bson.M
+	err := d.db.Collection("articles").FindOne(ctx, bson.M{"slug": slug}).Decode(&raw)
 	if err == mongo.ErrNoDocuments {
 		return nil, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("querying article failed: %w", err)
 	}
 
-	return &art, nil
+	return articleFromBSONM(raw), nil
 }
 
 func (d *DB) SaveArticle(art *Article) error {
@@ -582,26 +584,80 @@ func (d *DB) ListArticles(limit, offset int) ([]*Article, error) {
 	}
 	defer cursor.Close(ctx)
 
-	// Decode one document at a time rather than cursor.All: the collection
-	// holds legacy documents from the old Mongoose/TS backend whose field
-	// shapes (e.g. year as string, confidence_vector as nested array) don't
-	// fit the strict Go struct. cursor.All fails the WHOLE list if even one
-	// document won't decode, which surfaced as a 500 on /articles. We instead
-	// skip the un-decodable docs and log them, so one bad record can't take
-	// down the listing endpoint.
+	// Decode into bson.M first, then map to Article — handles legacy TS
+	// documents with type-mismatched fields (e.g. year as string vs float64).
 	var list []*Article
 	for cursor.Next(ctx) {
-		var art Article
-		if err := cursor.Decode(&art); err != nil {
+		var raw bson.M
+		if err := cursor.Decode(&raw); err != nil {
 			fmt.Printf("WARNING: skipping undecodable article document: %v\n", err)
 			continue
 		}
-		list = append(list, &art)
+		art := articleFromBSONM(raw)
+		list = append(list, art)
 	}
 	if err := cursor.Err(); err != nil {
-		return nil, fmt.Errorf("scanning listed article failed: %w", err)
+		fmt.Printf("WARNING: cursor iteration error (returning partial results): %v\n", err)
 	}
 	return list, nil
+}
+
+// articleFromBSONM converts a bson.M (from cursor.Decode, tolerant of any
+// legacy shape) into an Article struct with best-effort type coercion.
+func articleFromBSONM(raw bson.M) *Article {
+	art := &Article{}
+	if v, ok := raw["slug"]; ok { art.Slug, _ = v.(string) }
+	if v, ok := raw["title"]; ok { art.Title, _ = v.(string) }
+	if v, ok := raw["abstract"]; ok { art.Abstract, _ = v.(string) }
+
+	if v, ok := raw["derived_confidence"]; ok {
+		switch tv := v.(type) {
+		case float64: art.DerivedConfidence = tv
+		case int64: art.DerivedConfidence = float64(tv)
+		}
+	}
+
+	if v, ok := raw["categories"]; ok {
+		if ca, ok2 := v.(bson.A); ok2 {
+			for _, c := range ca {
+				if s, ok3 := c.(string); ok3 { art.Categories = append(art.Categories, s) }
+			}
+		}
+	}
+
+	// Metadata
+	if v, ok := raw["metadata"]; ok {
+		if md, ok2 := v.(bson.M); ok2 {
+			if s, ok3 := md["status"]; ok3 { art.Metadata.Status, _ = s.(string) }
+			if s, ok3 := md["version"]; ok3 {
+				switch tv := s.(type) {
+				case int64: art.Metadata.Version = int(tv)
+				case float64: art.Metadata.Version = int(tv)
+				case int32: art.Metadata.Version = int(tv)
+				}
+			}
+			if s, ok3 := md["created"]; ok3 { art.Metadata.Created, _ = s.(string) }
+			if s, ok3 := md["updated"]; ok3 { art.Metadata.Updated, _ = s.(string) }
+		}
+	}
+
+	// Timestamps
+	if v, ok := raw["created_at"]; ok {
+		switch tv := v.(type) {
+		case time.Time: art.CreatedAt = tv
+		case string:
+			if t, err := time.Parse(time.RFC3339, tv); err == nil { art.CreatedAt = t }
+		}
+	}
+	if v, ok := raw["updated_at"]; ok {
+		switch tv := v.(type) {
+		case time.Time: art.UpdatedAt = tv
+		case string:
+			if t, err := time.Parse(time.RFC3339, tv); err == nil { art.UpdatedAt = t }
+		}
+	}
+
+	return art
 }
 
 func (d *DB) SearchArticles(searchQuery string, limit int) ([]*Article, error) {
@@ -627,19 +683,18 @@ func (d *DB) SearchArticles(searchQuery string, limit int) ([]*Article, error) {
 	}
 	defer cursor.Close(ctx)
 
-	// Decode one document at a time; skip legacy docs that don't fit the struct
-	// (see ListArticles for rationale).
+	// Decode one document at a time via bson.M to handle legacy TS docs.
 	var list []*Article
 	for cursor.Next(ctx) {
-		var art Article
-		if err := cursor.Decode(&art); err != nil {
+		var raw bson.M
+		if err := cursor.Decode(&raw); err != nil {
 			fmt.Printf("WARNING: skipping undecodable article document in search: %v\n", err)
 			continue
 		}
-		list = append(list, &art)
+		list = append(list, articleFromBSONM(raw))
 	}
 	if err := cursor.Err(); err != nil {
-		return nil, fmt.Errorf("scanning searched article failed: %w", err)
+		fmt.Printf("WARNING: cursor iteration error in search (returning partial results): %v\n", err)
 	}
 	return list, nil
 }

@@ -78,26 +78,29 @@ export default function BlockRenderer({ blocks, compact = false }: { blocks: Blo
     if (normalizeBlockData(blocks[i]).type === "text") { firstTextIdx = i; break; }
   }
 
-  // Auto-number figures across the whole article.
-  let figureNum = 0;
-  const nextFigureNum = () => ++figureNum;
+  // Auto-number figures based on block position — deterministic for hydration.
+  const figureTypes = new Set(["image", "video", "diagram", "gallery"]);
 
   return (
     <div className="block-renderer">
-      {blocks.map((block, i) => (
-        <BlockCard
-          key={block.id ?? `block-${i}`}
-          block={normalizeBlockData(block)}
-          compact={compact}
-          dropCap={i === firstTextIdx}
-          nextFigureNum={nextFigureNum}
-        />
-      ))}
+      {blocks.map((block, i) => {
+        const figNum = blocks.slice(0, i).filter(b => figureTypes.has(normalizeBlockData(b).type)).length + 1;
+        const hasFigType = figureTypes.has(normalizeBlockData(block).type);
+        return (
+          <BlockCard
+            key={block.id ?? `block-${i}`}
+            block={normalizeBlockData(block)}
+            compact={compact}
+            dropCap={i === firstTextIdx}
+            figureNum={hasFigType ? figNum : undefined}
+          />
+        );
+      })}
     </div>
   );
 }
 
-function BlockCard({ block, compact, dropCap, nextFigureNum }: { block: Block; compact: boolean; dropCap?: boolean; nextFigureNum?: () => number }) {
+function BlockCard({ block, compact, dropCap, figureNum }: { block: Block; compact: boolean; dropCap?: boolean; figureNum?: number }) {
   switch (block.type) {
     case "heading":
       return <HeadingBlock data={block.data as unknown as HeadingBlockData} />;
@@ -112,13 +115,13 @@ function BlockCard({ block, compact, dropCap, nextFigureNum }: { block: Block; c
     case "map_3d":
       return <Map3DBlock data={block.data as unknown as Map3DBlockData} />;
     case "diagram":
-      return <DiagramBlock data={block.data as unknown as DiagramBlockData} nextFigureNum={nextFigureNum} />;
+      return <DiagramBlock data={block.data as unknown as DiagramBlockData} figureNum={figureNum} />;
     case "image":
-      return <ImageBlock data={block.data as unknown as ImageBlockData} nextFigureNum={nextFigureNum} />;
+      return <ImageBlock data={block.data as unknown as ImageBlockData} figureNum={figureNum} />;
     case "video":
-      return <VideoBlock data={block.data as unknown as VideoBlockData} nextFigureNum={nextFigureNum} />;
+      return <VideoBlock data={block.data as unknown as VideoBlockData} figureNum={figureNum} />;
     case "gallery":
-      return <GalleryBlock data={block.data as unknown as GalleryBlockData} nextFigureNum={nextFigureNum} />;
+      return <GalleryBlock data={block.data as unknown as GalleryBlockData} figureNum={figureNum} />;
     case "pullquote":
       return <PullQuoteBlock data={block.data as any} />;
     case "citation":
@@ -242,9 +245,9 @@ function Map3DBlock({ data }: { data: Map3DBlockData }) {
   );
 }
 
-function DiagramBlock({ data, nextFigureNum }: { data: DiagramBlockData; nextFigureNum?: () => number }) {
+function DiagramBlock({ data, figureNum }: { data: DiagramBlockData; figureNum?: number }) {
   if (!data) return null;
-  const num = nextFigureNum?.();
+  const num = figureNum;
   return (
     <figure className="figure-plate mb-4">
       <div className="p-2">
@@ -260,9 +263,9 @@ function DiagramBlock({ data, nextFigureNum }: { data: DiagramBlockData; nextFig
   );
 }
 
-function ImageBlock({ data, nextFigureNum }: { data: ImageBlockData; nextFigureNum?: () => number }) {
+function ImageBlock({ data, figureNum }: { data: ImageBlockData; figureNum?: number }) {
   if (!data) return null;
-  const num = nextFigureNum?.();
+  const num = figureNum;
   return (
     <figure className="figure-plate mb-4">
       <MediaImage src={data.src} caption={undefined} prompt={data.prompt} />
@@ -276,11 +279,11 @@ function ImageBlock({ data, nextFigureNum }: { data: ImageBlockData; nextFigureN
   );
 }
 
-function VideoBlock({ data, nextFigureNum }: { data: VideoBlockData; nextFigureNum?: () => number }) {
+function VideoBlock({ data, figureNum }: { data: VideoBlockData; figureNum?: number }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   if (!data?.src) return <div className="text-xs italic" style={{ color: "var(--subtle)" }}>Video not available</div>;
   const videoSrc = data.src.startsWith("/") ? `${BASE}${data.src}` : data.src;
-  const num = nextFigureNum?.();
+  const num = figureNum;
   return (
     <>
       <figure className="figure-plate mb-4 cursor-pointer" onClick={() => setLightboxOpen(true)}>
@@ -308,9 +311,9 @@ function VideoBlock({ data, nextFigureNum }: { data: VideoBlockData; nextFigureN
   );
 }
 
-function GalleryBlock({ data, nextFigureNum }: { data: GalleryBlockData; nextFigureNum?: () => number }) {
+function GalleryBlock({ data, figureNum }: { data: GalleryBlockData; figureNum?: number }) {
   if (!data?.images || data.images.length === 0) return null;
-  const num = nextFigureNum?.();
+  const num = figureNum;
   return (
     <figure className="figure-plate mb-4">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-2">

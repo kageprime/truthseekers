@@ -5,33 +5,28 @@ import (
 	"log"
 	"time"
 
+	"github.com/kageprime/veritas/go-orchestrator/internal/agent"
 	"github.com/kageprime/veritas/go-orchestrator/internal/dag"
-	"github.com/kageprime/veritas/go-orchestrator/internal/nodes"
 )
 
 func main() {
-	log.Println("Starting End-to-End DAG test with Python/Groq nodes...")
+	log.Println("Starting End-to-End DAG test with Go LLM nodes...")
 
-	pythonExec := func(scriptName string) func(context.Context, map[string]interface{}) (interface{}, error) {
-		return func(ctx context.Context, input map[string]interface{}) (interface{}, error) {
-			log.Printf("Executing Python node: %s", scriptName)
-			return nodes.RunPythonNode(ctx, scriptName, input)
-		}
-	}
+	systemPrompt := `You are VERITAS, a knowledge construction engine. Deliver accurate, evidence-based responses. Never hallucinate.`
+	execs := agent.DAGNodeExecutors(systemPrompt)
 
 	w := &dag.Workflow{
 		Nodes: []dag.Node{
-			{ID: "retrieve", Type: "retrieve", DependsOn: []string{}, Execute: pythonExec("retrieve.py")},
-			{ID: "extract_claims", Type: "extract_claims", DependsOn: []string{"retrieve"}, Execute: pythonExec("extract_claims.py")},
-			{ID: "map_evidence", Type: "map_evidence", DependsOn: []string{"retrieve", "extract_claims"}, Execute: pythonExec("map_evidence.py")},
-			{ID: "critique", Type: "critique", DependsOn: []string{"retrieve", "extract_claims", "map_evidence"}, Execute: pythonExec("critique.py")},
-			{ID: "detect_missing", Type: "detect_missing", DependsOn: []string{"extract_claims", "map_evidence"}, Execute: pythonExec("detect_missing.py")},
-			{ID: "map_language", Type: "map_language", DependsOn: []string{"extract_claims"}, Execute: pythonExec("map_language.py")},
-			{ID: "scrutinize", Type: "scrutinize", DependsOn: []string{"extract_claims", "critique", "detect_missing", "map_language"}, Execute: pythonExec("scrutinize.py")},
-			{ID: "resolve", Type: "resolve", DependsOn: []string{"extract_claims", "map_evidence", "critique", "scrutinize"}, Execute: pythonExec("resolve.py")},
-			{ID: "generate_article", Type: "generate_article", DependsOn: []string{"resolve"}, Execute: pythonExec("generate_article.py")},
-				{ID: "store", Type: "store", DependsOn: []string{"generate_article"}, Execute: pythonExec("store.py")},
-			},
+			{ID: "retrieve", Type: "retrieve", DependsOn: []string{}, Execute: execs["retrieve"]},
+			{ID: "extract_claims", Type: "extract_claims", DependsOn: []string{"retrieve"}, Execute: execs["extract_claims"]},
+			{ID: "map_evidence", Type: "map_evidence", DependsOn: []string{"retrieve", "extract_claims"}, Execute: execs["map_evidence"]},
+			{ID: "critique", Type: "critique", DependsOn: []string{"retrieve", "extract_claims", "map_evidence"}, Execute: execs["critique"]},
+			{ID: "detect_missing", Type: "detect_missing", DependsOn: []string{"extract_claims", "map_evidence"}, Execute: execs["detect_missing"]},
+			{ID: "map_language", Type: "map_language", DependsOn: []string{"extract_claims"}, Execute: execs["map_language"]},
+			{ID: "scrutinize", Type: "scrutinize", DependsOn: []string{"extract_claims", "critique", "detect_missing", "map_language"}, Execute: execs["scrutinize"]},
+			{ID: "resolve", Type: "resolve", DependsOn: []string{"extract_claims", "map_evidence", "critique", "scrutinize"}, Execute: execs["resolve"]},
+			{ID: "generate_article", Type: "generate_article", DependsOn: []string{"resolve"}, Execute: execs["generate_article"]},
+		},
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -51,6 +46,6 @@ func main() {
 			log.Printf("Final Output generated successfully!")
 		}
 	}
-	
+
 	log.Println("End-to-End Test completed successfully.")
 }

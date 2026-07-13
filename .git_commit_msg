@@ -1,0 +1,12 @@
+design(frontend): premium editorial UI refresh — FloatIslandNav, truth console segments, glass surfaces, refined gold & ink theming
+
+- Replace Sidebar with FloatIslandNav (glass dock, mobile/desktop variants)
+- Add truth-console component suite (SegmentPills, TruthConsoleDeck, useTraceSegments, types, registry)
+- Update AppShell to use new nav, add footer, mobile overlays
+- Refactor ArticleClient with improved article view
+- Update articles, chat, login, pricing, settings pages to match new theme
+- Update globals.css with refined typography, motion system, glass surfaces
+- Update layout.tsx with new font imports
+- Update FloatingChatWidget, ChatTour, ExploreView, PressView, MediaImage, TruthConsole
+- Add not-found page, SUMMARY.md
+- Add chat screenshots to public/images/

@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { useChat, useChats, useCreateChat } from "../../hooks";
+import { useChat, useChats, useCreateChat, useModels } from "../../hooks";
 import { useChatStream } from "../../hooks/useChatStream";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import ChatMessage from "../../components/ChatMessage";
@@ -39,17 +39,19 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [error, setError] = useState<string | null>(null);
   const [convId, setConvId] = useState<string | null>(id !== "new" ? id : null);
   const [loading, setLoading] = useState(false);
-  const [model, setModel] = useState("llama-4-scout-17b-16e-instruct");
+  const [model, setModel] = useState("deepseek-4-flash");
   const { mutate: createChat } = useCreateChat();
+  const { data: apiModels } = useModels();
 
   // Per-response segment derivation — must come after convId is declared.
   const seg = useTraceSegments(convId ?? id ?? null);
 
-  const MODELS = [
-    { id: "llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout" },
-    { id: "gemma-4-31b-it", label: "Gemma 4 31B" },
-    { id: "deepseek-4-flash", label: "DeepSeek 4 Flash" },
-  ];
+  const MODELS = (apiModels && apiModels.length > 0)
+    ? apiModels.filter((m: any) => m.toolCall).map((m: any) => ({ id: m.name, label: m.displayName }))
+    : [
+        { id: "deepseek-4-flash", label: "DeepSeek 4 Flash" },
+        { id: "gemma-4-31b-it", label: "Gemma 4 31B" },
+      ];
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const agentEventsRef = useRef<AgentEvent[]>([]);

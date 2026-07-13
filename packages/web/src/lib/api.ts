@@ -191,3 +191,88 @@ export async function fetchFeaturedArticles(): Promise<ArticleSummary[]> {
   }
   return articles;
 }
+
+// ── Models (LLM Gateway) ──
+
+export interface ModelSpec {
+  name: string;
+  provider: string;
+  displayName: string;
+  reasoning: boolean;
+  toolCall: boolean;
+  attachment: boolean;
+  contextLimit?: number;
+  outputLimit?: number;
+  inputCostPerM?: number;
+  outputCostPerM?: number;
+}
+
+export async function fetchModels(): Promise<ModelSpec[]> {
+  if (MOCK) return mock.MOCK_MODELS;
+  const res = await fetch(`${BASE}/v1/llm/models`, { cache: "no-store" });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.value ?? json.models ?? json;
+}
+
+// ── Connectors (Executor Gateway) ──
+
+export interface ConnectorSummary {
+  slug: string;
+  name: string;
+  provider: string;
+  actions: { name: string; risk: string }[];
+}
+
+export async function fetchConnectors(): Promise<ConnectorSummary[]> {
+  if (MOCK) return mock.MOCK_CONNECTORS;
+  const res = await fetch(`${BASE}/v1/executor/connectors`, { cache: "no-store" });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.value ?? json.connectors ?? json;
+}
+
+// ── Credentials ──
+
+export async function updateCredential(service: string, token: string): Promise<boolean> {
+  if (MOCK) return true;
+  const res = await fetch(`${BASE}/v1/credentials`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ service, token }),
+  });
+  return res.ok;
+}
+
+// ── LLM Usage Stats ──
+
+export interface UsageStats {
+  userId: string;
+  totals: { totalTokens: number; totalCost: number; callCount: number };
+  recent: { model: string; tokens: number; cost: number; timestamp: string }[];
+}
+
+export async function fetchUsageStats(): Promise<UsageStats | null> {
+  if (MOCK) return mock.MOCK_USAGE;
+  const res = await fetch(`${BASE}/v1/llm/usage`, { cache: "no-store", headers: { ...authHeaders() } });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+// ── JWT payload decode (no dependency, works client-side) ──
+
+export interface JwtPayload {
+  sub?: string;
+  role?: string;
+  iat?: number;
+  exp?: number;
+  [key: string]: unknown;
+}
+
+export function decodeJwt(token: string): JwtPayload | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    return JSON.parse(atob(parts[1]));
+  } catch { return null; }
+}

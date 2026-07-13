@@ -350,3 +350,48 @@ export function IconList(props: IconProps) {
     </IconBase>
   );
 }
+
+export function IconKey(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="9" cy="12" r="3" />
+      <line x1="11.5" y1="13.5" x2="20" y2="5" />
+      <line x1="17" y1="9" x2="19" y2="7" />
+      <line x1="14" y1="12" x2="20" y2="6" />
+    </IconBase>
+  );
+}
+
+export function IconTerminal(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="19" x2="20" y2="19" />
+    </IconBase>
+  );
+}
+
+export function IconCpu(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <rect x="9" y="9" width="6" height="6" />
+      <line x1="9" y1="2" x2="9" y2="4" />
+      <line x1="15" y1="2" x2="15" y2="4" />
+      <line x1="9" y1="20" x2="9" y2="22" />
+      <line x1="15" y1="20" x2="15" y2="22" />
+      <line x1="2" y1="9" x2="4" y2="9" />
+      <line x1="2" y1="15" x2="4" y2="15" />
+      <line x1="20" y1="9" x2="22" y2="9" />
+      <line x1="20" y1="15" x2="22" y2="15" />
+    </IconBase>
+  );
+}
+
+export function IconActivity(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </IconBase>
+  );
+}

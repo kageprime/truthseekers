@@ -2,21 +2,34 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"time"
 )
 
+// GatewaySearch routes web_search through the executor gateway for credential
+// isolation and audit. When set, web_search calls the gateway instead of
+// reading API keys from env vars directly.
+var GatewaySearch func(connector, action string, args map[string]interface{}) (string, error)
+
+// GatewayGenerateImage routes image generation through the executor gateway.
+// When set, generate_image calls the gateway instead of reading
+// MODEL_ACCESS_KEY from env.
+var GatewayGenerateImage func(connector, action string, args map[string]interface{}) (string, error)
+
 func ChatToolDefinitions() []ToolDefinition {
 	return append(
 		EpistemicToolDefinitions(),
 		[]ToolDefinition{
-			{Type: "function", Function: ToolFunctionDef{Name: "web_search", Description: "Search the web for current information on a topic", Parameters: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search query"},"maxResults":{"type":"number","description":"Max results (default 5)"}},"required":["query"]}`)}},
+			{Type: "function", Function: ToolFunctionDef{Name: "web_search", Description: "Search web sources for information on a topic. Supports general web, Reddit, and Internet Archive. Use 'sources' to narrow: web, reddit, archive, or news. Reddit search returns real Reddit results via their public API. Archive search queries the Internet Archive. Defaults to general web (Tavily/Firecrawl).", Parameters: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search query"},"maxResults":{"type":"number","description":"Max results (default 5)"},"sources":{"type":"array","items":{"type":"string","enum":["web","reddit","archive","news"]},"description":"Source types to search (default: [\"web\"])"}},"required":["query"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "render_blocks", Description: "Render structured content blocks in the conversation. Use this for ALL rich content: timelines, maps (2D/3D), image galleries, citation lists, cross-references, diagrams (mermaid), headings, text, and dividers.", Parameters: json.RawMessage(`{"type":"object","properties":{"blocks":{"type":"array","description":"Array of block objects","items":{"type":"object","properties":{"type":{"type":"string","enum":["heading","text","section","timeline","image","video","gallery","citation","crossref","diagram","divider","map_2d","map_3d","table","list","pullquote"]},"data":{"type":"object"}},"required":["type","data"]}}},"required":["blocks"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "get_article", Description: "Look up an existing encyclopedia article by slug", Parameters: json.RawMessage(`{"type":"object","properties":{"slug":{"type":"string","description":"Article slug"}},"required":["slug"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "create_article", Description: "Generate a full encyclopedia article for a topic. This runs the entire pipeline (research, write, verify, etc.) and stores the result.", Parameters: json.RawMessage(`{"type":"object","properties":{"slug":{"type":"string","description":"Topic slug (lowercase, hyphenated)"}},"required":["slug"]}`)}},
@@ -29,6 +42,7 @@ func ChatToolDefinitions() []ToolDefinition {
 			{Type: "function", Function: ToolFunctionDef{Name: "suggest_related", Description: "Find articles and topics related to a given slug.", Parameters: json.RawMessage(`{"type":"object","properties":{"slug":{"type":"string","description":"Article slug to find related topics for"}},"required":["slug"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "task", Description: "Delegate a sub-task to a sub-agent for parallel research.", Parameters: json.RawMessage(`{"type":"object","properties":{"objective":{"type":"string","description":"What the sub-agent should accomplish"},"tools":{"type":"array","items":{"type":"string"},"description":"Tools the sub-agent may use"}},"required":["objective"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "mem_store", Description: "Store a piece of information about the user for future conversations.", Parameters: json.RawMessage(`{"type":"object","properties":{"key":{"type":"string","description":"Memory key"},"value":{"type":"string","description":"The value to remember"}},"required":["key","value"]}`)}},
+			{Type: "function", Function: ToolFunctionDef{Name: "run_command", Description: "Execute a shell command and return its output. Use for data processing, file operations, or CLI tools. Timeout after 30s.", Parameters: json.RawMessage(`{"type":"object","properties":{"command":{"type":"string","description":"Command to run"},"args":{"type":"array","items":{"type":"string"},"description":"Command arguments"}},"required":["command"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "mem_recall", Description: "Retrieve stored information about the user from previous conversations.", Parameters: json.RawMessage(`{"type":"object","properties":{"key":{"type":"string","description":"Memory key to look up"}},"required":["key"]}`)}},
 		}...,
 	)
@@ -41,6 +55,7 @@ type ToolExecutors struct {
 	VerifyCitation  ToolExecutor
 	GenerateImage   ToolExecutor
 	GenerateVideo   ToolExecutor
+	RunCommand      ToolExecutor
 }
 
 func BuiltinToolExecutors() ToolExecutors {
@@ -51,6 +66,7 @@ func BuiltinToolExecutors() ToolExecutors {
 		VerifyCitation:  verifyCitationExecutor,
 		GenerateImage:   generateImageExecutor,
 		GenerateVideo:   generateVideoExecutor,
+		RunCommand:      runCommandExecutor,
 	}
 }
 
@@ -68,6 +84,7 @@ func MergeExecutorsWithEpistemic(builtins ToolExecutors, server map[string]ToolE
 	m["verify_citation"] = builtins.VerifyCitation
 	m["generate_image"] = builtins.GenerateImage
 	m["generate_video"] = builtins.GenerateVideo
+	m["run_command"] = builtins.RunCommand
 	for k, v := range server {
 		m[k] = v
 	}
@@ -79,8 +96,9 @@ func MergeExecutorsWithEpistemic(builtins ToolExecutors, server map[string]ToolE
 
 func webSearchExecutor(args json.RawMessage) (ToolResult, error) {
 	var p struct {
-		Query      string `json:"query"`
-		MaxResults int    `json:"maxResults"`
+		Query      string   `json:"query"`
+		MaxResults int      `json:"maxResults"`
+		Sources    []string `json:"sources"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil {
 		return ToolResult{Result: "Invalid arguments"}, nil
@@ -88,25 +106,87 @@ func webSearchExecutor(args json.RawMessage) (ToolResult, error) {
 	if p.MaxResults <= 0 {
 		p.MaxResults = 5
 	}
+	if len(p.Sources) == 0 {
+		p.Sources = []string{"web"}
+	}
+
+	// When a gateway is configured, route all non-special source searches
+	// through the gateway instead of reading API keys from env.
+	sourcesHaveGateway := false
+	for _, src := range p.Sources {
+		if src == "web" || src == "news" {
+			sourcesHaveGateway = true
+		}
+	}
+
+	if GatewaySearch != nil && sourcesHaveGateway {
+		argsMap := map[string]interface{}{
+			"query": p.Query, "maxResults": p.MaxResults, "sources": p.Sources,
+		}
+		result, err := GatewaySearch("web_search", "search", argsMap)
+		if err != nil {
+			result = fmt.Sprintf("gateway error: %v", err)
+		}
+		return ToolResult{Result: result}, nil
+	}
+
+	var allItems []item
+	seen := map[string]bool{}
+
+	for _, src := range p.Sources {
+		var results []item
+		var err error
+		switch src {
+		case "reddit":
+			results, err = redditSearch(p.Query, p.MaxResults)
+		case "archive":
+			results, err = archiveSearch(p.Query, p.MaxResults)
+		default:
+			results, err = generalWebSearch(p.Query, p.MaxResults)
+		}
+		if err != nil {
+			continue
+		}
+		for _, r := range results {
+			if !seen[r.URL] {
+				seen[r.URL] = true
+				allItems = append(allItems, r)
+			}
+		}
+	}
+	if len(allItems) == 0 {
+		return ToolResult{Result: "[]"}, nil
+	}
+	data, _ := json.Marshal(allItems)
+	return ToolResult{Result: string(data)}, nil
+}
+
+type item struct {
+	Title   string `json:"title"`
+	URL     string `json:"url"`
+	Snippet string `json:"snippet"`
+}
+
+func generalWebSearch(query string, maxResults int) ([]item, error) {
 	key := os.Getenv("TAVILY_API_KEY")
 	if key == "" {
 		key = os.Getenv("FIRECRAWL_API_KEY")
 		if key != "" {
-			return firecrawlSearch(p.Query, p.MaxResults)
+			return firecrawlSearch(query, maxResults)
 		}
-		return ToolResult{Result: "No search API key configured"}, nil
+		return nil, fmt.Errorf("no search API key configured")
 	}
 	body := map[string]interface{}{
-		"api_key":      key,
-		"query":        p.Query,
-		"max_results":  p.MaxResults,
-		"search_depth": "advanced",
+		"api_key":       key,
+		"query":         query,
+		"max_results":   maxResults,
+		"search_depth":  "advanced",
 		"include_answer": false,
 	}
 	payload, _ := json.Marshal(body)
 	resp, err := http.Post("https://api.tavily.com/search", "application/json", bytes.NewReader(payload))
 	if err != nil {
-		return ToolResult{Result: fmt.Sprintf("Search failed: %v", err)}, nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 	var result struct {
@@ -117,11 +197,6 @@ func webSearchExecutor(args json.RawMessage) (ToolResult, error) {
 		} `json:"results"`
 	}
 	json.NewDecoder(resp.Body).Decode(&result)
-	type item struct {
-		Title   string `json:"title"`
-		URL     string `json:"url"`
-		Snippet string `json:"snippet"`
-	}
 	var items []item
 	for _, r := range result.Results {
 		s := r.Content
@@ -130,11 +205,10 @@ func webSearchExecutor(args json.RawMessage) (ToolResult, error) {
 		}
 		items = append(items, item{Title: r.Title, URL: r.URL, Snippet: s})
 	}
-	data, _ := json.Marshal(items)
-	return ToolResult{Result: string(data)}, nil
+	return items, nil
 }
 
-func firecrawlSearch(query string, maxResults int) (ToolResult, error) {
+func firecrawlSearch(query string, maxResults int) ([]item, error) {
 	key := os.Getenv("FIRECRAWL_API_KEY")
 	body := map[string]interface{}{
 		"query": query,
@@ -148,24 +222,19 @@ func firecrawlSearch(query string, maxResults int) (ToolResult, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return ToolResult{Result: fmt.Sprintf("Search failed: %v", err)}, nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 	var result struct {
 		Success bool `json:"success"`
 		Data    []struct {
-			Title     string `json:"title"`
-			URL       string `json:"url"`
-			Markdown  string `json:"markdown"`
+			Title       string `json:"title"`
+			URL         string `json:"url"`
+			Markdown    string `json:"markdown"`
 			Description string `json:"description"`
 		} `json:"data"`
 	}
 	json.NewDecoder(resp.Body).Decode(&result)
-	type item struct {
-		Title   string `json:"title"`
-		URL     string `json:"url"`
-		Snippet string `json:"snippet"`
-	}
 	var items []item
 	if result.Success {
 		for _, r := range result.Data {
@@ -179,8 +248,99 @@ func firecrawlSearch(query string, maxResults int) (ToolResult, error) {
 			items = append(items, item{Title: r.Title, URL: r.URL, Snippet: s})
 		}
 	}
-	data, _ := json.Marshal(items)
-	return ToolResult{Result: string(data)}, nil
+	return items, nil
+}
+
+func redditSearch(query string, maxResults int) ([]item, error) {
+	url := fmt.Sprintf("https://www.reddit.com/search.json?q=%s&limit=%d&raw_json=1", url.QueryEscape(query), maxResults)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "Truthseekers/1.0 (encyclopedia agent)")
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var redditResp struct {
+		Data struct {
+			Children []struct {
+				Data struct {
+					Title   string `json:"title"`
+					Permalink string `json:"permalink"`
+					Selftext string `json:"selftext"`
+					Subreddit string `json:"subreddit"`
+					URL     string `json:"url"`
+				} `json:"data"`
+			} `json:"children"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&redditResp); err != nil {
+		return nil, err
+	}
+
+	var items []item
+	for _, c := range redditResp.Data.Children {
+		d := c.Data
+		fullURL := "https://reddit.com" + d.Permalink
+		s := d.Selftext
+		if len(s) > 500 {
+			s = s[:500]
+		}
+		if s == "" {
+			s = d.URL
+		}
+		items = append(items, item{
+			Title:   fmt.Sprintf("[r/%s] %s", d.Subreddit, d.Title),
+			URL:     fullURL,
+			Snippet: s,
+		})
+	}
+	return items, nil
+}
+
+func archiveSearch(query string, maxResults int) ([]item, error) {
+	url := fmt.Sprintf("https://archive.org/advancedsearch.php?q=%s&fl[]=identifier,title,description,creator,date&rows=%d&page=1&output=json", url.QueryEscape(query), maxResults)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "Truthseekers/1.0 (encyclopedia agent)")
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var archiveResp struct {
+		Response struct {
+			Docs []struct {
+				Identifier  string `json:"identifier"`
+				Title       string `json:"title"`
+				Description string `json:"description"`
+				Creator     string `json:"creator"`
+				Date        string `json:"date"`
+			} `json:"docs"`
+		} `json:"response"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&archiveResp); err != nil {
+		return nil, err
+	}
+
+	var items []item
+	for _, d := range archiveResp.Response.Docs {
+		s := d.Description
+		if len(s) > 500 {
+			s = s[:500]
+		}
+		if s == "" {
+			s = d.Creator + " " + d.Date
+		}
+		items = append(items, item{
+			Title:   d.Title,
+			URL:     fmt.Sprintf("https://archive.org/details/%s", d.Identifier),
+			Snippet: s,
+		})
+	}
+	return items, nil
 }
 
 func renderBlocksExecutor(args json.RawMessage) (ToolResult, error) {
@@ -274,45 +434,11 @@ func verifyCitationExecutor(args json.RawMessage) (ToolResult, error) {
 	}
 	systemPrompt := "You are a fact-checking AI. Given a claim and source text, determine if the source supports the claim. Respond with JSON only: { supported: boolean, confidence: number (0-1), explanation: string }"
 	userMsg := fmt.Sprintf("Claim: \"%s\"\n\nSource text:\n%s", p.Claim, text)
-	route := defaultRoute()
-	if route.APIKey == "" {
-		return ToolResult{Result: `{"supported":false,"confidence":0,"explanation":"No API key configured"}`}, nil
-	}
-	return llmVerify(systemPrompt, userMsg, route)
-}
-
-func llmVerify(system, user string, route ModelRoute) (ToolResult, error) {
-	body := map[string]interface{}{
-		"model": route.ModelID,
-		"messages": []map[string]string{
-			{"role": "system", "content": system},
-			{"role": "user", "content": user},
-		},
-		"max_tokens": 500,
-		"temperature": 0.3,
-	}
-	payload, _ := json.Marshal(body)
-	req, _ := http.NewRequest("POST", route.BaseURL+"/chat/completions", bytes.NewReader(payload))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+route.APIKey)
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	result, err := SendPromptJSON(systemPrompt, userMsg, epistemicModel)
 	if err != nil {
 		return ToolResult{Result: fmt.Sprintf(`{"supported":false,"confidence":0,"explanation":"LLM call failed: %v"}`, err)}, nil
 	}
-	defer resp.Body.Close()
-	var result struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-	json.NewDecoder(resp.Body).Decode(&result)
-	if len(result.Choices) > 0 {
-		return ToolResult{Result: result.Choices[0].Message.Content}, nil
-	}
-	return ToolResult{Result: `{"supported":false,"confidence":0,"explanation":"No response from LLM"}`}, nil
+	return ToolResult{Result: string(result)}, nil
 }
 
 func generateImageExecutor(args json.RawMessage) (ToolResult, error) {
@@ -323,6 +449,19 @@ func generateImageExecutor(args json.RawMessage) (ToolResult, error) {
 	if err := json.Unmarshal(args, &p); err != nil || p.Prompt == "" {
 		return ToolResult{Result: "Prompt required"}, nil
 	}
+
+	// Route through gateway for credential isolation.
+	if GatewayGenerateImage != nil {
+		argsMap := map[string]interface{}{
+			"prompt": p.Prompt, "caption": p.Caption,
+		}
+		result, err := GatewayGenerateImage("generate_image", "images/generations", argsMap)
+		if err != nil {
+			return ToolResult{Result: fmt.Sprintf("gateway error: %v", err)}, nil
+		}
+		return ToolResult{Result: result}, nil
+	}
+
 	key := os.Getenv("MODEL_ACCESS_KEY")
 	if key == "" {
 		return ToolResult{Result: "Image generation: MODEL_ACCESS_KEY not configured"}, nil
@@ -391,6 +530,35 @@ func generateVideoExecutor(args json.RawMessage) (ToolResult, error) {
 	return ToolResult{Result: `{"error":"Video generation not available in this deployment"}`, Blocks: []Block{
 		{Type: "text", Data: json.RawMessage(`{"content":"Video generation is not yet available in this deployment."}`)},
 	}}, nil
+}
+
+func runCommandExecutor(args json.RawMessage) (ToolResult, error) {
+	var p struct {
+		Command string   `json:"command"`
+		Args    []string `json:"args,omitempty"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil || p.Command == "" {
+		return ToolResult{Result: "command required"}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, p.Command, p.Args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	out := stdout.String()
+	if err != nil {
+		errStr := stderr.String()
+		if out != "" {
+			return ToolResult{Result: fmt.Sprintf("Output:\n%s\n\nError: %v\nStderr: %s", out, err, errStr)}, nil
+		}
+		return ToolResult{Result: fmt.Sprintf("Error: %v\n%s", err, errStr)}, nil
+	}
+	if len(out) > 50000 {
+		out = out[:50000] + "\n... [truncated at 50KB]"
+	}
+	return ToolResult{Result: out}, nil
 }
 
 

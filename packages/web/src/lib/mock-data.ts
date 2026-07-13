@@ -163,3 +163,21 @@ export const MOCK_USER = {
   subscriptionTier: "pro",
   onboarded: true,
 };
+
+export const MOCK_MODELS = [
+  { name: "gemma-4-31b-it", provider: "do", displayName: "Gemma 4 31B", reasoning: true, toolCall: true, attachment: true, contextLimit: 128000, outputLimit: 16384, inputCostPerM: 0.5, outputCostPerM: 0.75 },
+  { name: "deepseek-4-flash", provider: "do", displayName: "DeepSeek 4 Flash", reasoning: false, toolCall: true, attachment: false, contextLimit: 128000, outputLimit: 16384, inputCostPerM: 0.15, outputCostPerM: 0.3 },
+  { name: "llama-4-scout-17b-16e-instruct", provider: "groq", displayName: "Llama 4 Scout", reasoning: false, toolCall: true, attachment: false, contextLimit: 65536, outputLimit: 8192, inputCostPerM: 0, outputCostPerM: 0 },
+];
+
+export const MOCK_CONNECTORS = [
+  { slug: "web_search", name: "Web Search", provider: "http", actions: [{ name: "search", risk: "read" }] },
+  { slug: "webfetch", name: "Web Fetch", provider: "http", actions: [{ name: "fetch", risk: "read" }] },
+  { slug: "generate_image", name: "Image Generation", provider: "http", actions: [{ name: "generate", risk: "write" }] },
+];
+
+export const MOCK_USAGE = {
+  userId: "anonymous",
+  totals: { totalTokens: 0, totalCost: 0, callCount: 0 },
+  recent: [],
+};

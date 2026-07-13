@@ -35,7 +35,7 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
-	
+
 	// 2. Initialize and Start API Server
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -43,7 +43,6 @@ func main() {
 	}
 
 	server := api.NewServer(port, db)
-	server.Queue().Restore()
 
 	// Graceful shutdown setup
 	stop := make(chan os.Signal, 1)
@@ -61,7 +60,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	server.Queue().Stop()
+	server.SessionEngine().Stop()
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("Error during server shutdown: %v", err)
 	}

@@ -1,6 +1,6 @@
 import {
   IconSearch, IconGlobe, IconBook, IconMap, IconImage, IconCheck,
-  IconLink, IconPlus, IconDatabase, IconLightning, IconChat,
+  IconLink, IconPlus, IconDatabase, IconLightning, IconChat, IconTerminal,
 } from "../Icons";
 
 // ─── Icon / label / color registry ────────────────────────────────
@@ -22,6 +22,7 @@ export const TOOL_ICONS: Record<string, (size?: number) => React.ReactNode> = {
   task: (s) => <IconLightning size={s ?? 14} />,
   mem_store: (s) => <IconDatabase size={s ?? 14} />,
   mem_recall: (s) => <IconDatabase size={s ?? 14} />,
+  run_command: (s) => <IconTerminal size={s ?? 14} />,
   think: (s) => <IconChat size={s ?? 14} />,
 };
 
@@ -41,6 +42,7 @@ export const TOOL_COLORS: Record<string, string> = {
   task: "var(--task)",
   mem_store: "var(--tool-memory)",
   mem_recall: "var(--tool-memory)",
+  run_command: "var(--tool-command)",
   think: "var(--tool-think)",
 };
 
@@ -57,6 +59,7 @@ export function toolLabel(name: string): string {
     generate_image: "Generate Image", verify_citation: "Verify Citation",
     suggest_related: "Related Articles", create_article: "Generate Article",
     task: "Sub-agent", mem_store: "Remember", mem_recall: "Recall",
+    run_command: "Run Command",
     think: "Thinking",
   };
   return labels[name] ?? name.replace(/_/g, " ");
@@ -83,6 +86,7 @@ export function argsDisplay(name: string, args: Record<string, unknown>): string
   if (name === "suggest_related") return String(args.slug ?? "");
   if (name === "mem_store") return `${args.key} = ${String(args.value ?? "").slice(0, 50)}`;
   if (name === "mem_recall") return String(args.key ?? "");
+  if (name === "run_command") return String(args.command ?? "").slice(0, 100);
   if (name === "render_blocks") return `${(Array.isArray(args.blocks) ? args.blocks.length : 0)} blocks`;
   return JSON.stringify(args).slice(0, 120);
 }
@@ -187,6 +191,17 @@ export function parseRichResult(name: string, raw: unknown): RichResult {
   // Block render
   if (parsed.blockCount) return { kind: "generic", text: `${parsed.blockCount} blocks rendered` };
   if (parsed.queued) return { kind: "generic", text: `Queued: ${parsed.slug}` };
+
+  // Command execution result
+  if (name === "run_command") {
+    const out = (parsed.stdout || "").slice(0, 500);
+    const err = (parsed.stderr || "").slice(0, 500);
+    const code = parsed.exitCode;
+    const preview = err
+      ? `exit ${code}: ${err.slice(0, 120)}`
+      : out.slice(0, 300);
+    return { kind: "fetch", text: preview, contentPreview: out || err, url: "" };
+  }
 
   return fallback;
 }

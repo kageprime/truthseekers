@@ -101,6 +101,7 @@
   --task: #7c3aed;
   --tool-memory: #6b7280;
   --tool-think: #9ca3af;
+  --tool-command: #f59e0b;
 
   /* Timeline event colors */
   --event-war: #dc2626;
@@ -192,6 +193,7 @@
   --task: #a78bfa;
   --tool-memory: #9ca3af;
   --tool-think: #6b7280;
+  --tool-command: #f59e0b;
 
   --badge-error-bg: #4a1a1a;
   --badge-error-text: #fca5a5;

@@ -1,0 +1,61 @@
+{
+  "agents": [
+    {
+      "name": "default",
+      "model": "gemma-4-31B-it",
+      "max_iterations": 25,
+      "tools": ["web_search", "webfetch", "render_blocks", "verify_citation", "generate_image", "get_article", "article_search", "get_map", "suggest_related", "task", "mem_store", "mem_recall", "create_article"],
+      "grants": ["article.read", "article.create", "map.read"]
+    },
+    {
+      "name": "fast",
+      "model": "deepseek-4-flash",
+      "max_iterations": 5,
+      "tools": ["web_search", "webfetch"],
+      "grants": ["article.read"]
+    }
+  ],
+  "connectors": [
+    {
+      "type": "web_search",
+      "provider": "tavily",
+      "key_env": "TAVILY_API_KEY",
+      "base_url": "https://api.tavily.com"
+    },
+    {
+      "type": "web_search",
+      "provider": "firecrawl",
+      "key_env": "FIRECRAWL_API_KEY"
+    }
+  ],
+  "pipeline": {
+    "nodes": [
+      {"id": "retrieve", "script": "retrieve.py", "depends_on": []},
+      {"id": "extract_claims", "script": "extract_claims.py", "depends_on": ["retrieve"]},
+      {"id": "map_evidence", "script": "map_evidence.py", "depends_on": ["retrieve", "extract_claims"]},
+      {"id": "critique", "script": "critique.py", "depends_on": ["retrieve", "extract_claims", "map_evidence"]},
+      {"id": "detect_missing", "script": "detect_missing.py", "depends_on": ["extract_claims", "map_evidence"]},
+      {"id": "map_language", "script": "map_language.py", "depends_on": ["extract_claims"]},
+      {"id": "scrutinize", "script": "scrutinize.py", "depends_on": ["extract_claims", "critique", "detect_missing", "map_language"]},
+      {"id": "resolve", "script": "resolve.py", "depends_on": ["extract_claims", "map_evidence", "critique", "scrutinize"]},
+      {"id": "generate_article", "script": "generate_article.py", "depends_on": ["resolve"]}
+    ]
+  },
+  "policies": [
+    {"action": "article.*", "effect": "allow", "roles": ["admin", "member"]},
+    {"action": "admin.settings.write", "effect": "block", "roles": ["member"]}
+  ],
+  "triggers": [
+    {
+      "name": "weekly_trends",
+      "schedule": "0 8 * * 1",
+      "action": "create_article",
+      "params": {"slug": "this-week-in-history"}
+    }
+  ],
+  "sandbox": {
+    "work_dir": "/tmp/veritas",
+    "memory_limit_mb": 512,
+    "timeout_seconds": 300
+  }
+}

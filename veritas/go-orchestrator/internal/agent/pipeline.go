@@ -631,6 +631,69 @@ func EpistemicToolExecutors(systemPrompt string) map[string]ToolExecutor {
 	}
 }
 
+// ────────────────────────────────────────────────────────────
+// DAGNodeExecutors — Go LLM executors for the 9-node DAG
+// ────────────────────────────────────────────────────────────
+
+// DAGNodeExecutors returns Go-based DAG node executors that replace the
+// Python subprocess bridge. Each executor calls the LLM directly via
+// SendPromptJSON.  The returned map is keyed by node ID (retrieve,
+// extract_claims, …, generate_article).
+func DAGNodeExecutors(systemPrompt string) map[string]func(context.Context, map[string]interface{}) (interface{}, error) {
+	type nodeConfig struct {
+		prompt string
+		fields map[string]string // dag input key → prompt label
+	}
+	configs := map[string]nodeConfig{
+		"retrieve":         {promptRetrieve, map[string]string{"query": "QUERY"}},
+		"extract_claims":   {promptExtractClaims, map[string]string{"retrieve": "DOCUMENTS"}},
+		"map_evidence":     {promptMapEvidence, map[string]string{"retrieve": "AVAILABLE EVIDENCE", "extract_claims": "CLAIMS"}},
+		"critique":         {promptCritique, map[string]string{"map_evidence": "CLAIM-EVIDENCE MAP"}},
+		"detect_missing":   {promptDetectMissing, map[string]string{"map_evidence": "EVIDENCE MAP"}},
+		"map_language":     {promptMapLanguage, map[string]string{"extract_claims": "CLAIMS"}},
+		"scrutinize":       {promptScrutinize, map[string]string{"map_evidence": "EVIDENCE MAP"}},
+		"resolve":          {promptResolve, map[string]string{"critique": "CRITIQUE", "detect_missing": "MISSING EVIDENCE", "map_language": "LANGUAGE MAP", "scrutinize": "SCRUTINY REPORT"}},
+		"generate_article": {promptGenerateArticle, map[string]string{"resolve": "RESOLVED CLAIMS"}},
+	}
+
+	executors := make(map[string]func(context.Context, map[string]interface{}) (interface{}, error))
+	for name, cfg := range configs {
+		name, cfg := name, cfg
+		executors[name] = func(ctx context.Context, input map[string]interface{}) (interface{}, error) {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+			}
+			var parts []string
+			for key, label := range cfg.fields {
+				if val, ok := input[key]; ok {
+					var s string
+					switch v := val.(type) {
+					case string:
+						s = v
+					default:
+						b, _ := json.MarshalIndent(v, "", "  ")
+						s = string(b)
+					}
+					parts = append(parts, fmt.Sprintf("%s:\n%s", label, s))
+				}
+			}
+			userPrompt := cfg.prompt + "\n\n" + strings.Join(parts, "\n\n") + "\n\nReturn JSON only."
+			result, err := SendPromptJSON(systemPrompt, userPrompt, epistemicModel)
+			if err != nil {
+				return nil, fmt.Errorf("dag node %q: %w", name, err)
+			}
+			var output interface{}
+			if err := json.Unmarshal(result, &output); err != nil {
+				return nil, fmt.Errorf("dag node %q parse: %w", name, err)
+			}
+			return output, nil
+		}
+	}
+	return executors
+}
+
 // indentJSON pretty-prints raw JSON for injection into LLM prompts.
 func indentJSON(raw json.RawMessage) string {
 	var buf bytes.Buffer

@@ -185,3 +185,31 @@ export function useTrackView() {
   }, []);
 }
 
+// ── Models (LLM Gateway) ──
+
+export function useModels() {
+  return useApiQuery(["models"], () => api.fetchModels());
+}
+
+// ── Connectors (Executor Gateway) ──
+
+export function useConnectors() {
+  return useApiQuery(["connectors"], () => api.fetchConnectors());
+}
+
+// ── Credentials (hot-swap) ──
+
+export function useUpdateCredential() {
+  const queryClient = useQueryClient();
+  return useApiMutation(
+    ({ service, token }: { service: string; token: string }) => api.updateCredential(service, token),
+    { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["connectors"] }) },
+  );
+}
+
+// ── LLM Usage Stats ──
+
+export function useUsageStats() {
+  return useApiQuery(["usage"], () => api.fetchUsageStats());
+}
+

@@ -53,7 +53,9 @@ export default function LoginPage() {
 
       if (data.token) {
         storeToken(data.token);
-        if (data.user?.onboarded) router.push("/");
+        const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+        const redirectTo = params.get("redirect") || "/";
+        if (data.user?.onboarded) router.push(redirectTo);
         else router.push("/onboarding");
       } else if (data.sent) {
         setSent(true);

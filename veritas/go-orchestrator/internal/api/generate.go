@@ -7,45 +7,43 @@ import (
 	"log"
 	"time"
 
+	"github.com/kageprime/veritas/go-orchestrator/internal/agent"
 	"github.com/kageprime/veritas/go-orchestrator/internal/dag"
-	"github.com/kageprime/veritas/go-orchestrator/internal/nodes"
 	"github.com/kageprime/veritas/go-orchestrator/internal/storage"
 )
 
 // Article generation pipeline.
 //
 // processArticle runs the 9-node epistemic DAG (retrieve → extract_claims →
-// … → generate_article), broadcasts per-node progress over SSE, then
-// transforms the generate_article node's `{article: {...}}` output into a
-// storage.Article and persists it. Each node is a Python subprocess invocation
-// (internal/nodes/executors.go) with a schema-compliant mock fallback, so the
-// pipeline runs with or without Python installed.
-//
-// It is invoked by the generation worker pool (internal/api/queue.go) — never
-// call it directly from a request handler; enqueue via s.queue.Submit(slug,
-// persona).
+// … → generate_article) using native Go LLM calls, broadcasts per-node
+// progress over SSE, then transforms the generate_article node's
+// `{article: {...}}` output into a storage.Article and persists it.
 
-// pythonExec wraps nodes.RunPythonNode as a DAG node executor.
-func pythonExec(scriptName string) func(context.Context, map[string]interface{}) (interface{}, error) {
-	return func(ctx context.Context, input map[string]interface{}) (interface{}, error) {
-		return nodes.RunPythonNode(ctx, scriptName, input)
-	}
+// articleSystemPrompt is the system prompt used by the article generation DAG.
+// It's the preamble + deep epistemic framework (no chat tool rules or tone
+// modifiers).
+var articleSystemPrompt string
+
+func init() {
+	articleSystemPrompt = veritasPreamble + "\n\n" + loadSharedSystemPrompt()
 }
 
-// buildArticleWorkflow constructs the canonical 9-node epistemic pipeline.
-// Dependency graph mirrors cmd/test-dag/main.go.
+// buildArticleWorkflow constructs the canonical 9-node epistemic pipeline
+// using Go LLM-based executors.  Dependency graph mirrors the original Python
+// pipeline.
 func buildArticleWorkflow() *dag.Workflow {
+	execs := agent.DAGNodeExecutors(articleSystemPrompt)
 	return &dag.Workflow{
 		Nodes: []dag.Node{
-			{ID: "retrieve", DependsOn: []string{}, Execute: pythonExec("retrieve.py")},
-			{ID: "extract_claims", DependsOn: []string{"retrieve"}, Execute: pythonExec("extract_claims.py")},
-			{ID: "map_evidence", DependsOn: []string{"retrieve", "extract_claims"}, Execute: pythonExec("map_evidence.py")},
-			{ID: "critique", DependsOn: []string{"retrieve", "extract_claims", "map_evidence"}, Execute: pythonExec("critique.py")},
-			{ID: "detect_missing", DependsOn: []string{"extract_claims", "map_evidence"}, Execute: pythonExec("detect_missing.py")},
-			{ID: "map_language", DependsOn: []string{"extract_claims"}, Execute: pythonExec("map_language.py")},
-			{ID: "scrutinize", DependsOn: []string{"extract_claims", "critique", "detect_missing", "map_language"}, Execute: pythonExec("scrutinize.py")},
-			{ID: "resolve", DependsOn: []string{"extract_claims", "map_evidence", "critique", "scrutinize"}, Execute: pythonExec("resolve.py")},
-			{ID: "generate_article", DependsOn: []string{"resolve"}, Execute: pythonExec("generate_article.py")},
+			{ID: "retrieve", DependsOn: []string{}, Execute: execs["retrieve"]},
+			{ID: "extract_claims", DependsOn: []string{"retrieve"}, Execute: execs["extract_claims"]},
+			{ID: "map_evidence", DependsOn: []string{"retrieve", "extract_claims"}, Execute: execs["map_evidence"]},
+			{ID: "critique", DependsOn: []string{"retrieve", "extract_claims", "map_evidence"}, Execute: execs["critique"]},
+			{ID: "detect_missing", DependsOn: []string{"extract_claims", "map_evidence"}, Execute: execs["detect_missing"]},
+			{ID: "map_language", DependsOn: []string{"extract_claims"}, Execute: execs["map_language"]},
+			{ID: "scrutinize", DependsOn: []string{"extract_claims", "critique", "detect_missing", "map_language"}, Execute: execs["scrutinize"]},
+			{ID: "resolve", DependsOn: []string{"extract_claims", "map_evidence", "critique", "scrutinize"}, Execute: execs["resolve"]},
+			{ID: "generate_article", DependsOn: []string{"resolve"}, Execute: execs["generate_article"]},
 		},
 	}
 }
@@ -65,7 +63,7 @@ var humanPhase = map[string]string{
 }
 
 // processArticle executes the full generation pipeline for a slug and persists
-// the result. It is the real replacement for processArticleStub.
+// the result.
 func (s *Server) processArticle(slug string, persona string) {
 	start := time.Now()
 	log.Printf("🖌️ [generate] starting pipeline slug=%s persona=%s", slug, persona)
