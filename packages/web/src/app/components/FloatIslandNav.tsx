@@ -66,14 +66,14 @@ function NavLink({ href, isActive, icon: Icon, label }: {
   return (
     <Link
       href={href}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium no-underline transition-all duration-200"
-      style={{
-        color: isActive ? "var(--accent)" : "var(--muted)",
-        background: isActive ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "transparent",
-      }}
+      className="relative flex items-center gap-1.5 px-2.5 py-1 text-sm font-medium no-underline transition-all duration-200"
+      style={{ color: isActive ? "var(--accent)" : "var(--muted)" }}
     >
       <Icon size={16} />
       <span className="hidden lg:inline">{label}</span>
+      {isActive && (
+        <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full" style={{ background: "var(--accent)" }} />
+      )}
     </Link>
   );
 }
@@ -86,9 +86,9 @@ function TopHeader({ pathname }: { pathname: string }) {
 
   return (
     <header
-      className="hidden md:flex items-center justify-between px-4 py-2"
+      className="hidden md:flex items-center justify-between px-5"
       style={{
-        height: "3.5rem",
+        height: "3rem",
         background: "var(--surface-glass)",
         backdropFilter: "blur(20px) saturate(1.4)",
         borderBottom: "1px solid var(--glass-border)",
@@ -96,25 +96,25 @@ function TopHeader({ pathname }: { pathname: string }) {
       }}
     >
       {/* Left: Logo */}
-      <Link href="/" className="flex items-center gap-2 no-underline shrink-0">
-        <img src="/logo-icon.png" alt="" height={24} style={{ height: 24, width: "auto" }} />
-        <span className="text-sm font-semibold tracking-tight" style={{ color: "var(--ink)" }}>Truthseekers</span>
+      <Link href="/" className="flex items-center gap-2 no-underline shrink-0 -ml-1">
+        <img src="/logo-icon.png" alt="" height={20} style={{ height: 20, width: "auto" }} />
+        <span className="text-xs font-semibold tracking-tight" style={{ color: "var(--ink)" }}>Truthseekers</span>
       </Link>
 
       {/* Center: Nav links */}
-      <nav className="flex items-center gap-1">
+      <nav className="flex items-center gap-0">
         {NAV_LINKS.map((link) => (
           <NavLink key={link.href} href={link.href} isActive={pathname.startsWith(link.href)} icon={link.icon} label={link.label} />
         ))}
       </nav>
 
       {/* Right: Theme + Avatar */}
-      <div className="flex items-center gap-2">
-        <button onClick={toggle} className="p-2 rounded-lg text-muted hover:text-ink hover:bg-accent-bg/40 transition-all duration-200 cursor-pointer" aria-label="Toggle theme" style={{ background: "none", border: "none" }}>
+      <div className="flex items-center gap-1.5">
+        <button onClick={toggle} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-accent-bg/30 transition-all duration-200 cursor-pointer" style={{ background: "none", border: "none" }} aria-label="Toggle theme">
           {resolved === "dark" ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /></svg>
           ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
           )}
         </button>
         {user && (
@@ -138,17 +138,17 @@ function DockLink({ href, isActive, icon: Icon, label }: {
   return (
     <Link
       href={href}
-      className="flex items-center justify-center no-underline"
+      className="relative flex items-center justify-center no-underline"
       style={{
-        width: "2.75rem",
-        height: "2.75rem",
-        borderRadius: "0.75rem",
+        width: "2.5rem",
+        height: "2.5rem",
+        borderRadius: "0.625rem",
         color: isActive ? "var(--surface)" : "var(--muted)",
         background: isActive ? "var(--accent)" : "transparent",
       }}
       title={label}
     >
-      <Icon size={20} />
+      <Icon size={18} />
     </Link>
   );
 }
@@ -157,34 +157,32 @@ function BottomDock({ pathname }: { pathname: string }) {
   const { resolved, toggle } = useTheme();
 
   return (
-    <div className="p-[3px]" style={{ borderRadius: "1.25rem", background: "color-mix(in srgb, var(--border) 20%, transparent)" }}>
-      <div className="flex flex-row items-center gap-0.5 px-2 py-1.5" style={{
-        borderRadius: "calc(1.25rem - 3px)",
-        background: "var(--surface-glass)",
-        backdropFilter: "blur(24px) saturate(1.4)",
-        border: "1px solid rgba(255,255,255,0.06)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 24px rgba(0,0,0,0.06)",
-      }}>
-        <a href="/" className="block"><img src="/logo-icon.png" alt="Truthseekers" height={28} style={{ height: 28, width: "auto", objectFit: "contain", padding: "0.25rem" }} /></a>
+    <div className="flex flex-row items-center gap-1 px-2.5 py-1.5" style={{
+      borderRadius: "1rem",
+      background: "var(--surface-glass)",
+      backdropFilter: "blur(24px) saturate(1.4)",
+      border: "1px solid rgba(255,255,255,0.06)",
+      boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
+    }}>
+      <a href="/" className="block"><img src="/logo-icon.png" alt="Truthseekers" height={24} style={{ height: 24, width: "auto", objectFit: "contain", padding: "0.125rem" }} /></a>
 
-        <div className="w-px h-5 mx-0.5 shrink-0" style={{ background: "var(--glass-border)" }} />
+      <div className="w-px h-4 mx-0.5 shrink-0" style={{ background: "var(--glass-border)" }} />
 
-        <div className="flex flex-row items-center gap-0.5">
-          {NAV_LINKS.map((link) => (
-            <DockLink key={link.href} href={link.href} isActive={pathname.startsWith(link.href)} icon={link.icon} label={link.label} />
-          ))}
-        </div>
-
-        <div className="w-px h-5 mx-0.5 shrink-0" style={{ background: "var(--glass-border)" }} />
-
-        <button onClick={toggle} className="p-1.5 rounded-full text-muted hover:text-ink hover:bg-accent-bg/30 transition-all duration-200 cursor-pointer" aria-label="Toggle theme">
-          {resolved === "dark" ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /></svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
-          )}
-        </button>
+      <div className="flex flex-row items-center gap-0">
+        {NAV_LINKS.map((link) => (
+          <DockLink key={link.href} href={link.href} isActive={pathname.startsWith(link.href)} icon={link.icon} label={link.label} />
+        ))}
       </div>
+
+      <div className="w-px h-4 mx-0.5 shrink-0" style={{ background: "var(--glass-border)" }} />
+
+      <button onClick={toggle} className="p-1 rounded-full text-muted hover:text-ink hover:bg-accent-bg/30 transition-all duration-200 cursor-pointer">
+        {resolved === "dark" ? (
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /></svg>
+        ) : (
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+        )}
+      </button>
     </div>
   );
 }
@@ -196,10 +194,7 @@ export default function FloatIslandNav() {
 
   return (
     <>
-      {/* Desktop: top header */}
       <TopHeader pathname={pathname} />
-
-      {/* Mobile: bottom nav bar */}
       <div className="pointer-events-none md:hidden flex justify-center" style={{ position: "fixed", bottom: "0.75rem", left: "50%", transform: "translateX(-50%)", zIndex: "var(--z-island-nav)" }}>
         <div className="pointer-events-auto">
           <BottomDock pathname={pathname} />

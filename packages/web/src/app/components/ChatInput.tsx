@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import type { FC, SVGProps } from "react";
-import { IconPencil, IconChevronRight } from "./Icons";
+import { IconPencil } from "./Icons";
 
 const MODELS = [
   { id: "gemma-4-31B-it", label: "Gemma 4 31B" },
@@ -82,8 +82,8 @@ export default function ChatInput({
               <button
                 key={s}
                 onClick={() => { onChange(s); onSend(); }}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors"
-                style={{ borderColor: "var(--border)", color: "var(--muted)", background: "var(--surface-elevated)" }}
+                className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+                style={{ color: "var(--muted)", border: "1px solid var(--border)", background: "var(--surface)" }}
               >
                 {s}
               </button>
@@ -97,28 +97,29 @@ export default function ChatInput({
             <div className="relative" ref={modelRef}>
               <button
                 onClick={() => setModelOpen(!modelOpen)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors"
-                style={{ background: "var(--border-light)", color: "var(--muted)" }}
+                className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium rounded-md transition-colors"
+                style={{ color: "var(--muted)", border: "1px solid var(--border)" }}
               >
                 {MODELS.find((m) => m.id === model)?.label || model}
-                <IconChevronRight size={10} className={`transition-transform ${modelOpen ? "rotate-90" : ""}`} />
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className={`transition-transform ${modelOpen ? "rotate-180" : ""}`}>
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
               </button>
               {modelOpen && (
                 <div
-                  className="absolute bottom-full left-0 mb-1 rounded-xl p-1 shadow-lg glass-sm"
-                  style={{ background: "var(--surface)", border: "1px solid var(--border-light)", zIndex: 60, minWidth: "150px" }}
+                  className="absolute bottom-full left-0 mb-1 rounded-lg py-1 shadow-xl z-50"
+                  style={{ background: "var(--surface)", border: "1px solid var(--border)", minWidth: "150px" }}
                 >
                   {MODELS.map((m) => (
                     <button
                       key={m.id}
                       onClick={() => { onModelChange(m.id); setModelOpen(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-left transition-colors"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-left transition-colors hover:bg-accent-bg/20"
                       style={{
-                        background: m.id === model ? "var(--accent-bg)" : "transparent",
                         color: m.id === model ? "var(--accent)" : "var(--ink)",
                       }}
                     >
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: m.id === model ? "var(--accent)" : "var(--border)" }} />
+                      <span className="w-1 h-1 rounded-full shrink-0" style={{ background: m.id === model ? "var(--accent)" : "var(--border)" }} />
                       {m.label}
                     </button>
                   ))}
@@ -129,13 +130,15 @@ export default function ChatInput({
           {onToggleConsole && (
             <button
               onClick={onToggleConsole}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors"
+              className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium rounded-md transition-colors"
               style={{
-                background: consoleOpen ? "var(--accent-bg)" : "var(--border-light)",
+                background: consoleOpen ? "var(--accent-bg)" : "transparent",
                 color: consoleOpen ? "var(--accent)" : "var(--muted)",
+                border: "1px solid",
+                borderColor: consoleOpen ? "var(--accent-subtle)" : "var(--border)",
               }}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
               </svg>

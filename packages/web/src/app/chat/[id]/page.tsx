@@ -12,7 +12,6 @@ import TruthConsole from "../../components/TruthConsole";
 import TruthConsoleDeck from "../../components/truth-console/TruthConsoleDeck";
 import { useTraceSegments } from "../../components/truth-console/useTraceSegments";
 import { useChatContext } from "../ChatContext";
-import ContentCard from "../../components/ContentCard";
 import Spinner from "../../components/Spinner";
 import { IconPlus } from "../../components/Icons";
 
@@ -22,10 +21,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const queryClient = useQueryClient();
   const { send: streamSend, stop: streamStop } = useChatStream();
 
-
-  // Console state lives in ChatContext so the FloatingChatWidget and this page
-  // share one source of truth; `useTraceSegments` derives the per-response
-  // segments from history + the live array in context.
   const {
     consoleOpen, setConsoleOpen,
     sending, setSending,
@@ -40,10 +35,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [convId, setConvId] = useState<string | null>(id !== "new" ? id : null);
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState("deepseek-4-flash");
+  const [modelOpen, setModelOpen] = useState(false);
   const { mutate: createChat } = useCreateChat();
   const { data: apiModels } = useModels();
 
-  // Per-response segment derivation — must come after convId is declared.
   const seg = useTraceSegments(convId ?? id ?? null);
 
   const MODELS = (apiModels && apiModels.length > 0)
@@ -58,6 +53,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const finalizedRef = useRef(false);
   const lastUserMsgRef = useRef<string>("");
   const switcherRef = useRef<HTMLDivElement>(null);
+  const modelRef = useRef<HTMLDivElement>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const { data: conversations = [], loading: chatsLoading } = useChats();
 
@@ -69,8 +65,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const lastAssistantIndex = lastAssistantIdx >= 0 ? messages.length - 1 - lastAssistantIdx : -1;
   const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user")?.content ?? "";
 
-  // Auto-scroll on new content. requestAnimationFrame defers the layout read
-  // to the next frame so we don't force a synchronous reflow inside a render.
   useEffect(() => {
     requestAnimationFrame(() => {
       if (scrollRef.current) {
@@ -79,8 +73,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     });
   }, [messages, streamContent, streamSteps]);
 
-  // Auto-resize textarea. Debounce to avoid a forced reflow on every
-  // keystroke; 16ms (≈1 frame) is imperceptible but batches rapid input.
   const resizeRAF = useRef(0);
   useEffect(() => {
     cancelAnimationFrame(resizeRAF.current);
@@ -93,23 +85,24 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     return () => cancelAnimationFrame(resizeRAF.current);
   }, [input]);
 
-  // Auto-open console when the live run emits its first tool event —
-  // desktop only (the 440px rail doesn't fit on mobile; users open it
-  // manually via the notification deck badge).
   useEffect(() => {
     if (seg.liveSegmentId && !consoleOpen && window.innerWidth >= 768) setConsoleOpen(true);
   }, [seg.liveSegmentId, consoleOpen, setConsoleOpen]);
 
-  // Close session switcher on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) {
         setSwitcherOpen(false);
       }
+      if (modelRef.current && !modelRef.current.contains(e.target as Node)) {
+        setModelOpen(false);
+      }
     }
-    if (switcherOpen) document.addEventListener("mousedown", handleClick);
+    if (switcherOpen || modelOpen) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [switcherOpen]);
+  }, [switcherOpen, modelOpen]);
+
+  const currentModelLabel = MODELS.find((m) => m.id === model)?.label || model;
 
   const doSend = useCallback(
     async (msg: string) => {
@@ -167,8 +160,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         onToolEvent: (event) => {
           setStreamContent((cur) => {
             if (cur.trim()) {
-              // Defer the steps update to avoid cascading re-renders inside
-              // a state updater (which blocked the next paint for ~444ms).
               const step = cur.trim();
               requestAnimationFrame(() => setStreamSteps((s) => [...s, step]));
             }
@@ -188,10 +179,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           setStreamContent("");
           setStreamSteps([]);
           setStreamBlocks(finalBlocks);
-          // NOTE: intentionally NOT closing the console here — the segment
-          // cycling model keeps it open so the user can review the just-finished
-          // turn's tool calls. The active segment migrates from "live" to the
-          // committed historical message (handled by useTraceSegments).
           queryClient.setQueryData(["chat", cid], (prev: any) => {
             if (!prev) return prev;
             const real = prev.messages.map((m: any) =>
@@ -244,151 +231,106 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const showEmpty = messages.length === 0 && !sending && isNew;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <ContentCard
-        header={
-          <div className="flex items-center justify-between px-3 py-2.5 gap-2">
-            <div className="flex items-center gap-1 min-w-0">
-              {/* Session switcher */}
-              <div className="relative" ref={switcherRef}>
-                <button
-                  onClick={() => setSwitcherOpen((o) => !o)}
-                  className="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded hover:bg-accent-bg/30 transition-colors"
-                  style={{ color: "var(--muted)" }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                  <span className="truncate max-w-[80px] sm:max-w-[180px]">{isNew ? "New Chat" : conv?.title ?? "Chat"}</span>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0">
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </button>
-                {switcherOpen && (
-                  <div className="absolute left-0 top-full mt-1 w-56 rounded-lg py-1 shadow-xl z-50 bg-surface border border-border max-h-[300px] overflow-y-auto">
-                    {chatsLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Spinner size={16} />
-                      </div>
-                    ) : conversations.length === 0 ? (
-                      <div className="px-3 py-2 text-xs" style={{ color: "var(--subtle)" }}>No conversations</div>
-                    ) : (
-                      conversations.map((c: any) => (
-                        <button
-                          key={c.id}
-                          onClick={() => {
-                            router.push(`/chat/${c.id}`);
-                            setSwitcherOpen(false);
-                          }}
-                          className="w-full text-left px-3 py-2 text-xs transition-colors"
-                          style={{
-                            color: c.id === convId ? "var(--accent)" : "var(--muted)",
-                            background: c.id === convId ? "var(--accent-bg)" : "transparent",
-                          }}
-                        >
-                          <div className="truncate">{c.title}</div>
-                        </button>
-                      ))
-                    )}
+    <div className="flex-1 flex flex-col min-h-0 bg-surface">
+      {/* ── Header bar ── */}
+      <div className="shrink-0 flex items-center justify-between px-4 h-11 border-b border-border/30">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className="relative" ref={switcherRef}>
+            <button
+              onClick={() => setSwitcherOpen((o) => !o)}
+              className="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md hover:bg-accent-bg/30 transition-colors cursor-pointer"
+              style={{ color: "var(--muted)", background: "none", border: "none" }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              <span className="truncate max-w-[100px] sm:max-w-[200px]">{isNew ? "New Chat" : conv?.title ?? "Chat"}</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="shrink-0">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            {switcherOpen && (
+              <div className="absolute left-0 top-full mt-1 w-56 rounded-lg py-1 shadow-xl z-50 bg-surface border border-border/50 max-h-[300px] overflow-y-auto">
+                {chatsLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Spinner size={16} />
                   </div>
+                ) : conversations.length === 0 ? (
+                  <div className="px-3 py-2 text-xs" style={{ color: "var(--subtle)" }}>No conversations</div>
+                ) : (
+                  conversations.map((c: any) => (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        router.push(`/chat/${c.id}`);
+                        setSwitcherOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs transition-colors hover:bg-accent-bg/20"
+                      style={{
+                        color: c.id === convId ? "var(--accent)" : "var(--muted)",
+                        background: c.id === convId ? "var(--accent-bg)" : "transparent",
+                      }}
+                    >
+                      <div className="truncate">{c.title}</div>
+                    </button>
+                  ))
                 )}
               </div>
-
-              {/* Model picker */}
-              <div className="relative">
-                <select
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  aria-label="Select AI model"
-                  className="appearance-none bg-transparent text-[10px] text-subtle border border-border/50 rounded px-1.5 py-1 pr-4 cursor-pointer hover:text-ink hover:border-accent/40 transition-colors outline-none"
-                >
-                  {MODELS.map((m) => (
-                    <option key={m.id} value={m.id}>{m.label}</option>
-                  ))}
-                </select>
-                <svg width="6" height="6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-subtle">
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <button onClick={handleNewChat} className="btn-ghost p-1.5 text-subtle hover:text-accent cursor-pointer" aria-label="New chat" title="New chat">
-                <IconPlus size={16} />
-              </button>
-            </div>
+            )}
           </div>
-        }
-        footer={
-          <>
-            {!showEmpty && (
-              <div className="shrink-0 flex items-center justify-end px-4 py-1 border-t border-border/40">
-                <TruthConsoleDeck
-                  variant="footer"
-                  segments={seg.segments}
-                  liveSegmentId={seg.liveSegmentId}
-                  unreadTotal={seg.unreadCount}
-                  onClick={() => setConsoleOpen((o) => !o)}
-                />
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          {/* Model picker */}
+          <div className="relative" ref={modelRef}>
+            <button
+              onClick={() => setModelOpen((o) => !o)}
+              className="flex items-center gap-1.5 text-[10px] font-medium px-2 py-1 rounded-md transition-colors cursor-pointer"
+              style={{ color: "var(--subtle)", background: "none", border: "1px solid var(--border)", backgroundImage: modelOpen ? "var(--accent-bg)" : "transparent" }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+              <span className="hidden sm:inline">{currentModelLabel}</span>
+            </button>
+            {modelOpen && (
+              <div
+                className="absolute right-0 top-full mt-1 rounded-lg py-1 shadow-xl z-50 min-w-[160px]"
+                style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+              >
+                {MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => { setModel(m.id); setModelOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-left transition-colors hover:bg-accent-bg/20"
+                    style={{
+                      color: m.id === model ? "var(--accent)" : "var(--ink)",
+                    }}
+                  >
+                    <span className="w-1 h-1 rounded-full shrink-0" style={{ background: m.id === model ? "var(--accent)" : "var(--border)" }} />
+                    {m.label}
+                  </button>
+                ))}
               </div>
             )}
-            {!showEmpty && (
-              <div className="shrink-0 px-4 pb-3 pt-1.5">
-                <div className="flex items-end gap-2 rounded-xl p-1 bg-surface-elevated border border-border/70 transition-all focus-within:border-accent/50 focus-within:shadow-[0_0_0_3px_var(--gold-bg)]">
-                  <div className="flex-1 min-w-0">
-                    <textarea
-                      ref={textareaRef}
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder={sending ? "Waiting for response..." : "Ask about any topic..."}
-                      disabled={sending}
-                      rows={1}
-                      className="w-full resize-none bg-transparent border-none px-3 py-2 text-sm min-h-[38px] max-h-[180px] text-ink outline-none placeholder:text-subtle/60"
-                      aria-label="Chat message input"
-                    />
-                  </div>
-                  {sending ? (
-                    <button
-                      onClick={() => streamStop(convId ?? undefined)}
-                      aria-label="Stop generating"
-                      className="btn btn-sm shrink-0 rounded-lg bg-oxblood text-white active:scale-90 h-8"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                        <rect x="6" y="6" width="12" height="12" rx="2" />
-                      </svg>
-                      <span className="text-[11px]">Stop</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => doSend(input)}
-                      disabled={!input.trim()}
-                      aria-label="Send message"
-                      className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 ${input.trim() ? "bg-accent text-white" : "bg-border/50 text-subtle cursor-not-allowed"}`}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="22" y1="2" x2="11" y2="13" />
-                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                <div className="flex justify-between mt-1 px-1">
-                  <span className="text-[8px] text-subtle/60">Enter to send &middot; Shift+Enter for new line</span>
-                </div>
-              </div>
-            )}
-          </>
-        }
-      >
+          </div>
+
+          <button onClick={handleNewChat} className="flex items-center justify-center w-7 h-7 rounded-md text-subtle hover:text-accent hover:bg-accent-bg/30 transition-all cursor-pointer" aria-label="New chat" title="New chat" style={{ background: "none", border: "none" }}>
+            <IconPlus size={15} />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Messages area ── */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
         {loading || convLoading ? (
-          <div className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 space-y-5">
-            {/* User message skeleton — right-aligned */}
+          <div className="p-4 sm:p-6 space-y-5 max-w-3xl mx-auto">
             <div className="flex justify-end">
               <div className="rounded-2xl rounded-br-md p-3 sm:p-4 max-w-[70%]" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>
                 <div className="h-3 skeleton rounded w-40" />
               </div>
             </div>
-            {/* Assistant message skeleton — left-aligned */}
             <div className="flex justify-start">
               <div className="rounded-2xl rounded-bl-md p-3 sm:p-4 max-w-[80%]" style={{ background: "color-mix(in srgb, var(--border) 15%, transparent)" }}>
                 <div className="space-y-2.5">
@@ -399,13 +341,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                 </div>
               </div>
             </div>
-            {/* Another user message */}
             <div className="flex justify-end">
               <div className="rounded-2xl rounded-br-md p-3 sm:p-4 max-w-[60%]" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>
                 <div className="h-3 skeleton rounded w-32" />
               </div>
             </div>
-            {/* Assistant typing skeleton */}
             <div className="flex justify-start">
               <div className="rounded-2xl rounded-bl-md p-3 sm:p-4 max-w-[40%]" style={{ background: "color-mix(in srgb, var(--border) 15%, transparent)" }}>
                 <div className="flex gap-1">
@@ -417,64 +357,124 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             </div>
           </div>
         ) : showEmpty ? (
-          <div className="flex-1 overflow-y-auto">
-            <EmptyChatState onSetInput={doSend} />
-          </div>
+          <EmptyChatState onSetInput={doSend} />
         ) : (
-          <>
-            <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
-              <div>
-                {messages.map((msg: any, i: number) => (
-                  <ChatMessage
-                    key={msg.id}
-                    role={msg.role}
-                    content={msg.content}
-                    blocks={msg.blocks}
-                    createdAt={msg.createdAt}
-                    isLastAssistant={i === lastAssistantIndex}
-                    onRegenerate={i === lastAssistantIndex && lastUserMsg ? () => doSend(lastUserMsg) : undefined}
-                  />
-                ))}
+          <div className="max-w-3xl mx-auto">
+            {messages.map((msg: any, i: number) => (
+              <ChatMessage
+                key={msg.id}
+                role={msg.role}
+                content={msg.content}
+                blocks={msg.blocks}
+                createdAt={msg.createdAt}
+                isLastAssistant={i === lastAssistantIndex}
+                onRegenerate={i === lastAssistantIndex && lastUserMsg ? () => doSend(lastUserMsg) : undefined}
+              />
+            ))}
 
-                {error && (
-                  <div className="mx-3 my-4 px-4 py-3 rounded-xl border border-oxblood/30 bg-oxblood-subtle/30 text-sm text-oxblood flex items-center justify-between gap-3">
-                    <span>{error}</span>
-                    <button
-                      onClick={() => {
-                        setError(null);
-                        if (lastUserMsgRef.current) doSend(lastUserMsgRef.current);
-                      }}
-                      className="shrink-0 text-xs font-medium underline"
-                      style={{ color: "var(--oxblood)" }}
-                    >
-                      Retry
-                    </button>
-                  </div>
-                )}
-
-                {hasStreaming && (
-                  <div className="border-t border-border/40" style={{ background: "color-mix(in srgb, var(--accent-bg) 6%, transparent)" }}>
-                    {streamSteps.length > 0 && (
-                      <div className="px-3 sm:px-6 pt-3 pb-1 space-y-1">
-                        {streamSteps.map((step, i) => (
-                          <div key={i} className="flex items-start gap-2 text-[11px] text-muted">
-                            <span className="mt-1.5 w-1 h-1 rounded-full bg-accent/60 shrink-0" />
-                            <span className="line-clamp-2 font-serif-body">{step}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} streaming />
-                  </div>
-                )}
+            {error && (
+              <div className="mx-3 my-4 px-4 py-3 rounded-xl border border-oxblood/30 bg-oxblood-subtle/30 text-sm text-oxblood flex items-center justify-between gap-3">
+                <span>{error}</span>
+                <button
+                  onClick={() => {
+                    setError(null);
+                    if (lastUserMsgRef.current) doSend(lastUserMsgRef.current);
+                  }}
+                  className="shrink-0 text-xs font-medium underline"
+                  style={{ color: "var(--oxblood)" }}
+                >
+                  Retry
+                </button>
               </div>
-            </div>
-          </>
-        )}
-      </ContentCard>
+            )}
 
+            {hasStreaming && (
+              <div style={{ background: "color-mix(in srgb, var(--accent-bg) 6%, transparent)" }}>
+                {streamSteps.length > 0 && (
+                  <div className="px-3 sm:px-6 pt-3 pb-1 space-y-1">
+                    {streamSteps.map((step, i) => (
+                      <div key={i} className="flex items-start gap-2 text-[11px] text-muted">
+                        <span className="mt-1.5 w-1 h-1 rounded-full bg-accent/60 shrink-0" />
+                        <span className="line-clamp-2 font-serif-body">{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} streaming />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Footer: console deck + input ── */}
+      {!showEmpty && (
+        <div className="shrink-0 border-t border-border/30">
+          <div className="max-w-3xl mx-auto px-4">
+            <div className="flex items-center justify-end py-1">
+              <TruthConsoleDeck
+                variant="footer"
+                segments={seg.segments}
+                liveSegmentId={seg.liveSegmentId}
+                unreadTotal={seg.unreadCount}
+                onClick={() => setConsoleOpen((o) => !o)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      {!showEmpty && (
+        <div className="shrink-0 px-4 pb-3 pt-0">
+          <div className="max-w-3xl mx-auto">
+            <div className="flex items-end gap-2 rounded-xl px-3 py-2.5" style={{ background: "var(--surface-elevated)", border: "1px solid var(--border)" }}>
+              <div className="flex-1 min-w-0">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={sending ? "Waiting for response..." : "Ask about any topic..."}
+                  disabled={sending}
+                  rows={1}
+                  className="w-full resize-none bg-transparent border-none outline-none text-sm min-h-[22px] max-h-[180px] text-ink placeholder:text-subtle/60"
+                  aria-label="Chat message input"
+                  style={{ lineHeight: "1.5" }}
+                />
+              </div>
+              {sending ? (
+                <button
+                  onClick={() => streamStop(convId ?? undefined)}
+                  aria-label="Stop generating"
+                  className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-white text-[11px] font-medium transition-all active:scale-90"
+                  style={{ background: "var(--oxblood)" }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                  Stop
+                </button>
+              ) : (
+                <button
+                  onClick={() => doSend(input)}
+                  disabled={!input.trim()}
+                  aria-label="Send message"
+                  className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 ${input.trim() ? "text-white" : "text-subtle cursor-not-allowed"}`}
+                  style={{ background: input.trim() ? "var(--accent)" : "color-mix(in srgb, var(--border) 60%, transparent)" }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13" />
+                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Truth Console overlay ── */}
       {consoleOpen && (
-        <div className="fixed right-0 top-0 bottom-0 z-[var(--z-overlay)] w-[440px] max-w-[92vw] flex flex-col bg-surface border-l border-border/40 animate-slide-in-right">
+        <div className="fixed right-0 top-0 bottom-0 z-[var(--z-overlay)] w-[440px] max-w-[92vw] flex flex-col bg-surface border-l border-border/30 animate-slide-in-right">
           <TruthConsole
             segments={seg.segments}
             activeSegmentId={seg.activeSegmentId}
