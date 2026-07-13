@@ -641,6 +641,111 @@ func articleFromBSONM(raw bson.M) *Article {
 		}
 	}
 
+	// Sections
+	if v, ok := raw["sections"]; ok {
+		if arr, ok2 := v.(bson.A); ok2 {
+			for _, item := range arr {
+				if doc, ok3 := item.(bson.M); ok3 {
+					sec := Section{}
+					if s, ok4 := doc["id"]; ok4 { sec.ID, _ = s.(string) }
+					if s, ok4 := doc["title"]; ok4 { sec.Title, _ = s.(string) }
+					if s, ok4 := doc["content"]; ok4 { sec.Content, _ = s.(string) }
+					if m, ok4 := doc["media"]; ok4 {
+						if ma, ok5 := m.(bson.A); ok5 {
+							for _, mi := range ma {
+								if md, ok6 := mi.(bson.M); ok6 {
+									media := MediaItem{}
+									if s, ok7 := md["type"]; ok7 { media.Type, _ = s.(string) }
+									if s, ok7 := md["id"]; ok7 { media.ID, _ = s.(string) }
+									if s, ok7 := md["caption"]; ok7 { media.Caption, _ = s.(string) }
+									if s, ok7 := md["src"]; ok7 { media.Src, _ = s.(string) }
+									if s, ok7 := md["source"]; ok7 { media.Source, _ = s.(string) }
+									if s, ok7 := md["code"]; ok7 { media.Code, _ = s.(string) }
+									if s, ok7 := md["prompt"]; ok7 { media.Prompt, _ = s.(string) }
+									sec.Media = append(sec.Media, media)
+								}
+							}
+						}
+					}
+					art.Sections = append(art.Sections, sec)
+				}
+			}
+		}
+	}
+
+	// Blocks (raw interface{} since shape varies)
+	if v, ok := raw["blocks"]; ok {
+		if arr, ok2 := v.(bson.A); ok2 {
+			for _, item := range arr {
+				art.Blocks = append(art.Blocks, item)
+			}
+		}
+	}
+
+	// Timeline
+	if v, ok := raw["timeline"]; ok {
+		if arr, ok2 := v.(bson.A); ok2 {
+			for _, item := range arr {
+				if doc, ok3 := item.(bson.M); ok3 {
+					ev := TimelineEvent{}
+					if s, ok4 := doc["id"]; ok4 { ev.ID, _ = s.(string) }
+					if s, ok4 := doc["year"]; ok4 {
+						switch tv := s.(type) {
+						case float64: ev.Year = tv
+						case int64: ev.Year = float64(tv)
+						case int32: ev.Year = float64(tv)
+						}
+					}
+					if s, ok4 := doc["event"]; ok4 { ev.Event, _ = s.(string) }
+					if s, ok4 := doc["description"]; ok4 { ev.Description, _ = s.(string) }
+					if s, ok4 := doc["image"]; ok4 { ev.Image, _ = s.(string) }
+					art.Timeline = append(art.Timeline, ev)
+				}
+			}
+		}
+	}
+
+	// Crossrefs
+	if v, ok := raw["crossrefs"]; ok {
+		if arr, ok2 := v.(bson.A); ok2 {
+			for _, item := range arr {
+				if doc, ok3 := item.(bson.M); ok3 {
+					cr := CrossReference{}
+					if s, ok4 := doc["id"]; ok4 { cr.ID, _ = s.(string) }
+					if s, ok4 := doc["title"]; ok4 { cr.Title, _ = s.(string) }
+					if s, ok4 := doc["relationship"]; ok4 { cr.Relationship, _ = s.(string) }
+					art.Crossrefs = append(art.Crossrefs, cr)
+				}
+			}
+		}
+	}
+
+	// Citations
+	if v, ok := raw["citations"]; ok {
+		if arr, ok2 := v.(bson.A); ok2 {
+			for _, item := range arr {
+				if doc, ok3 := item.(bson.M); ok3 {
+					ct := Citation{}
+					if s, ok4 := doc["url"]; ok4 { ct.URL, _ = s.(string) }
+					if s, ok4 := doc["title"]; ok4 { ct.Title, _ = s.(string) }
+					if s, ok4 := doc["accessed"]; ok4 { ct.Accessed, _ = s.(string) }
+					if s, ok4 := doc["relevance"]; ok4 { ct.Relevance, _ = s.(string) }
+					art.Citations = append(art.Citations, ct)
+				}
+			}
+		}
+	}
+
+	// Confidence vector
+	if v, ok := raw["confidence_vector"]; ok {
+		if doc, ok2 := v.(bson.M); ok2 {
+			art.ConfidenceVector = make(map[string]interface{})
+			for k, val := range doc {
+				art.ConfidenceVector[k] = val
+			}
+		}
+	}
+
 	// Timestamps
 	if v, ok := raw["created_at"]; ok {
 		switch tv := v.(type) {
