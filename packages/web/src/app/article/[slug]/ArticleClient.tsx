@@ -309,6 +309,9 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
   if (!article) return null;
 
+  const hasFullContent = (article.blocks && article.blocks.length > 0) ||
+    (article.sections && article.sections.length > 0);
+
   return (
     <PageLayout maxWidthClass="max-w-3xl">
       <div
@@ -453,19 +456,25 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
         {/* Article body — reading column */}
         <div className="reading-column stagger-children">
-          {article.blocks && article.blocks.length > 0 ? (
-            <BlockRenderer blocks={article.blocks} />
-          ) : (
-            <BlockRenderer blocks={articleToBlocks(
-              article.slug,
-              article.title,
-              article.abstract,
-              article.sections,
-              article.timeline,
-              article.crossrefs,
-              article.citations,
-            )} />
-          )}
+          {hasFullContent ? (
+            <BlockRenderer blocks={
+              article.blocks && article.blocks.length > 0
+                ? article.blocks
+                : articleToBlocks(
+                    article.slug,
+                    article.title,
+                    article.abstract,
+                    article.sections,
+                    article.timeline,
+                    article.crossrefs,
+                    article.citations,
+                  )
+            } />
+          ) : article.abstract ? (
+            <div style={{ fontSize: "0.9375rem", lineHeight: 1.75, color: "var(--ink)" }}>
+              <p>{article.abstract}</p>
+            </div>
+          ) : null}
         </div>
       </article>
       </div>
