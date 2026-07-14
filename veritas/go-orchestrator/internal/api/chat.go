@@ -292,6 +292,13 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		history = append(history, storageToAgentMsg(m))
 	}
 
+	// Persist the user's message immediately so it's in the database for any concurrent GET requests
+	userMsg := toStoredMessage(convID, "user", body.Content, nil, nil, nil)
+	userMsg.ID = uuidV4()
+	if err := s.db.AddMessage(userMsg); err != nil {
+		log.Printf("Failed to immediately persist user message: %v", err)
+	}
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -391,11 +398,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Failed to persist assistant message: %v", err)
 			}
 		case agent.RoleUser:
-			sm := toStoredMessage(convID, "user", m.Content, nil, nil, nil)
-			sm.ID = msgID
-			if err := s.db.AddMessage(sm); err != nil {
-				log.Printf("Failed to persist user message: %v", err)
-			}
+			// Already persisted user message immediately before agent run, skip saving again
 		case agent.RoleTool:
 			sm := toStoredMessage(convID, "tool", m.Content, nil, nil, nil)
 			sm.ID = msgID

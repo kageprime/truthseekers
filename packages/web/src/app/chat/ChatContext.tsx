@@ -30,16 +30,24 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const pathname = usePathname();
-
-  // Reset on navigation to a different chat
   const chatId = pathname.startsWith("/chat/") ? pathname.split("/")[2] : null;
+
+  const [prevChatId, setPrevChatId] = useState<string | null>(null);
+
   useEffect(() => {
-    setLiveEvents([]);
-    setConsoleOpen(false);
-    setSending(false);
-    setActiveSegmentId(null);
-    setUnreadCount(0);
-  }, [chatId]);
+    if (chatId !== prevChatId) {
+      // Don't reset if we are transitioning from "new" to a real chat ID during an active stream/send
+      const isPromo = prevChatId === "new" && chatId !== "new" && chatId !== null;
+      if (!isPromo) {
+        setLiveEvents([]);
+        setConsoleOpen(false);
+        setSending(false);
+        setActiveSegmentId(null);
+        setUnreadCount(0);
+      }
+      setPrevChatId(chatId);
+    }
+  }, [chatId, prevChatId]);
 
   return (
     <ChatContext.Provider
