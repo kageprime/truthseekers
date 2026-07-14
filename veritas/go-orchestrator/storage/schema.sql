@@ -45,6 +45,12 @@ CREATE TABLE IF NOT EXISTS articles (
     confidence_vector JSONB,
     derived_confidence FLOAT,
     version INT DEFAULT 1,
+    sections JSONB,
+    timeline JSONB,
+    categories JSONB,
+    crossrefs JSONB,
+    citations JSONB,
+    metadata JSONB,
     status TEXT CHECK (status IN ('draft', 'published', 'error')) DEFAULT 'draft',
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
@@ -151,5 +157,60 @@ CREATE TABLE IF NOT EXISTS memories (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
     category TEXT,
+    updated_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP  -- TTL support
+);
+CREATE INDEX IF NOT EXISTS idx_memories_expires ON memories(expires_at) WHERE expires_at IS NOT NULL;
+
+-- 14. Users
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    name TEXT,
+    avatar TEXT DEFAULT '',
+    role TEXT DEFAULT 'member',
+    subscription_tier TEXT DEFAULT 'free',
+    onboarded BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+-- 15. Conversations
+CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    user_id TEXT REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_updated ON conversations(user_id, updated_at DESC);
+
+-- 16. Messages
+CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    content TEXT DEFAULT '',
+    blocks JSONB,
+    tool_calls JSONB,
+    tool_call_id TEXT DEFAULT '',
+    tool_name TEXT DEFAULT '',
+    agent_events JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_messages_conv_created ON messages(conversation_id, created_at);
+
+-- 17. Settings (key-value config)
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 18. Additional indexes for common queries
+CREATE INDEX IF NOT EXISTS idx_articles_created_at ON articles(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_articles_status ON articles(status);
+CREATE INDEX IF NOT EXISTS idx_article_views_slug_count ON article_views(slug);
+CREATE INDEX IF NOT EXISTS idx_articles_slug ON articles(slug);

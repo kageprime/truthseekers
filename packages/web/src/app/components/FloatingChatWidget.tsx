@@ -24,7 +24,8 @@ export default function FloatingChatWidget() {
   // chat page share one source of truth (useTraceSegments reads them).
   const { sending, setSending, setLiveEvents } = useChatContext();
   const { send: streamSend, stop: streamStop } = useChatStream();
-  const { data: conversations = [], loading: chatsLoading } = useChats();
+  const { data: conversationsData, loading: chatsLoading } = useChats();
+  const conversations = conversationsData || [];
   const { mutate: createChat } = useCreateChat();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
@@ -32,14 +33,13 @@ export default function FloatingChatWidget() {
   const [input, setInput] = useState("");
   const [streamContent, setStreamContent] = useState("");
   const [streamBlocks, setStreamBlocks] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [convId, setConvId] = useState<string | null>(null);
   const [view, setView] = useState<"chat" | "console">("chat");
   const [model, setModel] = useState("deepseek-4-flash");
   const agentEventsRef = useRef<AgentEvent[]>([]);
   const finalizedRef = useRef(false);
-  const streamContentRef = useRef("");
-  const streamAccumulatorRef = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Per-response segment derivation (history + live, shared via context).
@@ -83,26 +83,26 @@ export default function FloatingChatWidget() {
 
   const doSend = useCallback(async (msg: string) => {
     if (!msg.trim() || sending) return;
+    setError(null);
 
-    let id = convId;
-    if (!id) {
+    let cid = convId;
+    if (!cid) {
       setLoading(true);
       try {
         const conv = await createChat("Quick Chat");
         if (!conv) throw new Error("No conversation returned");
-        id = conv.id;
-        setConvId(id);
-        setActiveConversationId(id);
-        try { localStorage.setItem(CONV_STORAGE_KEY, id!); } catch {}
+        cid = conv.id;
+        setConvId(cid);
+        setActiveConversationId(cid);
+        try { localStorage.setItem(CONV_STORAGE_KEY, cid!); } catch {}
       } catch (err) {
         console.error("Failed to create conversation", err);
+        setError("Failed to start conversation.");
         setLoading(false);
         return;
       }
       setLoading(false);
     }
-
-    const cid = id!;
 
     setSending(true);
     setStreamContent("");
@@ -110,30 +110,26 @@ export default function FloatingChatWidget() {
     setLiveEvents([]);
     agentEventsRef.current = [];
     finalizedRef.current = false;
-    streamContentRef.current = "";
-    streamAccumulatorRef.current = "";
 
     const userMsg = {
       id: `temp-${Date.now()}`,
-      conversationId: cid,
+      conversationId: cid!,
       role: "user" as const,
       content: msg,
       createdAt: new Date().toISOString(),
     };
 
-    await queryClient.cancelQueries({ queryKey: ["chat", cid] });
-    queryClient.setQueryData(["chat", cid], (prev: any) => ({
+    await queryClient.cancelQueries({ queryKey: ["chat", cid!] });
+    queryClient.setQueryData(["chat", cid!], (prev: any) => ({
       ...(prev || { id: cid, title: "Chat", userId: "", createdAt: new Date().toISOString() }),
       messages: [...(prev?.messages || []), userMsg],
     }));
 
     setInput("");
 
-    await streamSend(cid, msg, {
+    await streamSend(cid!, msg, {
       onText: (text) => {
-        streamContentRef.current = text;
-        const acc = streamAccumulatorRef.current;
-        setStreamContent(acc ? `${acc}\n- ${text}` : `- ${text}`);
+        setStreamContent(text);
       },
       onToolEvent: (event) => {
         setLiveEvents((prev) => {
@@ -141,13 +137,6 @@ export default function FloatingChatWidget() {
           agentEventsRef.current = next;
           return next;
         });
-        // Append completed step text to the accumulator
-        const text = streamContentRef.current;
-        if (text) {
-          const prev = streamAccumulatorRef.current;
-          streamAccumulatorRef.current = prev ? `${prev}\n- ${text}` : `- ${text}`;
-          streamContentRef.current = "";
-        }
       },
       onDone: (event) => {
         if (finalizedRef.current) return;
@@ -155,10 +144,8 @@ export default function FloatingChatWidget() {
         const savedEvents = agentEventsRef.current;
         const finalBlocks = event.blocks ?? [];
         setStreamContent("");
-        streamContentRef.current = "";
-        streamAccumulatorRef.current = "";
         setStreamBlocks(finalBlocks);
-        queryClient.setQueryData(["chat", cid], (prev: any) => {
+        queryClient.setQueryData(["chat", cid!], (prev: any) => {
           if (!prev) return prev;
           const real = prev.messages.map((m: any) =>
             m.id.startsWith("temp-") ? { ...m, id: `${Date.now()}-${Math.random()}`, conversationId: cid } : m
@@ -177,14 +164,16 @@ export default function FloatingChatWidget() {
           };
         });
       },
-      onError: (err: string) => console.warn("Stream error:", err),
+      onError: (err: string) => {
+        setError(err || "Stream error occurred");
+      },
     }, model);
 
     setTimeout(() => setSending(false), 0);
-  }, [convId, sending, streamSend, queryClient, setLiveEvents, setActiveConversationId, model]);
+  }, [convId, sending, streamSend, queryClient, setLiveEvents, setActiveConversationId, createChat, setSending, model]);
 
   const messages = useMemo(() => (conv?.messages ?? []).filter((m: any) => m.role !== "tool"), [conv?.messages]);
-  const hasStreaming = sending;
+  const hasStreaming = sending && streamContent !== "";
   const currentConv = conversations.find((c) => c.id === convId);
   const lastAssistantIdx = [...messages].reverse().findIndex((m: any) => m.role === "assistant");
   const lastAssistantIndex = lastAssistantIdx >= 0 ? messages.length - 1 - lastAssistantIdx : -1;
@@ -294,12 +283,13 @@ export default function FloatingChatWidget() {
                   role={msg.role}
                   content={msg.content}
                   blocks={msg.blocks}
+                  agentEvents={msg.agentEvents}
                   createdAt={msg.createdAt}
                   isLastAssistant={i === lastAssistantIndex}
                 />
               ))}
               {hasStreaming && (
-                <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} streaming />
+                <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} agentEvents={liveEvents} streaming />
               )}
             </div>
           )}

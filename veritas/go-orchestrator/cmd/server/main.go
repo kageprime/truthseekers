@@ -25,9 +25,9 @@ func main() {
 
 	// 1. Initialize Database Connection
 	// In a real environment, read from environment variables
-	dbURL := os.Getenv("MOONGOSE_CONNECTION_STRING")
+	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		log.Printf("MOONGOSE_CONNECTION_STRING not set, falling back to Mock Mode")
+		log.Printf("DATABASE_URL not set, falling back to Mock Mode")
 	}
 
 	db, err := storage.NewDB(dbURL)

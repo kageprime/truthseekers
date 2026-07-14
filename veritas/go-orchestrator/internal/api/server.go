@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"github.com/kageprime/veritas/go-orchestrator/internal/agent"
 	"github.com/kageprime/veritas/go-orchestrator/internal/credstore"
 	"github.com/kageprime/veritas/go-orchestrator/internal/executor"
+	"github.com/kageprime/veritas/go-orchestrator/internal/iam"
 	llmgateway "github.com/kageprime/veritas/go-orchestrator/internal/llm-gateway"
 	"github.com/kageprime/veritas/go-orchestrator/internal/manifest"
 	"github.com/kageprime/veritas/go-orchestrator/internal/registry"
@@ -85,6 +87,214 @@ type agentRun struct {
 	agt    *agent.Agent
 	userID string
 }
+
+// ────────────────────────────────────────────────────────────
+// Middleware: Rate Limiting + Authorization
+// ────────────────────────────────────────────────────────────
+
+// rateLimiter provides simple in-memory token-bucket rate limiting per IP.
+type rateLimiter struct {
+	mu       sync.Mutex
+	buckets  map[string]*tokenBucket
+	rate     int           // requests per window
+	window   time.Duration // window size
+}
+
+type tokenBucket struct {
+	tokens     int
+	lastRefill time.Time
+}
+
+func newRateLimiter(rate int, window time.Duration) *rateLimiter {
+	return &rateLimiter{
+		buckets: make(map[string]*tokenBucket),
+		rate:    rate,
+		window:  window,
+	}
+}
+
+func (rl *rateLimiter) allow(ip string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	now := time.Now()
+	b, ok := rl.buckets[ip]
+	if !ok || now.Sub(b.lastRefill) >= rl.window {
+		b = &tokenBucket{tokens: rl.rate, lastRefill: now}
+		rl.buckets[ip] = b
+	}
+	if b.tokens <= 0 {
+		return false
+	}
+	b.tokens--
+	return true
+}
+
+func (rl *rateLimiter) middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := clientIP(r)
+		if !rl.allow(ip) {
+			http.Error(w, `{"error":"rate limit exceeded"}`, http.StatusTooManyRequests)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		return strings.Split(xff, ",")[0]
+	}
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+	return strings.Split(r.RemoteAddr, ":")[0]
+}
+
+// authMiddleware validates JWT and injects userID/role into request context.
+func (s *Server) authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, role := userAuthFromRequest(r)
+		if userID == "" {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		ctx := context.WithValue(r.Context(), "userID", userID)
+		ctx = context.WithValue(ctx, "userRole", role)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// requireRole ensures the user has at least the minimum role for the resource.
+func (s *Server) requireRole(minRole string, resourceType string, resourceID string, action string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return s.authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userRole := r.Context().Value("userRole").(string)
+			_ = r.Context().Value("userID").(string)
+
+			var projectRole *iam.ProjectRole
+			// For now, we don't have project membership - use implicit role
+			if implicit := iam.ImplicitProjectRoleForAccount(iam.AccountRole(userRole)); implicit != nil {
+				projectRole = implicit
+			}
+
+			result := iam.Authorize(iam.AccountRole(userRole), projectRole, iam.AuthorizeTarget{
+				Type: resourceType,
+				ID:   resourceID,
+			}, action)
+
+			if !result.Allowed {
+				http.Error(w, fmt.Sprintf(`{"error":"forbidden: %s"}`, result.Reason), http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		}))
+	}
+}
+
+func userIDFromContext(ctx context.Context) string {
+	if v := ctx.Value("userID"); v != nil {
+		return v.(string)
+	}
+	return ""
+}
+
+// chain composes middleware: chain(m1, m2)(h) == m1(m2(h))
+func chain(middlewares ...func(http.Handler) http.Handler) func(http.Handler) http.Handler {
+	return func(final http.Handler) http.Handler {
+		for i := len(middlewares) - 1; i >= 0; i-- {
+			final = middlewares[i](final)
+		}
+		return final
+	}
+}
+
+// validateBody wraps a handler to validate the JSON request body against a struct.
+// Usage: validateBody(&MyStruct{}, handler) where MyStruct has validation tags.
+// Only validates on POST/PUT/PATCH methods.
+func validateBody(model interface{}) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost && r.Method != http.MethodPut && r.Method != http.MethodPatch {
+				next.ServeHTTP(w, r)
+				return
+			}
+			// Limit body size to prevent abuse (1MB)
+			r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+			var target interface{}
+			switch v := model.(type) {
+			case func() interface{}:
+				target = v()
+			default:
+				target = model
+			}
+			if err := json.NewDecoder(r.Body).Decode(target); err != nil {
+				http.Error(w, `{"error":"Invalid JSON body"}`, http.StatusBadRequest)
+				return
+			}
+			// Store validated body in context for handler to retrieve
+			ctx := context.WithValue(r.Context(), "validatedBody", target)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// validatedBody retrieves the validated request body from context.
+func validatedBody(r *http.Request) interface{} {
+	return r.Context().Value("validatedBody")
+}
+
+// getValidatedBody retrieves the validated body into a typed destination.
+// Returns true if successful, false if not present or type mismatch.
+func getValidatedBody(r *http.Request, dst interface{}) bool {
+	v := r.Context().Value("validatedBody")
+	if v == nil {
+		return false
+	}
+	dstVal := reflect.ValueOf(dst)
+	if dstVal.Kind() != reflect.Ptr {
+		return false
+	}
+	srcVal := reflect.ValueOf(v)
+	if !srcVal.Type().AssignableTo(dstVal.Type().Elem()) {
+		return false
+	}
+	dstVal.Elem().Set(srcVal.Elem())
+	return true
+}
+
+// Validation request types
+type (
+	generateArticleReq struct {
+		Persona string `json:"persona" validate:"omitempty,max=50"`
+	}
+	
+	credentialsReq struct {
+		Service string `json:"service" validate:"required,max=100"`
+		Token   string `json:"token" validate:"required,max=5000"`
+	}
+	
+	adminSettingsReq struct {
+		Settings map[string]string `json:"settings" validate:"required"`
+	}
+	
+	createChatReq struct {
+		Title string `json:"title" validate:"omitempty,max=200"`
+	}
+	
+	updateChatReq struct {
+		Title string `json:"title" validate:"required,max=200"`
+	}
+	
+	sendMessageReq struct {
+		Content string `json:"content" validate:"required,max=50000"`
+		Model   string `json:"model" validate:"omitempty,max=100"`
+	}
+	
+	trackReq struct {
+		Slug  string `json:"slug" validate:"required,max=200"`
+		Event string `json:"event" validate:"omitempty,max=50"`
+	}
+)
 
 func NewServer(port string, db *storage.DB) *Server {
 	s := &Server{
@@ -481,6 +691,11 @@ func (s *Server) webSearchFirecrawl(query string, maxResults int, apiKey string)
 }
 
 func (s *Server) setupRoutes() {
+	// Rate limiters (local — one per Server, separate from package-level if any)
+	authLimiter := newRateLimiter(10, time.Minute)  // 10 req/min for auth
+	chatLimiter := newRateLimiter(30, time.Minute)   // 30 req/min for chat
+	apiLimiter := newRateLimiter(60, time.Minute)    // 60 req/min for general API
+
 	// Mount executor gateway routes.
 	execHandler := &executor.Handler{Gateway: s.executorGateway}
 	execHandler.RegisterRoutes(s.mux)
@@ -488,44 +703,56 @@ func (s *Server) setupRoutes() {
 	// Mount LLM gateway routes.
 	s.llmGateway.RegisterRoutes(s.mux)
 
-	// Register credential hot-swap endpoint.
-	s.mux.HandleFunc("/v1/credentials", s.handleCredentials)
+	// Health - no auth, no rate limit (for load balancers)
+	s.mux.Handle("/health", chain()(http.HandlerFunc(s.handleHealth)))
 
-	s.mux.HandleFunc("/health", s.handleHealth)
-	s.mux.HandleFunc("/auth", s.handleAuthStub)
-	s.mux.HandleFunc("/auth/login", s.handleAuthLogin)
-	s.mux.HandleFunc("/auth/me", s.handleAuthMe)
-	s.mux.HandleFunc("/auth/onboard", s.handleAuthOnboard)
-	s.mux.HandleFunc("/stripe", s.handleStripeRouter)
-	s.mux.HandleFunc("/stripe/", s.handleStripeRouter)
-	s.mux.HandleFunc("/quota", s.handleGetQuota)
-	s.mux.HandleFunc("/queue", s.handleGetQueue)
-	s.mux.HandleFunc("/track", s.handleTrack)
-	s.mux.HandleFunc("/articles/top", s.handleGetTopArticles)
-	s.mux.HandleFunc("/articles/search", s.handleSearchArticles)
+	// Auth endpoints - rate limited
+	s.mux.Handle("/auth", chain(authLimiter.middleware)(http.HandlerFunc(s.handleAuthStub)))
+	s.mux.Handle("/auth/login", chain(authLimiter.middleware)(http.HandlerFunc(s.handleAuthLogin)))
+	s.mux.Handle("/auth/me", chain(authLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleAuthMe)))
+	s.mux.Handle("/auth/onboard", chain(authLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleAuthOnboard)))
 
-	// Chat routing - native handlers
-	s.mux.HandleFunc("/chat", s.handleChatRoot)
-	s.mux.HandleFunc("/chat/", s.chatRouter)
+	// Credential hot-swap - auth required + rate limited + body validation
+	s.mux.Handle("/v1/credentials", chain(apiLimiter.middleware, s.authMiddleware, validateBody(credentialsReq{}))(http.HandlerFunc(s.handleCredentials)))
 
-	// Maps routing
-	s.mux.HandleFunc("/maps", s.handleMapsRoot)
-	s.mux.HandleFunc("/maps/", s.handleMapsDynamicRoute)
+	// Stripe - auth required
+	s.mux.Handle("/stripe", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleStripeRouter)))
+	s.mux.Handle("/stripe/", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleStripeRouter)))
 
-	// Admin site settings
-	s.mux.HandleFunc("/admin/settings", s.handleAdminSettings)
+	// Quota, queue, track - auth required + validation
+	s.mux.Handle("/quota", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleGetQuota)))
+	s.mux.Handle("/queue", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleGetQueue)))
+	s.mux.Handle("/track", chain(apiLimiter.middleware, s.authMiddleware, validateBody(trackReq{}))(http.HandlerFunc(s.handleTrack)))
 
-	// Webhook trigger endpoint — POST /webhook/{slug} triggers article generation.
-	s.mux.HandleFunc("/webhook/", s.handleWebhook)
+	// Articles - top/search public read, generate/refresh/write auth + rate limited + validation
+	s.mux.Handle("/articles/top", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleGetTopArticles)))
+	s.mux.Handle("/articles/search", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleSearchArticles)))
+
+	// Chat - auth required + rate limited
+	chatAuth := chain(chatLimiter.middleware, s.authMiddleware)
+	s.mux.Handle("/chat", chatAuth(http.HandlerFunc(s.handleChatRoot)))
+
+	// Chat router needs special handling for sub-paths
+	s.mux.Handle("/chat/", chatAuth(http.HandlerFunc(s.chatRouter)))
+
+	// Maps - public read
+	s.mux.Handle("/maps", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleMapsRoot)))
+	s.mux.Handle("/maps/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleMapsDynamicRoute)))
+
+	// Admin - auth + admin role required + validation on PUT
+	s.mux.Handle("/admin/settings", chain(apiLimiter.middleware, s.requireRole("admin", "admin", "settings", "write"), validateBody(adminSettingsReq{}))(http.HandlerFunc(s.handleAdminSettings)))
+
+	// Webhook - HMAC verified in handler, no auth middleware
+	s.mux.Handle("/webhook/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleWebhook)))
 
 	// Start cron scheduler if triggers are configured in manifest.
 	if s.manifest != nil {
 		triggers.StartScheduler(s.manifest.Triggers, s.triggerAction)
 	}
 
-	// Dynamic routing handler for /articles/...
-	s.mux.HandleFunc("/articles", s.handleArticlesDynamicRoute)
-	s.mux.HandleFunc("/articles/", s.handleArticlesDynamicRoute)
+	// Articles dynamic routes - apply auth
+	s.mux.Handle("/articles", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleArticlesDynamicRoute)))
+	s.mux.Handle("/articles/", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleArticlesDynamicRoute)))
 }
 
 func (s *Server) Start() error {
@@ -841,12 +1068,14 @@ func (s *Server) handleArticlesDynamicRoute(w http.ResponseWriter, r *http.Reque
 		}
 	case "generate":
 		if r.Method == "POST" {
+			_ = validatedBody(r)
 			s.handleGenerateArticle(w, r, slug)
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	case "refresh":
 		if r.Method == "POST" {
+			_ = validatedBody(r)
 			s.handleRefreshArticle(w, r, slug)
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

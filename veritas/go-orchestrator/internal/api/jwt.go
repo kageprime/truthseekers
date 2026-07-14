@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -29,6 +30,10 @@ func jwtSecret() []byte {
 	if s := os.Getenv("JWT_SECRET"); s != "" {
 		return []byte(s)
 	}
+	if os.Getenv("VERITAS_ENV") == "production" {
+		panic("JWT_SECRET must be set in production")
+	}
+	log.Printf("WARNING: Using default JWT secret. Set JWT_SECRET for production.")
 	return []byte(jwtDefaultSecret)
 }
 

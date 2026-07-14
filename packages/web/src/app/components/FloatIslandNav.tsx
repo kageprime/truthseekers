@@ -195,11 +195,6 @@ export default function FloatIslandNav() {
   return (
     <>
       <TopHeader pathname={pathname} />
-      <div className="pointer-events-none md:hidden flex justify-center" style={{ position: "fixed", bottom: "0.75rem", left: "50%", transform: "translateX(-50%)", zIndex: "var(--z-island-nav)" }}>
-        <div className="pointer-events-auto">
-          <BottomDock pathname={pathname} />
-        </div>
-      </div>
     </>
   );
 }

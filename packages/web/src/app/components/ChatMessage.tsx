@@ -26,16 +26,153 @@ interface ChatMessageProps {
   role: string;
   content: string;
   blocks?: Block[];
+  agentEvents?: any[];
   createdAt?: string;
   isLastAssistant?: boolean;
   onRegenerate?: () => void;
   streaming?: boolean;
 }
 
+function toolUseSummaryText(name: string, args: any): string {
+  if (!args) return "";
+  if (name === "web_search" || name === "websearch" || name === "tavilySearch" || name === "firecrawl_search") {
+    return args.query ? `Searching: "${args.query}"` : "";
+  }
+  if (name === "get_article" || name === "create_article" || name === "get_map" || name === "suggest_related") {
+    return args.slug ? `Target: "${args.slug}"` : "";
+  }
+  if (name === "article_search") {
+    return args.query ? `Query: "${args.query}"` : "";
+  }
+  if (name === "generate_image") {
+    return args.prompt ? `Prompt: "${args.prompt}"` : "";
+  }
+  if (name === "verify_citation") {
+    return args.claim ? `Claim: "${args.claim}"` : "";
+  }
+  if (name === "task") {
+    return args.objective ? `Objective: "${args.objective}"` : "";
+  }
+  if (name === "mem_store") {
+    return args.key ? `Storing: ${args.key}` : "";
+  }
+  if (name === "mem_recall") {
+    return args.key ? `Recalling: "${args.key}"` : "";
+  }
+  return "";
+}
+
+function toolResultSummaryText(data: any): string {
+  const content = data.result ?? data.content ?? "";
+  if (!content) return "";
+  if (typeof content === "string" && (content.startsWith("[") || content.startsWith("{"))) {
+    try {
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        return `Found ${parsed.length} results`;
+      }
+      if (parsed.blockCount !== undefined) {
+        return `Rendered ${parsed.blockCount} blocks`;
+      }
+      if (parsed.queued) {
+        return `Queued: ${parsed.slug}`;
+      }
+    } catch {}
+  }
+  const str = typeof content === "string" ? content : JSON.stringify(content);
+  return str.length > 120 ? str.slice(0, 120) + "..." : str;
+}
+
+import { toolLabel } from "./ProcessViewer";
+
+function ThinkingBox({ events, streaming }: { events: any[]; streaming?: boolean }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const activeEvents = events.filter(e => 
+    e.type === "tool_use" || 
+    e.type === "tool_result" || 
+    e.type === "status" || 
+    e.type === "error"
+  );
+
+  if (activeEvents.length === 0) return null;
+
+  const toolCallCount = activeEvents.filter(e => e.type === "tool_use").length;
+
+  return (
+    <div className="my-2 text-xs">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1.5 font-medium py-1 px-2 rounded-md hover:bg-accent-bg/10 transition-colors text-subtle border border-border/20 bg-surface-elevated/40"
+      >
+        <span className={`inline-block transition-transform duration-200 text-[8px] ${isOpen ? "rotate-90" : ""}`}>
+          ▶
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span>🧠 Thought process</span>
+          {toolCallCount > 0 && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-border/20 font-mono">
+              {toolCallCount} step{toolCallCount !== 1 ? "s" : ""}
+            </span>
+          )}
+          {streaming && (
+            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+          )}
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="mt-2 pl-3 ml-2.5 border-l border-border/30 space-y-2.5 max-w-2xl py-0.5">
+          {activeEvents.map((event, idx) => {
+            const isError = event.type === "error";
+            const isStatus = event.type === "status";
+            const isUse = event.type === "tool_use";
+            const isResult = event.type === "tool_result";
+
+            let label = "";
+            let summary = "";
+
+            if (isUse) {
+              const name = event.data?.name || "";
+              label = toolLabel(name);
+              const args = event.data?.args || {};
+              summary = toolUseSummaryText(name, args);
+            } else if (isResult) {
+              const name = event.data?.name || "";
+              label = `Returned: ${toolLabel(name).replace(/^[^\s]+\s+/, "")}`;
+              summary = toolResultSummaryText(event.data);
+            } else if (isStatus) {
+              label = `⚡ Status`;
+              summary = String(event.data || "");
+            } else if (isError) {
+              label = `🛑 Error`;
+              summary = String(event.data || "");
+            }
+
+            return (
+              <div key={idx} className="flex flex-col gap-0.5 border-l-2 border-border/10 pl-2">
+                <div className="flex items-center gap-2 font-medium text-ink-secondary">
+                  <span>{label}</span>
+                </div>
+                {summary && (
+                  <div className="text-[10px] text-subtle/80 pl-0.5 font-mono break-all max-w-lg leading-relaxed">
+                    {summary}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const ChatMessage = memo(function ChatMessage({
   role,
   content,
   blocks,
+  agentEvents,
   createdAt,
   isLastAssistant,
   onRegenerate,
@@ -85,6 +222,11 @@ const ChatMessage = memo(function ChatMessage({
             </span>
             {createdAt && <span className="text-[9px] text-subtle">{timeAgo(createdAt)}</span>}
           </div>
+
+          {/* Thinking Box */}
+          {agentEvents && agentEvents.length > 0 && (
+            <ThinkingBox events={agentEvents} streaming={streaming} />
+          )}
 
           {/* Content */}
           {cleanContent ? (

@@ -2,211 +2,285 @@ package storage
 
 import (
 	"context"
+	"crypto/rand"
+	"database/sql"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-
-	"crypto/rand"
+	_ "github.com/lib/pq"
 )
 
 // Core models matching packages/core/src/types.ts
 
 type MediaItem struct {
-	Type    string `json:"type" bson:"type"`
-	ID      string `json:"id,omitempty" bson:"id,omitempty"`
-	Caption string `json:"caption,omitempty" bson:"caption,omitempty"`
-	Src     string `json:"src,omitempty" bson:"src,omitempty"`
-	Source  string `json:"source,omitempty" bson:"source,omitempty"`
-	Code    string `json:"code,omitempty" bson:"code,omitempty"`
-	Prompt  string `json:"prompt,omitempty" bson:"prompt,omitempty"`
+	Type    string `json:"type"`
+	ID      string `json:"id,omitempty"`
+	Caption string `json:"caption,omitempty"`
+	Src     string `json:"src,omitempty"`
+	Source  string `json:"source,omitempty"`
+	Code    string `json:"code,omitempty"`
+	Prompt  string `json:"prompt,omitempty"`
 }
 
 type Section struct {
-	ID      string      `json:"id" bson:"id"`
-	Title   string      `json:"title" bson:"title"`
-	Content string      `json:"content" bson:"content"`
-	Media   []MediaItem `json:"media,omitempty" bson:"media,omitempty"`
+	ID      string      `json:"id"`
+	Title   string      `json:"title"`
+	Content string      `json:"content"`
+	Media   []MediaItem `json:"media,omitempty"`
 }
 
 type TimelineEvent struct {
-	ID          string   `json:"id,omitempty" bson:"id,omitempty"`
-	Year        float64  `json:"year" bson:"year"` // Mixed in TS (can be float or string)
-	Event       string   `json:"event" bson:"event"`
-	Description string   `json:"description,omitempty" bson:"description,omitempty"`
-	Image       string   `json:"image,omitempty" bson:"image,omitempty"`
-	Causes      []string `json:"causes,omitempty" bson:"causes,omitempty"`
-	Category    string   `json:"category,omitempty" bson:"category,omitempty"`
+	ID          string   `json:"id,omitempty"`
+	Year        float64  `json:"year"` // Mixed in TS (can be float or string)
+	Event       string   `json:"event"`
+	Description string   `json:"description,omitempty"`
+	Image       string   `json:"image,omitempty"`
+	Causes      []string `json:"causes,omitempty"`
+	Category    string   `json:"category,omitempty"`
 }
 
 type CrossReference struct {
-	ID           string `json:"id" bson:"id"`
-	Title        string `json:"title" bson:"title"`
-	Relationship string `json:"relationship" bson:"relationship"`
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Relationship string `json:"relationship"`
 }
 
 type Citation struct {
-	URL       string `json:"url" bson:"url"`
-	Title     string `json:"title,omitempty" bson:"title,omitempty"`
-	Accessed  string `json:"accessed,omitempty" bson:"accessed,omitempty"`
-	Relevance string `json:"relevance,omitempty" bson:"relevance,omitempty"`
+	URL       string `json:"url"`
+	Title     string `json:"title,omitempty"`
+	Accessed  string `json:"accessed,omitempty"`
+	Relevance string `json:"relevance,omitempty"`
 }
 
-type ThreeDScene struct {
-	ID          string `json:"id" bson:"id"`
-	Code        string `json:"code" bson:"code"`
-	Description string `json:"description" bson:"description"`
+// ────────────────────────────────────────────────────────────
+// Epistemic Pipeline Storage (Layer 1-3)
+// ────────────────────────────────────────────────────────────
+
+type Claim struct {
+	ID                string                 `json:"id"`
+	Text              string                 `json:"text"`
+	Type              string                 `json:"type"` // factual | interpretive | predictive
+	Status            string                 `json:"status"` // supported | disputed | weak | unknown
+	ConfidenceVector  map[string]interface{} `json:"confidence_vector,omitempty"`
+	DerivedConfidence float64                `json:"derived_confidence"`
+	CreatedAt         time.Time              `json:"created_at"`
+	UpdatedAt         time.Time              `json:"updated_at"`
+}
+
+type Source struct {
+	ID               string                 `json:"id"`
+	Name             string                 `json:"name"`
+	Type             string                 `json:"type"` // institutional | individual | anonymous | leaked_material
+	CredibilityVector map[string]interface{} `json:"credibility_vector,omitempty"`
+	CreatedAt        time.Time              `json:"created_at"`
+}
+
+type Evidence struct {
+	ID                string     `json:"id"`
+	ClaimID           string     `json:"claim_id"`
+	Type              string     `json:"type"` // primary_document | eyewitness | expert_analysis | leaked | patent | dataset | anonymous
+	URL               string     `json:"url,omitempty"`
+	ChainOfCustody    string     `json:"chain_of_custody"` // verified | partial | unverified
+	AcquisitionMethod string     `json:"acquisition_method,omitempty"`
+	Accessibility     string     `json:"accessibility"` // public | restricted | classified | destroyed
+	SupportsClaim     bool       `json:"supports_claim"`
+	SourceID          *string    `json:"source_id,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+}
+
+type EvidenceGap struct {
+	ID                 string                 `json:"id"`
+	ClaimID            string                 `json:"claim_id"`
+	GapType            string                 `json:"gap_type"` // expected | unexpected | unknown_expectedness
+	ExpectedArtifact   string                 `json:"expected_artifact"` // patent | primary_source | dataset | eyewitness
+	VerificationStatus string                 `json:"verification_status"` // verified_gap | unverified_gap | false_positive_risk
+	ExternalMetadata   map[string]interface{} `json:"external_metadata,omitempty"`
+	CauseLabel         string                 `json:"cause_label,omitempty"` // classified | destroyed | unlocatable | unknown
+	CauseConfidence    float64                `json:"cause_confidence"`
+	DetectedAt         time.Time              `json:"detected_at"`
+}
+
+type LanguageFlag struct {
+	ID               string  `json:"id"`
+	ClaimID          string  `json:"claim_id"`
+	SourcePhrase     string  `json:"source_phrase"`
+	PrecisionUpgrade string  `json:"precision_upgrade"`
+	FramingOrigin    string  `json:"framing_origin"`
+	FramingFunction  string  `json:"framing_function"`
+	Confidence       float64 `json:"confidence"`
+	DetectedAt       time.Time `json:"detected_at"`
+}
+
+type ScrutinyAssessment struct {
+	ID              string                 `json:"id"`
+	ClaimID         string                 `json:"claim_id"`
+	RiskFactors     map[string]interface{} `json:"risk_factors,omitempty"`
+	RiskScore       float64                `json:"risk_score"`
+	ActionRequired  map[string]interface{} `json:"action_required,omitempty"`
+	AssessedAt      time.Time              `json:"assessed_at"`
+}
+
+type ArticleClaim struct {
+	ArticleID string `json:"article_id"`
+	ClaimID   string `json:"claim_id"`
+}
+
+type EpistemicPipelineData struct {
+	Claims      []Claim            `json:"claims"`
+	Sources     []Source           `json:"sources"`
+	Evidence    []Evidence         `json:"evidence"`
+	Gaps        []EvidenceGap      `json:"gaps"`
+	LangFlags   []LanguageFlag     `json:"language_flags"`
+	Scrutinies  []ScrutinyAssessment `json:"scrutinies"`
+	ArticleClaims []ArticleClaim   `json:"article_claims"`
 }
 
 type ArticleMetadata struct {
-	Version     int    `json:"version" bson:"version"`
-	Created     string `json:"created" bson:"created"`
-	Updated     string `json:"updated" bson:"updated"`
-	Status      string `json:"status" bson:"status"` // draft | published | error
-	Freshness   string `json:"freshness,omitempty" bson:"freshness,omitempty"`
-	GeneratedBy string `json:"generatedBy,omitempty" bson:"generatedBy,omitempty"`
+	Version     int    `json:"version"`
+	Created     string `json:"created"`
+	Updated     string `json:"updated"`
+	Status      string `json:"status"` // draft | published | error
+	Freshness   string `json:"freshness,omitempty"`
+	GeneratedBy string `json:"generatedBy,omitempty"`
 }
 
 type Article struct {
-	ID                primitive.ObjectID     `json:"-" bson:"_id,omitempty"`
-	Slug              string                 `json:"slug" bson:"slug"`
-	Title             string                 `json:"title" bson:"title"`
-	Abstract          string                 `json:"abstract" bson:"abstract"`
-	Sections          []Section              `json:"sections" bson:"sections"`
-	Timeline          []TimelineEvent        `json:"timeline" bson:"timeline"`
-	Categories        []string               `json:"categories" bson:"categories"`
-	Crossrefs         []CrossReference       `json:"crossrefs" bson:"crossrefs"`
-	Citations         []Citation             `json:"citations" bson:"citations"`
-	ThreedScenes      []ThreeDScene          `json:"threedScenes" bson:"threedScenes"`
-	Blocks            []interface{}          `json:"blocks,omitempty" bson:"blocks,omitempty"`
-	ConfidenceVector  map[string]interface{} `json:"confidence_vector,omitempty" bson:"confidence_vector,omitempty"`
-	DerivedConfidence float64                `json:"derived_confidence" bson:"derived_confidence"`
-	Metadata          ArticleMetadata        `json:"metadata" bson:"metadata"`
-	CreatedAt         time.Time              `json:"created_at,omitempty" bson:"created_at,omitempty"`
-	UpdatedAt         time.Time              `json:"updated_at,omitempty" bson:"updated_at,omitempty"`
+	Slug              string                 `json:"slug"`
+	Title             string                 `json:"title"`
+	Abstract          string                 `json:"abstract"`
+	Sections          []Section              `json:"sections"`
+	Timeline          []TimelineEvent        `json:"timeline"`
+	Categories        []string               `json:"categories"`
+	Crossrefs         []CrossReference       `json:"crossrefs"`
+	Citations         []Citation             `json:"citations"`
+	Blocks            []interface{}          `json:"blocks,omitempty"`
+	ConfidenceVector  map[string]interface{} `json:"confidence_vector,omitempty"`
+	DerivedConfidence float64                `json:"derived_confidence"`
+	Metadata          ArticleMetadata        `json:"metadata"`
+	CreatedAt         time.Time              `json:"created_at,omitempty"`
+	UpdatedAt         time.Time              `json:"updated_at,omitempty"`
 }
 
 type GraphEdge struct {
-	Source       string `json:"source" bson:"source"`
-	Target       string `json:"target" bson:"target"`
-	Relationship string `json:"relationship" bson:"relationship"`
+	Source       string `json:"source"`
+	Target       string `json:"target"`
+	Relationship string `json:"relationship"`
 }
 
 type MapEntry struct {
-	Slug        string        `json:"slug" bson:"slug"`
-	Title       string        `json:"title" bson:"title"`
-	Subtitle    string        `json:"subtitle,omitempty" bson:"subtitle,omitempty"`
-	Description string        `json:"description" bson:"description"`
-	Content     string        `json:"content" bson:"content"`
-	Image       string        `json:"image,omitempty" bson:"image,omitempty"`
-	Region      string        `json:"region,omitempty" bson:"region,omitempty"`
-	Era         string        `json:"era,omitempty" bson:"era,omitempty"`
-	Type        string        `json:"type" bson:"type"` // static | interactive
-	ExternalUrl string        `json:"externalUrl,omitempty" bson:"externalUrl,omitempty"`
-	CenterLat   *float64      `json:"centerLat,omitempty" bson:"centerLat,omitempty"`
-	CenterLng   *float64      `json:"centerLng,omitempty" bson:"centerLng,omitempty"`
-	Zoom        int           `json:"zoom" bson:"zoom"`
-	GeoJson     interface{}   `json:"geoJson,omitempty" bson:"geoJson,omitempty"`
-	Markers     []interface{} `json:"markers,omitempty" bson:"markers,omitempty"`
-	Layers      []interface{} `json:"layers,omitempty" bson:"layers,omitempty"`
-	Timeline    []interface{} `json:"timeline,omitempty" bson:"timeline,omitempty"`
-	ThreedScene interface{}   `json:"threedScene,omitempty" bson:"threedScene,omitempty"`
-	CreatedAt   string        `json:"createdAt" bson:"createdAt"`
-	UpdatedAt   string        `json:"updatedAt" bson:"updatedAt"`
+	Slug        string        `json:"slug"`
+	Title       string        `json:"title"`
+	Subtitle    string        `json:"subtitle,omitempty"`
+	Description string        `json:"description"`
+	Content     string        `json:"content"`
+	Image       string        `json:"image,omitempty"`
+	Region      string        `json:"region,omitempty"`
+	Era         string        `json:"era,omitempty"`
+	Type        string        `json:"type"` // static | interactive
+	ExternalUrl string        `json:"externalUrl,omitempty"`
+	CenterLat   *float64      `json:"centerLat,omitempty"`
+	CenterLng   *float64      `json:"centerLng,omitempty"`
+	Zoom        int           `json:"zoom"`
+	GeoJson     interface{}   `json:"geoJson,omitempty"`
+	Markers     []interface{} `json:"markers,omitempty"`
+	CreatedAt   string        `json:"createdAt"`
+	UpdatedAt   string        `json:"updatedAt"`
 }
 
 type Job struct {
-	Slug      string      `json:"slug" bson:"slug"`
-	Title     string      `json:"title" bson:"title"`
-	Status    string      `json:"status" bson:"status"`
-	Phase     string      `json:"phase" bson:"phase"`
-	Error     string      `json:"error,omitempty" bson:"error,omitempty"`
-	Meta      interface{} `json:"meta,omitempty" bson:"meta,omitempty"`
-	CreatedAt string      `json:"createdAt" bson:"createdAt"`
-	UpdatedAt string      `json:"updatedAt" bson:"updatedAt"`
+	Slug      string      `json:"slug"`
+	Title     string      `json:"title"`
+	Status    string      `json:"status"`
+	Phase     string      `json:"phase"`
+	Error     string      `json:"error,omitempty"`
+	Meta      interface{} `json:"meta,omitempty"`
+	CreatedAt string      `json:"createdAt"`
+	UpdatedAt string      `json:"updatedAt"`
 }
 
 type DB struct {
-	client       *mongo.Client
-	db           *mongo.Database
-	mockMode     bool
-	mockMessages map[string][]*StoredMessage
-	mockUsers    map[string]*User
+	db                *sql.DB
+	mockMode          bool
+	mockMessages      map[string][]*StoredMessage
+	mockUsers         map[string]*User
 	mockConversations map[string]*Conversation
 }
 
 func NewDB(connStr string) (*DB, error) {
 	if connStr == "" {
-		fmt.Printf("WARNING: MongoDB connection string is empty. Entering Mock Mode.\n")
+		fmt.Printf("WARNING: PostgreSQL connection string is empty. Entering Mock Mode.\n")
+		return &DB{mockMode: true, mockMessages: make(map[string][]*StoredMessage), mockUsers: make(map[string]*User), mockConversations: make(map[string]*Conversation)}, nil
+	}
+
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		fmt.Printf("WARNING: postgres connection failed (%v). Entering Mock Mode.\n", err)
 		return &DB{mockMode: true, mockMessages: make(map[string][]*StoredMessage), mockUsers: make(map[string]*User), mockConversations: make(map[string]*Conversation)}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(connStr))
-	if err != nil {
-		fmt.Printf("WARNING: mongo connection failed (%v). Entering Mock Mode.\n", err)
-		return &DB{mockMode: true}, nil
+	if err := db.PingContext(ctx); err != nil {
+		fmt.Printf("WARNING: postgres ping failed (%v). Entering Mock Mode.\n", err)
+		return &DB{mockMode: true, mockMessages: make(map[string][]*StoredMessage), mockUsers: make(map[string]*User), mockConversations: make(map[string]*Conversation)}, nil
 	}
 
-	if err := client.Ping(ctx, nil); err != nil {
-		fmt.Printf("WARNING: mongo ping failed (%v). Entering Mock Mode.\n", err)
-		return &DB{mockMode: true}, nil
-	}
-
-	// Based on Mongoose default or typical Next.js config without db in URI
-	database := client.Database("test") 
-
-	return &DB{client: client, db: database, mockMode: false}, nil
+	return &DB{db: db, mockMode: false}, nil
 }
 
 type Conversation struct {
-	ID        string `bson:"id" json:"id"`
-	Title     string `bson:"title" json:"title"`
-	UserID    string `bson:"userId" json:"userId"`
-	CreatedAt string `bson:"createdAt" json:"createdAt"`
-	UpdatedAt string `bson:"updatedAt" json:"updatedAt"`
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	UserID    string `json:"userId"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
 }
 
 type StoredMessage struct {
-	ID             string          `bson:"id" json:"id"`
-	ConversationID string          `bson:"conversationId" json:"conversationId"`
-	Role           string          `bson:"role" json:"role"`
-	Content        string          `bson:"content" json:"content"`
-	Blocks         []interface{}   `bson:"blocks,omitempty" json:"blocks,omitempty"`
-	ToolCalls      []interface{}   `bson:"tool_calls,omitempty" json:"tool_calls,omitempty"`
-	ToolCallID     string          `bson:"tool_call_id,omitempty" json:"tool_call_id,omitempty"`
-	ToolName       string          `bson:"tool_name,omitempty" json:"tool_name,omitempty"`
-	AgentEvents    []interface{}   `bson:"agentEvents,omitempty" json:"agentEvents,omitempty"`
-	CreatedAt      string          `bson:"createdAt" json:"createdAt"`
+	ID             string        `json:"id"`
+	ConversationID string        `json:"conversationId"`
+	Role           string        `json:"role"`
+	Content        string        `json:"content"`
+	Blocks         []interface{} `json:"blocks,omitempty"`
+	ToolCalls      []interface{} `json:"tool_calls,omitempty"`
+	ToolCallID     string        `json:"tool_call_id,omitempty"`
+	ToolName       string        `json:"tool_name,omitempty"`
+	AgentEvents    []interface{} `json:"agentEvents,omitempty"`
+	CreatedAt      string        `json:"createdAt"`
 }
 
 type MemoryEntry struct {
-	Key       string `bson:"key" json:"key"`
-	Value     string `bson:"value" json:"value"`
-	UpdatedAt string `bson:"updatedAt,omitempty" json:"updatedAt,omitempty"`
+	Key       string `json:"key"`
+	Value     string `json:"value"`
+	UpdatedAt string `json:"updatedAt,omitempty"`
 }
 
 type User struct {
-	ID               string    `bson:"id" json:"id"`
-	Email            string    `bson:"email" json:"email"`
-	Name             string    `bson:"name" json:"name"`
-	Avatar           string    `bson:"avatar" json:"avatar"`
-	Role             string    `bson:"role" json:"role"`
-	SubscriptionTier string    `bson:"subscriptionTier" json:"subscriptionTier"`
-	Onboarded        bool      `bson:"onboarded" json:"onboarded"`
-	CreatedAt        time.Time `bson:"createdAt" json:"createdAt"`
-	UpdatedAt        time.Time `bson:"updatedAt" json:"updatedAt"`
+	ID               string    `json:"id"`
+	Email            string    `json:"email"`
+	Name             string    `json:"name"`
+	Avatar           string    `json:"avatar"`
+	Role             string    `json:"role"`
+	SubscriptionTier string    `json:"subscriptionTier"`
+	Onboarded        bool      `json:"onboarded"`
+	CreatedAt        time.Time `json:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
 }
 
 func randID() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+}
+
+func maxIdx(s string, n int) int {
+	if len(s) < n {
+		return len(s)
+	}
+	return n
 }
 
 func (d *DB) FindOrCreateUserByEmail(email string) (*User, error) {
@@ -231,30 +305,32 @@ func (d *DB) FindOrCreateUserByEmail(email string) (*User, error) {
 		return u, nil
 	}
 
-	ctx := context.Background()
 	var u User
-	err := d.db.Collection("users").FindOne(ctx, bson.M{"email": email}).Decode(&u)
-	if err == nil {
+	err := d.db.QueryRow("SELECT id, email, name, avatar, role, subscription_tier, onboarded, created_at, updated_at FROM users WHERE email = $1", email).
+		Scan(&u.ID, &u.Email, &u.Name, &u.Avatar, &u.Role, &u.SubscriptionTier, &u.Onboarded, &u.CreatedAt, &u.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		u = User{
+			ID:               randID(),
+			Email:            email,
+			Name:             email[:maxIdx(email, 20)],
+			Avatar:           "",
+			Role:             "member",
+			SubscriptionTier: "free",
+			Onboarded:        false,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		}
+		_, err = d.db.Exec("INSERT INTO users (id, email, name, avatar, role, subscription_tier, onboarded, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+			u.ID, u.Email, u.Name, u.Avatar, u.Role, u.SubscriptionTier, u.Onboarded, u.CreatedAt, u.UpdatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("create user: %w", err)
+		}
 		return &u, nil
-	}
-	if err != mongo.ErrNoDocuments {
+	} else if err != nil {
 		return nil, fmt.Errorf("find user: %w", err)
 	}
 
-	u = User{
-		ID:               randID(),
-		Email:            email,
-		Name:             email[:maxIdx(email, 20)],
-		Avatar:           "",
-		SubscriptionTier: "free",
-		Onboarded:        false,
-		CreatedAt:        now,
-		UpdatedAt:        now,
-	}
-	_, err = d.db.Collection("users").InsertOne(ctx, u)
-	if err != nil {
-		return nil, fmt.Errorf("create user: %w", err)
-	}
 	return &u, nil
 }
 
@@ -269,8 +345,9 @@ func (d *DB) GetUser(id string) (*User, error) {
 	}
 
 	var u User
-	err := d.db.Collection("users").FindOne(context.Background(), bson.M{"id": id}).Decode(&u)
-	if err == mongo.ErrNoDocuments {
+	err := d.db.QueryRow("SELECT id, email, name, avatar, role, subscription_tier, onboarded, created_at, updated_at FROM users WHERE id = $1", id).
+		Scan(&u.ID, &u.Email, &u.Name, &u.Avatar, &u.Role, &u.SubscriptionTier, &u.Onboarded, &u.CreatedAt, &u.UpdatedAt)
+	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
@@ -279,9 +356,6 @@ func (d *DB) GetUser(id string) (*User, error) {
 	return &u, nil
 }
 
-// SetUserOnboarded flips the onboarding flag for a user. Used by
-// handleAuthOnboard so the frontend's post-onboard /auth/me reflects the
-// change instead of still reporting onboarded:false.
 func (d *DB) SetUserOnboarded(id string, onboarded bool) error {
 	if d.mockMode {
 		if u, ok := d.mockUsers[id]; ok {
@@ -291,22 +365,11 @@ func (d *DB) SetUserOnboarded(id string, onboarded bool) error {
 		return nil
 	}
 
-	_, err := d.db.Collection("users").UpdateOne(
-		context.Background(),
-		bson.M{"id": id},
-		bson.M{"$set": bson.M{"onboarded": onboarded, "updatedAt": time.Now().UTC()}},
-	)
+	_, err := d.db.Exec("UPDATE users SET onboarded = $1, updated_at = $2 WHERE id = $3", onboarded, time.Now().UTC(), id)
 	if err != nil {
 		return fmt.Errorf("set user onboarded: %w", err)
 	}
 	return nil
-}
-
-func maxIdx(s string, n int) int {
-	if len(s) < n {
-		return len(s)
-	}
-	return n
 }
 
 func (d *DB) CreateConversation(id, title, userID string) (*Conversation, error) {
@@ -316,7 +379,8 @@ func (d *DB) CreateConversation(id, title, userID string) (*Conversation, error)
 		d.mockConversations[id] = conv
 		return conv, nil
 	}
-	_, err := d.db.Collection("conversations").InsertOne(context.Background(), conv)
+
+	_, err := d.db.Exec("INSERT INTO conversations (id, title, user_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)", id, title, userID, now, now)
 	if err != nil {
 		return nil, fmt.Errorf("create conversation: %w", err)
 	}
@@ -327,26 +391,36 @@ func (d *DB) ListConversations(userID string) ([]*Conversation, error) {
 	if d.mockMode {
 		var list []*Conversation
 		for _, c := range d.mockConversations {
-			if c.UserID == userID {
+			if userID == "" || c.UserID == userID {
 				list = append(list, c)
 			}
 		}
 		return list, nil
 	}
-	filter := bson.M{}
+
+	var rows *sql.Rows
+	var err error
 	if userID != "" {
-		filter["userId"] = userID
+		rows, err = d.db.Query("SELECT id, title, user_id, created_at, updated_at FROM conversations WHERE user_id = $1 ORDER BY updated_at DESC", userID)
+	} else {
+		rows, err = d.db.Query("SELECT id, title, user_id, created_at, updated_at FROM conversations ORDER BY updated_at DESC")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cursor, err := d.db.Collection("conversations").Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "updatedAt", Value: -1}}))
+
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer rows.Close()
+
 	var list []*Conversation
-	if err := cursor.All(ctx, &list); err != nil {
-		return nil, err
+	for rows.Next() {
+		var c Conversation
+		var createdAt, updatedAt time.Time
+		if err := rows.Scan(&c.ID, &c.Title, &c.UserID, &createdAt, &updatedAt); err != nil {
+			return nil, err
+		}
+		c.CreatedAt = createdAt.Format(time.RFC3339)
+		c.UpdatedAt = updatedAt.Format(time.RFC3339)
+		list = append(list, &c)
 	}
 	return list, nil
 }
@@ -355,25 +429,31 @@ func (d *DB) GetConversation(id string) (*Conversation, error) {
 	if d.mockMode {
 		return d.mockConversations[id], nil
 	}
-	var conv Conversation
-	err := d.db.Collection("conversations").FindOne(context.Background(), bson.M{"id": id}).Decode(&conv)
-	if err == mongo.ErrNoDocuments {
+
+	var c Conversation
+	var createdAt, updatedAt time.Time
+	err := d.db.QueryRow("SELECT id, title, user_id, created_at, updated_at FROM conversations WHERE id = $1", id).
+		Scan(&c.ID, &c.Title, &c.UserID, &createdAt, &updatedAt)
+	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	return &conv, nil
+	c.CreatedAt = createdAt.Format(time.RFC3339)
+	c.UpdatedAt = updatedAt.Format(time.RFC3339)
+	return &c, nil
 }
 
 func (d *DB) UpdateConversationTitle(id, title string) error {
 	if d.mockMode {
 		if c, ok := d.mockConversations[id]; ok {
 			c.Title = title
+			c.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 		}
 		return nil
 	}
-	_, err := d.db.Collection("conversations").UpdateOne(context.Background(), bson.M{"id": id}, bson.M{"$set": bson.M{"title": title}})
+	_, err := d.db.Exec("UPDATE conversations SET title = $1, updated_at = $2 WHERE id = $3", title, time.Now().UTC(), id)
 	return err
 }
 
@@ -384,11 +464,18 @@ func (d *DB) AddMessage(msg *StoredMessage) error {
 		d.mockMessages[msg.ConversationID] = append(d.mockMessages[msg.ConversationID], msg)
 		return nil
 	}
-	_, err := d.db.Collection("messages").InsertOne(context.Background(), msg)
+
+	blocksJson, _ := json.Marshal(msg.Blocks)
+	toolCallsJson, _ := json.Marshal(msg.ToolCalls)
+	agentEventsJson, _ := json.Marshal(msg.AgentEvents)
+
+	_, err := d.db.Exec("INSERT INTO messages (id, conversation_id, role, content, blocks, tool_calls, tool_call_id, tool_name, agent_events, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+		msg.ID, msg.ConversationID, msg.Role, msg.Content, blocksJson, toolCallsJson, msg.ToolCallID, msg.ToolName, agentEventsJson, now)
 	if err != nil {
 		return fmt.Errorf("add message: %w", err)
 	}
-	_, err = d.db.Collection("conversations").UpdateOne(context.Background(), bson.M{"id": msg.ConversationID}, bson.M{"$set": bson.M{"updatedAt": now}})
+
+	_, err = d.db.Exec("UPDATE conversations SET updated_at = $1 WHERE id = $2", now, msg.ConversationID)
 	return err
 }
 
@@ -396,31 +483,51 @@ func (d *DB) GetMessages(conversationID string) ([]*StoredMessage, error) {
 	if d.mockMode {
 		return d.mockMessages[conversationID], nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cursor, err := d.db.Collection("messages").Find(ctx, bson.M{"conversationId": conversationID}, options.Find().SetSort(bson.D{{Key: "createdAt", Value: 1}}))
+
+	rows, err := d.db.Query("SELECT id, conversation_id, role, content, blocks, tool_calls, tool_call_id, tool_name, agent_events, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC", conversationID)
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer rows.Close()
+
 	var list []*StoredMessage
-	if err := cursor.All(ctx, &list); err != nil {
-		return nil, err
+	for rows.Next() {
+		var m StoredMessage
+		var blocksJson, toolCallsJson, agentEventsJson []byte
+		var createdAt time.Time
+		var toolCallID, toolName sql.NullString
+
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &blocksJson, &toolCallsJson, &toolCallID, &toolName, &agentEventsJson, &createdAt); err != nil {
+			return nil, err
+		}
+		m.CreatedAt = createdAt.Format(time.RFC3339)
+		if toolCallID.Valid { m.ToolCallID = toolCallID.String }
+		if toolName.Valid { m.ToolName = toolName.String }
+
+		if len(blocksJson) > 0 { json.Unmarshal(blocksJson, &m.Blocks) }
+		if len(toolCallsJson) > 0 { json.Unmarshal(toolCallsJson, &m.ToolCalls) }
+		if len(agentEventsJson) > 0 { json.Unmarshal(agentEventsJson, &m.AgentEvents) }
+
+		list = append(list, &m)
 	}
 	return list, nil
 }
 
-func (d *DB) MemStore(key, value string) error {
+func (d *DB) MemStore(key, value string, ttlSeconds ...int) error {
 	if d.mockMode {
 		return nil
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := d.db.Collection("memory").UpdateOne(
-		context.Background(),
-		bson.M{"key": key},
-		bson.M{"$set": bson.M{"key": key, "value": value, "updatedAt": now}},
-		options.Update().SetUpsert(true),
-	)
+	now := time.Now().UTC()
+	var expiresAt *time.Time
+	if len(ttlSeconds) > 0 && ttlSeconds[0] > 0 {
+		exp := now.Add(time.Duration(ttlSeconds[0]) * time.Second)
+		expiresAt = &exp
+	}
+	_, err := d.db.Exec(`
+		INSERT INTO memories (key, value, updated_at, expires_at) 
+		VALUES ($1, $2, $3, $4) 
+		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at, expires_at = EXCLUDED.expires_at
+	`, key, value, now, expiresAt)
 	return err
 }
 
@@ -428,91 +535,86 @@ func (d *DB) MemRecall(key string) (string, error) {
 	if d.mockMode {
 		return "", nil
 	}
-	var entry MemoryEntry
-	err := d.db.Collection("memory").FindOne(context.Background(), bson.M{"key": key}).Decode(&entry)
-	if err == mongo.ErrNoDocuments {
+	var value string
+	err := d.db.QueryRow("SELECT value FROM memories WHERE key = $1 AND (expires_at IS NULL OR expires_at > NOW())", key).Scan(&value)
+	if err == sql.ErrNoRows {
 		return "", nil
 	}
 	if err != nil {
 		return "", err
 	}
-	return entry.Value, nil
+	return value, nil
 }
 
-// SiteSettings is a simple key/value store for admin-configurable values
-// (e.g. `featured_articles`, a JSON-encoded array of slugs). The frontend's
-// `GET /admin/settings` returns the whole map merged over defaults; `PUT`
-// accepts `{ "settings": { key: value, ... } }` and upserts each key.
-type SiteSetting struct {
-	Key       string `bson:"key" json:"key"`
-	Value     string `bson:"value" json:"value"`
-	UpdatedAt string `bson:"updatedAt,omitempty" json:"updatedAt,omitempty"`
+func (d *DB) MemDeleteExpired() (int64, error) {
+	if d.mockMode {
+		return 0, nil
+	}
+	res, err := d.db.Exec("DELETE FROM memories WHERE expires_at IS NOT NULL AND expires_at < NOW()")
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
-// DefaultSettings seeds the values the frontend relies on when nothing is set.
 func DefaultSettings() map[string]string {
 	return map[string]string{
 		"featured_articles": "[]",
 	}
 }
 
-// GetSettings returns all stored settings merged over defaults.
 func (d *DB) GetSettings() (map[string]string, error) {
 	out := DefaultSettings()
 	if d.mockMode {
 		return out, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := d.db.Collection("settings").Find(ctx, bson.M{})
+	rows, err := d.db.Query("SELECT key, value FROM settings")
 	if err != nil {
 		return nil, fmt.Errorf("list settings failed: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer rows.Close()
 
-	var entries []SiteSetting
-	if err := cursor.All(ctx, &entries); err != nil {
-		return nil, fmt.Errorf("scan settings failed: %w", err)
-	}
-	for _, e := range entries {
-		out[e.Key] = e.Value
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
+			return nil, fmt.Errorf("scan settings failed: %w", err)
+		}
+		out[k] = v
 	}
 	return out, nil
 }
 
-// SaveSettings upserts each key/value pair.
 func (d *DB) SaveSettings(settings map[string]string) error {
 	if d.mockMode {
 		return nil
 	}
+	now := time.Now().UTC()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 
-	now := time.Now().UTC().Format(time.RFC3339)
 	for key, value := range settings {
-		_, err := d.db.Collection("settings").UpdateOne(
-			ctx,
-			bson.M{"key": key},
-			bson.M{"$set": bson.M{"key": key, "value": value, "updatedAt": now}},
-			options.Update().SetUpsert(true),
-		)
+		_, err := tx.Exec(`
+			INSERT INTO settings (key, value, updated_at) 
+			VALUES ($1, $2, $3) 
+			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at
+		`, key, value, now)
 		if err != nil {
 			return fmt.Errorf("save setting %q: %w", key, err)
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (d *DB) Close() error {
-	if d.mockMode || d.client == nil {
+	if d.mockMode || d.db == nil {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	return d.client.Disconnect(ctx)
+	return d.db.Close()
 }
 
 func (d *DB) GetArticle(slug string) (*Article, error) {
@@ -527,18 +629,34 @@ func (d *DB) GetArticle(slug string) (*Article, error) {
 		}, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	var a Article
+	var blocksJson, cvJson, sectionsJson, timelineJson, categoriesJson, crossrefsJson, citationsJson, metadataJson []byte
+	var idStr string
 
-	var raw bson.M
-	err := d.db.Collection("articles").FindOne(ctx, bson.M{"slug": slug}).Decode(&raw)
-	if err == mongo.ErrNoDocuments {
+	err := d.db.QueryRow(`
+		SELECT id, slug, title, abstract, blocks, confidence_vector, derived_confidence, 
+		       sections, timeline, categories, crossrefs, citations, metadata, created_at, updated_at 
+		FROM articles WHERE slug = $1`, slug).Scan(
+		&idStr, &a.Slug, &a.Title, &a.Abstract, &blocksJson, &cvJson, &a.DerivedConfidence,
+		&sectionsJson, &timelineJson, &categoriesJson, &crossrefsJson, &citationsJson, &metadataJson,
+		&a.CreatedAt, &a.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("querying article failed: %w", err)
 	}
 
-	return articleFromBSONM(raw), nil
+	if len(blocksJson) > 0 { json.Unmarshal(blocksJson, &a.Blocks) }
+	if len(cvJson) > 0 { json.Unmarshal(cvJson, &a.ConfidenceVector) }
+	if len(sectionsJson) > 0 { json.Unmarshal(sectionsJson, &a.Sections) }
+	if len(timelineJson) > 0 { json.Unmarshal(timelineJson, &a.Timeline) }
+	if len(categoriesJson) > 0 { json.Unmarshal(categoriesJson, &a.Categories) }
+	if len(crossrefsJson) > 0 { json.Unmarshal(crossrefsJson, &a.Crossrefs) }
+	if len(citationsJson) > 0 { json.Unmarshal(citationsJson, &a.Citations) }
+	if len(metadataJson) > 0 { json.Unmarshal(metadataJson, &a.Metadata) }
+
+	return &a, nil
 }
 
 func (d *DB) SaveArticle(art *Article) error {
@@ -546,23 +664,63 @@ func (d *DB) SaveArticle(art *Article) error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	art.UpdatedAt = time.Now()
+	now := time.Now().UTC()
+	art.UpdatedAt = now
 	if art.CreatedAt.IsZero() {
-		art.CreatedAt = time.Now()
+		art.CreatedAt = now
 	}
 
-	opts := options.Update().SetUpsert(true)
-	update := bson.M{
-		"$set": art,
-	}
+	blocksJson, _ := json.Marshal(art.Blocks)
+	cvJson, _ := json.Marshal(art.ConfidenceVector)
+	sectionsJson, _ := json.Marshal(art.Sections)
+	timelineJson, _ := json.Marshal(art.Timeline)
+	categoriesJson, _ := json.Marshal(art.Categories)
+	crossrefsJson, _ := json.Marshal(art.Crossrefs)
+	citationsJson, _ := json.Marshal(art.Citations)
+	metadataJson, _ := json.Marshal(art.Metadata)
 
-	_, err := d.db.Collection("articles").UpdateOne(ctx, bson.M{"slug": art.Slug}, update, opts)
+	id := randID()
+
+	// Using UPSERT style via ON CONFLICT (slug)
+	_, err := d.db.Exec(`
+		INSERT INTO articles (id, slug, title, abstract, blocks, confidence_vector, derived_confidence, 
+		                      sections, timeline, categories, crossrefs, citations, metadata, created_at, updated_at) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
+		ON CONFLICT (slug) DO UPDATE SET 
+			title = EXCLUDED.title, abstract = EXCLUDED.abstract, blocks = EXCLUDED.blocks, 
+			confidence_vector = EXCLUDED.confidence_vector, derived_confidence = EXCLUDED.derived_confidence,
+			sections = EXCLUDED.sections, timeline = EXCLUDED.timeline, categories = EXCLUDED.categories,
+			crossrefs = EXCLUDED.crossrefs, citations = EXCLUDED.citations, metadata = EXCLUDED.metadata, updated_at = EXCLUDED.updated_at
+	`, id, art.Slug, art.Title, art.Abstract, blocksJson, cvJson, art.DerivedConfidence,
+	sectionsJson, timelineJson, categoriesJson, crossrefsJson, citationsJson, metadataJson, art.CreatedAt, art.UpdatedAt)
+
 	if err != nil {
 		return fmt.Errorf("saving article failed: %w", err)
 	}
+
+	// Populate graph_edges from crossrefs for graph traversal
+	if len(art.Crossrefs) > 0 {
+		tx, err := d.db.Begin()
+		if err != nil {
+			return fmt.Errorf("begin tx for graph_edges: %w", err)
+		}
+		// Clear existing edges for this source
+		_, _ = tx.Exec("DELETE FROM graph_edges WHERE source = $1", art.Slug)
+		for _, cr := range art.Crossrefs {
+			_, err = tx.Exec(
+				"INSERT INTO graph_edges (source, target, relationship) VALUES ($1, $2, $3) ON CONFLICT (source, target) DO UPDATE SET relationship = EXCLUDED.relationship",
+				art.Slug, cr.Title, cr.Relationship,
+			)
+			if err != nil {
+				tx.Rollback()
+				return fmt.Errorf("insert graph_edge: %w", err)
+			}
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit graph_edges: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -574,195 +732,39 @@ func (d *DB) ListArticles(limit, offset int) ([]*Article, error) {
 		}, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}}).SetLimit(int64(limit)).SetSkip(int64(offset))
-	cursor, err := d.db.Collection("articles").Find(ctx, bson.M{}, opts)
+	rows, err := d.db.Query(`
+		SELECT slug, title, abstract, blocks, confidence_vector, derived_confidence, 
+		       sections, timeline, categories, crossrefs, citations, metadata, created_at, updated_at 
+		FROM articles ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list articles failed: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer rows.Close()
 
-	// Decode into bson.M first, then map to Article — handles legacy TS
-	// documents with type-mismatched fields (e.g. year as string vs float64).
 	var list []*Article
-	for cursor.Next(ctx) {
-		var raw bson.M
-		if err := cursor.Decode(&raw); err != nil {
-			fmt.Printf("WARNING: skipping undecodable article document: %v\n", err)
-			continue
+	for rows.Next() {
+		var a Article
+		var blocksJson, cvJson, sectionsJson, timelineJson, categoriesJson, crossrefsJson, citationsJson, metadataJson []byte
+
+		if err := rows.Scan(
+			&a.Slug, &a.Title, &a.Abstract, &blocksJson, &cvJson, &a.DerivedConfidence,
+			&sectionsJson, &timelineJson, &categoriesJson, &crossrefsJson, &citationsJson, &metadataJson,
+			&a.CreatedAt, &a.UpdatedAt,
+		); err != nil {
+			return nil, err
 		}
-		art := articleFromBSONM(raw)
-		list = append(list, art)
-	}
-	if err := cursor.Err(); err != nil {
-		fmt.Printf("WARNING: cursor iteration error (returning partial results): %v\n", err)
+
+		if len(blocksJson) > 0 { json.Unmarshal(blocksJson, &a.Blocks) }
+		if len(cvJson) > 0 { json.Unmarshal(cvJson, &a.ConfidenceVector) }
+		if len(sectionsJson) > 0 { json.Unmarshal(sectionsJson, &a.Sections) }
+		if len(timelineJson) > 0 { json.Unmarshal(timelineJson, &a.Timeline) }
+		if len(categoriesJson) > 0 { json.Unmarshal(categoriesJson, &a.Categories) }
+		if len(crossrefsJson) > 0 { json.Unmarshal(crossrefsJson, &a.Crossrefs) }
+		if len(citationsJson) > 0 { json.Unmarshal(citationsJson, &a.Citations) }
+		if len(metadataJson) > 0 { json.Unmarshal(metadataJson, &a.Metadata) }
+		list = append(list, &a)
 	}
 	return list, nil
-}
-
-// articleFromBSONM converts a bson.M (from cursor.Decode, tolerant of any
-// legacy shape) into an Article struct with best-effort type coercion.
-func articleFromBSONM(raw bson.M) *Article {
-	art := &Article{}
-	if v, ok := raw["slug"]; ok { art.Slug, _ = v.(string) }
-	if v, ok := raw["title"]; ok { art.Title, _ = v.(string) }
-	if v, ok := raw["abstract"]; ok { art.Abstract, _ = v.(string) }
-
-	if v, ok := raw["derived_confidence"]; ok {
-		switch tv := v.(type) {
-		case float64: art.DerivedConfidence = tv
-		case int64: art.DerivedConfidence = float64(tv)
-		}
-	}
-
-	if v, ok := raw["categories"]; ok {
-		if ca, ok2 := v.(bson.A); ok2 {
-			for _, c := range ca {
-				if s, ok3 := c.(string); ok3 { art.Categories = append(art.Categories, s) }
-			}
-		}
-	}
-
-	// Metadata
-	if v, ok := raw["metadata"]; ok {
-		if md, ok2 := v.(bson.M); ok2 {
-			if s, ok3 := md["status"]; ok3 { art.Metadata.Status, _ = s.(string) }
-			if s, ok3 := md["version"]; ok3 {
-				switch tv := s.(type) {
-				case int64: art.Metadata.Version = int(tv)
-				case float64: art.Metadata.Version = int(tv)
-				case int32: art.Metadata.Version = int(tv)
-				}
-			}
-			if s, ok3 := md["created"]; ok3 { art.Metadata.Created, _ = s.(string) }
-			if s, ok3 := md["updated"]; ok3 { art.Metadata.Updated, _ = s.(string) }
-		}
-	}
-
-	// Sections
-	if v, ok := raw["sections"]; ok {
-		if arr, ok2 := v.(bson.A); ok2 {
-			for _, item := range arr {
-				if doc, ok3 := item.(bson.M); ok3 {
-					sec := Section{}
-					if s, ok4 := doc["id"]; ok4 { sec.ID, _ = s.(string) }
-					if s, ok4 := doc["title"]; ok4 { sec.Title, _ = s.(string) }
-					if s, ok4 := doc["content"]; ok4 { sec.Content, _ = s.(string) }
-					if m, ok4 := doc["media"]; ok4 {
-						if ma, ok5 := m.(bson.A); ok5 {
-							for _, mi := range ma {
-								if md, ok6 := mi.(bson.M); ok6 {
-									media := MediaItem{}
-									if s, ok7 := md["type"]; ok7 { media.Type, _ = s.(string) }
-									if s, ok7 := md["id"]; ok7 { media.ID, _ = s.(string) }
-									if s, ok7 := md["caption"]; ok7 { media.Caption, _ = s.(string) }
-									if s, ok7 := md["src"]; ok7 { media.Src, _ = s.(string) }
-									if s, ok7 := md["source"]; ok7 { media.Source, _ = s.(string) }
-									if s, ok7 := md["code"]; ok7 { media.Code, _ = s.(string) }
-									if s, ok7 := md["prompt"]; ok7 { media.Prompt, _ = s.(string) }
-									sec.Media = append(sec.Media, media)
-								}
-							}
-						}
-					}
-					art.Sections = append(art.Sections, sec)
-				}
-			}
-		}
-	}
-
-	// Blocks (raw interface{} since shape varies)
-	if v, ok := raw["blocks"]; ok {
-		if arr, ok2 := v.(bson.A); ok2 {
-			for _, item := range arr {
-				art.Blocks = append(art.Blocks, item)
-			}
-		}
-	}
-
-	// Timeline
-	if v, ok := raw["timeline"]; ok {
-		if arr, ok2 := v.(bson.A); ok2 {
-			for _, item := range arr {
-				if doc, ok3 := item.(bson.M); ok3 {
-					ev := TimelineEvent{}
-					if s, ok4 := doc["id"]; ok4 { ev.ID, _ = s.(string) }
-					if s, ok4 := doc["year"]; ok4 {
-						switch tv := s.(type) {
-						case float64: ev.Year = tv
-						case int64: ev.Year = float64(tv)
-						case int32: ev.Year = float64(tv)
-						}
-					}
-					if s, ok4 := doc["event"]; ok4 { ev.Event, _ = s.(string) }
-					if s, ok4 := doc["description"]; ok4 { ev.Description, _ = s.(string) }
-					if s, ok4 := doc["image"]; ok4 { ev.Image, _ = s.(string) }
-					art.Timeline = append(art.Timeline, ev)
-				}
-			}
-		}
-	}
-
-	// Crossrefs
-	if v, ok := raw["crossrefs"]; ok {
-		if arr, ok2 := v.(bson.A); ok2 {
-			for _, item := range arr {
-				if doc, ok3 := item.(bson.M); ok3 {
-					cr := CrossReference{}
-					if s, ok4 := doc["id"]; ok4 { cr.ID, _ = s.(string) }
-					if s, ok4 := doc["title"]; ok4 { cr.Title, _ = s.(string) }
-					if s, ok4 := doc["relationship"]; ok4 { cr.Relationship, _ = s.(string) }
-					art.Crossrefs = append(art.Crossrefs, cr)
-				}
-			}
-		}
-	}
-
-	// Citations
-	if v, ok := raw["citations"]; ok {
-		if arr, ok2 := v.(bson.A); ok2 {
-			for _, item := range arr {
-				if doc, ok3 := item.(bson.M); ok3 {
-					ct := Citation{}
-					if s, ok4 := doc["url"]; ok4 { ct.URL, _ = s.(string) }
-					if s, ok4 := doc["title"]; ok4 { ct.Title, _ = s.(string) }
-					if s, ok4 := doc["accessed"]; ok4 { ct.Accessed, _ = s.(string) }
-					if s, ok4 := doc["relevance"]; ok4 { ct.Relevance, _ = s.(string) }
-					art.Citations = append(art.Citations, ct)
-				}
-			}
-		}
-	}
-
-	// Confidence vector
-	if v, ok := raw["confidence_vector"]; ok {
-		if doc, ok2 := v.(bson.M); ok2 {
-			art.ConfidenceVector = make(map[string]interface{})
-			for k, val := range doc {
-				art.ConfidenceVector[k] = val
-			}
-		}
-	}
-
-	// Timestamps
-	if v, ok := raw["created_at"]; ok {
-		switch tv := v.(type) {
-		case time.Time: art.CreatedAt = tv
-		case string:
-			if t, err := time.Parse(time.RFC3339, tv); err == nil { art.CreatedAt = t }
-		}
-	}
-	if v, ok := raw["updated_at"]; ok {
-		switch tv := v.(type) {
-		case time.Time: art.UpdatedAt = tv
-		case string:
-			if t, err := time.Parse(time.RFC3339, tv); err == nil { art.UpdatedAt = t }
-		}
-	}
-
-	return art
 }
 
 func (d *DB) SearchArticles(searchQuery string, limit int) ([]*Article, error) {
@@ -770,36 +772,38 @@ func (d *DB) SearchArticles(searchQuery string, limit int) ([]*Article, error) {
 		return nil, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Use regex for partial search
-	filter := bson.M{
-		"$or": []bson.M{
-			{"title": primitive.Regex{Pattern: searchQuery, Options: "i"}},
-			{"abstract": primitive.Regex{Pattern: searchQuery, Options: "i"}},
-		},
-	}
-	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}}).SetLimit(int64(limit))
-	
-	cursor, err := d.db.Collection("articles").Find(ctx, filter, opts)
+	q := "%" + searchQuery + "%"
+	rows, err := d.db.Query(`
+		SELECT slug, title, abstract, blocks, confidence_vector, derived_confidence, 
+		       sections, timeline, categories, crossrefs, citations, metadata, created_at, updated_at 
+		FROM articles WHERE title ILIKE $1 OR abstract ILIKE $1 ORDER BY created_at DESC LIMIT $2`, q, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search articles failed: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer rows.Close()
 
-	// Decode one document at a time via bson.M to handle legacy TS docs.
 	var list []*Article
-	for cursor.Next(ctx) {
-		var raw bson.M
-		if err := cursor.Decode(&raw); err != nil {
-			fmt.Printf("WARNING: skipping undecodable article document in search: %v\n", err)
-			continue
+	for rows.Next() {
+		var a Article
+		var blocksJson, cvJson, sectionsJson, timelineJson, categoriesJson, crossrefsJson, citationsJson, metadataJson []byte
+
+		if err := rows.Scan(
+			&a.Slug, &a.Title, &a.Abstract, &blocksJson, &cvJson, &a.DerivedConfidence,
+			&sectionsJson, &timelineJson, &categoriesJson, &crossrefsJson, &citationsJson, &metadataJson,
+			&a.CreatedAt, &a.UpdatedAt,
+		); err != nil {
+			return nil, err
 		}
-		list = append(list, articleFromBSONM(raw))
-	}
-	if err := cursor.Err(); err != nil {
-		fmt.Printf("WARNING: cursor iteration error in search (returning partial results): %v\n", err)
+
+		if len(blocksJson) > 0 { json.Unmarshal(blocksJson, &a.Blocks) }
+		if len(cvJson) > 0 { json.Unmarshal(cvJson, &a.ConfidenceVector) }
+		if len(sectionsJson) > 0 { json.Unmarshal(sectionsJson, &a.Sections) }
+		if len(timelineJson) > 0 { json.Unmarshal(timelineJson, &a.Timeline) }
+		if len(categoriesJson) > 0 { json.Unmarshal(categoriesJson, &a.Categories) }
+		if len(crossrefsJson) > 0 { json.Unmarshal(crossrefsJson, &a.Crossrefs) }
+		if len(citationsJson) > 0 { json.Unmarshal(citationsJson, &a.Citations) }
+		if len(metadataJson) > 0 { json.Unmarshal(metadataJson, &a.Metadata) }
+		list = append(list, &a)
 	}
 	return list, nil
 }
@@ -809,30 +813,22 @@ func (d *DB) SaveJob(slug string, status string, phase string, meta map[string]i
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	title := slug
 	if t, ok := meta["title"].(string); ok {
 		title = t
 	}
 
-	opts := options.Update().SetUpsert(true)
-	update := bson.M{
-		"$set": bson.M{
-			"slug":       slug,
-			"title":      title,
-			"status":     status,
-			"phase":      phase,
-			"meta":       meta,
-			"updatedAt":  time.Now().Format(time.RFC3339),
-		},
-		"$setOnInsert": bson.M{
-			"createdAt": time.Now().Format(time.RFC3339),
-		},
-	}
+	now := time.Now().UTC()
+	metaJson, _ := json.Marshal(meta)
 
-	_, err := d.db.Collection("jobs").UpdateOne(ctx, bson.M{"slug": slug}, update, opts)
+	_, err := d.db.Exec(`
+		INSERT INTO jobs (slug, title, status, phase, meta, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $6)
+		ON CONFLICT (slug) DO UPDATE SET
+			title = EXCLUDED.title, status = EXCLUDED.status, phase = EXCLUDED.phase,
+			meta = EXCLUDED.meta, updated_at = EXCLUDED.updated_at
+	`, slug, title, status, phase, metaJson, now)
+
 	if err != nil {
 		return fmt.Errorf("saving job failed: %w", err)
 	}
@@ -843,39 +839,49 @@ func (d *DB) GetJob(slug string) (*Job, error) {
 	if d.mockMode {
 		return nil, nil
 	}
-	
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
-	var job Job
-	err := d.db.Collection("jobs").FindOne(ctx, bson.M{"slug": slug}).Decode(&job)
-	if err == mongo.ErrNoDocuments {
+	var j Job
+	var metaJson []byte
+	var created, updated time.Time
+
+	err := d.db.QueryRow("SELECT slug, title, status, phase, meta, created_at, updated_at FROM jobs WHERE slug = $1", slug).
+		Scan(&j.Slug, &j.Title, &j.Status, &j.Phase, &metaJson, &created, &updated)
+	
+	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("querying job failed: %w", err)
 	}
-	return &job, nil
+
+	if len(metaJson) > 0 { json.Unmarshal(metaJson, &j.Meta) }
+	j.CreatedAt = created.Format(time.RFC3339)
+	j.UpdatedAt = updated.Format(time.RFC3339)
+	return &j, nil
 }
 
-// ListJobsByStatus returns jobs in a given status (e.g. "queued", "writing").
-// Used by the generation worker pool to restore in-flight jobs on boot.
 func (d *DB) ListJobsByStatus(status string) ([]*Job, error) {
 	if d.mockMode {
 		return nil, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := d.db.Collection("jobs").Find(ctx, bson.M{"status": status}, options.Find().SetSort(bson.D{{Key: "createdAt", Value: 1}}))
+	rows, err := d.db.Query("SELECT slug, title, status, phase, meta, created_at, updated_at FROM jobs WHERE status = $1 ORDER BY created_at ASC", status)
 	if err != nil {
 		return nil, fmt.Errorf("list jobs by status failed: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer rows.Close()
 
 	var list []*Job
-	if err = cursor.All(ctx, &list); err != nil {
-		return nil, fmt.Errorf("scanning jobs failed: %w", err)
+	for rows.Next() {
+		var j Job
+		var metaJson []byte
+		var created, updated time.Time
+		if err := rows.Scan(&j.Slug, &j.Title, &j.Status, &j.Phase, &metaJson, &created, &updated); err != nil {
+			return nil, err
+		}
+		if len(metaJson) > 0 { json.Unmarshal(metaJson, &j.Meta) }
+		j.CreatedAt = created.Format(time.RFC3339)
+		j.UpdatedAt = updated.Format(time.RFC3339)
+		list = append(list, &j)
 	}
 	return list, nil
 }
@@ -884,17 +890,7 @@ func (d *DB) TrackArticleView(slug string, ip string, event string) error {
 	if d.mockMode {
 		return nil
 	}
-	
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	doc := bson.M{
-		"slug":      slug,
-		"event":     event,
-		"ip":        ip,
-		"createdAt": time.Now(),
-	}
-	_, err := d.db.Collection("articleviews").InsertOne(ctx, doc)
+	_, err := d.db.Exec("INSERT INTO article_views (slug, ip, event, created_at) VALUES ($1, $2, $3, $4)", slug, ip, event, time.Now().UTC())
 	return err
 }
 
@@ -902,40 +898,72 @@ func (d *DB) GetArticleViewCount(slug string) (int, error) {
 	if d.mockMode {
 		return 42, nil
 	}
-	
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	count, err := d.db.Collection("articleviews").CountDocuments(ctx, bson.M{"slug": slug})
-	return int(count), err
+	var count int
+	err := d.db.QueryRow("SELECT COUNT(*) FROM article_views WHERE slug = $1", slug).Scan(&count)
+	return count, err
 }
 
 func (d *DB) GetTopArticles(limit int) ([]*Article, error) {
 	if d.mockMode {
 		return d.ListArticles(limit, 0)
 	}
+	rows, err := d.db.Query(`
+		SELECT a.slug, a.title, a.abstract, a.blocks, a.confidence_vector, a.derived_confidence,
+		       a.sections, a.timeline, a.categories, a.crossrefs, a.citations, a.threed_scenes, a.metadata, a.created_at, a.updated_at
+		FROM articles a
+		JOIN (
+			SELECT slug, COUNT(*) as view_count
+			FROM article_views
+			GROUP BY slug
+		) av ON a.slug = av.slug
+		ORDER BY av.view_count DESC, a.created_at DESC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("get top articles failed: %w", err)
+	}
+	defer rows.Close()
 
-	// Using standard list for MongoDB simplification (a full aggregate view count can be done later if needed)
-	return d.ListArticles(limit, 0)
+	var list []*Article
+	for rows.Next() {
+		var a Article
+		var blocksJson, cvJson, sectionsJson, timelineJson, categoriesJson, crossrefsJson, citationsJson, metadataJson []byte
+		if err := rows.Scan(
+			&a.Slug, &a.Title, &a.Abstract, &blocksJson, &cvJson, &a.DerivedConfidence,
+			&sectionsJson, &timelineJson, &categoriesJson, &crossrefsJson, &citationsJson, &metadataJson,
+			&a.CreatedAt, &a.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		if len(blocksJson) > 0 { json.Unmarshal(blocksJson, &a.Blocks) }
+		if len(cvJson) > 0 { json.Unmarshal(cvJson, &a.ConfidenceVector) }
+		if len(sectionsJson) > 0 { json.Unmarshal(sectionsJson, &a.Sections) }
+		if len(timelineJson) > 0 { json.Unmarshal(timelineJson, &a.Timeline) }
+		if len(categoriesJson) > 0 { json.Unmarshal(categoriesJson, &a.Categories) }
+		if len(crossrefsJson) > 0 { json.Unmarshal(crossrefsJson, &a.Crossrefs) }
+		if len(citationsJson) > 0 { json.Unmarshal(citationsJson, &a.Citations) }
+		if len(metadataJson) > 0 { json.Unmarshal(metadataJson, &a.Metadata) }
+		list = append(list, &a)
+	}
+	return list, nil
 }
 
 func (d *DB) GetGraphEdges(slug string) ([]*GraphEdge, error) {
 	if d.mockMode {
 		return nil, nil
 	}
-	
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := d.db.Collection("graphedges").Find(ctx, bson.M{"source": slug})
+	rows, err := d.db.Query("SELECT source, target, relationship FROM graph_edges WHERE source = $1", slug)
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer rows.Close()
 
 	var list []*GraphEdge
-	if err = cursor.All(ctx, &list); err != nil {
-		return nil, err
+	for rows.Next() {
+		var e GraphEdge
+		if err := rows.Scan(&e.Source, &e.Target, &e.Relationship); err != nil {
+			return nil, err
+		}
+		list = append(list, &e)
 	}
 	return list, nil
 }
@@ -944,19 +972,19 @@ func (d *DB) GetBacklinks(slug string) ([]*GraphEdge, error) {
 	if d.mockMode {
 		return nil, nil
 	}
-	
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := d.db.Collection("graphedges").Find(ctx, bson.M{"target": slug})
+	rows, err := d.db.Query("SELECT source, target, relationship FROM graph_edges WHERE target = $1", slug)
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer rows.Close()
 
 	var list []*GraphEdge
-	if err = cursor.All(ctx, &list); err != nil {
-		return nil, err
+	for rows.Next() {
+		var e GraphEdge
+		if err := rows.Scan(&e.Source, &e.Target, &e.Relationship); err != nil {
+			return nil, err
+		}
+		list = append(list, &e)
 	}
 	return list, nil
 }
@@ -965,17 +993,33 @@ func (d *DB) GetMap(slug string) (*MapEntry, error) {
 	if d.mockMode {
 		return nil, nil
 	}
-	
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	var m MapEntry
-	err := d.db.Collection("mapentries").FindOne(ctx, bson.M{"slug": slug}).Decode(&m)
-	if err == mongo.ErrNoDocuments {
+	var clat, clng sql.NullFloat64
+	var geoJson, markersJson []byte
+	var created, updated time.Time
+
+	err := d.db.QueryRow(`
+		SELECT slug, title, subtitle, description, content, image, region, era, type, external_url, 
+		       center_lat, center_lng, zoom, geo_json, markers, created_at, updated_at 
+		FROM maps WHERE slug = $1`, slug).Scan(
+		&m.Slug, &m.Title, &m.Subtitle, &m.Description, &m.Content, &m.Image, &m.Region, &m.Era, &m.Type, &m.ExternalUrl,
+		&clat, &clng, &m.Zoom, &geoJson, &markersJson, &created, &updated,
+	)
+	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
 	}
+
+	if clat.Valid { m.CenterLat = &clat.Float64 }
+	if clng.Valid { m.CenterLng = &clng.Float64 }
+	if len(geoJson) > 0 { json.Unmarshal(geoJson, &m.GeoJson) }
+	if len(markersJson) > 0 { json.Unmarshal(markersJson, &m.Markers) }
+
+	m.CreatedAt = created.Format(time.RFC3339)
+	m.UpdatedAt = updated.Format(time.RFC3339)
+
 	return &m, nil
 }
 
@@ -983,30 +1027,43 @@ func (d *DB) GetMaps(limit, offset int) ([]*MapEntry, []*MapEntry, error) {
 	if d.mockMode {
 		return nil, nil, nil
 	}
-	
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
-	opts := options.Find().SetLimit(int64(limit)).SetSkip(int64(offset))
-	cursor, err := d.db.Collection("mapentries").Find(ctx, bson.M{}, opts)
+	rows, err := d.db.Query(`
+		SELECT slug, title, subtitle, description, content, image, region, era, type, external_url, 
+		       center_lat, center_lng, zoom, geo_json, markers, created_at, updated_at 
+		FROM maps LIMIT $1 OFFSET $2`, limit, offset)
 	if err != nil {
 		return nil, nil, err
 	}
-	defer cursor.Close(ctx)
+	defer rows.Close()
 
 	var staticMaps []*MapEntry
 	var interactiveMaps []*MapEntry
 
-	var allMaps []*MapEntry
-	if err = cursor.All(ctx, &allMaps); err != nil {
-		return nil, nil, err
-	}
+	for rows.Next() {
+		var m MapEntry
+		var clat, clng sql.NullFloat64
+		var geoJson, markersJson []byte
+		var created, updated time.Time
+		if err := rows.Scan(
+			&m.Slug, &m.Title, &m.Subtitle, &m.Description, &m.Content, &m.Image, &m.Region, &m.Era, &m.Type, &m.ExternalUrl,
+			&clat, &clng, &m.Zoom, &geoJson, &markersJson, &created, &updated,
+		); err != nil {
+			return nil, nil, err
+		}
 
-	for _, m := range allMaps {
+		if clat.Valid { m.CenterLat = &clat.Float64 }
+		if clng.Valid { m.CenterLng = &clng.Float64 }
+		if len(geoJson) > 0 { json.Unmarshal(geoJson, &m.GeoJson) }
+		if len(markersJson) > 0 { json.Unmarshal(markersJson, &m.Markers) }
+
+		m.CreatedAt = created.Format(time.RFC3339)
+		m.UpdatedAt = updated.Format(time.RFC3339)
+
 		if m.Type == "interactive" {
-			interactiveMaps = append(interactiveMaps, m)
+			interactiveMaps = append(interactiveMaps, &m)
 		} else {
-			staticMaps = append(staticMaps, m)
+			staticMaps = append(staticMaps, &m)
 		}
 	}
 	return staticMaps, interactiveMaps, nil
@@ -1017,36 +1074,324 @@ func (d *DB) SearchMaps(searchQuery string, limit int) ([]*MapEntry, error) {
 		return nil, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	filter := bson.M{
-		"$or": []bson.M{
-			{"title": primitive.Regex{Pattern: searchQuery, Options: "i"}},
-			{"subtitle": primitive.Regex{Pattern: searchQuery, Options: "i"}},
-			{"description": primitive.Regex{Pattern: searchQuery, Options: "i"}},
-			{"region": primitive.Regex{Pattern: searchQuery, Options: "i"}},
-			{"era": primitive.Regex{Pattern: searchQuery, Options: "i"}},
-		},
-	}
-	opts := options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}).SetLimit(int64(limit))
-
-	cursor, err := d.db.Collection("mapentries").Find(ctx, filter, opts)
+	q := "%" + searchQuery + "%"
+	rows, err := d.db.Query(`
+		SELECT slug, title, subtitle, description, content, image, region, era, type, external_url, 
+		       center_lat, center_lng, zoom, geo_json, markers, created_at, updated_at 
+		FROM maps 
+		WHERE title ILIKE $1 OR subtitle ILIKE $1 OR description ILIKE $1 OR region ILIKE $1 OR era ILIKE $1 
+		ORDER BY created_at DESC LIMIT $2`, q, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search maps failed: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer rows.Close()
 
 	var list []*MapEntry
-	if err = cursor.All(ctx, &list); err != nil {
-		return nil, fmt.Errorf("scanning searched maps failed: %w", err)
+	for rows.Next() {
+		var m MapEntry
+		var clat, clng sql.NullFloat64
+		var geoJson, markersJson []byte
+		var created, updated time.Time
+		if err := rows.Scan(
+			&m.Slug, &m.Title, &m.Subtitle, &m.Description, &m.Content, &m.Image, &m.Region, &m.Era, &m.Type, &m.ExternalUrl,
+			&clat, &clng, &m.Zoom, &geoJson, &markersJson, &created, &updated,
+		); err != nil {
+			return nil, err
+		}
+
+		if clat.Valid { m.CenterLat = &clat.Float64 }
+		if clng.Valid { m.CenterLng = &clng.Float64 }
+		if len(geoJson) > 0 { json.Unmarshal(geoJson, &m.GeoJson) }
+		if len(markersJson) > 0 { json.Unmarshal(markersJson, &m.Markers) }
+
+		m.CreatedAt = created.Format(time.RFC3339)
+		m.UpdatedAt = updated.Format(time.RFC3339)
+		list = append(list, &m)
 	}
 	return list, nil
 }
 
-// IsMockMode reports whether the database is running in mock (in-memory) mode.
-// The health endpoint uses this to let operators know the storage layer has no
-// real backing database.
+// ────────────────────────────────────────────────────────────
+// Epistemic Pipeline Storage Methods
+// ────────────────────────────────────────────────────────────
+
+func (d *DB) SaveEpistemicPipeline(data *EpistemicPipelineData) error {
+	if d.mockMode {
+		return nil
+	}
+	if data == nil {
+		return nil
+	}
+
+	tx, err := d.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	// 1. Save Claims
+	for _, c := range data.Claims {
+		cvJson, _ := json.Marshal(c.ConfidenceVector)
+		_, err = tx.Exec(`
+			INSERT INTO claims (id, text, type, status, confidence_vector, derived_confidence, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			ON CONFLICT (id) DO UPDATE SET
+				text = EXCLUDED.text, type = EXCLUDED.type, status = EXCLUDED.status,
+				confidence_vector = EXCLUDED.confidence_vector, derived_confidence = EXCLUDED.derived_confidence,
+				updated_at = EXCLUDED.updated_at
+		`, c.ID, c.Text, c.Type, c.Status, cvJson, c.DerivedConfidence, c.CreatedAt, c.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("save claim %s: %w", c.ID, err)
+		}
+	}
+
+	// 2. Save Sources
+	for _, s := range data.Sources {
+		cvJson, _ := json.Marshal(s.CredibilityVector)
+		_, err = tx.Exec(`
+			INSERT INTO sources (id, name, type, credibility_vector, created_at)
+			VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT (id) DO UPDATE SET
+				name = EXCLUDED.name, type = EXCLUDED.type, credibility_vector = EXCLUDED.credibility_vector
+		`, s.ID, s.Name, s.Type, cvJson, s.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("save source %s: %w", s.ID, err)
+		}
+	}
+
+	// 3. Save Evidence
+	for _, e := range data.Evidence {
+		var sourceID interface{}
+		if e.SourceID != nil {
+			sourceID = *e.SourceID
+		}
+		_, err = tx.Exec(`
+			INSERT INTO evidence (id, claim_id, type, url, chain_of_custody, acquisition_method, accessibility, supports_claim, source_id, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			ON CONFLICT (id) DO UPDATE SET
+				claim_id = EXCLUDED.claim_id, type = EXCLUDED.type, url = EXCLUDED.url,
+				chain_of_custody = EXCLUDED.chain_of_custody, acquisition_method = EXCLUDED.acquisition_method,
+				accessibility = EXCLUDED.accessibility, supports_claim = EXCLUDED.supports_claim, source_id = EXCLUDED.source_id
+		`, e.ID, e.ClaimID, e.Type, e.URL, e.ChainOfCustody, e.AcquisitionMethod, e.Accessibility, e.SupportsClaim, sourceID, e.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("save evidence %s: %w", e.ID, err)
+		}
+	}
+
+	// 4. Save Evidence Gaps
+	for _, g := range data.Gaps {
+		emJson, _ := json.Marshal(g.ExternalMetadata)
+		_, err = tx.Exec(`
+			INSERT INTO evidence_gaps (id, claim_id, gap_type, expected_artifact, verification_status, external_metadata, cause_label, cause_confidence, detected_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			ON CONFLICT (id) DO UPDATE SET
+				claim_id = EXCLUDED.claim_id, gap_type = EXCLUDED.gap_type, expected_artifact = EXCLUDED.expected_artifact,
+				verification_status = EXCLUDED.verification_status, external_metadata = EXCLUDED.external_metadata,
+				cause_label = EXCLUDED.cause_label, cause_confidence = EXCLUDED.cause_confidence
+		`, g.ID, g.ClaimID, g.GapType, g.ExpectedArtifact, g.VerificationStatus, emJson, g.CauseLabel, g.CauseConfidence, g.DetectedAt)
+		if err != nil {
+			return fmt.Errorf("save evidence gap %s: %w", g.ID, err)
+		}
+	}
+
+	// 5. Save Language Flags
+	for _, lf := range data.LangFlags {
+		_, err = tx.Exec(`
+			INSERT INTO language_flags (id, claim_id, source_phrase, precision_upgrade, framing_origin, framing_function, confidence, detected_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			ON CONFLICT (id) DO UPDATE SET
+				claim_id = EXCLUDED.claim_id, source_phrase = EXCLUDED.source_phrase,
+				precision_upgrade = EXCLUDED.precision_upgrade, framing_origin = EXCLUDED.framing_origin,
+				framing_function = EXCLUDED.framing_function, confidence = EXCLUDED.confidence
+		`, lf.ID, lf.ClaimID, lf.SourcePhrase, lf.PrecisionUpgrade, lf.FramingOrigin, lf.FramingFunction, lf.Confidence, lf.DetectedAt)
+		if err != nil {
+			return fmt.Errorf("save language flag %s: %w", lf.ID, err)
+		}
+	}
+
+	// 6. Save Scrutiny Assessments
+	for _, s := range data.Scrutinies {
+		rfJson, _ := json.Marshal(s.RiskFactors)
+		arJson, _ := json.Marshal(s.ActionRequired)
+		_, err = tx.Exec(`
+			INSERT INTO scrutiny_assessments (id, claim_id, risk_factors, risk_score, action_required, assessed_at)
+			VALUES ($1, $2, $3, $4, $5, $6)
+			ON CONFLICT (id) DO UPDATE SET
+				claim_id = EXCLUDED.claim_id, risk_factors = EXCLUDED.risk_factors,
+				risk_score = EXCLUDED.risk_score, action_required = EXCLUDED.action_required
+		`, s.ID, s.ClaimID, rfJson, s.RiskScore, arJson, s.AssessedAt)
+		if err != nil {
+			return fmt.Errorf("save scrutiny %s: %w", s.ID, err)
+		}
+	}
+
+	// 7. Save Article-Claim junctions
+	for _, ac := range data.ArticleClaims {
+		_, err = tx.Exec(`
+			INSERT INTO article_claims (article_id, claim_id)
+			VALUES ($1, $2)
+			ON CONFLICT (article_id, claim_id) DO NOTHING
+		`, ac.ArticleID, ac.ClaimID)
+		if err != nil {
+			return fmt.Errorf("save article_claim %s-%s: %w", ac.ArticleID, ac.ClaimID, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (d *DB) GetEpistemicPipelineForArticle(articleID string) (*EpistemicPipelineData, error) {
+	if d.mockMode {
+		return &EpistemicPipelineData{}, nil
+	}
+
+	data := &EpistemicPipelineData{}
+
+	// Get article-claim links
+	rows, err := d.db.Query("SELECT claim_id FROM article_claims WHERE article_id = $1", articleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var claimIDs []string
+	for rows.Next() {
+		var cid string
+		if err := rows.Scan(&cid); err != nil {
+			return nil, err
+		}
+		claimIDs = append(claimIDs, cid)
+	}
+	if len(claimIDs) == 0 {
+		return data, nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := make([]string, len(claimIDs))
+	args := make([]interface{}, len(claimIDs))
+	for i, id := range claimIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+	inClause := strings.Join(placeholders, ",")
+
+	// Get Claims
+	rows, err = d.db.Query(fmt.Sprintf("SELECT id, text, type, status, confidence_vector, derived_confidence, created_at, updated_at FROM claims WHERE id IN (%s)", inClause), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var c Claim
+		var cvJson []byte
+		if err := rows.Scan(&c.ID, &c.Text, &c.Type, &c.Status, &cvJson, &c.DerivedConfidence, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if len(cvJson) > 0 { json.Unmarshal(cvJson, &c.ConfidenceVector) }
+		data.Claims = append(data.Claims, c)
+	}
+
+	// Get Evidence for these claims
+	rows, err = d.db.Query(fmt.Sprintf("SELECT id, claim_id, type, url, chain_of_custody, acquisition_method, accessibility, supports_claim, source_id, created_at FROM evidence WHERE claim_id IN (%s)", inClause), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var e Evidence
+		var sourceID sql.NullString
+		if err := rows.Scan(&e.ID, &e.ClaimID, &e.Type, &e.URL, &e.ChainOfCustody, &e.AcquisitionMethod, &e.Accessibility, &e.SupportsClaim, &sourceID, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		if sourceID.Valid { e.SourceID = &sourceID.String }
+		data.Evidence = append(data.Evidence, e)
+	}
+
+	// Get Evidence Gaps
+	rows, err = d.db.Query(fmt.Sprintf("SELECT id, claim_id, gap_type, expected_artifact, verification_status, external_metadata, cause_label, cause_confidence, detected_at FROM evidence_gaps WHERE claim_id IN (%s)", inClause), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var g EvidenceGap
+		var emJson []byte
+		if err := rows.Scan(&g.ID, &g.ClaimID, &g.GapType, &g.ExpectedArtifact, &g.VerificationStatus, &emJson, &g.CauseLabel, &g.CauseConfidence, &g.DetectedAt); err != nil {
+			return nil, err
+		}
+		if len(emJson) > 0 { json.Unmarshal(emJson, &g.ExternalMetadata) }
+		data.Gaps = append(data.Gaps, g)
+	}
+
+	// Get Language Flags
+	rows, err = d.db.Query(fmt.Sprintf("SELECT id, claim_id, source_phrase, precision_upgrade, framing_origin, framing_function, confidence, detected_at FROM language_flags WHERE claim_id IN (%s)", inClause), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var lf LanguageFlag
+		if err := rows.Scan(&lf.ID, &lf.ClaimID, &lf.SourcePhrase, &lf.PrecisionUpgrade, &lf.FramingOrigin, &lf.FramingFunction, &lf.Confidence, &lf.DetectedAt); err != nil {
+			return nil, err
+		}
+		data.LangFlags = append(data.LangFlags, lf)
+	}
+
+	// Get Scrutiny Assessments
+	rows, err = d.db.Query(fmt.Sprintf("SELECT id, claim_id, risk_factors, risk_score, action_required, assessed_at FROM scrutiny_assessments WHERE claim_id IN (%s)", inClause), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var s ScrutinyAssessment
+		var rfJson, arJson []byte
+		if err := rows.Scan(&s.ID, &s.ClaimID, &rfJson, &s.RiskScore, &arJson, &s.AssessedAt); err != nil {
+			return nil, err
+		}
+		if len(rfJson) > 0 { json.Unmarshal(rfJson, &s.RiskFactors) }
+		if len(arJson) > 0 { json.Unmarshal(arJson, &s.ActionRequired) }
+		data.Scrutinies = append(data.Scrutinies, s)
+	}
+
+	// Get Sources referenced by evidence
+	sourceIDs := make(map[string]bool)
+	for _, e := range data.Evidence {
+		if e.SourceID != nil {
+			sourceIDs[*e.SourceID] = true
+		}
+	}
+	if len(sourceIDs) > 0 {
+		srcIDs := make([]string, 0, len(sourceIDs))
+		for id := range sourceIDs {
+			srcIDs = append(srcIDs, id)
+		}
+		srcPlaceholders := make([]string, len(srcIDs))
+		srcArgs := make([]interface{}, len(srcIDs))
+		for i, id := range srcIDs {
+			srcPlaceholders[i] = fmt.Sprintf("$%d", i+1)
+			srcArgs[i] = id
+		}
+		srcInClause := strings.Join(srcPlaceholders, ",")
+		rows, err = d.db.Query(fmt.Sprintf("SELECT id, name, type, credibility_vector, created_at FROM sources WHERE id IN (%s)", srcInClause), srcArgs...)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var s Source
+			var cvJson []byte
+			if err := rows.Scan(&s.ID, &s.Name, &s.Type, &cvJson, &s.CreatedAt); err != nil {
+				return nil, err
+			}
+			if len(cvJson) > 0 { json.Unmarshal(cvJson, &s.CredibilityVector) }
+			data.Sources = append(data.Sources, s)
+		}
+	}
+
+	return data, nil
+}
+
 func (d *DB) IsMockMode() bool {
 	return d.mockMode
 }

@@ -56,7 +56,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {!isOverlayRoute && !isHidden && <FloatIslandNav />}
       <div className="flex-1 flex min-h-0 min-w-0 relative overflow-hidden">
         <main
-          className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col pb-[5.5rem] md:pb-0"
+          className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col"
           id="main-content"
           style={{ 
             containerType: "inline-size", 

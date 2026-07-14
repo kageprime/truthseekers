@@ -1,6 +1,7 @@
 node_modules
 dist
 .env
+.env.local
 *.db-wal
 *.db-shm
 content/*
@@ -8,5 +9,20 @@ content/*
 .next
 ponytail
 *.tsbuildinfo
+*.log
+*.exe
+server.err
+test-*.mjs
+test-pro.mjs
+skills-lock.json
+.agents/
+.opencode/
+veritas/.opencode/
+veritas/go-orchestrator/*.log
+veritas/go-orchestrator/*.exe
+veritas/go-orchestrator/test_db.go
+veritas/server_*.log
+DEAD_CODE_ANALYSIS.md
+*Client ID*
 nul
 

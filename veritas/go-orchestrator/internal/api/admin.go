@@ -39,11 +39,9 @@ func (s *Server) getAdminSettings(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) putAdminSettings(w http.ResponseWriter, r *http.Request) {
 	reqLog(r, "update admin settings")
-	var body struct {
-		Settings map[string]string `json:"settings"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, `{"error":"Invalid JSON body"}`, http.StatusBadRequest)
+	var body adminSettingsReq
+	if !getValidatedBody(r, &body) {
+		http.Error(w, `{"error":"Missing validated body"}`, http.StatusInternalServerError)
 		return
 	}
 	if len(body.Settings) == 0 {

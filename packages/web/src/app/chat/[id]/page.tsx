@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChat, useChats, useCreateChat, useModels } from "../../hooks";
 import { useChatStream } from "../../hooks/useChatStream";
@@ -12,6 +13,7 @@ import TruthConsole from "../../components/TruthConsole";
 import TruthConsoleDeck from "../../components/truth-console/TruthConsoleDeck";
 import { useTraceSegments } from "../../components/truth-console/useTraceSegments";
 import { useChatContext } from "../ChatContext";
+import { useTheme } from "../../components/ThemeProvider";
 import Spinner from "../../components/Spinner";
 import { IconPlus } from "../../components/Icons";
 
@@ -25,6 +27,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     consoleOpen, setConsoleOpen,
     sending, setSending,
     setLiveEvents,
+    liveEvents,
   } = useChatContext();
 
   const [input, setInput] = useState("");
@@ -34,7 +37,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [error, setError] = useState<string | null>(null);
   const [convId, setConvId] = useState<string | null>(id !== "new" ? id : null);
   const [loading, setLoading] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { mutate: createChat } = useCreateChat();
+  const { resolved: theme, toggle: toggleTheme } = useTheme();
 
   const seg = useTraceSegments(convId ?? id ?? null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -42,7 +47,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const agentEventsRef = useRef<AgentEvent[]>([]);
   const finalizedRef = useRef(false);
   const lastUserMsgRef = useRef<string>("");
-  const { data: conversations = [], loading: chatsLoading } = useChats();
+  const { data: conversationsData, loading: chatsLoading } = useChats();
+  const conversations = conversationsData || [];
 
   const { data: conv, loading: convLoading } = useChat(convId ?? undefined);
   const messages = useMemo(() => (conv?.messages ?? []).filter((m: any) => m.role !== "tool"), [conv?.messages]);
@@ -202,8 +208,120 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const isNew = id === "new" && !convId;
   const showEmpty = messages.length === 0 && !sending && isNew;
 
+  const NAV_LINKS = [
+    { href: "/articles", label: "Articles", icon: "📚" },
+    { href: "/maps", label: "Maps", icon: "🗺️" },
+    { href: "/settings", label: "Settings", icon: "⚙️" },
+  ];
+
   return (
     <div className="flex-1 flex min-h-0 bg-surface">
+      {/* ── Mobile header bar ── */}
+      <div className="md:hidden fixed top-0 left-0 right-0 flex items-center justify-between px-3 h-11 bg-surface/95 backdrop-blur-md border-b border-border/30" style={{ zIndex: 40 }}>
+        <button
+          onClick={() => setMobileSidebarOpen(true)}
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-accent-bg/20 transition-all"
+          aria-label="Open menu"
+          style={{ background: "none", border: "none" }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+        <span className="text-xs font-semibold tracking-tight" style={{ color: "var(--ink)" }}>Truthseekers</span>
+        <button onClick={handleNewChat} className="flex items-center justify-center w-8 h-8 rounded-lg text-muted hover:text-accent hover:bg-accent-bg/20 transition-all" aria-label="New chat" style={{ background: "none", border: "none" }}>
+          <IconPlus size={16} />
+        </button>
+      </div>
+
+      {/* ── Mobile sidebar overlay ── */}
+      {mobileSidebarOpen && (
+        <div className="md:hidden fixed inset-0" style={{ zIndex: 50 }}>
+          <div className="absolute inset-0 bg-black/40 animate-appear-blur" onClick={() => setMobileSidebarOpen(false)} />
+          <aside className="absolute left-0 top-0 bottom-0 w-72 flex flex-col bg-surface border-r border-border/30 shadow-2xl animate-slide-in-left">
+            {/* Sidebar header */}
+            <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-border/30">
+              <div className="flex items-center gap-2">
+                <img src="/logo-icon.png" alt="" height={18} style={{ height: 18, width: "auto" }} />
+                <span className="text-xs font-semibold" style={{ color: "var(--ink)" }}>Truthseekers</span>
+              </div>
+              <button
+                onClick={() => setMobileSidebarOpen(false)}
+                className="flex items-center justify-center w-7 h-7 rounded-md text-subtle hover:text-ink hover:bg-accent-bg/20 transition-all"
+                aria-label="Close menu"
+                style={{ background: "none", border: "none" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Nav links */}
+            <div className="shrink-0 px-3 pt-3 pb-2 space-y-0.5">
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg no-underline transition-colors hover:bg-accent-bg/15"
+                  style={{ color: "var(--muted)" }}
+                >
+                  <span className="text-base">{link.icon}</span>
+                  <span>{link.label}</span>
+                </Link>
+              ))}
+              <button
+                onClick={toggleTheme}
+                className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg w-full text-left transition-colors hover:bg-accent-bg/15"
+                style={{ color: "var(--muted)", background: "none", border: "none" }}
+              >
+                <span className="text-base">{theme === "dark" ? "☀️" : "🌙"}</span>
+                <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
+              </button>
+            </div>
+
+            <div className="mx-3 border-t border-border/20" />
+
+            {/* Sessions header */}
+            <div className="shrink-0 flex items-center justify-between px-4 pt-3 pb-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--subtle)" }}>Sessions</span>
+              <button onClick={() => { handleNewChat(); setMobileSidebarOpen(false); }} className="flex items-center justify-center w-5 h-5 rounded text-subtle hover:text-accent hover:bg-accent-bg/30 transition-all cursor-pointer" aria-label="New chat" style={{ background: "none", border: "none" }}>
+                <IconPlus size={12} />
+              </button>
+            </div>
+
+            {/* Session list */}
+            <div className="flex-1 overflow-y-auto min-h-0 px-2 pb-3">
+              {chatsLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Spinner size={14} />
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="px-3 py-6 text-xs text-center" style={{ color: "var(--subtle)" }}>No conversations yet</div>
+              ) : (
+                conversations.map((c: any) => (
+                  <button
+                    key={c.id}
+                    onClick={() => { router.push(`/chat/${c.id}`); setMobileSidebarOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-xs rounded-md transition-colors hover:bg-accent-bg/15 mb-0.5"
+                    style={{
+                      color: c.id === convId ? "var(--accent)" : "var(--muted)",
+                      background: c.id === convId ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",
+                    }}
+                  >
+                    <div className="truncate font-medium">{c.title}</div>
+                  </button>
+                ))
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
+
       {/* ── Sidebar: session list (desktop) ── */}
       <aside className="hidden md:flex flex-col shrink-0 w-60 border-r border-border/30 bg-surface-elevated/40">
         <div className="shrink-0 flex items-center justify-between px-3 h-11 border-b border-border/30">
@@ -240,7 +358,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       {/* ── Main chat area ── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* ── Messages area ── */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 pt-12 md:pt-0">
           {loading || convLoading ? (
             <div className="p-4 sm:p-6 space-y-5 max-w-3xl mx-auto">
               <div className="flex justify-end">
@@ -283,6 +401,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                   role={msg.role}
                   content={msg.content}
                   blocks={msg.blocks}
+                  agentEvents={msg.agentEvents}
                   createdAt={msg.createdAt}
                   isLastAssistant={i === lastAssistantIndex}
                   onRegenerate={i === lastAssistantIndex && lastUserMsg ? () => doSend(lastUserMsg) : undefined}
@@ -317,7 +436,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                       ))}
                     </div>
                   )}
-                  <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} streaming />
+                  <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} agentEvents={liveEvents} streaming />
                 </div>
               )}
             </div>
@@ -341,19 +460,19 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           </div>
         )}
         {!showEmpty && (
-          <div className="shrink-0 px-4 pb-3 pt-0">
+          <div className="shrink-0 px-2 sm:px-4 pb-2 sm:pb-3 pt-0">
             <div className="max-w-3xl mx-auto">
-              <div className="flex items-end gap-2 rounded-xl px-3 py-2.5" style={{ background: "var(--surface-elevated)", border: "1px solid var(--border)" }}>
+              <div className="flex items-end gap-1.5 sm:gap-2 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2.5" style={{ background: "var(--surface-elevated)", border: "1px solid var(--border)" }}>
                 <div className="flex-1 min-w-0">
                   <textarea
                     ref={textareaRef}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={sending ? "Waiting for response..." : "Ask about any topic..."}
+                    placeholder={sending ? "Waiting..." : "Ask anything..."}
                     disabled={sending}
                     rows={1}
-                    className="w-full resize-none bg-transparent border-none outline-none text-sm min-h-[22px] max-h-[180px] text-ink placeholder:text-subtle/60"
+                    className="w-full resize-none bg-transparent border-none outline-none text-[13px] sm:text-sm min-h-[20px] sm:min-h-[22px] max-h-[120px] sm:max-h-[180px] text-ink placeholder:text-subtle/60"
                     aria-label="Chat message input"
                     style={{ lineHeight: "1.5" }}
                   />
@@ -362,10 +481,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                   <button
                     onClick={() => streamStop(convId ?? undefined)}
                     aria-label="Stop generating"
-                    className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-white text-[11px] font-medium transition-all active:scale-90"
+                    className="shrink-0 flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-white text-[10px] sm:text-[11px] font-medium transition-all active:scale-90"
                     style={{ background: "var(--oxblood)" }}
                   >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
                       <rect x="6" y="6" width="12" height="12" rx="2" />
                     </svg>
                     Stop
@@ -375,10 +494,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                     onClick={() => doSend(input)}
                     disabled={!input.trim()}
                     aria-label="Send message"
-                    className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 ${input.trim() ? "text-white" : "text-subtle cursor-not-allowed"}`}
+                    className={`shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 ${input.trim() ? "text-white" : "text-subtle cursor-not-allowed"}`}
                     style={{ background: input.trim() ? "var(--accent)" : "color-mix(in srgb, var(--border) 60%, transparent)" }}
                   >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="22" y1="2" x2="11" y2="13" />
                       <polygon points="22 2 15 22 11 13 2 9 22 2" />
                     </svg>
