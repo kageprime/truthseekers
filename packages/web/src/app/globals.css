@@ -892,6 +892,10 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
   from { transform: translateX(100%); opacity: 0; }
   to   { transform: translateX(0); opacity: 1; }
 }
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
 @keyframes typing-dots {
   0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
   30%           { opacity: 1; transform: translateY(-4px); }
@@ -902,6 +906,7 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
 .animate-appear-scale { animation: appear-scale var(--duration-slow) var(--ease-out-expo) both; }
 .animate-appear-blur  { animation: appear-blur var(--duration-enter) var(--ease-out-expo) both; }
 .animate-slide-in-right { animation: slide-in-right 300ms var(--ease-out-expo) both; }
+.animate-slide-in-left  { animation: slide-in-left 300ms var(--ease-out-expo) both; }
 .animate-float        { animation: float-subtle 3s ease-in-out infinite; }
 .animate-pulse-ring   { animation: pulse-ring 2s ease-out infinite; }
 

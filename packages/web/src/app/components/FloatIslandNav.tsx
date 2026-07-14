@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "./ThemeProvider";
@@ -187,6 +189,122 @@ function BottomDock({ pathname }: { pathname: string }) {
   );
 }
 
+// ─── Mobile header (non-chat pages) ────────────────────────────
+
+function MobileHeader({ pathname }: { pathname: string }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { resolved, toggle } = useTheme();
+  const { user } = useAuth();
+
+  // Chat pages render their own mobile header
+  if (pathname.startsWith("/chat")) return null;
+
+  return (
+    <>
+      <header
+        className="md:hidden flex items-center justify-between px-3"
+        style={{
+          height: "2.75rem",
+          background: "var(--surface-glass)",
+          backdropFilter: "blur(20px) saturate(1.4)",
+          borderBottom: "1px solid var(--glass-border)",
+          zIndex: "var(--z-header)",
+        }}
+      >
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-accent-bg/20 transition-all"
+          aria-label="Open menu"
+          style={{ background: "none", border: "none" }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+
+        <Link href="/" className="flex items-center gap-2 no-underline">
+          <img src="/logo-icon.png" alt="" height={18} style={{ height: 18, width: "auto" }} />
+          <span className="text-xs font-semibold tracking-tight" style={{ color: "var(--ink)" }}>Truthseekers</span>
+        </Link>
+
+        <div className="w-8 flex items-center justify-center">
+          {user ? (
+            <Link href="/settings" className="shrink-0">
+              <Avatar src={user.avatar || undefined} alt={user.name} size="sm" />
+            </Link>
+          ) : (
+            <div className="w-8" />
+          )}
+        </div>
+      </header>
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div className="md:hidden fixed inset-0" style={{ zIndex: 50 }}>
+          <div className="absolute inset-0 bg-black/40 animate-appear-blur" onClick={() => setSidebarOpen(false)} />
+          <aside className="absolute left-0 top-0 bottom-0 w-72 flex flex-col bg-surface border-r border-border/30 shadow-2xl animate-slide-in-left">
+            {/* Header */}
+            <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-border/30">
+              <div className="flex items-center gap-2">
+                <img src="/logo-icon.png" alt="" height={18} style={{ height: 18, width: "auto" }} />
+                <span className="text-xs font-semibold" style={{ color: "var(--ink)" }}>Truthseekers</span>
+              </div>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="flex items-center justify-center w-7 h-7 rounded-md text-subtle hover:text-ink hover:bg-accent-bg/20 transition-all"
+                aria-label="Close menu"
+                style={{ background: "none", border: "none" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Nav links */}
+            <div className="flex-1 px-3 pt-3 space-y-0.5">
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium rounded-lg no-underline transition-colors hover:bg-accent-bg/15"
+                  style={{
+                    color: pathname.startsWith(link.href) ? "var(--accent)" : "var(--muted)",
+                    background: pathname.startsWith(link.href) ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",
+                  }}
+                >
+                  <link.icon size={18} />
+                  <span>{link.label}</span>
+                </Link>
+              ))}
+            </div>
+
+            {/* Bottom: theme toggle */}
+            <div className="shrink-0 px-3 pb-4 pt-2 border-t border-border/20 mt-2">
+              <button
+                onClick={toggle}
+                className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg w-full text-left transition-colors hover:bg-accent-bg/15"
+                style={{ color: "var(--muted)", background: "none", border: "none" }}
+              >
+                {resolved === "dark" ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /></svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+                )}
+                <span>{resolved === "dark" ? "Light mode" : "Dark mode"}</span>
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── Entry point ──────────────────────────────────────────────────
 
 export default function FloatIslandNav() {
@@ -195,6 +313,7 @@ export default function FloatIslandNav() {
   return (
     <>
       <TopHeader pathname={pathname} />
+      <MobileHeader pathname={pathname} />
     </>
   );
 }
