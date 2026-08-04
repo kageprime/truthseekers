@@ -25,6 +25,22 @@ var GatewaySearch func(connector, action string, args map[string]interface{}) (s
 // MODEL_ACCESS_KEY from env.
 var GatewayGenerateImage func(connector, action string, args map[string]interface{}) (string, error)
 
+// RetrievedDoc is a real document fetched from web search + URL fetch.
+type RetrievedDoc struct {
+	ID      string `json:"id"`
+	Title   string `json:"title"`
+	Text    string `json:"text"`
+	URL     string `json:"url"`
+	Snippet string `json:"snippet"`
+}
+
+// RealRetrieve, when set by the server at boot, causes the epistemic
+// retrieve node to call real web search (Tavily/Firecrawl) + URL fetch
+// before invoking the LLM — grounding the pipeline in live evidence
+// instead of model memory. When nil, the retrieve node falls back to
+// the LLM-only mode (no external search keys configured).
+var RealRetrieve func(query string) ([]RetrievedDoc, error)
+
 func ChatToolDefinitions() []ToolDefinition {
 	return append(
 		EpistemicToolDefinitions(),
@@ -205,7 +221,96 @@ func generalWebSearch(query string, maxResults int) ([]item, error) {
 		}
 		items = append(items, item{Title: r.Title, URL: r.URL, Snippet: s})
 	}
-	return items, nil
+		return items, nil
+}
+
+// RealRetrieveDocuments performs real web retrieval for the epistemic
+// retrieve node. It runs the main query plus 2–3 sub-queries through
+// generalWebSearch (Tavily or Firecrawl), then fetches the full text of
+// the top 3 URLs via a simple HTTP GET. Results are deduplicated by URL.
+// Returns a flat list of RetrievedDoc. When no search API key is
+// configured, returns nil (the pipeline falls back to LLM-only mode).
+func RealRetrieveDocuments(query string) ([]RetrievedDoc, error) {
+	// Build related sub-queries to broaden recall.
+	subQueries := []string{
+		query,
+		query + " history background",
+		query + " controversy debate",
+	}
+
+	var allDocs []RetrievedDoc
+	seen := map[string]bool{}
+
+	for _, sq := range subQueries {
+		results, err := generalWebSearch(sq, 5)
+		if err != nil {
+			continue // one failed sub-query shouldn't kill the whole retrieve
+		}
+		for _, r := range results {
+			if seen[r.URL] || r.URL == "" {
+				continue
+			}
+			seen[r.URL] = true
+
+			// Fetch the full page text for richer evidence.
+			text := fetchURLText(r.URL)
+			if text == "" {
+				text = r.Snippet
+			}
+			if len(text) > 8000 {
+				text = text[:8000]
+			}
+
+			allDocs = append(allDocs, RetrievedDoc{
+				ID:      "doc-" + shortHash(r.URL),
+				Title:   r.Title,
+				Text:    text,
+				URL:     r.URL,
+				Snippet: r.Snippet,
+			})
+
+			if len(allDocs) >= 9 {
+				return allDocs, nil
+			}
+		}
+	}
+
+	if len(allDocs) == 0 {
+		return nil, fmt.Errorf("no search API key configured")
+	}
+	return allDocs, nil
+}
+
+// fetchURLText does a simple HTTP GET and strips HTML to return plain text.
+func fetchURLText(rawURL string) string {
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, _ := http.NewRequest("GET", rawURL, nil)
+	req.Header.Set("User-Agent", "Truthseekers/1.0 (encyclopedia agent)")
+	resp, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return ""
+	}
+	body, _ := io.ReadAll(resp.Body)
+	text := string(body)
+	text = tagRegex.ReplaceAllString(text, "")
+	text = wsRegex.ReplaceAllString(text, " ")
+	return strings.TrimSpace(text)
+}
+
+// shortHash returns the first 8 hex chars of an MD5 hash of s (used for
+// generating stable document IDs from URLs).
+func shortHash(s string) string {
+	// Simple deterministic hash without importing crypto/md5.
+	h := uint32(0)
+	for i := 0; i < len(s); i++ {
+		h = h*31 + uint32(s[i])
+	}
+	hex := fmt.Sprintf("%08x", h)
+	return hex
 }
 
 func firecrawlSearch(query string, maxResults int) ([]item, error) {

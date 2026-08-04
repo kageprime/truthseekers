@@ -2,13 +2,13 @@
 
 An LLM-powered interactive encyclopedia — an AI agent-driven knowledge base that produces structured, evidence-grounded articles.
 
-> **Stack note (June 2026):** The backend has migrated from the legacy TypeScript/Hono stack (`packages/server`, `packages/core`) to a Go + Python architecture under `veritas/`. The Go orchestrator is the live API gateway; the legacy Node packages are retained for reference and pending removal (see `veritas/docs/MIGRATION_STATUS.md`).
+> **Stack note (July 2026):** The backend has migrated from the legacy TypeScript/Hono stack to a Go + Python architecture under `veritas/`. The Go orchestrator is the live API gateway. Legacy packages (`packages/server`, `packages/storage`, `packages/cli`) have been deleted.
 
 ## Architecture
 
 - **Backend:** Go orchestrator (`veritas/go-orchestrator/`) — std-library `net/http` API gateway on port **4097**, native Go agent loop, and a DAG engine. No web framework.
 - **Epistemic pipeline:** Native Go LLM calls (`internal/agent/pipeline.go`) — 9 nodes invoked via `SendPromptJSON` for both the chat agent and article generation DAG. No Python dependency.
-- **Storage:** MongoDB via the `go.mongodb.org/mongo-driver`. The DB falls back to an in-memory **mock mode** when `MOONGOSE_CONNECTION_STRING` is unset or unreachable, so the server runs with zero infrastructure.
+- **Storage:** PostgreSQL via `database/sql` + `lib/pq`. The DB falls back to an in-memory **mock mode** when `DATABASE_URL` is unset or unreachable, so the server runs with zero infrastructure.
 - **Frontend:** Next.js app (`packages/web/`) — deployed to Vercel, calls the Go API via `NEXT_PUBLIC_API_URL`.
 - **State (client):** Custom pub/sub stores (`lib/store.ts`) via React 19 `useSyncExternalStore` — zero deps, no Zustand.
 - **Real-time:** ReadableStream SSE parser (`hooks/useChatStream.ts`) + structured event store (`stores/chat-events.ts`).
@@ -18,24 +18,23 @@ An LLM-powered interactive encyclopedia — an AI agent-driven knowledge base th
 
 | Path | Purpose |
 |------|---------|
-| `veritas/go-orchestrator/` | Go API gateway, native agent, DAG engine, MongoDB storage |
+| `veritas/go-orchestrator/` | Go API gateway, native agent, DAG engine, PostgreSQL storage |
 | `veritas/go-orchestrator/internal/agent/pipeline.go` | Native Go epistemic pipeline (retrieve → extract_claims → … → generate_article) with embedded prompts and `SendPromptJSON` LLM calls |
 | `veritas/docs/` | System design, epistemic-layer contract, migration status |
 | `packages/web/` | Next.js frontend (the only live TS package) |
 | `packages/core/` | **Legacy** — TS types + `articleToBlocks`; still consumed by the frontend at runtime |
-| `packages/server/`, `packages/storage/`, `packages/cli/` | **Legacy** — old Hono server, Mongoose storage, admin CLI; pending deletion |
 
 ### Go orchestrator internals
 
 | Package | Path | Purpose |
 |---------|------|---------|
-| `main` | `cmd/server/main.go` | Boot: load `.env`, connect Mongo (or mock mode), start server on `PORT` (default 4097), graceful shutdown |
+| `main` | `cmd/server/main.go` | Boot: load `.env`, connect PostgreSQL (or mock mode), start server on `PORT` (default 4097), graceful shutdown |
 | `cmd/test-dag` | `cmd/test-dag/main.go` | CLI that runs the full 9-node DAG end-to-end against a sample topic |
 | `api` | `internal/api/` | HTTP layer: routing, CORS, JWT auth, article/job/quota/chat handlers, SSE progress broadcast |
 | `agent` | `internal/agent/` | Native Go agent loop (up to 25 iterations, 90k-token budget), OpenAI-compatible streaming LLM client, tool definitions + builtin executors |
 | `dag` | `internal/dag/` | Workflow DAG engine: cycle detection, concurrent node execution, exponential-backoff retries, channel-based progress streaming |
 | `nodes` | `internal/nodes/executors.go` | Python subprocess bridge (`RunPythonNode`) with per-node mock fallback |
-| `storage` | `internal/storage/db.go` | MongoDB CRUD for articles, jobs, conversations, messages, users, graph edges, maps, memory KV |
+| `storage` | `internal/storage/db.go` | PostgreSQL CRUD for articles, jobs, conversations, messages, users, graph edges, maps, memory KV |
 | `iam` | `internal/iam/` | Role-based authorization (6 fixed roles, action-level permissions, glob matching, agent scope) |
 | `executor` | `internal/executor/` | Tool execution gateway: server-side credential resolution, policy engine (allow/block/approval), audit, custom executors |
 | `llm-gateway` | `internal/llm-gateway/` | Unified LLM routing: model catalog, usage metering, cost estimation, `GET /v1/llm/models` |
@@ -55,7 +54,13 @@ Routes are registered in `internal/api/server.go` (`setupRoutes`) and dispatched
 | `/chat`, `/chat/:id`, `/chat/:id/messages` | GET/POST/PATCH / POST | Conversations + SSE-streamed agent run |
 | `/articles`, `/articles/search`, `/articles/top` | GET | List / search / top |
 | `/articles/:slug` | GET | Fetch article |
-| `/articles/:slug/{status,progress,generate,refresh,export,resolve,views,graph}` | various | Per-article sub-resources; `progress` is SSE |
+| `/articles/:slug/{status,progress,generate,refresh,export,resolve,views,graph,claim-graph,claims,gaps,freshness,refresh-diff}` | various | Per-article sub-resources; `progress` is SSE; `claim-graph` returns the claim-level force-directed graph (claims + evidence nodes, typed edges); `refresh-diff` summarizes claim version changes from the last refresh |
+| `/contested` | GET | Public dashboard — most contested claims across the encyclopedia, ranked by contradiction level |
+| `/claim-graph` | GET | Global claim graph — all claims + edges across the encyclopedia (signature-merged) |
+| `/gaps` | GET | All open evidence gaps, enriched with claim text + upvote count |
+| `/gaps/:id/upvote` | POST | Community upvote on a gap (idempotent per user) |
+| `/gaps/:id/submit` | POST | Submit community evidence (URL + note) for a gap |
+| `/stale` | GET | Articles ranked by evidence freshness ascending (stalest first) |
 | `/quota`, `/queue`, `/track` | GET / GET / POST | Mock quota, mock queue, view tracking |
 | `/v1/executor/call` | POST | Tool execution gateway (credential isolation, policy, audit) |
 | `/v1/executor/connectors` | GET | List available connectors |
@@ -175,7 +180,7 @@ Both pipelines default to the `epistemic_model` (qwen/qwen3-32b) via `SendPrompt
 
 ```bash
 cd veritas/go-orchestrator
-go run ./cmd/server            # API on http://localhost:4097 (mock-mode DB if no Mongo)
+go run ./cmd/server            # API on http://localhost:4097 (mock-mode DB if no DATABASE_URL)
 ```
 
 ### Full stack (Docker)
@@ -195,7 +200,7 @@ npm run dev                    # from repo root, runs the Next.js app
 
 | Variable | Purpose |
 |----------|---------|
-| `MOONGOSE_CONNECTION_STRING` | MongoDB URI for the Go storage layer (sic — legacy typo; unset → mock mode) |
+| `DATABASE_URL` | PostgreSQL connection string for the Go storage layer (unset → mock mode) |
 | `PORT` | Go API port (default `4097`) |
 | `CORS_ORIGIN` | Allowed CORS origin |
 | `MODEL_ACCESS_KEY` | DigitalOcean Inference API key |

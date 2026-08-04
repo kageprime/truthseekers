@@ -154,6 +154,133 @@ export function chatStopUrl(id: string): string {
   return `${BASE}/chat/${id}/stop`;
 }
 
+// ── Epistemic Claims ──────────────────────────────────
+
+export async function fetchArticleClaims(slug: string): Promise<{ claims: any[] } | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/articles/${slug}/claims`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function fetchArticleGaps(slug: string): Promise<{ gaps: any[] } | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/articles/${slug}/gaps`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function fetchClaimEvidence(claimId: string): Promise<{ evidence: any[] } | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/claims/${claimId}/evidence`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export interface FreshnessInfo {
+  slug: string;
+  overall_score: number;
+  claim_freshness: { claim_id: string; text: string; freshness_score: number; evidence_count: number }[];
+}
+
+export async function fetchAllGaps(): Promise<{ gaps: any[] } | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/gaps`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function fetchArticleFreshness(slug: string): Promise<FreshnessInfo | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/articles/${slug}/freshness`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function fetchRefreshDiff(slug: string): Promise<any | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/articles/${slug}/refresh-diff`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function fetchStaleArticles(limit = 50): Promise<{ articles: any[] } | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/stale?limit=${limit}`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function upvoteGap(gapId: string): Promise<{ gap_id: string; upvotes: number } | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/gaps/${gapId}/upvote`, { method: "POST" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function submitGapEvidence(gapId: string, url: string, note: string): Promise<any | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/gaps/${gapId}/submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url, note }),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export interface GraphNode {
+  id: string; type: string; label: string;
+  status?: string; confidence?: number;
+}
+
+export interface GraphLink {
+  source: string; target: string; type: string;
+}
+
+export async function fetchArticleGraph(slug: string): Promise<{ nodes: GraphNode[]; links: GraphLink[] } | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/articles/${slug}/graph`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+// ── Claim-level graph ──────────────────────────────────
+
+export interface ClaimGraphNode {
+  id: string;
+  type: "claim" | "evidence" | "source";
+  label: string;
+  status?: string;
+  confidence?: number;
+  supports?: boolean;
+  chain_of_custody?: string;
+  accessibility?: string;
+  confidence_vector?: Record<string, number>;
+}
+
+export interface ClaimGraphEdge {
+  source: string;
+  target: string;
+  type: "evidence" | "claim";
+  relationship: string; // supports | contradicts | related | evidence
+  strength?: number;
+}
+
+export async function fetchArticleClaimGraph(slug: string): Promise<{ nodes: ClaimGraphNode[]; edges: ClaimGraphEdge[] } | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/articles/${slug}/claim-graph`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function fetchContestedClaims(limit = 50): Promise<{ claims: any[] } | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/contested?limit=${limit}`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 // ── Admin ────────────────────────────────────────────────
 
 export async function fetchSettings(): Promise<Record<string, string>> {

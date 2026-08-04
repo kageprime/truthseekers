@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import AppFooter from "./components/AppFooter";
 
 function useScrollReveal() {
   useEffect(() => {
@@ -123,6 +124,82 @@ function BentoCard({ children, className = "", colSpan = 1, rowSpan = 1 }: { chi
   );
 }
 
+function BookGlyph() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </svg>
+  );
+}
+
+function FeatureLink({ href, glyph, title, desc }: { href: string; glyph: string; title: string; desc: string }) {
+  return (
+    <Link
+      href={href}
+      className="reveal-up group flex flex-col gap-3 p-5 sm:p-6 no-underline transition-all duration-200 hover:-translate-y-0.5"
+      style={{ border: "1px solid var(--rule)", borderRadius: "var(--radius-sharp)", background: "var(--surface-elevated)" }}
+    >
+      <div className="flex items-center gap-2">
+        <span className="flex items-center justify-center w-8 h-8 rounded-md text-sm" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)", color: "var(--accent)" }}>{glyph}</span>
+        <h3 className="font-display font-bold text-base" style={{ color: "var(--ink)" }}>{title}</h3>
+      </div>
+      <p className="text-xs sm:text-sm leading-relaxed" style={{ color: "var(--muted)" }}>{desc}</p>
+      <span className="mt-auto text-xs font-medium inline-flex items-center gap-1 transition-colors" style={{ color: "var(--accent)" }}>
+        Explore
+        <span className="transition-transform group-hover:translate-x-0.5">→</span>
+      </span>
+    </Link>
+  );
+}
+
+function LiveStatsStrip() {
+  const [stats, setStats] = useState<{ articles?: number; contested?: number; gaps?: number } | null>(null);
+
+  useEffect(() => {
+    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
+    let cancelled = false;
+    (async () => {
+      try {
+        const [h, c, g] = await Promise.all([
+          fetch(`${base}/health`).then((r) => r.json()).catch(() => null),
+          fetch(`${base}/contested?limit=100`).then((r) => r.json()).catch(() => null),
+          fetch(`${base}/gaps`).then((r) => r.json()).catch(() => null),
+        ]);
+        if (cancelled) return;
+        setStats({
+          articles: h?.article_count,
+          contested: c?.claims?.length,
+          gaps: g?.gaps?.length,
+        });
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!stats) return null;
+  const items = [
+    { label: "Articles", value: stats.articles },
+    { label: "Contested claims", value: stats.contested },
+    { label: "Open questions", value: stats.gaps },
+  ].filter((i) => i.value != null);
+
+  return (
+    <div className="reveal-up mt-10 flex items-center justify-center gap-6 sm:gap-10">
+      {items.map((i) => (
+        <div key={i.label} className="text-center">
+          <div className="font-display font-bold tabular-nums" style={{ color: "var(--ink)", fontSize: "clamp(1.5rem, 3vw, 2.25rem)" }}>
+            {i.value}
+          </div>
+          <div className="text-[10px] font-medium uppercase tracking-[0.14em] mt-1" style={{ color: "var(--subtle)" }}>
+            {i.label}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Testimonial({ quote, name, role, seed }: { quote: string; name: string; role: string; seed: string }) {
   return (
     <div className="reveal-up flex flex-col gap-4 h-full">
@@ -167,6 +244,9 @@ export default function HomePage() {
               Browse articles
             </Link>
           </div>
+
+          {/* Live stats */}
+          <LiveStatsStrip />
         </div>
       </section>
 
@@ -292,6 +372,29 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* LIVING ENCYCLOPEDIA — Evidence dashboards */}
+      <section className="py-16 sm:py-24 md:py-32 px-6 border-t" style={{ borderColor: "var(--rule)" }}>
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12 sm:mb-16">
+            <div className="reveal-up inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-medium uppercase tracking-[0.12em] border mb-6" style={{ borderColor: "var(--rule)", color: "var(--accent)" }}>
+              <BookGlyph /> The Living Encyclopedia
+            </div>
+            <h2 className="reveal-up font-display font-bold" style={{ fontSize: "clamp(1.75rem, 3vw, 2.75rem)", lineHeight: 1.1, color: "var(--ink)" }}>
+              Knowledge you can audit, not just read
+            </h2>
+            <p className="reveal-up mt-4 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed" style={{ color: "var(--muted)" }}>
+              Beyond polished articles, Truthseekers exposes the evidence underneath — what&apos;s contested, what&apos;s missing, and what&apos;s going stale.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-4">
+            <FeatureLink href="/contested" glyph="⚠" title="Contested Claims" desc="The most debated claims across the encyclopedia, ranked by contradiction level." />
+            <FeatureLink href="/gaps" glyph="?" title="Open Questions" desc="Claims missing evidence. Upvote gaps and submit sources you&apos;ve found." />
+            <FeatureLink href="/stale" glyph="↻" title="Stale Watch" desc="Articles whose evidence is aging. See what needs re-verification first." />
+          </div>
+        </div>
+      </section>
+
       {/* TESTIMONIALS — Stacked Cards with GSAP */}
       <section className="py-16 sm:py-24 md:py-40 px-4 sm:px-6" style={{ background: "var(--surface-elevated)" }}>
         <div className="max-w-5xl mx-auto">
@@ -345,6 +448,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* FOOTER — closing section of the living encyclopedia */}
+      <AppFooter />
 
       <style jsx>{`
         @keyframes marquee {

@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import type { Block } from "@encarta/core";
 
-export type ViewMode = "stream" | "explore" | "press";
+export type ViewMode = "stream" | "explore" | "press" | "graph";
 
 interface ArticleViewValue {
   article: { title: string; blocks: Block[] } | null;

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import FloatingChatWidget from "./components/FloatingChatWidget";
 import ExploreView from "./components/ExploreView";
 import PressView from "./components/PressView";
+import GraphView from "./components/GraphView";
 import ViewSwitcher from "./components/ViewSwitcher";
 import FloatIslandNav from "./components/FloatIslandNav";
 import { useFloatingChat } from "./FloatingChatContext";
@@ -76,20 +77,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
         )}
       </div>
 
-      {!isHidden && !isChatRoute && !isOverlayRoute && (
-        <footer className="border-t border-border shrink-0 h-9 leading-9 bg-surface">
-          <div className="max-w-[1400px] mx-auto px-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-accent">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-              </svg>
-              <span className="text-[11px] font-serif text-muted">Truthseekers — The Living Encyclopedia</span>
-            </div>
-            <span className="text-[10px] font-serif text-subtle">&copy; {new Date().getFullYear()}</span>
-          </div>
-        </footer>
-      )}
-
       {/* Mobile/Overlay: bottom-sheet backdrop + panel */}
       {showChat && isOverlay && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end pointer-events-none">
@@ -117,6 +104,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       {/* Press overlay */}
       <PressView />
+
+      {/* Graph overlay */}
+      <GraphView />
 
       {/* Floating ViewSwitcher for stream mode — clear mobile nav */}
       {article && mode === "stream" && (

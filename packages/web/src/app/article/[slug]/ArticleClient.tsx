@@ -10,6 +10,9 @@ import PageLayout from "../../components/PageLayout";
 import ContentCard from "../../components/ContentCard";
 import GenerationBar from "../../components/GenerationBar";
 import BlockRenderer, { articleToBlocks } from "../../components/BlockRenderer";
+import ClaimGraphViewer from "../../components/ClaimGraphViewer";
+import FreshnessBadge from "../../components/FreshnessBadge";
+import RefreshDiffBanner from "../../components/RefreshDiffBanner";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import type { Article } from "@encarta/core";
 import { IconXCircle, IconBook, IconLightning, IconFile, IconFileText, IconUser, IconRefresh, IconAlert } from "../../components/Icons";
@@ -29,6 +32,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   const [progress, setProgress] = useState(initialPhase);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
   const [pausedError, setPausedError] = useState<string | undefined>(undefined);
+  const [showGraph, setShowGraph] = useState(false);
   const { data: quota } = useQuota();
   const { mutate: generateArticle } = useGenerateArticle();
   const { mutate: refreshArticle } = useRefreshArticle();
@@ -451,8 +455,31 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
               <span style={{ color: "var(--rule)" }}>·</span>
               <span><IconUser size={11} /> {article.metadata.generatedBy.slice(0, 12)}</span>
             </>)}
+            {article.slug && <FreshnessBadge slug={article.slug} />}
           </div>
         </header>
+
+        <RefreshDiffBanner slug={slug} />
+
+        {/* Claim graph toggle */}
+        <div className="mb-8">
+          <button
+            onClick={() => setShowGraph(!showGraph)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium transition-colors cursor-pointer"
+            style={{
+              borderColor: "var(--border-light, #e5e5e5)",
+              color: showGraph ? "var(--accent)" : "var(--muted)",
+              background: showGraph ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",
+            }}
+          >
+            <span aria-hidden>◈</span> {showGraph ? "Hide claim graph" : "Show claim graph"}
+          </button>
+          {showGraph && (
+            <div className="mt-3">
+              <ClaimGraphViewer slug={slug} />
+            </div>
+          )}
+        </div>
 
         {/* Article body — reading column */}
         <div className="reading-column stagger-children">

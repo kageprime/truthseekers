@@ -7,6 +7,8 @@ import MermaidDiagram from "./MermaidDiagram";
 import { MediaImage, MediaLightbox } from "./MediaImage";
 import { BASE } from "@/lib/constants";
 import { IconLink, IconLightning } from "./Icons";
+import { parseClaimAnchors } from "@/lib/claim-parser";
+import { ProvenanceChipInline } from "./ProvenanceChip";
 
 const InteractiveTimeline = dynamic(() => import("./InteractiveTimeline"), { ssr: false });
 const MapViewer = dynamic(() => import("./MapViewer"), { ssr: false });
@@ -198,9 +200,23 @@ function HeadingBlock({ data }: { data: HeadingBlockData }) {
 function TextBlock({ data, dropCap }: { data: TextBlockData; dropCap?: boolean }) {
   if (!data) return null;
   const content = (data as any).content || (data as any).text || "";
+  if (!content.includes("[claim:")) {
+    return (
+      <div className={dropCap ? "drop-cap" : ""}>
+        <MarkdownRenderer content={content} />
+      </div>
+    );
+  }
+  const { parts } = parseClaimAnchors(content);
   return (
     <div className={dropCap ? "drop-cap" : ""}>
-      <MarkdownRenderer content={content} />
+      {parts.map((part, i) =>
+        part.type === "claim" ? (
+          <ProvenanceChipInline key={i} claimId={part.value} />
+        ) : (
+          <MarkdownRenderer key={i} content={part.value} />
+        )
+      )}
     </div>
   );
 }

@@ -31,7 +31,7 @@ export default function OnboardingPage() {
       setStep(1);
     } else if (step === 1 && goal) {
       const ok = await completeOnboarding(name);
-      if (ok) router.push("/chat?tour=true");
+      if (ok) router.push("/chat/new?tour=true");
     }
   };
 
@@ -171,7 +171,7 @@ export default function OnboardingPage() {
 
             <div className="text-center mt-4">
               <button
-                onClick={() => router.push("/chat")}
+                onClick={() => router.push("/chat/new")}
                 className="text-xs hover:underline cursor-pointer"
                 style={{ color: "var(--subtle)", background: "none", border: "none" }}
               >

@@ -2,7 +2,7 @@
 
 An AI-powered interactive encyclopedia. The chat is the universal interface; categories are the browse layer; responsive layout adapts to any device.
 
-> **⚠️ Backend migration note (June 2026):** The backend has migrated from the legacy TypeScript/Hono stack to a Go + Python architecture under `veritas/`. Throughout this roadmap, file references to `packages/server/...`, `packages/storage/...`, `packages/cli/...`, and `packages/core/src/tools.ts` / `pipeline/...` describe the **legacy** Node stack and are pending re-implementation in Go. For the current backend architecture, see [`AGENTS.md`](AGENTS.md) and [`veritas/docs/MIGRATION_STATUS.md`](veritas/docs/MIGRATION_STATUS.md). Frontend (`packages/web/`) references remain accurate.
+> **⚠️ Backend migration note (July 2026):** The backend has migrated from the legacy TypeScript/Hono stack to a Go + Python architecture under `veritas/`. Legacy packages (`packages/server`, `packages/storage`, `packages/cli`) have been **deleted**. Throughout this roadmap, file references to `packages/server/...`, `packages/storage/...`, `packages/cli/...`, and `packages/core/src/tools.ts` / `pipeline/...` refer to the now-deleted Node stack. For the current backend architecture, see [`AGENTS.md`](AGENTS.md) and [`veritas/docs/MIGRATION_STATUS.md`](veritas/docs/MIGRATION_STATUS.md). Frontend (`packages/web/`) references remain accurate.
 
 ---
 

@@ -164,6 +164,33 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// optionalAuthMiddleware injects userID/role when a valid JWT is present but
+// does not reject unauthenticated requests. Used for public-read article
+// routes so anonymous browsing works while write sub-routes can still gate on
+// an authenticated context via requireCtxAuth.
+func (s *Server) optionalAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, role := userAuthFromRequest(r)
+		if userID != "" {
+			ctx := context.WithValue(r.Context(), "userID", userID)
+			ctx = context.WithValue(ctx, "userRole", role)
+			r = r.WithContext(ctx)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// requireCtxAuth writes a 401 and returns false when no authenticated user is
+// present in the request context. Used to gate write sub-routes that ride on
+// a public-read dynamic route.
+func requireCtxAuth(w http.ResponseWriter, r *http.Request) bool {
+	if userIDFromContext(r.Context()) == "" {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return false
+	}
+	return true
+}
+
 // requireRole ensures the user has at least the minimum role for the resource.
 func (s *Server) requireRole(minRole string, resourceType string, resourceID string, action string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -406,6 +433,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"version":   version,
 		"uptime":    uptime,
 		"mockMode":  s.db.IsMockMode(),
+		"storage_mode":  s.db.StorageMode(),
+		"article_count": s.db.ArticleCount(),
 		"goVersion": runtime.Version(),
 		"queue": map[string]int{
 			"active": active,
@@ -495,8 +524,20 @@ func (s *Server) wireAgentGateway() {
 		}
 		return "", fmt.Errorf("%s: %s", result.Status, result.Reason)
 	}
-	agent.GatewaySearch = gatewayCall
+		agent.GatewaySearch = gatewayCall
 	agent.GatewayGenerateImage = gatewayCall
+
+	// Wire real web retrieval into the epistemic retrieve node.
+	// When Tavily or Firecrawl API keys are present, the retrieve node
+	// will fetch live documents before calling the LLM. When keys are
+	// absent, RealRetrieve stays nil and the pipeline falls back to
+	// LLM-only mode (graceful degradation).
+	if os.Getenv("TAVILY_API_KEY") != "" || os.Getenv("FIRECRAWL_API_KEY") != "" {
+				agent.RealRetrieve = agent.RealRetrieveDocuments
+		log.Printf("[veritas] real web retrieval enabled (Tavily/Firecrawl)")
+	} else {
+		log.Printf("[veritas] web retrieval offline — pipeline falling back to LLM-only mode")
+	}
 
 	// Register custom executors for tools that need specialized HTTP handling
 	// (the generic HTTP executor in the gateway doesn't handle their API shapes).
@@ -725,8 +766,8 @@ func (s *Server) setupRoutes() {
 	s.mux.Handle("/track", chain(apiLimiter.middleware, s.authMiddleware, validateBody(trackReq{}))(http.HandlerFunc(s.handleTrack)))
 
 	// Articles - top/search public read, generate/refresh/write auth + rate limited + validation
-	s.mux.Handle("/articles/top", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleGetTopArticles)))
-	s.mux.Handle("/articles/search", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleSearchArticles)))
+	s.mux.Handle("/articles/top", chain(apiLimiter.middleware, s.optionalAuthMiddleware)(http.HandlerFunc(s.handleGetTopArticles)))
+	s.mux.Handle("/articles/search", chain(apiLimiter.middleware, s.optionalAuthMiddleware)(http.HandlerFunc(s.handleSearchArticles)))
 
 	// Chat - auth required + rate limited
 	chatAuth := chain(chatLimiter.middleware, s.authMiddleware)
@@ -739,20 +780,38 @@ func (s *Server) setupRoutes() {
 	s.mux.Handle("/maps", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleMapsRoot)))
 	s.mux.Handle("/maps/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleMapsDynamicRoute)))
 
+	// Claims - public read
+	s.mux.Handle("/claims/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleClaimEvidence)))
+
+	// Gaps - aggregate view + engagement (upvote, submit evidence)
+	s.mux.Handle("/gaps", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleGapsDynamicRoute)))
+	s.mux.Handle("/gaps/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleGapsDynamicRoute)))
+
+	// Stale articles queue
+	s.mux.Handle("/stale", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleGetStaleArticles)))
+
+	// Contested claims - aggregate dashboard (public read)
+	s.mux.Handle("/contested", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleGetContestedClaims)))
+
 	// Admin - auth + admin role required + validation on PUT
 	s.mux.Handle("/admin/settings", chain(apiLimiter.middleware, s.requireRole("admin", "admin", "settings", "write"), validateBody(adminSettingsReq{}))(http.HandlerFunc(s.handleAdminSettings)))
 
 	// Webhook - HMAC verified in handler, no auth middleware
 	s.mux.Handle("/webhook/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleWebhook)))
 
+	// Start built-in daily refresh (always runs, regardless of manifest).
+	s.startDailyRefresh()
+
 	// Start cron scheduler if triggers are configured in manifest.
 	if s.manifest != nil {
 		triggers.StartScheduler(s.manifest.Triggers, s.triggerAction)
 	}
 
-	// Articles dynamic routes - apply auth
-	s.mux.Handle("/articles", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleArticlesDynamicRoute)))
-	s.mux.Handle("/articles/", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleArticlesDynamicRoute)))
+	// Articles dynamic routes — GET reads are public (an encyclopedia must be
+	// readable without login); POST writes (generate/refresh/resolve) are
+	// gated inside the handler via requireCtxAuth.
+	s.mux.Handle("/articles", chain(apiLimiter.middleware, s.optionalAuthMiddleware)(http.HandlerFunc(s.handleArticlesDynamicRoute)))
+	s.mux.Handle("/articles/", chain(apiLimiter.middleware, s.optionalAuthMiddleware)(http.HandlerFunc(s.handleArticlesDynamicRoute)))
 }
 
 func (s *Server) Start() error {
@@ -854,6 +913,60 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "accepted"})
 }
 
+// startDailyRefresh runs a goroutine that checks for stale articles every 24h.
+func (s *Server) startDailyRefresh() {
+	go func() {
+		// Fire once on boot after a short delay.
+		time.Sleep(30 * time.Second)
+		s.refreshStaleArticles()
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			s.refreshStaleArticles()
+		}
+	}()
+}
+
+// refreshStaleArticles queries for articles whose claims have low freshness
+// and re-generates them via the session engine.
+func (s *Server) refreshStaleArticles() {
+	log.Printf("[refresh] checking for stale articles")
+	articles, err := s.db.ListArticles(0, 100)
+	if err != nil {
+		log.Printf("[refresh] list articles: %v", err)
+		return
+	}
+	var refreshed int
+	for _, a := range articles {
+		claims, err := s.db.GetClaimsByArticle(a.Slug)
+		if err != nil {
+			continue
+		}
+		if len(claims) == 0 {
+			continue
+		}
+		var totalScore float64
+		for _, cl := range claims {
+			info, err := s.db.ComputeClaimFreshness(cl.ID)
+			if err != nil {
+				continue
+			}
+			totalScore += info.FreshnessScore
+		}
+		avg := totalScore / float64(len(claims))
+		if avg < 0.4 {
+			log.Printf("[refresh] stale article: slug=%s freshness=%.2f, re-generating", a.Slug, avg)
+			s.sessionEngine.CreateSession(sessionlifecycle.CreateCommand{
+				Slug:    a.Slug,
+				Persona: "veritas",
+				Source:  "trigger:refresh",
+			})
+			refreshed++
+		}
+	}
+	log.Printf("[refresh] done — %d/%d stale articles refreshed", refreshed, len(articles))
+}
+
 // triggerAction is the callback used by cron triggers and webhooks to dispatch
 // article generation or other manifest-defined actions.
 func (s *Server) triggerAction(action string, params map[string]string) {
@@ -870,6 +983,8 @@ func (s *Server) triggerAction(action string, params map[string]string) {
 			Persona: "veritas",
 			Source:  "trigger:cron",
 		})
+	case "refresh_stale":
+		s.refreshStaleArticles()
 	default:
 		log.Printf("[triggers] unknown action: %s", action)
 	}
@@ -1068,6 +1183,9 @@ func (s *Server) handleArticlesDynamicRoute(w http.ResponseWriter, r *http.Reque
 		}
 	case "generate":
 		if r.Method == "POST" {
+			if !requireCtxAuth(w, r) {
+				return
+			}
 			_ = validatedBody(r)
 			s.handleGenerateArticle(w, r, slug)
 		} else {
@@ -1075,6 +1193,9 @@ func (s *Server) handleArticlesDynamicRoute(w http.ResponseWriter, r *http.Reque
 		}
 	case "refresh":
 		if r.Method == "POST" {
+			if !requireCtxAuth(w, r) {
+				return
+			}
 			_ = validatedBody(r)
 			s.handleRefreshArticle(w, r, slug)
 		} else {
@@ -1088,6 +1209,9 @@ func (s *Server) handleArticlesDynamicRoute(w http.ResponseWriter, r *http.Reque
 		}
 	case "resolve":
 		if r.Method == "POST" {
+			if !requireCtxAuth(w, r) {
+				return
+			}
 			s.handleResolveArticle(w, r, slug)
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -1098,9 +1222,39 @@ func (s *Server) handleArticlesDynamicRoute(w http.ResponseWriter, r *http.Reque
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
+	case "claims":
+		if r.Method == "GET" {
+			s.handleArticleClaims(w, r, slug)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	case "gaps":
+		if r.Method == "GET" {
+			s.handleArticleGaps(w, r, slug)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	case "freshness":
+		if r.Method == "GET" {
+			s.handleArticleFreshness(w, r, slug)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	case "refresh-diff":
+		if r.Method == "GET" {
+			s.handleRefreshDiff(w, r, slug)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
 	case "graph":
 		if r.Method == "GET" {
 			s.handleGetArticleGraph(w, r, slug)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	case "claim-graph":
+		if r.Method == "GET" {
+			s.handleArticleClaimGraph(w, r, slug)
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}

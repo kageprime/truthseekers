@@ -79,8 +79,9 @@ func (s *Server) processArticle(slug string, persona string) {
 		return
 	}
 
-	// Track the generate_article node output; it's the source of the final Article.
+	// Collect node outputs for epistemic persistence.
 	var generatedOutput interface{}
+	nodeOutputs := make(map[string]interface{})
 	var pipelineFailed bool
 
 	for update := range updates {
@@ -109,6 +110,7 @@ func (s *Server) processArticle(slug string, persona string) {
 				"timestamp": time.Now().Unix(),
 			})
 		case "completed":
+			nodeOutputs[update.NodeID] = update.Output
 			if update.NodeID == "generate_article" {
 				generatedOutput = update.Output
 			}
@@ -130,6 +132,12 @@ func (s *Server) processArticle(slug string, persona string) {
 		s.failArticle(slug, fmt.Sprintf("save article: %v", err))
 		return
 	}
+
+	// Epistemic persistence — save claims, evidence, gaps, language flags,
+	// and scrutiny assessments from intermediate DAG node outputs.
+	// Non-fatal: article is already saved; log errors and continue.
+	s.persistNodeOutputs(slug, nodeOutputs)
+
 	_ = s.db.SaveJob(slug, "done", "store", map[string]interface{}{"title": art.Title})
 
 	BroadcastProgress(slug, "article_complete", map[string]interface{}{
@@ -228,6 +236,337 @@ func transformGeneratedArticle(slug string, raw interface{}) *storage.Article {
 			Updated:     time.Now().UTC().Format(time.RFC3339),
 			GeneratedBy: "veritas-pipeline",
 		},
+	}
+}
+
+// persistNodeOutputs saves intermediate DAG node outputs (claims, evidence gaps,
+// language flags, scrutiny assessments) to the epistemic tables. Non-fatal:
+// errors are logged but the article save is unaffected.
+func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{}) {
+	now := time.Now().UTC()
+
+	// 0. retrieve → save evidence items
+	if raw, ok := outputs["retrieve"]; ok {
+		var result struct {
+			Documents map[string][]struct {
+				ID    string `json:"id"`
+				Title string `json:"title"`
+				Text  string `json:"text"`
+				URL   string `json:"url"`
+			} `json:"documents"`
+		}
+		b, _ := json.Marshal(raw)
+		if err := json.Unmarshal(b, &result); err == nil {
+			for _, docs := range result.Documents {
+				for _, d := range docs {
+					if d.ID == "" {
+						continue
+					}
+					// Save as source
+					if err := s.db.SaveSource(&storage.Source{
+						ID:   d.ID,
+						Name: d.Title,
+						Type: "institutional",
+					}); err != nil {
+						log.Printf("[epistemic] save source %s: %v", d.ID, err)
+					}
+					// Save as evidence
+					evID := d.ID + "-ev"
+					if err := s.db.SaveEvidence(&storage.Evidence{
+						ID:             evID,
+						Type:           "primary_document",
+						URL:            d.URL,
+						ChainOfCustody: "unverified",
+						AcquisitionMethod: "retrieval",
+						Accessibility:  "public",
+						SupportsClaim:  true,
+						SourceID:       &d.ID,
+						CreatedAt:      now,
+					}); err != nil {
+						log.Printf("[epistemic] save evidence %s: %v", evID, err)
+					}
+				}
+			}
+		} else {
+			log.Printf("[epistemic] parse retrieve: %v", err)
+		}
+	}
+
+	// 1. map_evidence → link evidence to claims
+	if raw, ok := outputs["map_evidence"]; ok {
+		var result struct {
+			ClaimEvidenceMap []struct {
+				ClaimID      string   `json:"claim_id"`
+				Supporting   []string `json:"supporting"`
+				Contradicting []string `json:"contradicting"`
+			} `json:"claim_evidence_map"`
+		}
+		b, _ := json.Marshal(raw)
+		if err := json.Unmarshal(b, &result); err == nil {
+			for _, m := range result.ClaimEvidenceMap {
+				if m.ClaimID == "" {
+					continue
+				}
+				for _, eid := range m.Supporting {
+					evID := eid + "-ev"
+					if err := s.db.SaveEvidence(&storage.Evidence{
+						ID:       evID,
+						ClaimID:  m.ClaimID,
+						Type:     "primary_document",
+						SupportsClaim: true,
+						CreatedAt: now,
+					}); err != nil {
+						log.Printf("[epistemic] save evidence %s: %v", evID, err)
+					}
+				}
+				for _, eid := range m.Contradicting {
+					evID := eid + "-ev"
+					if err := s.db.SaveEvidence(&storage.Evidence{
+						ID:       evID,
+						ClaimID:  m.ClaimID,
+						Type:     "primary_document",
+						SupportsClaim: false,
+						CreatedAt: now,
+					}); err != nil {
+						log.Printf("[epistemic] save evidence %s: %v", evID, err)
+					}
+				}
+			}
+		} else {
+			log.Printf("[epistemic] parse map_evidence: %v", err)
+		}
+	}
+
+	// 2. extract_claims → save claims + link to article (with signature dedup)
+	if raw, ok := outputs["extract_claims"]; ok {
+		var result struct {
+			Claims []struct {
+				ClaimID string `json:"claim_id"`
+				Text    string `json:"text"`
+			} `json:"claims"`
+		}
+		b, _ := json.Marshal(raw)
+		if err := json.Unmarshal(b, &result); err == nil {
+			for _, c := range result.Claims {
+				if c.ClaimID == "" || c.Text == "" {
+					continue
+				}
+				sig := storage.ClaimSignature(c.Text)
+				existing, err := s.db.GetClaimBySignature(sig)
+				if err != nil {
+					log.Printf("[epistemic] dedup check %s: %v", c.ClaimID, err)
+				}
+				if existing != nil {
+					if err := s.db.LinkArticleClaim(slug, existing.ID); err != nil {
+						log.Printf("[epistemic] link dedup %s: %v", existing.ID, err)
+					}
+					continue
+				}
+				if err := s.db.SaveClaim(&storage.Claim{
+					ID:        c.ClaimID,
+					Text:      c.Text,
+					Signature: sig,
+					Type:      "factual",
+					Status:    "unknown",
+					CreatedAt: now,
+					UpdatedAt: now,
+				}); err != nil {
+					log.Printf("[epistemic] save claim %s: %v", c.ClaimID, err)
+					continue
+				}
+				if err := s.db.LinkArticleClaim(slug, c.ClaimID); err != nil {
+					log.Printf("[epistemic] link claim %s: %v", c.ClaimID, err)
+				}
+			}
+		} else {
+			log.Printf("[epistemic] parse extract_claims: %v", err)
+		}
+	}
+
+	// 3. resolve → update claim status, confidence_vector, derived_confidence
+	if raw, ok := outputs["resolve"]; ok {
+		var result struct {
+			ResolvedClaims []struct {
+				ClaimID           string                 `json:"claim_id"`
+				Text              string                 `json:"text"`
+				Status            string                 `json:"status"`
+				ConfidenceVector  map[string]interface{} `json:"confidence_vector"`
+				DerivedConfidence float64                `json:"derived_confidence"`
+			} `json:"resolved_claims"`
+		}
+		b, _ := json.Marshal(raw)
+		if err := json.Unmarshal(b, &result); err == nil {
+			runID := storage.EnsureGenerationRunID()
+			for _, rc := range result.ResolvedClaims {
+				if rc.ClaimID == "" {
+					continue
+				}
+				if err := s.db.SaveClaim(&storage.Claim{
+					ID:                rc.ClaimID,
+					Text:              rc.Text,
+					Status:            rc.Status,
+					ConfidenceVector:  rc.ConfidenceVector,
+					DerivedConfidence: rc.DerivedConfidence,
+					UpdatedAt:         now,
+				}); err != nil {
+					log.Printf("[epistemic] resolve claim %s: %v", rc.ClaimID, err)
+					continue
+				}
+				if err := s.db.SaveClaimVersion(rc.ClaimID, runID, rc.ConfidenceVector, rc.DerivedConfidence); err != nil {
+					log.Printf("[epistemic] save version %s: %v", rc.ClaimID, err)
+				}
+			}
+		} else {
+			log.Printf("[epistemic] parse resolve: %v", err)
+		}
+	}
+
+	// 3b. resolve → persist claim→claim relationships (supports/contradicts/related)
+	if raw, ok := outputs["resolve"]; ok {
+		var result struct {
+			Relationships []struct {
+				SourceClaimID    string  `json:"source_claim_id"`
+				TargetClaimID    string  `json:"target_claim_id"`
+				RelationshipType string  `json:"relationship_type"`
+				Strength         float64 `json:"strength"`
+			} `json:"claim_relationships"`
+		}
+		b, _ := json.Marshal(raw)
+		if err := json.Unmarshal(b, &result); err == nil {
+			for _, rel := range result.Relationships {
+				if rel.SourceClaimID == "" || rel.TargetClaimID == "" || rel.SourceClaimID == rel.TargetClaimID {
+					continue
+				}
+				switch rel.RelationshipType {
+				case "supports", "contradicts", "related":
+				default:
+					continue
+				}
+				if err := s.db.SaveClaimRelationship(rel.SourceClaimID, rel.TargetClaimID, rel.RelationshipType, rel.Strength); err != nil {
+					log.Printf("[epistemic] save relationship %s→%s: %v", rel.SourceClaimID, rel.TargetClaimID, err)
+				}
+			}
+		} else {
+			log.Printf("[epistemic] parse claim_relationships: %v", err)
+		}
+	}
+
+	// 4. detect_missing → save evidence gaps
+	if raw, ok := outputs["detect_missing"]; ok {
+		var result struct {
+			Gaps []struct {
+				EvidenceID         string  `json:"evidence_id"`
+				GapType            string  `json:"gap_type"`
+				ExpectedArtifact   string  `json:"expected_artifact"`
+				VerificationStatus string  `json:"verification_status"`
+				CauseLabel         string  `json:"cause_label"`
+				CauseConfidence    float64 `json:"cause_confidence"`
+			} `json:"gaps"`
+		}
+		b, _ := json.Marshal(raw)
+		if err := json.Unmarshal(b, &result); err == nil {
+			for _, g := range result.Gaps {
+				if g.EvidenceID == "" {
+					continue
+				}
+				if err := s.db.SaveEvidenceGap(&storage.EvidenceGap{
+					ID:                 g.EvidenceID,
+					GapType:            g.GapType,
+					ExpectedArtifact:   g.ExpectedArtifact,
+					VerificationStatus: g.VerificationStatus,
+					CauseLabel:         g.CauseLabel,
+					CauseConfidence:    g.CauseConfidence,
+					DetectedAt:         now,
+				}); err != nil {
+					log.Printf("[epistemic] save gap %s: %v", g.EvidenceID, err)
+				}
+			}
+		} else {
+			log.Printf("[epistemic] parse detect_missing: %v", err)
+		}
+	}
+
+	// 5. map_language → save language flags
+	if raw, ok := outputs["map_language"]; ok {
+		var result struct {
+			Flags []struct {
+				ClaimID          string  `json:"claim_id"`
+				SourcePhrase     string  `json:"source_phrase"`
+				PrecisionUpgrade string  `json:"precision_upgrade"`
+				FramingOrigin    string  `json:"framing_origin"`
+				FramingFunction  string  `json:"framing_function"`
+				Confidence       float64 `json:"confidence"`
+			} `json:"language_flags"`
+		}
+		b, _ := json.Marshal(raw)
+		if err := json.Unmarshal(b, &result); err == nil {
+			for _, f := range result.Flags {
+				if f.ClaimID == "" {
+					continue
+				}
+				id := f.ClaimID + "-lang-" + storage.EnsureGenerationRunID()
+				if err := s.db.SaveLanguageFlag(&storage.LanguageFlag{
+					ID:               id,
+					ClaimID:          f.ClaimID,
+					SourcePhrase:     f.SourcePhrase,
+					PrecisionUpgrade: f.PrecisionUpgrade,
+					FramingOrigin:    f.FramingOrigin,
+					FramingFunction:  f.FramingFunction,
+					Confidence:       f.Confidence,
+					DetectedAt:       now,
+				}); err != nil {
+					log.Printf("[epistemic] save language flag %s: %v", id, err)
+				}
+			}
+		} else {
+			log.Printf("[epistemic] parse map_language: %v", err)
+		}
+	}
+
+	// 6. scrutinize → save scrutiny assessments
+	if raw, ok := outputs["scrutinize"]; ok {
+		var result struct {
+			Assessments []struct {
+				ClaimID    string   `json:"claim_id"`
+				RiskFactors []string `json:"risk_factors"`
+				RiskScore  float64  `json:"risk_score"`
+				Action     struct {
+					RequiresExtraCorroboration bool     `json:"requires_extra_corroboration"`
+					ExcludedEvidenceIDs       []string `json:"excluded_evidence_ids"`
+					MinimumIndependentSources int      `json:"minimum_independent_sources"`
+				} `json:"action"`
+			} `json:"risk_assessments"`
+		}
+		b, _ := json.Marshal(raw)
+		if err := json.Unmarshal(b, &result); err == nil {
+			for _, a := range result.Assessments {
+				if a.ClaimID == "" {
+					continue
+				}
+				id := a.ClaimID + "-scr-" + storage.EnsureGenerationRunID()
+				rf := make(map[string]interface{})
+				for i, f := range a.RiskFactors {
+					rf[fmt.Sprintf("factor_%d", i)] = f
+				}
+				ar := map[string]interface{}{
+					"requires_extra_corroboration": a.Action.RequiresExtraCorroboration,
+					"excluded_evidence_ids":        a.Action.ExcludedEvidenceIDs,
+					"minimum_independent_sources":  a.Action.MinimumIndependentSources,
+				}
+				if err := s.db.SaveScrutinyAssessment(&storage.ScrutinyAssessment{
+					ID:             id,
+					ClaimID:        a.ClaimID,
+					RiskFactors:    rf,
+					RiskScore:      a.RiskScore,
+					ActionRequired: ar,
+					AssessedAt:     now,
+				}); err != nil {
+					log.Printf("[epistemic] save scrutiny %s: %v", id, err)
+				}
+			}
+		} else {
+			log.Printf("[epistemic] parse scrutinize: %v", err)
+		}
 	}
 }
 

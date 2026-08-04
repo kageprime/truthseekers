@@ -27,16 +27,30 @@ func main() {
 	// In a real environment, read from environment variables
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		log.Printf("DATABASE_URL not set, falling back to Mock Mode")
+		log.Printf("DATABASE_URL not set, falling back to File-backed Mode")
 	}
 
-	db, err := storage.NewDB(dbURL)
+	// ENCARTA_DATA_DIR points at the encyclopedia JSON directory used by the
+	// file-backed store when no database is available. Defaults to a few
+	// common relative locations resolved inside the storage layer.
+	dataDir := os.Getenv("ENCARTA_DATA_DIR")
+	db, err := storage.NewDB(dbURL, dataDir)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
-	// 2. Initialize and Start API Server
+		// 2. Run database migrations
+	migrationsDir := os.Getenv("MIGRATIONS_DIR")
+	if migrationsDir == "" {
+		migrationsDir = "migrations"
+	}
+	if err := db.Migrate(migrationsDir); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	log.Println("Database migrations applied successfully")
+
+	// 3. Initialize and Start API Server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "4097" // Matching Hono API server port

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -33,12 +34,30 @@ type Section struct {
 
 type TimelineEvent struct {
 	ID          string   `json:"id,omitempty"`
-	Year        float64  `json:"year"` // Mixed in TS (can be float or string)
+	Year        interface{} `json:"year"` // Mixed in TS (can be number or string, e.g. 1324 or "14th century")
 	Event       string   `json:"event"`
 	Description string   `json:"description,omitempty"`
 	Image       string   `json:"image,omitempty"`
 	Causes      []string `json:"causes,omitempty"`
 	Category    string   `json:"category,omitempty"`
+}
+
+// UnmarshalJSON accepts both the canonical "event" key (used by generated
+// articles) and the "title" key (used by hand-authored encyclopedia JSON
+// files) so legacy data loads without a separate migration.
+func (t *TimelineEvent) UnmarshalJSON(data []byte) error {
+	type alias TimelineEvent
+	if err := json.Unmarshal(data, (*alias)(t)); err != nil {
+		return err
+	}
+	if t.Event == "" {
+		var flex struct {
+			Title string `json:"title"`
+		}
+		_ = json.Unmarshal(data, &flex)
+		t.Event = flex.Title
+	}
+	return nil
 }
 
 type CrossReference struct {
@@ -61,6 +80,7 @@ type Citation struct {
 type Claim struct {
 	ID                string                 `json:"id"`
 	Text              string                 `json:"text"`
+	Signature         string                 `json:"signature,omitempty"`
 	Type              string                 `json:"type"` // factual | interpretive | predictive
 	Status            string                 `json:"status"` // supported | disputed | weak | unknown
 	ConfidenceVector  map[string]interface{} `json:"confidence_vector,omitempty"`
@@ -169,6 +189,16 @@ type GraphEdge struct {
 	Relationship string `json:"relationship"`
 }
 
+// ClaimRelationship is a typed edge between two claims (supports / contradicts /
+// related). Stored in the claim_relationships table and surfaced by the
+// claim-level graph API.
+type ClaimRelationship struct {
+	SourceClaimID    string  `json:"source_claim_id"`
+	TargetClaimID    string  `json:"target_claim_id"`
+	RelationshipType string  `json:"relationship_type"` // supports | contradicts | related
+	Strength         float64 `json:"strength"`
+}
+
 type MapEntry struct {
 	Slug        string        `json:"slug"`
 	Title       string        `json:"title"`
@@ -203,32 +233,92 @@ type Job struct {
 type DB struct {
 	db                *sql.DB
 	mockMode          bool
+	storageMode       string // "postgres" | "file"
+	fs                *fileStore
 	mockMessages      map[string][]*StoredMessage
 	mockUsers         map[string]*User
 	mockConversations map[string]*Conversation
 }
 
-func NewDB(connStr string) (*DB, error) {
+// StorageMode reports which backing store is active: "postgres" when a real
+// database is connected, or "file" when running off the in-memory file
+// store (DATABASE_URL unset/unreachable). Exposed via /health so DB-down is
+// never silent.
+func (d *DB) StorageMode() string {
+	if d == nil {
+		return "file"
+	}
+	if d.storageMode == "" {
+		if d.mockMode {
+			return "file"
+		}
+		return "postgres"
+	}
+	return d.storageMode
+}
+
+// ArticleCount returns the number of articles available in the active store.
+func (d *DB) ArticleCount() int {
+	if d.mockMode && d.fs != nil {
+		return len(d.fs.articles)
+	}
+	if !d.mockMode {
+		var n int
+		_ = d.db.QueryRow("SELECT COUNT(*) FROM articles").Scan(&n)
+		return n
+	}
+	return 0
+}
+
+// newMockDB builds a file-backed in-memory store for zero-infrastructure
+// local development. It loads real article JSON from the data directory so
+// the product is fully populated even with no database.
+func newMockDB(dataDir string) *DB {
+	fs, err := loadFileStore(dataDir)
+	if err != nil {
+		fmt.Printf("WARNING: failed to load file store (%v). Falling back to empty store.\n", err)
+		fs = &fileStore{
+			articles:      map[string]*Article{},
+			claims:        map[string][]*Claim{},
+			claimsByID:    map[string]*Claim{},
+			evidence:      map[string][]*Evidence{},
+			gaps:          map[string][]*EvidenceGap{},
+			backlinks:     map[string][]*GraphEdge{},
+			relationships: map[string][]*ClaimRelationship{},
+			views:         map[string]int{},
+		}
+	}
+	return &DB{
+		mockMode:          true,
+		storageMode:       "file",
+		fs:                fs,
+		mockMessages:      make(map[string][]*StoredMessage),
+		mockUsers:         make(map[string]*User),
+		mockConversations: make(map[string]*Conversation),
+	}
+}
+
+func NewDB(connStr, dataDir string) (*DB, error) {
 	if connStr == "" {
-		fmt.Printf("WARNING: PostgreSQL connection string is empty. Entering Mock Mode.\n")
-		return &DB{mockMode: true, mockMessages: make(map[string][]*StoredMessage), mockUsers: make(map[string]*User), mockConversations: make(map[string]*Conversation)}, nil
+		fmt.Printf("WARNING: PostgreSQL connection string is empty. Entering File-backed Mode.\n")
+		return newMockDB(dataDir), nil
 	}
 
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		fmt.Printf("WARNING: postgres connection failed (%v). Entering Mock Mode.\n", err)
-		return &DB{mockMode: true, mockMessages: make(map[string][]*StoredMessage), mockUsers: make(map[string]*User), mockConversations: make(map[string]*Conversation)}, nil
+		fmt.Printf("WARNING: postgres connection failed (%v). Entering File-backed Mode.\n", err)
+		return newMockDB(dataDir), nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
-		fmt.Printf("WARNING: postgres ping failed (%v). Entering Mock Mode.\n", err)
-		return &DB{mockMode: true, mockMessages: make(map[string][]*StoredMessage), mockUsers: make(map[string]*User), mockConversations: make(map[string]*Conversation)}, nil
+		fmt.Printf("WARNING: postgres ping failed (%v). Entering File-backed Mode.\n", err)
+		return newMockDB(dataDir), nil
 	}
 
-	return &DB{db: db, mockMode: false}, nil
+	return &DB{db: db, mockMode: false, storageMode: "postgres"}, nil
 }
 
 type Conversation struct {
@@ -619,14 +709,12 @@ func (d *DB) Close() error {
 
 func (d *DB) GetArticle(slug string) (*Article, error) {
 	if d.mockMode {
-		return &Article{
-			Slug:              slug,
-			Title:             "Mock Article",
-			Abstract:          "This is a mock article because the database is offline.",
-			Metadata:          ArticleMetadata{Status: "published"},
-			DerivedConfidence: 0.95,
-			Blocks:            []interface{}{map[string]interface{}{"id": "h1", "type": "heading", "data": map[string]interface{}{"level": 1, "text": "Mock Article"}}},
-		}, nil
+		if d.fs != nil {
+			if a, ok := d.fs.articles[slug]; ok {
+				return a, nil
+			}
+		}
+		return nil, nil
 	}
 
 	var a Article
@@ -726,10 +814,20 @@ func (d *DB) SaveArticle(art *Article) error {
 
 func (d *DB) ListArticles(limit, offset int) ([]*Article, error) {
 	if d.mockMode {
-		return []*Article{
-			{Slug: "mock-article-1", Title: "The Apollo 11 Moon Landing", Abstract: "A mock historical analysis.", DerivedConfidence: 0.99, Metadata: ArticleMetadata{Status: "published", Created: time.Now().Format(time.RFC3339)}},
-			{Slug: "mock-article-2", Title: "The JFK Assassination", Abstract: "Mock epistemic evaluation.", DerivedConfidence: 0.85, Metadata: ArticleMetadata{Status: "published", Created: time.Now().Format(time.RFC3339)}},
-		}, nil
+		if d.fs == nil {
+			return []*Article{}, nil
+		}
+		all := d.fs.articleList
+		if offset >= len(all) {
+			return []*Article{}, nil
+		}
+		end := offset + limit
+		if end > len(all) {
+			end = len(all)
+		}
+		out := make([]*Article, 0, end-offset)
+		out = append(out, all[offset:end]...)
+		return out, nil
 	}
 
 	rows, err := d.db.Query(`
@@ -769,7 +867,20 @@ func (d *DB) ListArticles(limit, offset int) ([]*Article, error) {
 
 func (d *DB) SearchArticles(searchQuery string, limit int) ([]*Article, error) {
 	if d.mockMode {
-		return nil, nil
+		if d.fs == nil {
+			return []*Article{}, nil
+		}
+		q := strings.ToLower(searchQuery)
+		out := []*Article{}
+		for _, a := range d.fs.articleList {
+			if strings.Contains(strings.ToLower(a.Title), q) || strings.Contains(strings.ToLower(a.Abstract), q) {
+				out = append(out, a)
+				if len(out) >= limit {
+					break
+				}
+			}
+		}
+		return out, nil
 	}
 
 	q := "%" + searchQuery + "%"
@@ -896,7 +1007,10 @@ func (d *DB) TrackArticleView(slug string, ip string, event string) error {
 
 func (d *DB) GetArticleViewCount(slug string) (int, error) {
 	if d.mockMode {
-		return 42, nil
+		if d.fs != nil {
+			return d.fs.views[slug], nil
+		}
+		return 0, nil
 	}
 	var count int
 	err := d.db.QueryRow("SELECT COUNT(*) FROM article_views WHERE slug = $1", slug).Scan(&count)
@@ -905,7 +1019,21 @@ func (d *DB) GetArticleViewCount(slug string) (int, error) {
 
 func (d *DB) GetTopArticles(limit int) ([]*Article, error) {
 	if d.mockMode {
-		return d.ListArticles(limit, 0)
+		if d.fs == nil {
+			return []*Article{}, nil
+		}
+		all := make([]*Article, len(d.fs.articleList))
+		copy(all, d.fs.articleList)
+		sort.Slice(all, func(i, j int) bool {
+			return d.fs.views[all[i].Slug] > d.fs.views[all[j].Slug]
+		})
+		if limit > len(all) {
+			limit = len(all)
+		}
+		if limit < 0 {
+			limit = 0
+		}
+		return all[:limit], nil
 	}
 	rows, err := d.db.Query(`
 		SELECT a.slug, a.title, a.abstract, a.blocks, a.confidence_vector, a.derived_confidence,
@@ -949,7 +1077,16 @@ func (d *DB) GetTopArticles(limit int) ([]*Article, error) {
 
 func (d *DB) GetGraphEdges(slug string) ([]*GraphEdge, error) {
 	if d.mockMode {
-		return nil, nil
+		if d.fs == nil {
+			return nil, nil
+		}
+		out := []*GraphEdge{}
+		for _, e := range d.fs.edges {
+			if e.Source == slug {
+				out = append(out, e)
+			}
+		}
+		return out, nil
 	}
 	rows, err := d.db.Query("SELECT source, target, relationship FROM graph_edges WHERE source = $1", slug)
 	if err != nil {
@@ -970,6 +1107,9 @@ func (d *DB) GetGraphEdges(slug string) ([]*GraphEdge, error) {
 
 func (d *DB) GetBacklinks(slug string) ([]*GraphEdge, error) {
 	if d.mockMode {
+		if d.fs != nil {
+			return d.fs.backlinks[slug], nil
+		}
 		return nil, nil
 	}
 	rows, err := d.db.Query("SELECT source, target, relationship FROM graph_edges WHERE target = $1", slug)

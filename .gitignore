@@ -2,6 +2,7 @@ node_modules
 dist
 .env
 .env.local
+.env.*.local
 *.db-wal
 *.db-shm
 content/*
@@ -12,6 +13,9 @@ ponytail
 *.log
 *.exe
 server.err
+server.out
+web.err
+web.out
 test-*.mjs
 test-pro.mjs
 skills-lock.json
@@ -26,3 +30,21 @@ DEAD_CODE_ANALYSIS.md
 *Client ID*
 nul
 
+# Build artifacts
+packages/web/tsconfig.tsbuildinfo
+packages/core/tsconfig.tsbuildinfo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.bak
+*.orig

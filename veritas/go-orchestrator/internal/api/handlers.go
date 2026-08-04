@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -283,6 +284,83 @@ func (s *Server) handleResolveArticle(w http.ResponseWriter, r *http.Request, sl
 	w.Write([]byte(fmt.Sprintf(`{"status":"resolved","action":"%s"}`, action)))
 }
 
+func (s *Server) handleArticleClaims(w http.ResponseWriter, r *http.Request, slug string) {
+	reqLog(r, "article claims slug=%s", slug)
+	claims, err := s.db.GetClaimsByArticle(slug)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"claims": claims})
+}
+
+func (s *Server) handleArticleGaps(w http.ResponseWriter, r *http.Request, slug string) {
+	reqLog(r, "article gaps slug=%s", slug)
+	gaps, err := s.db.GetGapsByArticle(slug)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"gaps": gaps})
+}
+
+func (s *Server) handleClaimEvidence(w http.ResponseWriter, r *http.Request) {
+	// Path: /claims/{id}/evidence
+	path := strings.TrimPrefix(r.URL.Path, "/claims/")
+	path = strings.TrimSuffix(path, "/evidence")
+	claimID := strings.TrimSuffix(path, "/")
+	reqLog(r, "claim evidence id=%s", claimID)
+	evidence, err := s.db.GetEvidenceByClaim(claimID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"evidence": evidence})
+}
+
+func (s *Server) handleArticleFreshness(w http.ResponseWriter, r *http.Request, slug string) {
+	reqLog(r, "article freshness slug=%s", slug)
+	claims, err := s.db.GetClaimsByArticle(slug)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	type cf struct {
+		ClaimID         string  `json:"claim_id"`
+		Text            string  `json:"text"`
+		FreshnessScore  float64 `json:"freshness_score"`
+		EvidenceCount   int     `json:"evidence_count"`
+	}
+	var claimFreshness []cf
+	var totalScore float64
+	for _, cl := range claims {
+		info, err := s.db.ComputeClaimFreshness(cl.ID)
+		if err != nil {
+			continue
+		}
+		claimFreshness = append(claimFreshness, cf{
+			ClaimID:        cl.ID,
+			Text:           cl.Text,
+			FreshnessScore: info.FreshnessScore,
+			EvidenceCount:  info.EvidenceCount,
+		})
+		totalScore += info.FreshnessScore
+	}
+	overall := 0.5
+	if len(claims) > 0 {
+		overall = totalScore / float64(len(claims))
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"slug":           slug,
+		"overall_score":  overall,
+		"claim_freshness": claimFreshness,
+	})
+}
+
 func (s *Server) handleGetArticleViews(w http.ResponseWriter, r *http.Request, slug string) {
 	reqLog(r, "get article views slug=%s", slug)
 	count, err := s.db.GetArticleViewCount(slug)
@@ -296,6 +374,8 @@ func (s *Server) handleGetArticleViews(w http.ResponseWriter, r *http.Request, s
 
 func (s *Server) handleGetArticleGraph(w http.ResponseWriter, r *http.Request, slug string) {
 	reqLog(r, "get article graph slug=%s", slug)
+
+	// Article crossref edges
 	edges, err := s.db.GetGraphEdges(slug)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -307,13 +387,143 @@ func (s *Server) handleGetArticleGraph(w http.ResponseWriter, r *http.Request, s
 		return
 	}
 
+	// Claim nodes for this article
+	claims, err := s.db.GetClaimsByArticle(slug)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Build nodes + edges for force-directed graph
+	var nodes []map[string]interface{}
+	linkSet := make(map[string]bool)
+
+	// Article node
+	nodes = append(nodes, map[string]interface{}{
+		"id": slug, "type": "article", "label": slug,
+	})
+
+	// Claim nodes linked to article
+	for _, c := range claims {
+		nodes = append(nodes, map[string]interface{}{
+			"id": c.ID, "type": "claim", "label": c.Text,
+			"status": c.Status, "confidence": c.DerivedConfidence,
+		})
+		key := slug + "|" + c.ID
+		if !linkSet[key] {
+			linkSet[key] = true
+		}
+	}
+
+	// Build links from article→claim and crossref edges
+	var links []map[string]interface{}
+	for c := range linkSet {
+		parts := strings.SplitN(c, "|", 2)
+		links = append(links, map[string]interface{}{
+			"source": parts[0], "target": parts[1], "type": "contains",
+		})
+	}
+	for _, e := range edges {
+		links = append(links, map[string]interface{}{
+			"source": e.Source, "target": e.Target, "type": e.Relationship,
+		})
+	}
+	for _, e := range backlinks {
+		links = append(links, map[string]interface{}{
+			"source": e.Source, "target": e.Target, "type": e.Relationship,
+		})
+	}
+
 	response := map[string]interface{}{
-		"edges":     edges,
-		"backlinks": backlinks,
+		"nodes": nodes,
+		"links": links,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// handleArticleClaimGraph returns a claim-level graph for an article: claim,
+// evidence, and source nodes joined by typed edges (evidence→claim supports /
+// contradicts, plus claim→claim relationships from the resolve node).
+func (s *Server) handleArticleClaimGraph(w http.ResponseWriter, r *http.Request, slug string) {
+	reqLog(r, "article claim graph slug=%s", slug)
+	claims, err := s.db.GetClaimsByArticle(slug)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	rels, err := s.db.GetClaimRelationships(slug)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var nodes []map[string]interface{}
+	edges := []map[string]interface{}{}
+	seen := make(map[string]bool)
+
+	for _, c := range claims {
+		if !seen["claim|"+c.ID] {
+			nodes = append(nodes, map[string]interface{}{
+				"id": c.ID, "type": "claim", "label": c.Text,
+				"status": c.Status, "confidence": c.DerivedConfidence,
+				"confidence_vector": c.ConfidenceVector,
+			})
+			seen["claim|"+c.ID] = true
+		}
+		evs, _ := s.db.GetEvidenceByClaim(c.ID)
+		for _, e := range evs {
+			if !seen["evidence|"+e.ID] {
+				nodes = append(nodes, map[string]interface{}{
+					"id":    e.ID,
+					"type":  "evidence",
+					"label": e.URL,
+					"supports":           e.SupportsClaim,
+					"chain_of_custody":   e.ChainOfCustody,
+					"accessibility":      e.Accessibility,
+				})
+				seen["evidence|"+e.ID] = true
+			}
+			rel := "contradicts"
+			if e.SupportsClaim {
+				rel = "supports"
+			}
+			edges = append(edges, map[string]interface{}{
+				"source": e.ID, "target": c.ID,
+				"type": "evidence", "relationship": rel,
+			})
+		}
+	}
+
+	for _, rel := range rels {
+		edges = append(edges, map[string]interface{}{
+			"source": rel.SourceClaimID, "target": rel.TargetClaimID,
+			"type": "claim", "relationship": rel.RelationshipType, "strength": rel.Strength,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"nodes": nodes, "edges": edges})
+}
+
+// handleGetContestedClaims returns the most contested claims across the whole
+// encyclopedia (disputed/weak, ranked by contradiction level) for the
+// /contested dashboard.
+func (s *Server) handleGetContestedClaims(w http.ResponseWriter, r *http.Request) {
+	reqLog(r, "contested claims")
+	limitStr := r.URL.Query().Get("limit")
+	limit := 50
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+		limit = l
+	}
+	claims, err := s.db.GetMostContestedClaims(limit)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"claims": claims})
 }
 
 func (s *Server) handleGetQuota(w http.ResponseWriter, r *http.Request) {
@@ -353,6 +563,132 @@ func (s *Server) handleTrack(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"status":"tracked"}`))
+}
+
+func (s *Server) handleGetAllGaps(w http.ResponseWriter, r *http.Request) {
+	reqLog(r, "get all gaps")
+	gaps, err := s.db.GetAllEvidenceGapsWithClaims()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"gaps": gaps})
+}
+
+func (s *Server) handleUpvoteGap(w http.ResponseWriter, r *http.Request) {
+	// Path: /gaps/{id}/upvote
+	path := strings.TrimPrefix(r.URL.Path, "/gaps/")
+	gapID := strings.TrimSuffix(path, "/upvote")
+	gapID = strings.TrimSuffix(gapID, "/")
+	reqLog(r, "upvote gap id=%s", gapID)
+	userID := userIDFromRequest(r)
+	if userID == "" {
+		userID = "anonymous"
+	}
+	if err := s.db.UpvoteGap(gapID, userID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	count, _ := s.db.GetGapUpvoteCount(gapID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"gap_id": gapID, "upvotes": count})
+}
+
+func (s *Server) handleSubmitGapEvidence(w http.ResponseWriter, r *http.Request) {
+	// Path: /gaps/{id}/submit
+	path := strings.TrimPrefix(r.URL.Path, "/gaps/")
+	gapID := strings.TrimSuffix(path, "/submit")
+	gapID = strings.TrimSuffix(gapID, "/")
+	reqLog(r, "submit gap evidence id=%s", gapID)
+	var body struct {
+		URL  string `json:"url"`
+		Note string `json:"note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.URL == "" {
+		http.Error(w, `{"error":"url is required"}`, http.StatusBadRequest)
+		return
+	}
+	userID := userIDFromRequest(r)
+	if userID == "" {
+		userID = "anonymous"
+	}
+	sub, err := s.db.SubmitGapEvidence(gapID, body.URL, body.Note, userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sub)
+}
+
+func (s *Server) handleRefreshDiff(w http.ResponseWriter, r *http.Request, slug string) {
+	reqLog(r, "refresh diff slug=%s", slug)
+	diff, err := s.db.GetRefreshDiff(slug)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if diff == nil {
+		diff = map[string]interface{}{
+			"slug": slug, "total_claims": 0, "upgraded": 0,
+			"downgraded": 0, "status_changed": 0, "claim_diffs": []interface{}{},
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(diff)
+}
+
+func (s *Server) handleGetStaleArticles(w http.ResponseWriter, r *http.Request) {
+	reqLog(r, "stale articles")
+	limitStr := r.URL.Query().Get("limit")
+	limit := 50
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+		limit = l
+	}
+	articles, err := s.db.GetStaleArticles(limit)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"articles": articles})
+}
+
+// handleGapsDynamicRoute dispatches gap sub-routes:
+//   GET  /gaps              → list all gaps (enriched with claim text)
+//   POST /gaps/{id}/upvote  → upvote a gap
+//   POST /gaps/{id}/submit  → submit community evidence for a gap
+func (s *Server) handleGapsDynamicRoute(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/gaps")
+	path = strings.TrimPrefix(path, "/")
+	if path == "" {
+		// GET /gaps
+		if r.Method == "GET" {
+			s.handleGetAllGaps(w, r)
+			return
+		}
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	// /gaps/{id}/{action}
+	parts := strings.Split(path, "/")
+	if len(parts) >= 2 {
+		action := parts[len(parts)-1]
+		switch action {
+		case "upvote":
+			if r.Method == "POST" {
+				s.handleUpvoteGap(w, r)
+				return
+			}
+		case "submit":
+			if r.Method == "POST" {
+				s.handleSubmitGapEvidence(w, r)
+				return
+			}
+		}
+	}
+	http.NotFound(w, r)
 }
 
 func (s *Server) handleGetTopArticles(w http.ResponseWriter, r *http.Request) {

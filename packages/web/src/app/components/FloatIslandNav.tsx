@@ -48,13 +48,62 @@ function SettingsIcon({ size }: { size: number }) {
   );
 }
 
-// ─── NAV_LINKS ─────────────────────────────────────────────────────
+// ─── Living Encyclopedia icons ──────────────────────────────────
+
+function ContestedIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v18" />
+      <path d="M8 21h8" />
+      <path d="M12 3 4 8v9l8 4 8-4V8z" />
+      <path d="M12 3l8 5v9l-8 4-8-4V8z" />
+    </svg>
+  );
+}
+
+function GapIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.35-4.35" />
+      <path d="M8.5 11h5" />
+      <path d="M11 8.5v5" />
+    </svg>
+  );
+}
+
+function StaleIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+function BookIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      <path d="M9 7h7" />
+    </svg>
+  );
+}
+
+// ─── NAV LINKS ─────────────────────────────────────────────────────
 
 const NAV_LINKS = [
-  { href: "/chat", label: "Chat", icon: ChatIcon },
+  { href: "/chat/new", label: "Chat", icon: ChatIcon },
   { href: "/articles", label: "Articles", icon: ArticleIcon },
   { href: "/maps", label: "Maps", icon: MapIcon },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
+];
+
+// Secondary epistemic dashboards grouped under the "Living" entry point.
+const LIVING_LINKS = [
+  { href: "/contested", label: "Contested", icon: ContestedIcon },
+  { href: "/gaps", label: "Open Questions", icon: GapIcon },
+  { href: "/stale", label: "Stale", icon: StaleIcon },
 ];
 
 // ─── Nav link ────────────────────────────────────────────────────
@@ -77,6 +126,72 @@ function NavLink({ href, isActive, icon: Icon, label }: {
         <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full" style={{ background: "var(--accent)" }} />
       )}
     </Link>
+  );
+}
+
+// ─── Living dropdown (desktop) ───────────────────────────────────
+
+function LivingDropdown({ pathname }: { pathname: string }) {
+  const [open, setOpen] = useState(false);
+  const active = LIVING_LINKS.some((l) => pathname.startsWith(l.href));
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        onClick={() => setOpen(!open)}
+        className="relative flex items-center gap-1.5 px-2.5 py-1 text-sm font-medium no-underline transition-all duration-200 cursor-pointer"
+        style={{ color: active || open ? "var(--accent)" : "var(--muted)", background: "none", border: "none" }}
+        aria-haspopup="true"
+        aria-expanded={open}
+      >
+        <BookIcon size={16} />
+        <span className="hidden lg:inline">Living</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+        {(active || open) && (
+          <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full" style={{ background: "var(--accent)" }} />
+        )}
+      </button>
+
+      {open && (
+        <div
+          className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 min-w-[15rem] p-1.5 rounded-xl"
+          style={{
+            background: "var(--surface-glass)",
+            backdropFilter: "blur(24px) saturate(1.4)",
+            border: "1px solid var(--glass-border)",
+            boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
+          }}
+        >
+          <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--subtle)" }}>
+            Living Encyclopedia
+          </div>
+          {LIVING_LINKS.map((link) => {
+            const isActive = pathname.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium no-underline rounded-lg transition-colors"
+                style={{
+                  color: isActive ? "var(--accent)" : "var(--ink)",
+                  background: isActive ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",
+                }}
+              >
+                <link.icon size={16} />
+                <span>{link.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -104,10 +219,12 @@ function TopHeader({ pathname }: { pathname: string }) {
       </Link>
 
       {/* Center: Nav links */}
-      <nav className="flex items-center gap-0">
+      <nav className="flex items-center gap-1">
         {NAV_LINKS.map((link) => (
           <NavLink key={link.href} href={link.href} isActive={pathname.startsWith(link.href)} icon={link.icon} label={link.label} />
         ))}
+        <div className="w-px h-4 mx-1.5 shrink-0" style={{ background: "var(--glass-border)" }} />
+        <LivingDropdown pathname={pathname} />
       </nav>
 
       {/* Right: Theme + Avatar */}
@@ -119,6 +236,9 @@ function TopHeader({ pathname }: { pathname: string }) {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
           )}
         </button>
+        <Link href="/settings" className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-accent-bg/30 transition-all duration-200 cursor-pointer" aria-label="Settings">
+          <SettingsIcon size={15} />
+        </Link>
         {user && (
           <Link href="/settings" className="shrink-0">
             <Avatar src={user.avatar || undefined} alt={user.name} size="sm" />
@@ -281,6 +401,28 @@ function MobileHeader({ pathname }: { pathname: string }) {
                   <span>{link.label}</span>
                 </Link>
               ))}
+
+              {/* Living group */}
+              <div className="pt-3 mt-3 border-t border-border/30">
+                <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--subtle)" }}>
+                  Living Encyclopedia
+                </div>
+                {LIVING_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setSidebarOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium rounded-lg no-underline transition-colors hover:bg-accent-bg/15"
+                    style={{
+                      color: pathname.startsWith(link.href) ? "var(--accent)" : "var(--muted)",
+                      background: pathname.startsWith(link.href) ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",
+                    }}
+                  >
+                    <link.icon size={18} />
+                    <span>{link.label}</span>
+                  </Link>
+                ))}
+              </div>
             </div>
 
             {/* Bottom: theme toggle */}

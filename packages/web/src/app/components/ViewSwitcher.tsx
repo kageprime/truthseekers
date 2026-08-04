@@ -6,6 +6,7 @@ const modes: { key: ViewMode; label: string }[] = [
   { key: "stream", label: "Stream" },
   { key: "explore", label: "Explore" },
   { key: "press", label: "Press" },
+  { key: "graph", label: "Graph" },
 ];
 
 export default function ViewSwitcher() {

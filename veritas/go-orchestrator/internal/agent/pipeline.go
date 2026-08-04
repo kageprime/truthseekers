@@ -149,8 +149,48 @@ OUTPUT FORMAT:
 
 Each document should include: id, title, text, url. Preserve all source metadata.`
 
-	promptExtractClaims = `AGENT ROLE: Claim Extraction Node — Layer 1 (Evidence Integrity)
+	promptRetrieveReal = `AGENT ROLE: Retrieve Node — Layer 1 (Evidence Integrity)
 
+FUNCTION: Categorize real documents fetched from live web search into truth categories and normalize them into the document schema.
+
+SUPPLEMENTAL INSTRUCTIONS:
+- You are a retrieval engine, not an analyst.
+- The real documents were fetched via web search (Tavily/Firecrawl) and URL fetch. Do NOT invent additional sources.
+- Categorize each real document into the appropriate truth category based on its content and source type:
+  - "confirmed": primary sources, official records, peer-reviewed academic journals.
+  - "contested": opposing viewpoints, allegations, claims under investigation.
+  - "suppressed": documents from sources that may be restricted or hard to verify.
+  - "speculative": opinion, analysis, unverified claims.
+  - "web": general web articles that don't fit the above.
+- Preserve source metadata (URL, title). Do NOT rewrite the document text.
+- Assign each document a short, stable id (use the document's provided id field where available).
+
+INPUT FORMAT:
+{
+  "query": "string",
+  "real_documents": [
+    {"id": "doc-xxxxx", "title": "...", "text": "...", "url": "...", "snippet": "..."}
+  ]
+}
+
+OUTPUT FORMAT:
+{
+  "documents": {
+    "confirmed": [{"id": "...", "title": "...", "text": "...", "url": "...", "chain_of_custody": "web_search", "acquisition_method": "tavily", "accessibility": "public"}],
+    "contested": [...],
+    "suppressed": [...],
+    "speculative": [...],
+    "web": [...]
+  },
+  "metadata": {
+    "category_counts": {"confirmed": 0, "contested": 0, "suppressed": 0, "speculative": 0, "web": 0},
+    "retrieval_method": "real_web_search",
+    "search_query": "string"
+  }
+  }
+}`
+
+	promptExtractClaims = `AGENT ROLE: Claim Extraction Node — Layer 1 (Evidence Integrity)
 FUNCTION: Extract atomic, verifiable factual claims from the retrieved documents.
 
 SUPPLEMENTAL INSTRUCTIONS:
@@ -334,6 +374,7 @@ SUPPLEMENTAL INSTRUCTIONS:
 - Propagate all is_interpretive flags from Layer 2.
 - Never invent evidence, drop provenance, or re-label an interpretive claim as factual.
 - If a confidence vector is low, say so.
+- ALSO emit claim_relationships: link each claim to the other claims it directly supports or contradicts (a disputed claim contradicts the factual claim(s) it disputes; corroborating claims support each other; weakly-related claims use "related"). Use "related" sparingly — only for meaningful topical linkage.
 
 OUTPUT FORMAT:
 {
@@ -357,6 +398,14 @@ OUTPUT FORMAT:
         "interpretive_framing": "string | null"
       }
     }
+  ],
+  "claim_relationships": [
+    {
+      "source_claim_id": "uuid",
+      "target_claim_id": "uuid",
+      "relationship_type": "supports | contradicts | related",
+      "strength": 0.0
+    }
   ]
 }`
 
@@ -368,7 +417,10 @@ SUPPLEMENTAL INSTRUCTIONS:
 - Build the article from the resolved claims; do not introduce new claims.
 - Use precise language. If Layer 2 offered precision upgrades, you may adopt them, but must show the original phrasing in language notes.
 - Include sections for Evidence Gaps, Dissenting Perspectives, and Confidence Note.
-- Every factual statement must be traceable to a specific claim_id.
+- Every factual statement MUST be traceable to a specific claim_id.
+- Insert claim anchors in the content using the format: [claim:{claim_id}]
+- Example: "The mission launched on July 16, 1969. [claim:abc-123]"
+- Do NOT add claim anchors to interpretive or speculative statements.
 - Mark uncertainty clearly. The reader must see what is solid and what is interpretive.
 - Never invent evidence, drop provenance, or re-label an interpretive claim as factual.
 
@@ -381,7 +433,7 @@ OUTPUT FORMAT (return a JSON object with root "article" key):
       {
         "id": "section-id-hyphenated",
         "title": "Section Title",
-        "content": "Markdown content with citations..."
+        "content": "Markdown content with [claim:xxx] claim anchors..."
       }
     ],
     "evidence_gaps": [
@@ -656,10 +708,39 @@ func DAGNodeExecutors(systemPrompt string) map[string]func(context.Context, map[
 		"generate_article": {promptGenerateArticle, map[string]string{"resolve": "RESOLVED CLAIMS"}},
 	}
 
-	executors := make(map[string]func(context.Context, map[string]interface{}) (interface{}, error))
+		executors := make(map[string]func(context.Context, map[string]interface{}) (interface{}, error))
 	for name, cfg := range configs {
 		name, cfg := name, cfg
 		executors[name] = func(ctx context.Context, input map[string]interface{}) (interface{}, error) {
+			// Special case: the retrieve node can use real web search
+			// (RealRetrieve) to ground the pipeline in live evidence. When
+			// RealRetrieve is nil (no search keys) or fails, we fall back to
+			// the LLM-only mode (passes the query to the LLM as before).
+			if name == "retrieve" && RealRetrieve != nil {
+				query := ""
+				if q, ok := input["query"].(string); ok {
+					query = q
+				}
+				if docs, err := RealRetrieve(query); err == nil && len(docs) > 0 {
+					// Replace the query input with real documents so the
+					// downstream extract_claims node receives them.
+					docJSON, _ := json.Marshal(docs)
+					input["retrieve"] = json.RawMessage(docJSON)
+					// Build the prompt with real documents.
+					userPrompt := promptRetrieveReal + "\n\nQUERY:\n" + query + "\n\nREAL DOCUMENTS:\n" + indentJSON(docJSON) + "\n\nReturn JSON only."
+					result, err := SendPromptJSON(systemPrompt, userPrompt, epistemicModel)
+					if err != nil {
+						return nil, fmt.Errorf("dag node %q: %w", name, err)
+					}
+					var output interface{}
+					if err := json.Unmarshal(result, &output); err != nil {
+						return nil, fmt.Errorf("dag node %q parse: %w", name, err)
+					}
+					return output, nil
+				}
+				// Fall through to LLM-only mode if retrieval yielded nothing.
+			}
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
