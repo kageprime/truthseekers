@@ -9,7 +9,7 @@ export type {
   Persona,
   JobInfo, JobStatus,
   Citation, CrossReference, TimelineEvent, Section, MediaItem,
-  ThreeDScene, ThreeDMapScene, ThreeDBuilding, ThreeDModel, ThreeDAnnotation,
+  ThreeDMapScene, ThreeDBuilding, ThreeDModel, ThreeDAnnotation,
   MapEntry, MapMarker, MapLayer,
   HeadingBlockData, TextBlockData, SectionBlockData,
   TimelineBlockData, Map2DBlockData, Map3DBlockData,

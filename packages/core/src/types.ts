@@ -21,12 +21,6 @@ export interface TimelineEvent {
   category?: string;
 }
 
-export interface ThreeDScene {
-  id: string;
-  code: string;
-  description: string;
-}
-
 export interface ThreeDBuilding {
   id: string;
   lat: number;
@@ -123,7 +117,6 @@ export interface ArticleContent {
   categories: string[];
   crossrefs: CrossReference[];
   citations: Citation[];
-  threedScenes: ThreeDScene[];
 }
 
 export interface Article extends ArticleContent {

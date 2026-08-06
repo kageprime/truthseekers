@@ -6,7 +6,7 @@ import type { AgentEvent } from "../components/ProcessViewer";
 
 export interface StreamEvent {
   type: string;
-  data?: unknown;
+  data?: string;
   name?: string;
   content?: string;
   blocks?: any[];
@@ -83,8 +83,8 @@ export function useChatStream() {
           try {
             const event: StreamEvent = JSON.parse(payload);
             if (event.type === "text") {
-              if (needsReset) { fullText = event.data; needsReset = false; }
-              else { fullText += event.data; }
+              if (needsReset) { fullText = event.data ?? ""; needsReset = false; }
+              else { fullText += event.data ?? ""; }
               callbacks.onText(fullText);
             } else if (event.type === "tool_use" || event.type === "tool_result" || event.type === "trace") {
               needsReset = true;

@@ -1,7 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
 import path from "path";
-import { defineConfig } from "@playwright/test";
 
 const webRoot = path.resolve(__dirname, "..");
 

@@ -22,7 +22,7 @@ export default function FloatingChatWidget() {
   const { close, activeConversationId, setActiveConversationId, toggleExpanded } = useFloatingChat();
   // Console + sending state now live in ChatContext so this widget and the
   // chat page share one source of truth (useTraceSegments reads them).
-  const { sending, setSending, setLiveEvents } = useChatContext();
+  const { liveEvents, sending, setSending, setLiveEvents } = useChatContext();
   const { send: streamSend, stop: streamStop } = useChatStream();
   const { data: conversationsData, loading: chatsLoading } = useChats();
   const conversations = conversationsData || [];
