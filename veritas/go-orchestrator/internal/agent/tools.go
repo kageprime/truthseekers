@@ -41,8 +41,17 @@ type RetrievedDoc struct {
 // the LLM-only mode (no external search keys configured).
 var RealRetrieve func(query string) ([]RetrievedDoc, error)
 
+// runCommandEnabled gates the LLM-driven shell tool: on by default in dev,
+// off in production unless explicitly enabled via ENABLE_RUN_COMMAND=1.
+func runCommandEnabled() bool {
+	if os.Getenv("ENABLE_RUN_COMMAND") == "1" {
+		return true
+	}
+	return os.Getenv("VERITAS_ENV") != "production"
+}
+
 func ChatToolDefinitions() []ToolDefinition {
-	return append(
+	tools := append(
 		EpistemicToolDefinitions(),
 		[]ToolDefinition{
 			{Type: "function", Function: ToolFunctionDef{Name: "web_search", Description: "Search web sources for information on a topic. Supports general web, Reddit, and Internet Archive. Use 'sources' to narrow: web, reddit, archive, or news. Reddit search returns real Reddit results via their public API. Archive search queries the Internet Archive. Defaults to general web (Tavily/Firecrawl).", Parameters: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search query"},"maxResults":{"type":"number","description":"Max results (default 5)"},"sources":{"type":"array","items":{"type":"string","enum":["web","reddit","archive","news"]},"description":"Source types to search (default: [\"web\"])"}},"required":["query"]}`)}},
@@ -58,10 +67,13 @@ func ChatToolDefinitions() []ToolDefinition {
 			{Type: "function", Function: ToolFunctionDef{Name: "suggest_related", Description: "Find articles and topics related to a given slug.", Parameters: json.RawMessage(`{"type":"object","properties":{"slug":{"type":"string","description":"Article slug to find related topics for"}},"required":["slug"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "task", Description: "Delegate a sub-task to a sub-agent for parallel research.", Parameters: json.RawMessage(`{"type":"object","properties":{"objective":{"type":"string","description":"What the sub-agent should accomplish"},"tools":{"type":"array","items":{"type":"string"},"description":"Tools the sub-agent may use"}},"required":["objective"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "mem_store", Description: "Store a piece of information about the user for future conversations.", Parameters: json.RawMessage(`{"type":"object","properties":{"key":{"type":"string","description":"Memory key"},"value":{"type":"string","description":"The value to remember"}},"required":["key","value"]}`)}},
-			{Type: "function", Function: ToolFunctionDef{Name: "run_command", Description: "Execute a shell command and return its output. Use for data processing, file operations, or CLI tools. Timeout after 30s.", Parameters: json.RawMessage(`{"type":"object","properties":{"command":{"type":"string","description":"Command to run"},"args":{"type":"array","items":{"type":"string"},"description":"Command arguments"}},"required":["command"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "mem_recall", Description: "Retrieve stored information about the user from previous conversations.", Parameters: json.RawMessage(`{"type":"object","properties":{"key":{"type":"string","description":"Memory key to look up"}},"required":["key"]}`)}},
 		}...,
 	)
+	if runCommandEnabled() {
+		tools = append(tools, ToolDefinition{Type: "function", Function: ToolFunctionDef{Name: "run_command", Description: "Execute a shell command and return its output. Use for data processing, file operations, or CLI tools. Timeout after 30s.", Parameters: json.RawMessage(`{"type":"object","properties":{"command":{"type":"string","description":"Command to run"},"args":{"type":"array","items":{"type":"string"},"description":"Command arguments"}},"required":["command"]}`)}})
+	}
+	return tools
 }
 
 type ToolExecutors struct {
@@ -100,7 +112,9 @@ func MergeExecutorsWithEpistemic(builtins ToolExecutors, server map[string]ToolE
 	m["verify_citation"] = builtins.VerifyCitation
 	m["generate_image"] = builtins.GenerateImage
 	m["generate_video"] = builtins.GenerateVideo
-	m["run_command"] = builtins.RunCommand
+	if runCommandEnabled() {
+		m["run_command"] = builtins.RunCommand
+	}
 	for k, v := range server {
 		m[k] = v
 	}

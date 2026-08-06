@@ -1,6 +1,8 @@
 package sessionlifecycle
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"sync"
@@ -253,8 +255,9 @@ func (e *Engine) Stop() {
 
 func randID() string {
 	b := make([]byte, 16)
-	for i := range b {
-		b[i] = byte('a' + i%26)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
 	}
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:8], b[8:12], b[12:14], b[14:])
+	return hex.EncodeToString(b[:4]) + "-" + hex.EncodeToString(b[4:8]) + "-" +
+		hex.EncodeToString(b[8:12]) + "-" + hex.EncodeToString(b[12:14]) + "-" + hex.EncodeToString(b[14:])
 }

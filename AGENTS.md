@@ -171,7 +171,7 @@ Both pipelines default to the `epistemic_model` (qwen/qwen3-32b) via `SendPrompt
 - CORS allowing all origins (configurable via `CORS_ORIGIN`).
 - Rate limiting (in-memory token bucket per IP, 3 tiers: auth 10/min, chat 30/min, API 60/min).
 - Graceful shutdown on SIGINT/SIGTERM.
-- The `run_command` tool executes arbitrary shell commands — a known risk. Sandbox or remove in production.
+- The `run_command` tool executes arbitrary shell commands — gated off in production (`VERITAS_ENV=production`); explicit opt-in via `ENABLE_RUN_COMMAND=1`. Sandbox or remove for hostile deployments.
 
 > **Note:** Real JWT signing, rate limiting, and input validation are now implemented. Remaining hardening items: `run_command` sandboxing, `randID` crypto hardening, rate limiter cleanup goroutine.
 
@@ -210,6 +210,8 @@ npm run dev                    # from repo root, runs the Next.js app
 | `FIRECRAWL_API_KEY` / `TAVILY_API_KEY` | Web-search backend for the `web_search` tool |
 | `ENCARTA_IMAGE_DIR` | Output dir for generated images (default `public/images`) |
 | `NEXT_PUBLIC_API_URL` | API URL for the frontend (default `http://localhost:4097`) |
+| `VERITAS_ENV` | `production` panics on missing `JWT_SECRET` and disables `run_command` |
+| `ENABLE_RUN_COMMAND` | `1` re-enables the `run_command` tool (prod opt-in, default off) |
 
 ## Streaming Transparency
 
