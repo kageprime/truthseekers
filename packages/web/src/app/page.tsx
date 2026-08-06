@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AppFooter from "./components/AppFooter";
+import { useHealth, useContestedClaims, useAllGaps } from "./hooks";
 
 function useScrollReveal() {
   useEffect(() => {
@@ -154,35 +155,20 @@ function FeatureLink({ href, glyph, title, desc }: { href: string; glyph: string
 }
 
 function LiveStatsStrip() {
-  const [stats, setStats] = useState<{ articles?: number; contested?: number; gaps?: number } | null>(null);
+  // Pull from the shared React Query caches so all three stats share one
+  // network round-trip and the home page stays in sync with the gaps/contested
+  // dashboards.
+  const { data: h } = useHealth();
+  const { data: c } = useContestedClaims(100);
+  const { data: g } = useAllGaps();
 
-  useEffect(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
-    let cancelled = false;
-    (async () => {
-      try {
-        const [h, c, g] = await Promise.all([
-          fetch(`${base}/health`).then((r) => r.json()).catch(() => null),
-          fetch(`${base}/contested?limit=100`).then((r) => r.json()).catch(() => null),
-          fetch(`${base}/gaps`).then((r) => r.json()).catch(() => null),
-        ]);
-        if (cancelled) return;
-        setStats({
-          articles: h?.article_count,
-          contested: c?.claims?.length,
-          gaps: g?.gaps?.length,
-        });
-      } catch {}
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  if (!stats) return null;
   const items = [
-    { label: "Articles", value: stats.articles },
-    { label: "Contested claims", value: stats.contested },
-    { label: "Open questions", value: stats.gaps },
+    { label: "Articles", value: h?.article_count },
+    { label: "Contested claims", value: c?.claims?.length },
+    { label: "Open questions", value: g?.gaps?.length },
   ].filter((i) => i.value != null);
+
+  if (items.length === 0) return null;
 
   return (
     <div className="reveal-up mt-10 flex items-center justify-center gap-6 sm:gap-10">
@@ -237,7 +223,7 @@ export default function HomePage() {
             Truthseekers generates structured, evidence-grounded articles through a nine-stage epistemic pipeline. Every claim is sourced. Every source is checked.
           </p>
           <div className="reveal mt-12 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-            <Link href="/chat/new" className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-white transition-all duration-150 w-full sm:w-auto" style={{ padding: "14px 32px", borderRadius: 4, background: "#111111" }}>
+            <Link href="/chat/new" className="cta-primary inline-flex items-center justify-center gap-1.5 text-sm font-medium transition-all duration-150 w-full sm:w-auto" style={{ padding: "14px 32px", borderRadius: 4 }}>
               Start researching
             </Link>
             <Link href="/articles" className="inline-flex items-center justify-center gap-1.5 px-6 py-3.5 sm:py-3 text-sm font-medium transition-all duration-150 w-full sm:w-auto" style={{ borderRadius: 4, border: "1px solid var(--rule)", color: "var(--ink-secondary)", background: "transparent" }}>
@@ -252,7 +238,7 @@ export default function HomePage() {
 
       {/* TRUST BAR — Infinite Marquee */}
       <section className="py-8 border-y" style={{ borderColor: "var(--rule)" }}>
-        <InfiniteMarquee items={["Veritas", "Groq", "Zhipu", "OpenAI", "DigitalOcean", "MongoDB", "Z.ai", "Firecrawl", "Tavily"]} speed={50} />
+          <InfiniteMarquee items={["Veritas", "Groq", "Zhipu", "OpenAI", "DigitalOcean", "PostgreSQL", "Z.ai", "Firecrawl", "Tavily"]} speed={50} />
       </section>
 
       {/* INTEREST — BENTO GRID (gapless, dense) */}
@@ -322,7 +308,7 @@ export default function HomePage() {
               Explore the research
             </h2>
             <p className="reveal-up mt-4 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed" style={{ color: "var(--muted)" }}>
-              Interactive deep-dives. Hover to expand. Scroll to reveal.
+              Hover a panel to expand. Scroll the page to reveal.
             </p>
           </div>
 
@@ -439,11 +425,11 @@ export default function HomePage() {
             No sign-up required. Open the chat and start researching any topic.
           </p>
           <div className="reveal-up mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-            <Link href="/chat/new" className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-white transition-all duration-150 w-full sm:w-auto" style={{ padding: "14px 36px", borderRadius: 4, background: "#111111" }}>
+            <Link href="/chat/new" className="cta-primary inline-flex items-center justify-center gap-1.5 text-sm font-medium transition-all duration-150 w-full sm:w-auto" style={{ padding: "14px 36px", borderRadius: 4 }}>
               Start researching
             </Link>
             <Link href="/settings" className="inline-flex items-center justify-center gap-1.5 px-6 py-3.5 sm:py-3 text-sm font-medium transition-all duration-150 w-full sm:w-auto" style={{ borderRadius: 4, border: "1px solid var(--rule)", color: "var(--ink-secondary)", background: "transparent" }}>
-              Configure
+              Settings
             </Link>
           </div>
         </div>

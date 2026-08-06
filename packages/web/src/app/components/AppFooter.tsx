@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 
 /**
  * AppFooter — editorial footer rendered by AppShell on non-chat, non-overlay routes.
- * Uses the Antique Gold & Ink design tokens. Links are static/placeholder for now;
- * wire to real routes as they come online.
+ * Uses the Antique Gold & Ink design tokens. Only real, wired routes are listed;
+ * placeholder legal/company pages are omitted rather than linked to "#".
  */
 const COLUMNS: Array<{ title: string; links: Array<{ label: string; href: string }> }> = [
   {
@@ -25,15 +25,6 @@ const COLUMNS: Array<{ title: string; links: Array<{ label: string; href: string
       { label: "Pricing", href: "/pricing" },
       { label: "Settings", href: "/settings" },
       { label: "Admin", href: "/admin" },
-    ],
-  },
-  {
-    title: "Company",
-    links: [
-      { label: "About", href: "#" },
-      { label: "Privacy", href: "#" },
-      { label: "Terms", href: "#" },
-      { label: "Contact", href: "#" },
     ],
   },
 ];
