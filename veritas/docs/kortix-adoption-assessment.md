@@ -43,7 +43,7 @@ Single Go LLM pipeline — Python removed as of 2026-07-13.
 |---|---------|---------------|---------------|------------|
 | 8 | **Process supervisor for DAG nodes** | Child process supervision with restart policies | Naive `exec.CommandContext` — no health checks, no restart, no resource limits | Wrap Python/Go node execution in a subprocess manager with restart backoff, health probes, resource accounting. |
 | 9 | **Hot-reload manifest** | Config watcher pattern | `kortix.toml` read once at boot; changing agents/tools/policies requires restart | Add `fsnotify` watcher on `kortix.toml`. On change, atomic-swap config structs and rewire tool/agent/policy registries. |
-| 10 | **Session persistence (DB-backed)** | — | `session-lifecycle.Engine` is in-memory only — lost on restart | Back session state with MongoDB (reuses existing `storage/db.go`). Survive restarts, support multi-instance coordination. |
+| 10 | **Session persistence (DB-backed)** | — | `session-lifecycle.Engine` is in-memory only — lost on restart | Back session state with PostgreSQL (reuses existing `storage/db.go`). Survive restarts, support multi-instance coordination. |
 | 11 | **Human-in-the-loop approval flow** | `policy.go:require_approval` + SSE relay | `policy.go` defines `require_approval` risk level but nothing wires it into an actual approval UI/event | Wire `require_approval` → paused agent → `question.asked` SSE event → UI prompt → `question.replied` → resume. |
 
 ---

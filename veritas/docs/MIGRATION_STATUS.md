@@ -5,7 +5,7 @@
 
 This document outlines the work completed during the architectural migration from the TypeScript/Mongoose stack (`packages/core`, `packages/server`) to the new Go architecture under `veritas/`, and sets the roadmap for the next phases.
 
-> **Correction (July 2026):** Earlier versions of this document incorrectly stated the Go storage layer uses MongoDB via `go.mongodb.org/mongo-driver`. The live Go code has **always** used **PostgreSQL via `database/sql` + `lib/pq`** (confirmed by `go.mod` and `internal/storage/db.go`). The `MOONGOSE_CONNECTION_STRING` environment variable name was a legacy typo; the server actually reads `DATABASE_URL`. The `storage/schema.sql` and Postgres service in `docker-compose.yml` are the live schema.
+> **Correction (July 2026):** Earlier versions of this document incorrectly stated the Go storage layer uses MongoDB via `go.mongodb.org/mongo-driver`. The live Go code has **always** used **PostgreSQL via `database/sql` + `lib/pq`** (confirmed by `go.mod` and `internal/storage/db.go`). The `MOONGOSE_CONNECTION_STRING` environment variable name was a legacy typo; the server actually reads `DATABASE_URL`. The live schema applies via `migrations/001_initial_schema.sql`, and `schema.sql` is a reference-only port from the legacy Mongoose models.
 
 ---
 
@@ -18,7 +18,7 @@ This document outlines the work completed during the architectural migration fro
 ### 1.2 Data Persistence (PostgreSQL)
 - **Driver:** The Go storage adapter (`internal/storage/db.go`) uses `database/sql` with `github.com/lib/pq` (the only runtime DB dependency — see `go.mod`). The schema (`storage/schema.sql`) defines all tables including the full epistemic layer (`claims`, `evidence`, `sources`, `evidence_gaps`, `language_flags`, `scrutiny_assessments`).
 - **Mock mode:** If `DATABASE_URL` is unset or the connection fails, `NewDB` returns an in-memory mock that serves hardcoded articles and stores conversations/users in maps — enabling zero-infrastructure local development.
-- **Known hardening items (in progress):** No migration system exists yet (`schema.sql` is reference-only); the `MOONGOSE_CONNECTION_STRING` env var name is a legacy typo from an earlier design iteration.
+- **Migrations:** Automated on boot via `internal/storage/migrate.go` + numbered SQL files in `migrations/` (`001_initial_schema.sql`).
 
 ### 1.3 Orchestration & Execution (Go)
 - **DAG Engine:** Implemented a robust Directed Acyclic Graph orchestrator (`internal/dag/engine.go`) featuring Kahn's cycle detection, concurrent goroutines with `sync.RWMutex`, exponential backoff retries, and channel-based progress streaming.
@@ -37,30 +37,30 @@ This document outlines the work completed during the architectural migration fro
   - `resolve`: Final confidence scoring.
   - `generate_article`: Final article synthesis.
 
-> **Note:** The epistemic pipeline currently runs **ephemerally** — intermediate node outputs are not persisted to the database. Only the final `generate_article` output is saved as an `Article` row. Persisting the full epistemic data layer is the next major initiative (see Phase 1B below).
+> **Note:** Epistemic pipeline outputs (claims, evidence, gaps, language flags, scrutiny) are now persisted to PostgreSQL via `internal/storage/epistemic.go` and served through dedicated endpoints (`/articles/:slug/claims`, `/claims/:id/evidence`, `/articles/:slug/gaps`, `/contested`, `/gaps`, `/claim-graph`, `/articles/:slug/claim-graph`).
 
 ---
 
 ## 2. The Plan Ahead
 
-### Phase 0: Foundation Hardening 🔄 In Progress
-- **Security:** Purge committed secrets, add `.gitignore` protections, rotate API keys.
-- **Documentation:** Correct MongoDB/PostgreSQL drift in `AGENTS.md` and this file.
-- **Migration system:** Adopt `pressly/goose` or `golang-migrate`. Version `schema.sql` as numbered migrations.
-- **CI/CD:** GitHub Actions workflow for `go test ./...`.
-- **Tooling:** Ensure Go is installed and available on all dev machines.
+### Phase 0: Foundation Hardening ✅ (CI/CD remaining)
+- **Security:** ✅ Purge committed secrets, add `.gitignore` protections, rotate API keys.
+- **Documentation:** ✅ Correct MongoDB/PostgreSQL drift in `AGENTS.md` and this file.
+- **Migration system:** ✅ `internal/storage/migrate.go` + `migrations/001_initial_schema.sql`, automated on boot.
+- **CI/CD:** ⏳ GitHub Actions workflow for `go test ./...` — not yet added.
+- **Tooling:** ✅ Ensure Go is installed and available on all dev machines.
 
-### Phase 1A: Epistemic Data Persistence ⏳
-- **Storage layer:** Extend `internal/storage/db.go` with CRUD for `claims`, `evidence`, `sources`, `evidence_gaps`, `language_flags`, `scrutiny_assessments`, `article_claims`.
-- **Persistence hook:** Add `OnNodeComplete` callback to the DAG engine. Wire an `epistemic.Store` that intercepts node outputs and persists them.
-- **Claim tracking:** Modify `generate_article` prompt to embed `claim_id` anchors in article text.
-- **API additions:** `GET /articles/:slug/claims`, `GET /claims/:id/evidence`, `GET /articles/:slug/gaps`.
+### Phase 1A: Epistemic Data Persistence ✅
+- **Storage layer:** ✅ CRUD in `internal/storage/db.go` + `epistemic.go` for `claims`, `evidence`, `sources`, `evidence_gaps`, `language_flags`, `scrutiny_assessments`, `article_claims`.
+- **Persistence hook:** ✅ DAG node outputs intercepted and persisted on generate/refresh.
+- **Claim tracking:** ✅ `generate_article` emits claim anchors embedded in article text.
+- **API additions:** ✅ `GET /articles/:slug/claims`, `GET /claims/:id/evidence`, `GET /articles/:slug/gaps`.
 
-### Phase 1B: Claim Transparency Mode ✅ (mostly)
-- **Frontend:** `ProvenanceChip` and `ClaimPopover` components. Parse `[claim:xxx]` anchors in article content.
-- **UX:** Hover over a chip → see claim status, confidence vector, evidence list, and a 6-axis `ConfidenceRadar`.
+### Phase 1B: Claim Transparency Mode ✅
+- **Frontend:** ✅ `ProvenanceChip` and `ClaimPopover` components. Parse `[claim:xxx]` anchors in article content.
+- **UX:** ✅ Hover over a chip → see claim status, confidence vector, evidence list, and a 6-axis `ConfidenceRadar`.
 
-### Phase 2: Global Claim Graph ⏳ (claim-level graph + relationships delivered)
+### Phase 2: Global Claim Graph ✅ (claim-level graph + relationships delivered)
 - **Deduplication:** ✅ Claim signature hashing for cross-article claim merging (`GetClaimBySignature` wired in `generate.go`, works in file mode too).
 - **Claim relationships:** ✅ The `resolve` node now emits `claim_relationships` (supports/contradicts/related) which are persisted (previously dead `SaveClaimRelationship`), surfacing typed claim→claim edges.
 - **Graph API:** ✅ `GET /articles/:slug/claim-graph` returns claim/evidence nodes + typed edges (claim-level, distinct from the article crossref `/graph`).
@@ -68,9 +68,9 @@ This document outlines the work completed during the architectural migration fro
 - **Contested dashboard:** ✅ `GET /contested` + `/contested` page ranking disputed/weak claims by contradiction level.
 
 ### Phase 3: Living Articles & Open Questions ⏳
-- **Freshness scoring:** Evidence age + web activity metrics.
-- **Auto-refresh cron:** Daily re-verification of stale articles.
-- **Gap dashboard:** Public `/gaps` page showing unresolved evidence gaps.
+- **Freshness scoring:** ✅ Evidence age scoring; `GET /stale` ranks articles by freshness ascending; per-article `/articles/:slug/freshness` + `refresh-diff` endpoints.
+- **Gap dashboard:** ✅ Public `/gaps` page with community upvote (`/gaps/:id/upvote`) and evidence submission (`/gaps/:id/submit`).
+- **Auto-refresh cron:** ⏳ The `triggers` package ships a 60s-tick cron scheduler (5-field expressions) + HMAC webhooks, but a daily stale-article auto-reverify job is not wired.
 
 ### Phase 4: Engine SaaS & Ecosystem ⏳
 - **API product:** `POST /v1/analyze` — generic epistemic analysis for any topic.
@@ -108,4 +108,4 @@ This document outlines the work completed during the architectural migration fro
 
 ---
 
-*Last updated: 2026-07-14*
+*Last updated: 2026-08-06*

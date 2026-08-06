@@ -8,11 +8,11 @@ An AI-powered interactive encyclopedia. The chat is the universal interface; cat
 
 ## Current State
 
-- **Backend**: Go orchestrator (`veritas/go-orchestrator/`) on port 4097 — native agent loop, DAG engine, MongoDB storage with mock-mode fallback. Native Go epistemic pipeline (`internal/agent/pipeline.go`) for all 9 DAG nodes, wired into both the chat agent and article generation HTTP path.
-- **Article pipeline** (target): Research → Outline → Write → Verify → Correct → Media → Store. The Go DAG engine + 9 Python nodes implement the epistemic version (retrieve → extract_claims → … → generate_article). SSE streams process. Articles have maps, timelines, 3D models, images as `Block[]`.
-- **Chat agent**: 14 tools, tool-calling loop (up to 15 iterations, 90k-token budget). Streaming via SSE. Agent events captured and displayed in Truth Console. Persisted per message in MongoDB.
+- **Backend**: Go orchestrator (`veritas/go-orchestrator/`) on port 4097 — native agent loop, DAG engine, PostgreSQL storage with mock-mode fallback. Native Go epistemic pipeline (`internal/agent/pipeline.go`) for all 9 DAG nodes, wired into both the chat agent and article generation HTTP path.
+- **Article pipeline** (target): Research → Outline → Write → Verify → Correct → Media → Store. The Go DAG engine + 9 native Go LLM nodes implement the epistemic version (retrieve → extract_claims → … → generate_article). SSE streams process. Articles have maps, timelines, 3D models, images as `Block[]`.
+- **Chat agent**: 14 tools, tool-calling loop (up to 25 iterations, 90k-token budget). Streaming via SSE. Agent events captured and displayed in Truth Console. Persisted per message in PostgreSQL.
 - **Web app**: Next.js 15 with App Router. Pages: chat (with sidebar history), article viewer, article grid, maps, login, settings, queue, pricing.
-- **Data**: MongoDB via `go.mongodb.org/mongo-driver` for serving. Redis and git versioning are not yet wired into the Go server.
+- **Data**: PostgreSQL via `database/sql` + `lib/pq` for serving. Redis and git versioning are not yet wired into the Go server.
 - **Chat context** (`ChatContext`): lives in `chat/layout.tsx`, holds `agentEvents`, `consoleOpen`, `sending`. Resets on navigation.
 - **Responsive**: Basic `max-md:` breakpoints. No container queries. No adaptive layout that responds to chat open/close.
 
@@ -56,7 +56,7 @@ Core principles:
 | Chat conversation ID | Lazy-created on first message, stored in `localStorage` | No wasted API calls. User can browse without creating conversations. |
 | Overlay vs split detection | Route-level export (`chatMode: "split" | "overlay"`) | Maps and fullscreen pages can opt out of the grid split. |
 | Category taxonomy | Fixed 13 slugs, stored as `String[]` on articles | Simple querying, no hierarchy complexity. Subcategories freeform. |
-| Cross-session memory | `mem_store`/`mem_recall` tools + `Memory` MongoDB collection | Already exists. Enhance with automatic injection of relevant memories into system prompt. |
+| Cross-session memory | `mem_store`/`mem_recall` tools + `Memory` PostgreSQL table | Already exists. Enhance with automatic injection of relevant memories into system prompt. |
 | Container queries | `container-type: inline-size` on `.app-content` | Content reflows based on its actual width (not viewport), so it adapts to both split and full modes. |
 | Quiz generation | On-demand via agent tool: `create_quiz(topic, count)` → returns QuizBlock | No storage needed; generated fresh each time. Option to persist popular quizzes later. |
 
@@ -361,7 +361,7 @@ Core principles:
 
 | Item | Detail |
 |------|--------|
-| **Current state** | `mem_store`/`mem_recall` tools exist in the agent. User can say "remember that I like medieval history" and it's stored in the `Memory` MongoDB collection. But no automatic recall. |
+| **Current state** | `mem_store`/`mem_recall` tools exist in the agent. User can say "remember that I like medieval history" and it's stored in the `Memory` PostgreSQL table. But no automatic recall. |
 | **Enhancement** | On each chat start, inject relevant memories into the system prompt. Relevance determined by embedding similarity or keyword overlap with the user's message. |
 | **Memory injection** | In `chatService.ts`, before calling `Agent.run()`, call `memRecallAll(userId)` to fetch all memories. Filter top 5 by relevance (simple: keyword overlap with the user's message). Append to system prompt as: "User preferences: ...". |
 | **Memory UI** | A `/memories` page or section in settings where users can view and delete stored memories. |

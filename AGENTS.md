@@ -2,17 +2,17 @@
 
 An LLM-powered interactive encyclopedia — an AI agent-driven knowledge base that produces structured, evidence-grounded articles.
 
-> **Stack note (July 2026):** The backend has migrated from the legacy TypeScript/Hono stack to a Go + Python architecture under `veritas/`. The Go orchestrator is the live API gateway. Legacy packages (`packages/server`, `packages/storage`, `packages/cli`) have been deleted.
+> **Stack note (August 2026):** Backend: pure Go — no Python, no Node, no web framework. Legacy packages (`packages/server`, `packages/storage`, `packages/cli`) are deleted. This file is the central documentation hub. No scattered design docs or analysis files exist outside of `veritas/docs/` (design references) and the root roadmap files.
 
 ## Architecture
 
-- **Backend:** Go orchestrator (`veritas/go-orchestrator/`) — std-library `net/http` API gateway on port **4097**, native Go agent loop, and a DAG engine. No web framework.
-- **Epistemic pipeline:** Native Go LLM calls (`internal/agent/pipeline.go`) — 9 nodes invoked via `SendPromptJSON` for both the chat agent and article generation DAG. No Python dependency.
-- **Storage:** PostgreSQL via `database/sql` + `lib/pq`. The DB falls back to an in-memory **mock mode** when `DATABASE_URL` is unset or unreachable, so the server runs with zero infrastructure.
-- **Frontend:** Next.js app (`packages/web/`) — deployed to Vercel, calls the Go API via `NEXT_PUBLIC_API_URL`.
-- **State (client):** Custom pub/sub stores (`lib/store.ts`) via React 19 `useSyncExternalStore` — zero deps, no Zustand.
-- **Real-time:** ReadableStream SSE parser (`hooks/useChatStream.ts`) + structured event store (`stores/chat-events.ts`).
-- **Containerization:** `docker-compose.yml` wires up Postgres + Go backend + Next.js frontend; the `Makefile` wraps `up/down/build/logs`.
+- **Backend:** Go orchestrator (`veritas/go-orchestrator/`) — std-library `net/http` API gateway on port **4097**, native Go agent loop, and a DAG engine. Zero web frameworks. PostgreSQL via `database/sql` + `lib/pq`.
+- **Epistemic pipeline:** Native Go LLM calls (`internal/agent/pipeline.go`) — 9 nodes invoked via `SendPromptJSON`. Epistemic data (claims, evidence, gaps, language flags, scrutiny) is persisted to PostgreSQL and served through the API. No Python dependency.
+- **Storage:** PostgreSQL with automated migrations on boot (`internal/storage/migrate.go`). Falls back to file-backed mock mode when `DATABASE_URL` is unset.
+- **Frontend:** Next.js 15 (`packages/web/`) — deployed to Vercel, calls the Go API via `NEXT_PUBLIC_API_URL`.
+- **State (client):** Custom pub/sub stores (`lib/store.ts`) via React 19 `useSyncExternalStore` — zero deps.
+- **Real-time:** SSE streaming parser (`app/hooks/useChatStream.ts`) + event store (`stores/chat-events.ts`).
+- **Containerization:** `docker-compose.yml` — Postgres 15 + Go backend (:4097) + Next.js frontend (:3000).
 
 ## Repository Layout
 
@@ -33,8 +33,7 @@ An LLM-powered interactive encyclopedia — an AI agent-driven knowledge base th
 | `api` | `internal/api/` | HTTP layer: routing, CORS, JWT auth, article/job/quota/chat handlers, SSE progress broadcast |
 | `agent` | `internal/agent/` | Native Go agent loop (up to 25 iterations, 90k-token budget), OpenAI-compatible streaming LLM client, tool definitions + builtin executors |
 | `dag` | `internal/dag/` | Workflow DAG engine: cycle detection, concurrent node execution, exponential-backoff retries, channel-based progress streaming |
-| `nodes` | `internal/nodes/executors.go` | Python subprocess bridge (`RunPythonNode`) with per-node mock fallback |
-| `storage` | `internal/storage/db.go` | PostgreSQL CRUD for articles, jobs, conversations, messages, users, graph edges, maps, memory KV |
+| `storage` | `internal/storage/db.go` | PostgreSQL CRUD for articles, jobs, conversations, messages, users, graph edges, maps, memory KV, epistemic tables (claims, evidence, gaps, language flags, scrutiny) |
 | `iam` | `internal/iam/` | Role-based authorization (6 fixed roles, action-level permissions, glob matching, agent scope) |
 | `executor` | `internal/executor/` | Tool execution gateway: server-side credential resolution, policy engine (allow/block/approval), audit, custom executors |
 | `llm-gateway` | `internal/llm-gateway/` | Unified LLM routing: model catalog, usage metering, cost estimation, `GET /v1/llm/models` |
@@ -87,7 +86,7 @@ Routes are registered in `internal/api/server.go` (`setupRoutes`) and dispatched
 | Webhook (`/webhook/{slug}`) | NOT WIRED — no frontend UI (backend-only, for external callers) |
 | Executor call (`/v1/executor/call`) | NOT WIRED — gateway is for agent internal routing, not frontend |
 
-> **Known gaps vs. the frontend:** `/maps`, `/admin/settings`, and `/stripe/*` sub-routes are not yet implemented in Go — see the migration roadmap.
+> **Known gaps vs. the frontend:** `/maps`, `/admin/settings`, and `/stripe/*` sub-routes are now implemented in Go. The internal epistemic pipeline fully persists claims, evidence, gaps, language flags, and scrutiny assessments.
 
 ## Agent Tool Loop (Chat)
 
@@ -168,11 +167,13 @@ Both pipelines default to the `epistemic_model` (qwen/qwen3-32b) via `SendPrompt
 
 ## Security
 
-- Bearer-token auth via (currently unsigned, dev-only) JWT — `internal/api/server.go:mockJWT`.
+- Bearer-token auth via HS256-signed JWT (`internal/api/jwt.go`) with `role` claim in the payload. Default signing key is `veritas-dev-secret-change-me`; panics if unset in production (`VERITAS_ENV=production`).
 - CORS allowing all origins (configurable via `CORS_ORIGIN`).
+- Rate limiting (in-memory token bucket per IP, 3 tiers: auth 10/min, chat 30/min, API 60/min).
 - Graceful shutdown on SIGINT/SIGTERM.
+- The `run_command` tool executes arbitrary shell commands — a known risk. Sandbox or remove in production.
 
-> **Note:** Real JWT signing, rate limiting, and input validation are not yet implemented in the Go backend — tracked in the migration roadmap.
+> **Note:** Real JWT signing, rate limiting, and input validation are now implemented. Remaining hardening items: `run_command` sandboxing, `randID` crypto hardening, rate limiter cleanup goroutine.
 
 ## Quick Start (Local)
 
@@ -209,7 +210,6 @@ npm run dev                    # from repo root, runs the Next.js app
 | `FIRECRAWL_API_KEY` / `TAVILY_API_KEY` | Web-search backend for the `web_search` tool |
 | `ENCARTA_IMAGE_DIR` | Output dir for generated images (default `public/images`) |
 | `NEXT_PUBLIC_API_URL` | API URL for the frontend (default `http://localhost:4097`) |
-| `DATABASE_URL` | Postgres URL — currently referenced by docker-compose but **not** wired into the Go storage layer |
 
 ## Streaming Transparency
 

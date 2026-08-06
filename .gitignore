@@ -44,6 +44,20 @@ Thumbs.db
 *.swp
 *.swo
 
+# Scattered build/tool output logs
+*.err
+*.out
+
+# SQLite leftovers
+encarta.db*
+
+# Auto-generated analysis / planning artifacts (superseded by docs/)
+PROJECT_ANALYSIS.md
+architectural-debt.md
+PLAN.md
+SESSIONS.md
+temp_article.json
+
 # Temporary files
 *.tmp
 *.bak

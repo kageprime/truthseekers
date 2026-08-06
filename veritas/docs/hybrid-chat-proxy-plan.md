@@ -36,7 +36,7 @@ No Node server needed for chat. The agent calls LLM APIs directly (Groq + DO inf
 
 ## Dependencies
 
-No new Go dependencies beyond stdlib + existing MongoDB driver. JWT parsing is done with base64 decode (no JWT library needed for dev).
+No new Go dependencies beyond stdlib + existing PostgreSQL driver (`lib/pq`).
 
 ## Running
 
