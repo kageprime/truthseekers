@@ -56,6 +56,7 @@ func (w *Workflow) Execute(ctx context.Context, query string) (<-chan ProgressUp
 		completed["__query__"] = query
 
 		totalNodes := len(w.Nodes)
+		doneCh := make(chan struct{}, totalNodes)
 
 		for {
 			mu.RLock()
@@ -181,10 +182,14 @@ func (w *Workflow) Execute(ctx context.Context, query string) (<-chan ProgressUp
 							Timestamp: time.Now(),
 						}
 					}
+					doneCh <- struct{}{}
 				}(node)
 			}
 
-			time.Sleep(50 * time.Millisecond)
+			select {
+			case <-doneCh:
+			case <-ctx.Done():
+			}
 		}
 
 		if executionErr != nil {

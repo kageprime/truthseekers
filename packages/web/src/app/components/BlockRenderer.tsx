@@ -14,7 +14,7 @@ const InteractiveTimeline = dynamic(() => import("./InteractiveTimeline"), { ssr
 const MapViewer = dynamic(() => import("./MapViewer"), { ssr: false });
 const ThreeDMapViewer = dynamic(() => import("./ThreeDMapViewer"), { ssr: false });
 
-export { articleToBlocks } from "@encarta/core/dist/blocks.js";
+export { articleToBlocks } from "@encarta/core";
 import { useState } from "react";
 import type {
   Block,

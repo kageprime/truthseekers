@@ -1,7 +1,6 @@
 import ArticleClient from "./ArticleClient";
 import type { Article } from "@encarta/core";
-
-const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4097";
+import { BASE } from "@/lib/constants";
 
 async function fetchArticle(slug: string): Promise<Article | null> {
   try {
