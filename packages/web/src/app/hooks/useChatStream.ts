@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useCallback } from "react";
-import { chatProgressUrl, chatStopUrl } from "@/lib/api";
+import { chatProgressUrl, chatStopUrl, authHeaders } from "@/lib/api";
 import type { AgentEvent } from "../components/ProcessViewer";
 
 export interface StreamEvent {
@@ -24,18 +24,12 @@ export function useChatStream() {
   const abortRef = useRef<AbortController | null>(null);
 
   const stop = useCallback((convId?: string) => {
-    // Signal the server to Abort() its in-flight agent loop BEFORE severing
-    // our own read. keepalive:true so the request still fires after we abort
-    // the controller below. Fire-and-forget — we deliberately swallow errors
-    // (no conversation id, or the run already finished) so the button never
-    // throws.
     if (convId) {
       try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("truthseekers_token") : null;
         fetch(chatStopUrl(convId), {
           method: "POST",
           keepalive: true,
-          headers: { ...(token ? { authorization: `Bearer ${token}` } : {}) },
+          headers: { ...authHeaders() },
         }).catch(() => {});
       } catch {}
     }
@@ -46,15 +40,12 @@ export function useChatStream() {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    // Hoisted out of try so the catch block can recover partial output when
-    // the stream is cut mid-flight (e.g. ERR_INCOMPLETE_CHUNKED_ENCODING).
     let fullText = "";
 
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("truthseekers_token") : null;
       const res = await fetch(chatProgressUrl(id), {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ content: msg, ...(model ? { model } : {}) }),
         signal: controller.signal,
       });
@@ -104,22 +95,13 @@ export function useChatStream() {
 
       reader.cancel();
 
-      // Fallback: if the stream ended without a done event, synthesize one
       if (!receivedDone && fullText) {
-        callbacks.onDone({
-          type: "done",
-          content: fullText,
-        });
+        callbacks.onDone({ type: "done", content: fullText });
       }
     } catch (err: any) {
       if (err?.name === "AbortError") return;
-      // If we have accumulated text, synthesize a partial done event first
       if (fullText) {
-        callbacks.onDone({
-          type: "done",
-          content: fullText,
-          blocks: [],
-        });
+        callbacks.onDone({ type: "done", content: fullText, blocks: [] });
       }
       callbacks.onError(err instanceof Error ? err.message : String(err));
     }

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import PhaseTimeline from "./PhaseTimeline";
 import type { AgentEvent } from "./ProcessViewer";
 import { IconLightning, IconCheckCircle, IconAlert } from "./Icons";
-import { BASE } from "../../lib/constants";
+import { useResolveArticle } from "../hooks";
 
 export interface GeneratingEntry {
   slug: string;
@@ -59,6 +59,7 @@ export default function GenerationBar({
   const [expanded, setExpanded] = useState(true);
   const [smoothPct, setSmoothPct] = useState(5);
   const animRef = useRef<ReturnType<typeof requestAnimationFrame> | null>(null);
+  const { mutate: resolveMutation } = useResolveArticle();
 
   const targetPct = phasePercent(entry.phase);
   const label = phaseLabel(entry.phase);
@@ -77,16 +78,7 @@ export default function GenerationBar({
   async function handleResolve(action: "approve" | "correct") {
     setResolving(true);
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("truthseekers_token") : null;
-      const res = await fetch(`${BASE}/articles/${entry.slug}/resolve`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ action }),
-      });
-      if (!res.ok) throw new Error("Resolve failed");
+      await resolveMutation({ slug: entry.slug, action });
     } catch (err) {
       console.error(err);
     } finally {

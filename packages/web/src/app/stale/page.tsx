@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { fetchStaleArticles } from "@/lib/api";
+import { useStaleArticles } from "../hooks";
 
 interface StaleArticle {
   slug: string;
@@ -13,14 +12,8 @@ interface StaleArticle {
 }
 
 export default function StalePage() {
-  const [articles, setArticles] = useState<StaleArticle[] | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchStaleArticles(50).then((res) => {
-      if (res) setArticles(res.articles as StaleArticle[]);
-    }).finally(() => setLoading(false));
-  }, []);
+  const { data: res, loading } = useStaleArticles(50);
+  const articles = (res?.articles as StaleArticle[] | undefined) ?? [];
 
   const freshColor = (score: number) =>
     score > 0.66 ? "#4a8f5a" : score > 0.33 ? "#b87a2e" : "#b33c3c";
@@ -35,11 +28,11 @@ export default function StalePage() {
 
       {loading && <div className="text-xs text-subtle">Loading...</div>}
 
-      {!loading && (!articles || articles.length === 0) && (
+      {!loading && articles.length === 0 && (
         <div className="text-xs text-subtle py-8 text-center">No articles tracked.</div>
       )}
 
-      {articles && articles.length > 0 && (
+      {articles.length > 0 && (
         <div className="space-y-1.5">
           {articles.map((a) => (
             <Link

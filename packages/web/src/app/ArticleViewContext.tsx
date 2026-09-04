@@ -6,9 +6,9 @@ import type { Block } from "@encarta/core";
 export type ViewMode = "stream" | "explore" | "press" | "graph";
 
 interface ArticleViewValue {
-  article: { title: string; blocks: Block[] } | null;
+  article: { slug: string | null; title: string; blocks: Block[] } | null;
   mode: ViewMode;
-  open: (title: string, blocks: Block[], initialMode?: ViewMode) => void;
+  open: (title: string, blocks: Block[], initialMode?: ViewMode, slug?: string | null) => void;
   close: () => void;
   setMode: (mode: ViewMode) => void;
 }
@@ -16,11 +16,11 @@ interface ArticleViewValue {
 const ArticleViewContext = createContext<ArticleViewValue | null>(null);
 
 export function ArticleViewProvider({ children }: { children: ReactNode }) {
-  const [article, setArticle] = useState<{ title: string; blocks: Block[] } | null>(null);
+  const [article, setArticle] = useState<{ slug: string | null; title: string; blocks: Block[] } | null>(null);
   const [mode, setMode] = useState<ViewMode>("explore");
 
-  const open = useCallback((title: string, blocks: Block[], initialMode: ViewMode = "explore") => {
-    setArticle({ title, blocks });
+  const open = useCallback((title: string, blocks: Block[], initialMode: ViewMode = "explore", slug: string | null = null) => {
+    setArticle({ slug, title, blocks });
     setMode(initialMode);
   }, []);
 

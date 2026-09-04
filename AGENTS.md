@@ -10,8 +10,8 @@ An LLM-powered interactive encyclopedia — an AI agent-driven knowledge base th
 - **Epistemic pipeline:** Native Go LLM calls (`internal/agent/pipeline.go`) — 9 nodes invoked via `SendPromptJSON`. Epistemic data (claims, evidence, gaps, language flags, scrutiny) is persisted to PostgreSQL and served through the API. No Python dependency.
 - **Storage:** PostgreSQL with automated migrations on boot (`internal/storage/migrate.go`). Falls back to file-backed mock mode when `DATABASE_URL` is unset.
 - **Frontend:** Next.js 15 (`packages/web/`) — deployed to Vercel, calls the Go API via `NEXT_PUBLIC_API_URL`.
-- **State (client):** Custom pub/sub stores (`lib/store.ts`) via React 19 `useSyncExternalStore` — zero deps.
-- **Real-time:** SSE streaming parser (`app/hooks/useChatStream.ts`) + event store (`stores/chat-events.ts`).
+- **State (client):** TanStack React Query 5 for server-state queries/mutations (`hooks/useApi.ts`) + local component state for ephemeral UI state.
+- **Real-time:** SSE streaming parser (`app/hooks/useChatStream.ts`) + shared `useArticleProgress` hook for `/articles/:slug/progress`.
 - **Containerization:** `docker-compose.yml` — Postgres 15 + Go backend (:4097) + Next.js frontend (:3000).
 
 ## Repository Layout
@@ -53,9 +53,10 @@ Routes are registered in `internal/api/server.go` (`setupRoutes`) and dispatched
 | `/chat`, `/chat/:id`, `/chat/:id/messages` | GET/POST/PATCH / POST | Conversations + SSE-streamed agent run |
 | `/articles`, `/articles/search`, `/articles/top` | GET | List / search / top |
 | `/articles/:slug` | GET | Fetch article |
-| `/articles/:slug/{status,progress,generate,refresh,export,resolve,views,graph,claim-graph,claims,gaps,freshness,refresh-diff}` | various | Per-article sub-resources; `progress` is SSE; `claim-graph` returns the claim-level force-directed graph (claims + evidence nodes, typed edges); `refresh-diff` summarizes claim version changes from the last refresh |
+| `/articles/:slug/{status,progress,generate,refresh,export,resolve,views,graph,claim-graph,claims,gaps,freshness,refresh-diff,epistemic}` | various | Per-article sub-resources; `progress` is SSE; `claim-graph` returns the claim-level force-directed graph (claims + evidence nodes, typed edges); `refresh-diff` summarizes claim version changes from the last refresh; `epistemic` is the composite — claims + gaps + freshness + refresh_diff + claim_graph in one round-trip |
 | `/contested` | GET | Public dashboard — most contested claims across the encyclopedia, ranked by contradiction level |
-| `/claim-graph` | GET | Global claim graph — all claims + edges across the encyclopedia (signature-merged) |
+| `/claim-graph` | GET | Global claim graph — top-N most-contested claims + their evidence + claim→claim edges, `?limit=` (default 150, max 500) and `?min_contradiction=` (default 0) filters; each claim node carries `article_slug` so the frontend can link back |
+| `/api/revalidate` (Next.js) | POST | On-demand revalidation: clears ISR cache for `/article/{slug}` + global pages; called by Go via `X-Revalidate-Secret` after every article completion (env: `REVALIDATE_SECRET`, `NEXT_PUBLIC_API_URL`) |
 | `/gaps` | GET | All open evidence gaps, enriched with claim text + upvote count |
 | `/gaps/:id/upvote` | POST | Community upvote on a gap (idempotent per user) |
 | `/gaps/:id/submit` | POST | Submit community evidence (URL + note) for a gap |
@@ -223,11 +224,38 @@ npm run dev                    # from repo root, runs the Next.js app
 
 | Path | Purpose |
 |------|---------|
-| `lib/store.ts` | Generic pub/sub store factory — `createStore<T>()` + `useStore()` hook, powered by React 19 `useSyncExternalStore` |
-| `stores/chat-events.ts` | Chat streaming event store — accumulates text/tool/done events from SSE, exposes per-property selectors |
-| `stores/chat-draft.ts` | Draft text persistence — saves unsent input per conversation to `sessionStorage`, survives navigation |
-| `stores/chat-pending.ts` | Pending questions/permissions from agent tool calls — tracks unanswered items for inline Q&A |
-| `hooks/useAutoScroll.ts` | ChatGPT-style scroll engine — spacer physics, RAF growth tracking, user intent detection, FAB toggle |
+| `hooks/useApi.ts` | React Query hook layer — useQuery/useMutation wrappers over `lib/api.ts` (the only sanctioned fetch layer) |
+
+## Frontend Routes
+
+Next.js App Router under `packages/web/src/app/`. Public reads are public; writes (generate/refresh/resolve) require auth via the `optionalAuthMiddleware` pattern. Articles use `force-static`-friendly ISR (`revalidate: 60`) and opt into `generateMetadata` for OG tags.
+
+| Route | Source | Notes |
+|-------|--------|-------|
+| `/` | `app/page.tsx` | Marketing landing — hero, bento, accordion, testimonials, CTA |
+| `/articles`, `/articles/page.tsx` | Browse all articles with filters |
+| `/article/new` | `app/article/new/page.tsx` | Generate a new article (auth required) |
+| `/article/[slug]` | `app/article/[slug]/page.tsx` | Read an article; SSR with ISR; injects `ClaimReview` JSON-LD per claim |
+| `/chat` | redirects to `/chat/new` | |
+| `/chat/new`, `/chat/[id]` | `app/chat/[id]/page.tsx` | SSE-streamed agent chat with truth console side panel |
+| `/claim-graph` | `app/claim-graph/page.tsx` | Global force-directed claim graph; limit + min-contradiction filters |
+| `/contested`, `/gaps`, `/stale` | Public dashboards for the "Living Encyclopedia" surfaces |
+| `/maps`, `/maps/[slug]` | Static + interactive maps (Leaflet + Three Fiber) |
+| `/admin`, `/settings`, `/queue`, `/pricing`, `/onboarding`, `/login`, `/style-guide` | Auth-gated / utility pages |
+| `/sitemap.xml`, `/robots.txt` | `app/sitemap.ts` (1h revalidate, 5000 article limit) + `app/robots.ts` |
+| `/api/revalidate` | `app/api/revalidate/route.ts` | Receives `X-Revalidate-Secret` from Go after article completion |
+
+## Header (FloatIslandNav)
+
+`packages/web/src/app/components/FloatIslandNav.tsx` — single source of truth for the top nav.
+
+| Group | Links |
+|-------|-------|
+| **Spine** (top nav) | Chat, Articles, Maps, Claim Graph |
+| **Living Encyclopedia** (dropdown) | Contested, Open Questions, Stale |
+| **More** (dropdown) | Pricing, Style Guide |
+| **Right** | Theme toggle, Settings, Avatar (auth) |
+| **Mobile** | Hamburger → morph-X sidebar (same groups, stacked vertically) |
 
 ## Frontend Components
 - **SharedHeader** — search, generate button, nav links

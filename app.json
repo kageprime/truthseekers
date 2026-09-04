@@ -1,0 +1,28 @@
+{
+  "name": "veritas-orchestrator",
+  "description": "Truthseekers Go orchestrator API. Binds $PORT, uses DATABASE_URL, migrates on boot.",
+  "stack": "container",
+  "formation": {
+    "web": { "quantity": 1, "size": "basic" }
+  },
+  "addons": [{ "plan": "heroku-postgresql:essential-0" }],
+  "env": {
+    "VERITAS_ENV": { "value": "production" },
+    "JWT_SECRET": { "generator": "secret" },
+    "CORS_ORIGIN": {
+      "description": "Frontend origin, e.g. https://truthopedia-web.vercel.app",
+      "value": ""
+    },
+    "MODEL_API_KEY": {
+      "description": "Meta Model API key (muse-spark-1.3-contributor)",
+      "value": ""
+    },
+    "GROQ_API_KEY": { "description": "Legacy fallback LLM key (optional)", "value": "" },
+    "TAVILY_API_KEY": { "description": "Web search (optional)", "value": "" },
+    "FIRECRAWL_API_KEY": { "description": "Web search fallback (optional)", "value": "" },
+    "REVALIDATE_SECRET": {
+      "generator": "secret",
+      "description": "Must match Next.js REVALIDATE_SECRET on Vercel"
+    }
+  }
+}

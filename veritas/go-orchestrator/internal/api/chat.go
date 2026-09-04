@@ -282,7 +282,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 
 	model := body.Model
 	if model == "" {
-		model = "deepseek-4-flash"
+		model = "muse-spark-1.3-contributor"
 	}
 
 	// Load existing messages (before this new one)
@@ -581,10 +581,10 @@ func (s *Server) createServerToolExecutors(model string) map[string]agent.ToolEx
 					}
 				}
 			}
-			m := model
-			if m == "" {
-				m = "deepseek-4-flash"
-			}
+		m := model
+		if m == "" {
+			m = "muse-spark-1.3-contributor"
+		}
 			resp, err := agent.SendPromptStream(nil, "You are a research sub-agent.", m, 0.5, toolDefs, nil)
 			if err != nil {
 				return agent.ToolResult{Result: fmt.Sprintf("Sub-agent error: %v", err)}, nil

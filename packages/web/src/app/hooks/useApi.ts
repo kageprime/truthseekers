@@ -7,8 +7,20 @@ import { BASE } from "@/lib/constants";
 
 // ─── Query helper ───────────────────────────────────────────────────────
 
-function useApiQuery<T>(key: unknown[], fetcher: () => Promise<T>, options?: { enabled?: boolean; staleTime?: number }) {
-  const result = useQuery<T, Error>({ queryKey: key, queryFn: fetcher, enabled: options?.enabled ?? true, staleTime: options?.staleTime });
+type UseApiQueryOptions = {
+  enabled?: boolean;
+  staleTime?: number;
+  refetchInterval?: number | false;
+};
+
+function useApiQuery<T>(key: unknown[], fetcher: () => Promise<T>, options?: UseApiQueryOptions) {
+  const result = useQuery<T, Error>({
+    queryKey: key,
+    queryFn: fetcher,
+    enabled: options?.enabled ?? true,
+    staleTime: options?.staleTime,
+    refetchInterval: options?.refetchInterval,
+  });
   return { data: result.data, loading: result.isLoading, isRefetching: result.isFetching && !result.isPending, error: result.error?.message ?? null, refetch: result.refetch };
 }
 
@@ -153,35 +165,17 @@ export function useFeaturedArticles() {
 
 // ── Profile ──────────────────────────────────────────────────
 
-function authHeaders(): Record<string, string> {
-  if (typeof document === "undefined") return {};
-  const fromCookie = document.cookie.match(/(?:^|; )truthseekers_token=([^;]*)/);
-  const token = fromCookie ? decodeURIComponent(fromCookie[1]) : localStorage.getItem("truthseekers_token");
-  return token ? { authorization: `Bearer ${token}` } : {};
-}
-
 export function useUpdateProfile() {
-  return useCallback(async (name: string, avatar?: string): Promise<boolean> => {
-    try {
-      const res = await fetch(`${BASE}/auth/me`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ name, avatar: avatar || undefined }),
-      });
-      return res.ok;
-    } catch { return false; }
-  }, []);
+  return useApiMutation(
+    ({ name, avatar }: { name: string; avatar?: string }) => api.updateProfile(name, avatar),
+  );
 }
 
 // ── Tracking ─────────────────────────────────────────────────
 
 export function useTrackView() {
   return useCallback((slug: string) => {
-    fetch(`${BASE}/track`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug, event: "view" }),
-    }).catch(() => {});
+    api.trackView(slug);
   }, []);
 }
 
@@ -211,5 +205,143 @@ export function useUpdateCredential() {
 
 export function useUsageStats() {
   return useApiQuery(["usage"], () => api.fetchUsageStats());
+}
+
+// ── Epistemic: Contested / Gaps / Stale / Freshness / Refresh-diff ──
+
+export function useContestedClaims(limit = 50) {
+  return useApiQuery(["contested", limit], () => api.fetchContestedClaims(limit));
+}
+
+export function useAllGaps() {
+  return useApiQuery(["gaps", "all"], () => api.fetchAllGaps());
+}
+
+export function useStaleArticles(limit = 50) {
+  return useApiQuery(["stale", limit], () => api.fetchStaleArticles(limit));
+}
+
+export function useArticleFreshness(slug: string | undefined) {
+  return useApiQuery(["article", slug, "freshness"], () => api.fetchArticleFreshness(slug!), { enabled: !!slug });
+}
+
+export function useRefreshDiff(slug: string | undefined) {
+  return useApiQuery(["article", slug, "refresh-diff"], () => api.fetchRefreshDiff(slug!), { enabled: !!slug });
+}
+
+export function useArticleGraph(slug: string | undefined) {
+  return useApiQuery(["article", slug, "graph"], () => api.fetchArticleGraph(slug!), { enabled: !!slug });
+}
+
+export function useArticleClaimGraph(slug: string | undefined) {
+  return useApiQuery(["article", slug, "claim-graph"], () => api.fetchArticleClaimGraph(slug!), { enabled: !!slug });
+}
+
+export function useArticleEpistemic(slug: string | undefined) {
+  return useApiQuery(["article", slug, "epistemic"], () => api.fetchArticleEpistemic(slug!), { enabled: !!slug, staleTime: 60_000 });
+}
+
+export function useGlobalClaimGraph(limit = 150, minContradiction = 0) {
+  return useApiQuery(["claim-graph", "global", limit, minContradiction], () => api.fetchGlobalClaimGraph(limit, minContradiction), { staleTime: 60_000 });
+}
+
+export function useArticleClaims(slug: string | undefined) {
+  return useApiQuery(["article", slug, "claims"], () => api.fetchArticleClaims(slug!), { enabled: !!slug });
+}
+
+export function useArticleGaps(slug: string | undefined) {
+  return useApiQuery(["article", slug, "gaps"], () => api.fetchArticleGaps(slug!), { enabled: !!slug });
+}
+
+export function useClaimEvidence(claimId: string | undefined) {
+  return useApiQuery(["claim", claimId, "evidence"], () => api.fetchClaimEvidence(claimId!), { enabled: !!claimId });
+}
+
+// ── Gap mutations ──
+
+export function useUpvoteGap() {
+  const queryClient = useQueryClient();
+  return useApiMutation(
+    (gapId: string) => api.upvoteGap(gapId),
+    { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["gaps", "all"] }) },
+  );
+}
+
+export function useSubmitGapEvidence() {
+  const queryClient = useQueryClient();
+  return useApiMutation(
+    ({ gapId, url, note }: { gapId: string; url: string; note: string }) => api.submitGapEvidence(gapId, url, note),
+    { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["gaps", "all"] }) },
+  );
+}
+
+// ── Queue (poll + cancel) ──
+
+export function useQueue(refetchInterval = 5000) {
+  return useApiQuery(["queue"], () => api.fetchQueue(), { refetchInterval });
+}
+
+export function useCancelQueueJob() {
+  const queryClient = useQueryClient();
+  return useApiMutation(
+    (slug: string) => api.cancelQueueJob(slug),
+    { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["queue"] }) },
+  );
+}
+
+// ── Article status check (one-shot, for generate button) ──
+
+export function useCheckArticleStatus() {
+  return useApiMutation(
+    (slug: string) => api.fetchArticleStatus(slug),
+  );
+}
+
+// ── Article Resolve (paused review flow) ──
+
+export function useResolveArticle() {
+  return useApiMutation(
+    ({ slug, action }: { slug: string; action: "approve" | "correct" }) => api.resolveArticle(slug, action),
+  );
+}
+
+// ── Health (home page stats) ──
+
+export function useHealth() {
+  return useApiQuery(["health"], () => api.fetchHealth(), { staleTime: 60_000 });
+}
+
+// ── Auth mutations ──
+
+export function useLoginEmail() {
+  return useApiMutation(
+    (email: string) => api.loginEmail(email),
+  );
+}
+
+export function useOnboard() {
+  return useApiMutation(
+    ({ token, name }: { token: string; name: string }) => api.onboard(token, name),
+  );
+}
+
+export function useFetchMe() {
+  return useApiMutation(
+    (token: string) => api.fetchMe(token),
+  );
+}
+
+// ── Stripe (billing) ──
+
+export function useStripeCheckout() {
+  return useApiMutation(
+    (priceId: string) => api.stripeCheckout(priceId),
+  );
+}
+
+export function useStripePortal() {
+  return useApiMutation(
+    () => api.stripePortal(),
+  );
 }
 

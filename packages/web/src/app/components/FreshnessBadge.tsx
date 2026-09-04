@@ -1,26 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { fetchArticleFreshness } from "@/lib/api";
+import { useArticleFreshness } from "../hooks";
 
 interface Props {
   slug: string;
 }
 
 export default function FreshnessBadge({ slug }: Props) {
-  const [score, setScore] = useState<number | null>(null);
-  const [claimCount, setClaimCount] = useState(0);
-
-  useEffect(() => {
-    fetchArticleFreshness(slug).then((res) => {
-      if (res) {
-        setScore(res.overall_score);
-        setClaimCount(res.claim_freshness?.length || 0);
-      }
-    });
-  }, [slug]);
-
-  if (score === null) return null;
+  const { data: res } = useArticleFreshness(slug);
+  if (!res) return null;
+  const { overall_score: score, claim_freshness: claimFreshness } = res;
+  const claimCount = claimFreshness?.length || 0;
 
   // Color thresholds: green > 0.66, amber > 0.33, red otherwise
   const color =

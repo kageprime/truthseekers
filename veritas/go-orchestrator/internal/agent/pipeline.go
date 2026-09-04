@@ -19,12 +19,12 @@ import (
 const epistemicPromptTimeout = 120 * time.Second
 
 // epistemicModel is the default model used by all epistemic nodes. Override via
-// the EPISTEMIC_MODEL env var (falls back to the same default as the Python
-// workers' Groq entry: qwen/qwen3-32b).
-var epistemicModel = "qwen/qwen3-32b"
+// the EPISTEMIC_MODEL env var (default: Meta Muse Spark 1.3 contributor tier).
+var epistemicModel = "muse-spark-1.3-contributor"
 
 func init() {
-	if m := strings.TrimSpace(strings.ToUpper(os.Getenv("EPISTEMIC_MODEL"))); m != "" {
+	// ponytail: no ToUpper — model IDs are case-sensitive (muse-spark-* is lowercase).
+	if m := strings.TrimSpace(os.Getenv("EPISTEMIC_MODEL")); m != "" {
 		epistemicModel = m
 	}
 }

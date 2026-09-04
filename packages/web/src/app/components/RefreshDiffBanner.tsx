@@ -1,20 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { fetchRefreshDiff } from "@/lib/api";
+import { useRefreshDiff } from "../hooks";
 
 interface Props {
   slug: string;
 }
 
 export default function RefreshDiffBanner({ slug }: Props) {
-  const [diff, setDiff] = useState<any | null>(null);
-
-  useEffect(() => {
-    fetchRefreshDiff(slug).then((res) => {
-      if (res && res.total_claims > 0) setDiff(res);
-    });
-  }, [slug]);
+  const { data: diff } = useRefreshDiff(slug);
 
   if (!diff) return null;
   if (diff.upgraded === 0 && diff.downgraded === 0 && diff.status_changed === 0) return null;

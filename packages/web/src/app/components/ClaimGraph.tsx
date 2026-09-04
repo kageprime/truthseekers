@@ -65,6 +65,7 @@ function forceSimulation(nodes: SimNode[], links: SimLink[], width: number, heig
 export default function ClaimGraph({ nodes, links }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [dim, setDim] = useState({ w: 800, h: 600 });
+  const [hover, setHover] = useState<string | null>(null);
 
   useEffect(() => {
     const onResize = () => {
@@ -92,51 +93,100 @@ export default function ClaimGraph({ nodes, links }: Props) {
 
   forceSimulation(simNodes, simLinks, dim.w, dim.h);
 
-  const nodeRadius = (n: SimNode) => n.type === "article" ? 10 : 6;
-  const nodeColor = (n: SimNode) => {
-    if (n.type === "article") return "#c8a45a";
+  const typedSet = new Set(simLinks.filter((l) => l.type === "supports" || l.type === "contradicts"));
+
+  const nodeRadius = (n: SimNode) => (n.type === "article" ? 13 : 7);
+  const nodeFill = (n: SimNode) => {
+    if (n.type === "article") return "var(--gold)";
     if (n.status === "supported") return "#3b8c5e";
     if (n.status === "disputed") return "#c84a4a";
-    return "#6b7280";
+    return "var(--subtle)";
   };
 
+  // Neighbor cluster of the hovered node.
+  const cluster = hover ? new Set<string>([hover]) : null;
+  if (cluster) {
+    for (const l of simLinks) {
+      const s = l.source.id, t = l.target.id;
+      if (s === hover || t === hover) { cluster.add(s); cluster.add(t); }
+    }
+  }
+
   return (
-    <svg ref={svgRef} width={dim.w} height={dim.h} className="select-none">
+    <svg ref={svgRef} width={dim.w} height={dim.h} className="select-none"
+      onPointerLeave={() => setHover(null)}>
       <defs>
-        {simNodes.map((n) => (
-          <filter key={n.id} id={`glow-${n.id}`}>
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        ))}
+        <radialGradient id="cg-node" cx="35%" cy="30%" r="90%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#000000" stopOpacity="0.1" />
+        </radialGradient>
+        <filter id="cg-glow" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="3.5" result="b" />
+          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+        <marker id="cg-arrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+          <path d="M0,0 L8,4 L0,8 z" fill="var(--accent)" />
+        </marker>
       </defs>
-      {simLinks.map((l, i) => (
-        <line
-          key={i}
-          x1={l.source.x} y1={l.source.y}
-          x2={l.target.x} y2={l.target.y}
-          stroke="#374151" strokeWidth={0.5} strokeOpacity={0.4}
-        />
-      ))}
-      {simNodes.map((n) => (
-        <g key={n.id}>
-          <circle
-            cx={n.x} cy={n.y} r={nodeRadius(n)}
-            fill={nodeColor(n)} stroke="none"
-            opacity={0.9}
-            filter={`url(#glow-${n.id})`}
+
+      {simLinks.map((l, i) => {
+        const inCluster = cluster ? cluster.has(l.source.id) && cluster.has(l.target.id) : true;
+        const active = hover ? inCluster : true;
+        const dx = l.target.x - l.source.x;
+        const dy = l.target.y - l.source.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const ux = dx / dist, uy = dy / dist;
+        const tr = nodeRadius(l.target) + 2;
+        return (
+          <line
+            key={i}
+            x1={l.source.x} y1={l.source.y}
+            x2={l.target.x - ux * tr} y2={l.target.y - uy * tr}
+            stroke={typedSet.has(l)
+              ? (l.type === "supports" ? "var(--green, #3b8c5e)" : "var(--red, #c84a4a)")
+              : "var(--subtle)"}
+            strokeWidth={active ? (typedSet.has(l) ? 1.5 : 1.2) : 0.5}
+            strokeOpacity={active ? 0.75 : 0.12}
+            markerEnd={typedSet.has(l) ? "url(#cg-arrow)" : undefined}
           />
-          <text
-            x={n.x} y={n.y + nodeRadius(n) + 10}
-            textAnchor="middle" fill="#9ca3af"
-            fontSize={n.type === "article" ? 10 : 8}
-            fontFamily="inherit"
-          >
-            {n.type === "article" ? n.label : n.label.slice(0, 40) + (n.label.length > 40 ? "…" : "")}
-          </text>
-          <title>{n.id} — {n.label} ({n.status ?? "unknown"})</title>
-        </g>
-      ))}
+        );
+      })}
+
+      {simNodes.map((n) => {
+        const inCluster = cluster ? cluster.has(n.id) : true;
+        const isHover = hover === n.id;
+        const active = hover ? inCluster : true;
+        const r = nodeRadius(n);
+        const fill = nodeFill(n);
+        return (
+          <g key={n.id}
+            onPointerEnter={() => setHover(n.id)}
+            style={{ cursor: "pointer", opacity: active ? 1 : 0.28, transition: "opacity 0.2s" }}>
+            {isHover && (
+              <circle cx={n.x} cy={n.y} r={r + 6} fill="none"
+                stroke="var(--accent)" strokeWidth={1.2} strokeOpacity={0.7} />
+            )}
+            <circle
+              cx={n.x} cy={n.y} r={r * (isHover ? 1.15 : 1)}
+              fill={fill} stroke="transparent"
+              filter={n.type === "article" ? "url(#cg-glow)" : undefined}
+              style={{ transition: "r 0.2s" }}
+            />
+            <circle cx={n.x} cy={n.y} r={r} fill="url(#cg-node)" pointerEvents="none" />
+            <text
+              x={n.x} y={n.y + r + 14}
+              textAnchor="middle" fill="var(--ink)" fillOpacity={active ? 0.9 : 0.3}
+              fontSize={n.type === "article" ? 11 : 9}
+              fontWeight={n.type === "article" ? 600 : 500}
+              fontFamily="var(--font-display), Georgia, serif"
+              pointerEvents="none"
+            >
+              {n.type === "article" ? n.label : n.label.slice(0, 34) + (n.label.length > 34 ? "…" : "")}
+            </text>
+            <title>{n.id} — {n.label} ({n.status ?? "unknown"})</title>
+          </g>
+        );
+      })}
     </svg>
   );
 }

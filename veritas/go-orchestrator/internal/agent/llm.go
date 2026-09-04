@@ -107,13 +107,19 @@ func resolveKey(baseURL string) string {
 	if strings.Contains(baseURL, "groq.com") {
 		return os.Getenv("GROQ_API_KEY")
 	}
+	if strings.Contains(baseURL, "api.meta.ai") {
+		return os.Getenv("MODEL_API_KEY")
+	}
 	return os.Getenv("MODEL_ACCESS_KEY")
 }
 
 func defaultRoute() ModelRoute {
-	model := os.Getenv("DO_MODEL")
+	model := os.Getenv("LLM_MODEL")
 	if model == "" {
-		model = "gemma-4-31B-it"
+		model = os.Getenv("DO_MODEL")
+	}
+	if model == "" {
+		model = "muse-spark-1.3-contributor"
 	}
 	return resolveModel(model)
 }
@@ -121,10 +127,11 @@ func defaultRoute() ModelRoute {
 func resolveModel(model string) ModelRoute {
 	doKey := os.Getenv("MODEL_ACCESS_KEY")
 	groqKey := os.Getenv("GROQ_API_KEY")
+	metaKey := os.Getenv("MODEL_API_KEY")
 	catalog := llmgateway.DefaultCatalog()
 
 	// Use the catalog to resolve the provider.
-	provider := llmgateway.ResolveProvider(model, doKey, groqKey)
+	provider := llmgateway.ResolveProvider(model, doKey, groqKey, metaKey)
 	isReasoning := llmgateway.IsReasoningModel(model, catalog)
 
 	return ModelRoute{

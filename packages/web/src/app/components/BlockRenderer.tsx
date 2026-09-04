@@ -15,7 +15,7 @@ const MapViewer = dynamic(() => import("./MapViewer"), { ssr: false });
 const ThreeDMapViewer = dynamic(() => import("./ThreeDMapViewer"), { ssr: false });
 
 export { articleToBlocks } from "@encarta/core";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type {
   Block,
   HeadingBlockData,
@@ -34,80 +34,132 @@ import type {
   ListBlockData,
 } from "@encarta/core";
 
+// Pure normalizer — returns a NEW block with normalized data. Never mutates
+// the input (which may come from the React Query cache or server-fetched props).
 function normalizeBlockData(block: Block): Block {
   if (!block.data) return block;
   const d = block.data as Record<string, unknown>;
+  const nd: Record<string, unknown> = { ...d };
 
   if (block.type === "text" && typeof d.text === "string" && !d.content) {
-    d.content = d.text; delete d.text;
+    nd.content = d.text;
+    delete nd.text;
   }
   if (block.type === "image" && typeof d.url === "string" && !d.src) {
-    d.src = d.url; delete d.url;
+    nd.src = d.url;
+    delete nd.url;
   }
   if (block.type === "video" && typeof d.url === "string" && !d.src) {
-    d.src = d.url; delete d.url;
+    nd.src = d.url;
+    delete nd.url;
   }
   if (block.type === "citation") {
-    if (typeof d.text === "string" && !d.title) { d.title = d.text; delete d.text; }
-    if (typeof d.source === "string" && !d.url) { d.url = d.source; delete d.source; }
+    if (typeof d.text === "string" && !d.title) { nd.title = d.text; delete nd.text; }
+    if (typeof d.source === "string" && !d.url) { nd.url = d.source; delete nd.source; }
   }
   if (block.type === "gallery" && Array.isArray(d.images)) {
-    d.images = d.images.map((img: any) => {
-      if (img && typeof img.url === "string" && !img.src) { img.src = img.url; }
+    nd.images = d.images.map((img: any) => {
+      if (img && typeof img.url === "string" && !img.src) { return { ...img, src: img.url }; }
       return img;
     });
   }
   if (block.type === "timeline" && Array.isArray(d.events)) {
-    d.events = d.events.map((e: any) => {
+    nd.events = d.events.map((e: any) => {
       if (e && typeof e.year === "string") {
         const cleaned = e.year.replace(/[^0-9\-]/g, "");
-        e.year = parseInt(cleaned, 10) || 0;
+        return { ...e, year: parseInt(cleaned, 10) || 0 };
       }
       return e;
     });
   }
-  return block;
+  return { ...block, data: nd };
 }
 
-export default function BlockRenderer({ blocks, compact = false }: { blocks: Block[]; compact?: boolean }) {
-  if (!blocks || blocks.length === 0) {
+const FIGURE_TYPES = new Set(["image", "video", "diagram", "gallery"]);
+
+export default function BlockRenderer({
+  blocks,
+  compact = false,
+  claimsIndex,
+  dissentMode = false,
+}: {
+  blocks: Block[];
+  compact?: boolean;
+  claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
+  dissentMode?: boolean;
+}) {
+  // Normalize + derive firstTextIdx + figure numbers in a single memoized pass.
+  // Previously this ran 3× per block per render and mutated the cached props.
+  const { normalized, firstTextIdx, figureNums } = useMemo(() => {
+    if (!blocks || blocks.length === 0) {
+      return { normalized: [] as Block[], firstTextIdx: -1, figureNums: [] as (number | undefined)[] };
+    }
+    const norm = blocks.map(normalizeBlockData);
+    let firstText = -1;
+    for (let i = 0; i < norm.length; i++) {
+      if (norm[i].type === "text") { firstText = i; break; }
+    }
+    const figNums: (number | undefined)[] = [];
+    let figCount = 0;
+    for (let i = 0; i < norm.length; i++) {
+      if (FIGURE_TYPES.has(norm[i].type)) {
+        figCount++;
+        figNums[i] = figCount;
+      } else {
+        figNums[i] = undefined;
+      }
+    }
+    return { normalized: norm, firstTextIdx: firstText, figureNums: figNums };
+  }, [blocks]);
+
+  if (!normalized || normalized.length === 0) {
     return <div className="text-sm" style={{ color: "var(--subtle)" }}>No content yet.</div>;
   }
 
-  // Find index of the first text block — that one gets the drop cap.
-  let firstTextIdx = -1;
-  for (let i = 0; i < blocks.length; i++) {
-    if (normalizeBlockData(blocks[i]).type === "text") { firstTextIdx = i; break; }
-  }
-
-  // Auto-number figures based on block position — deterministic for hydration.
-  const figureTypes = new Set(["image", "video", "diagram", "gallery"]);
-
   return (
     <div className="block-renderer">
-      {blocks.map((block, i) => {
-        const figNum = blocks.slice(0, i).filter(b => figureTypes.has(normalizeBlockData(b).type)).length + 1;
-        const hasFigType = figureTypes.has(normalizeBlockData(block).type);
-        return (
-          <BlockCard
-            key={block.id ?? `block-${i}`}
-            block={normalizeBlockData(block)}
-            compact={compact}
-            dropCap={i === firstTextIdx}
-            figureNum={hasFigType ? figNum : undefined}
-          />
-        );
-      })}
+      {normalized.map((block, i) => (
+        <BlockCard
+          key={block.id ?? `block-${i}`}
+          block={block}
+          compact={compact}
+          dropCap={i === firstTextIdx}
+          figureNum={figureNums[i]}
+          claimsIndex={claimsIndex}
+          dissentMode={dissentMode}
+        />
+      ))}
     </div>
   );
 }
 
-function BlockCard({ block, compact, dropCap, figureNum }: { block: Block; compact: boolean; dropCap?: boolean; figureNum?: number }) {
+function BlockCard({
+  block,
+  compact,
+  dropCap,
+  figureNum,
+  claimsIndex,
+  dissentMode,
+}: {
+  block: Block;
+  compact: boolean;
+  dropCap?: boolean;
+  figureNum?: number;
+  claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
+  dissentMode?: boolean;
+}) {
   switch (block.type) {
     case "heading":
       return <HeadingBlock data={block.data as unknown as HeadingBlockData} />;
     case "text":
-      return <TextBlock data={block.data as unknown as TextBlockData} dropCap={dropCap} />;
+      return (
+        <TextBlock
+          data={block.data as unknown as TextBlockData}
+          dropCap={dropCap}
+          claimsIndex={claimsIndex}
+          dissentMode={dissentMode}
+        />
+      );
     case "section":
       return <SectionBlock data={block.data as unknown as SectionBlockData} />;
     case "timeline":
@@ -197,7 +249,17 @@ function HeadingBlock({ data }: { data: HeadingBlockData }) {
   return <Tag style={style}>{data.text}</Tag>;
 }
 
-function TextBlock({ data, dropCap }: { data: TextBlockData; dropCap?: boolean }) {
+function TextBlock({
+  data,
+  dropCap,
+  claimsIndex,
+  dissentMode,
+}: {
+  data: TextBlockData;
+  dropCap?: boolean;
+  claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
+  dissentMode?: boolean;
+}) {
   if (!data) return null;
   const content = (data as any).content || (data as any).text || "";
   if (!content.includes("[claim:")) {
@@ -210,13 +272,39 @@ function TextBlock({ data, dropCap }: { data: TextBlockData; dropCap?: boolean }
   const { parts } = parseClaimAnchors(content);
   return (
     <div className={dropCap ? "drop-cap" : ""}>
-      {parts.map((part, i) =>
-        part.type === "claim" ? (
-          <ProvenanceChipInline key={i} claimId={part.value} />
-        ) : (
-          <MarkdownRenderer key={i} content={part.value} />
-        )
-      )}
+      {parts.map((part, i) => {
+        if (part.type === "text") {
+          if (dissentMode) {
+            return (
+              <span
+                key={i}
+                className="rounded px-0.5 transition-colors"
+                style={{ background: "rgba(184,122,46,0.05)" }}
+              >
+                <MarkdownRenderer content={part.value} />
+              </span>
+            );
+          }
+          return <MarkdownRenderer key={i} content={part.value} />;
+        }
+        const meta = claimsIndex?.[part.value];
+        const status = meta?.status || "unknown";
+        const isDisputed = dissentMode && (status === "disputed" || status === "weak");
+        return (
+          <span
+            key={i}
+            className={isDisputed ? "dissent-highlight" : ""}
+            style={isDisputed ? {
+              boxShadow: "0 0 0 2px rgba(179,60,60,0.18)",
+              borderRadius: "3px",
+              padding: "1px 2px",
+              margin: "0 1px",
+            } : undefined}
+          >
+            <ProvenanceChipInline claimId={part.value} status={status} />
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -363,22 +451,49 @@ function PullQuoteBlock({ data }: { data: { text?: string; quote?: string; cite?
   );
 }
 
+function domainOf(url?: string): string {
+  try {
+    return new URL(url || "").hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
 function CitationBlock({ data }: { data: CitationBlockData }) {
   if (!data) return null;
+  const domain = domainOf(data.url);
   return (
     <a
       href={data.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="plate flex items-start gap-2 mb-2 transition-colors"
-      style={{ textDecoration: "none", color: "inherit", fontSize: "0.85rem", padding: "0.6rem 0.75rem", borderLeft: "2px solid var(--gold)" }}
+      className="group my-2 flex items-start gap-3 rounded-xl border p-3 pr-4 transition-transform duration-300 hover:-translate-y-0.5"
+      style={{
+        textDecoration: "none", color: "inherit",
+        borderColor: "color-mix(in srgb, var(--gold) 24%, transparent)",
+        background: "linear-gradient(180deg, color-mix(in srgb, var(--surface-elevated) 75%, transparent), color-mix(in srgb, var(--surface) 55%, transparent))",
+        boxShadow: "inset 3px 0 0 0 var(--gold)",
+      }}
     >
-      <IconLink size={14} style={{ color: "var(--gold)", marginTop: 2 }} />
-      <span className="flex-1 min-w-0">
-        <span className="block truncate font-display" style={{ fontSize: "0.875rem" }}>{data.title || data.url}</span>
-        {data.relevance && <span className="block font-serif text-xs italic" style={{ color: "var(--muted)" }}>{data.relevance}</span>}
+      <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+        style={{ background: "color-mix(in srgb, var(--gold) 12%, transparent)", color: "var(--accent-dark)" }}>
+        <IconLink size={13} />
       </span>
-      <span className="text-[10px]" style={{ color: "var(--subtle)" }}>↗</span>
+      <span className="min-w-0 flex-1">
+        {domain && (
+          <span className="small-caps text-[9px] tracking-[0.18em]" style={{ color: "var(--accent-dark)" }}>{domain}</span>
+        )}
+        <span className="block truncate font-display text-[0.9rem] leading-snug" style={{ color: "var(--ink)" }}>
+          {data.title || data.url}
+        </span>
+        {data.relevance && (
+          <span className="mt-0.5 block font-serif text-[0.78rem] italic leading-relaxed" style={{ color: "var(--muted)" }}>
+            {data.relevance}
+          </span>
+        )}
+      </span>
+      <span className="mt-1 shrink-0 text-[12px] transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+        style={{ color: "var(--gold-soft)" }}>↗</span>
     </a>
   );
 }

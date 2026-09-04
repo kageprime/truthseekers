@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { CONTINENTS, type ContinentOutline } from "./continent-data";
 import SiteViewer3D from "./SiteViewer3D";
+import PanoramaViewer from "./PanoramaViewer";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -46,6 +47,35 @@ const SITES: AtlasSite[] = [
   { id: "kilwa", name: "Kilwa Kisiwani", country: "Tanzania", lat: -8.9596, lon: 39.517, era: "9th–16th c.", desc: "Swahili coral-stone sultanate controlling gold from Zimbabwe to China.", artifacts: ["Husuni Kubwa Palace", "Great Mosque", "Chinese porcelain"] },
   { id: "kerma", name: "Kerma", country: "Sudan", lat: 19.6035, lon: 30.4088, era: "2500–1500 BCE", desc: "First Nubian kingdom. Massive Western Deffufa temple.", artifacts: ["Western Deffufa", "Tumulus graves", "Blue faience"] },
 ];
+
+// ─── 360° Panorama data ─────────────────────────────────────────────
+
+interface PanoramaHotspot {
+  id: string;
+  position: [number, number, number];
+  label: string;
+  description?: string;
+}
+
+const PANORAMA_URL: Record<string, string> = {
+  // ponytail: placeholder equirectangular photo — swap with real site
+  // panoramas (Zamani Project, AI-generated, or captured) per site ID.
+  default: "https://threejs.org/examples/textures/2294472375_24a3b8ef46_o.jpg",
+};
+
+const PANORAMA_HOTSPOTS: Record<string, PanoramaHotspot[]> = {
+  giza: [
+    { id: "pyramid", position: [0, 10, -200], label: "Great Pyramid", description: "Khufu's pyramid — 146m tall, 2.3M limestone blocks" },
+    { id: "sphinx", position: [-200, 5, 150], label: "Great Sphinx", description: "73m long, 20m high. Oldest known monumental sculpture" },
+    { id: "khafre", position: [200, 10, -150], label: "Pyramid of Khafre", description: "Appears taller due to elevated foundation" },
+  ],
+  default: [
+    { id: "north", position: [0, 0, -300], label: "North", description: "Panoramic view facing north" },
+    { id: "east", position: [300, 0, 0], label: "East", description: "Panoramic view facing east" },
+    { id: "south", position: [0, 0, 300], label: "South", description: "Panoramic view facing south" },
+    { id: "west", position: [-300, 0, 0], label: "West", description: "Panoramic view facing west" },
+  ],
+};
 
 // ─── Projection ─────────────────────────────────────────────────────
 
@@ -113,6 +143,7 @@ export default function AtlasAntiquaMap({ focusSlug }: Props) {
 
   const [selectedSite, setSelectedSite] = useState<AtlasSite | null>(null);
   const [exploringSite, setExploringSite] = useState<AtlasSite | null>(null);
+  const [panorama360, setPanorama360] = useState<AtlasSite | null>(null);
   const [parchment, setParchment] = useState(true);
 
   noiseOffsets.current = precomputeNoise(CONTINENTS, 0.5);
@@ -485,6 +516,9 @@ export default function AtlasAntiquaMap({ focusSlug }: Props) {
         onExplore={() => {
           if (selectedSite) setExploringSite(selectedSite);
         }}
+        onPanorama360={() => {
+          if (selectedSite) setPanorama360(selectedSite);
+        }}
       />
 
       {exploringSite && (
@@ -492,6 +526,18 @@ export default function AtlasAntiquaMap({ focusSlug }: Props) {
           siteId={exploringSite.id}
           siteName={exploringSite.name}
           onClose={() => setExploringSite(null)}
+        />
+      )}
+
+      {panorama360 && (
+        <PanoramaViewer
+          imageUrl={PANORAMA_URL[panorama360.id] ?? PANORAMA_URL.default}
+          hotspots={(PANORAMA_HOTSPOTS[panorama360.id] ?? PANORAMA_HOTSPOTS.default).map((h) => ({
+            ...h,
+            description: h.description ?? `${h.label} viewpoint`,
+          }))}
+          siteName={panorama360.name}
+          onClose={() => setPanorama360(null)}
         />
       )}
     </div>
@@ -737,10 +783,12 @@ function MuseumPanel({
   site,
   onClose,
   onExplore,
+  onPanorama360,
 }: {
   site: AtlasSite | null;
   onClose: () => void;
   onExplore: () => void;
+  onPanorama360?: () => void;
 }) {
   return (
     <aside
@@ -876,6 +924,30 @@ function MuseumPanel({
               >
                 ⛏ Explore in 3D
               </button>
+
+              {/* 360° Panorama */}
+              {onPanorama360 && (
+                <button
+                  onClick={onPanorama360}
+                  className="cursor-pointer"
+                  style={{
+                    width: "100%", marginTop: 8,
+                    fontFamily: "Cinzel, serif",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    letterSpacing: ".04em",
+                    color: "#f5e6c4",
+                    background: "linear-gradient(180deg,#3a2a18,#1a0d04)",
+                    border: "1px solid #d4a76a",
+                    borderRadius: 4,
+                    padding: "10px 14px",
+                    boxShadow: "0 3px 0 #1a0d04",
+                    transition: "all .15s ease",
+                  }}
+                >
+                  ◉ 360° View
+                </button>
+              )}
             </div>
           </>
         ) : (

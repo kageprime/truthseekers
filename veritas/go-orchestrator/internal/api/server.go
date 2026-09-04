@@ -349,6 +349,7 @@ func NewServer(port string, db *storage.DB) *Server {
 		Meter:     llmgateway.NewMeter(10000),
 		DoKey:     os.Getenv("MODEL_ACCESS_KEY"),
 		GroqKey:   os.Getenv("GROQ_API_KEY"),
+		MetaKey:   os.Getenv("MODEL_API_KEY"),
 		CredStore: s.credStore,
 	}
 
@@ -364,10 +365,13 @@ func NewServer(port string, db *storage.DB) *Server {
 	s.credStore = credstore.New(map[string]string{
 		"MODEL_ACCESS_KEY":   "do",
 		"GROQ_API_KEY":       "groq",
+		"MODEL_API_KEY":      "meta",
 		"OPENAI_API_KEY":     "openai",
 		"TAVILY_API_KEY":     "tavily",
 		"FIRECRAWL_API_KEY":  "firecrawl",
 	})
+	// ponytail: gateway was built before credStore existed — link it now so PATCH /v1/credentials works for meta.
+	s.llmGateway.CredStore = s.credStore
 
 	// Registry — auto-discover skills, tools, commands from filesystem.
 	if reg, err := registry.Scan(""); err != nil {
@@ -792,6 +796,12 @@ func (s *Server) setupRoutes() {
 
 	// Contested claims - aggregate dashboard (public read)
 	s.mux.Handle("/contested", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleGetContestedClaims)))
+
+	// Global claim graph - cross-encyclopedia claim/evidence/relationship view
+	s.mux.Handle("/claim-graph", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleGetGlobalClaimGraph)))
+
+	// Live feed - per-article presence + global activity ticker (public SSE)
+	s.mux.Handle("/live/now", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleGlobalLive)))
 
 	// Admin - auth + admin role required + validation on PUT
 	s.mux.Handle("/admin/settings", chain(apiLimiter.middleware, s.requireRole("admin", "admin", "settings", "write"), validateBody(adminSettingsReq{}))(http.HandlerFunc(s.handleAdminSettings)))
@@ -1255,6 +1265,18 @@ func (s *Server) handleArticlesDynamicRoute(w http.ResponseWriter, r *http.Reque
 	case "claim-graph":
 		if r.Method == "GET" {
 			s.handleArticleClaimGraph(w, r, slug)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	case "epistemic":
+		if r.Method == "GET" {
+			s.handleArticleEpistemic(w, r, slug)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	case "live":
+		if r.Method == "GET" {
+			s.handleArticleLive(w, r)
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}

@@ -36,6 +36,9 @@ func DefaultCatalog() []ModelSpec {
 
 		// Epistemic workers (Python-side, but cataloged for consistency)
 		{Name: "qwen/qwen3-32b", Provider: "groq", DisplayName: "Qwen 3 32B", Reasoning: true, ToolCall: true, Attachment: true, Temperature: true, ContextLimit: 128000, OutputLimit: 16384, InputCostPerM: 0, OutputCostPerM: 0},
+
+		// Meta Model API (Muse Spark — OpenAI-compatible at https://api.meta.ai/v1)
+		{Name: "muse-spark-1.3-contributor", Provider: "meta", DisplayName: "Muse Spark 1.3 Contributor", Reasoning: true, ToolCall: true, Attachment: true, Temperature: true, ContextLimit: 1048576, OutputLimit: 131072, InputCostPerM: 0.10, OutputCostPerM: 0.20},
 	}
 }
 
@@ -63,7 +66,11 @@ type ProviderConfig struct {
 }
 
 // ResolveProvider maps a model name to its provider configuration.
-func ResolveProvider(modelName string, doKey, groqKey string) ProviderConfig {
+func ResolveProvider(modelName string, doKey, groqKey, metaKey string) ProviderConfig {
+	// ponytail: prefix match so future muse-spark checkpoints route to Meta without a catalog edit.
+	if len(modelName) >= 10 && modelName[:10] == "muse-spark" {
+		return ProviderConfig{BaseURL: "https://api.meta.ai/v1", APIKey: metaKey}
+	}
 	switch modelName {
 	case "gemma-4-31B-it", "deepseek-4-flash", "deepseek-v4-pro", "stable-diffusion-3.5-large":
 		return ProviderConfig{BaseURL: "https://inference.do-ai.run/v1", APIKey: doKey}

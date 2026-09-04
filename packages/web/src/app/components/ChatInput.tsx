@@ -5,6 +5,7 @@ import type { FC, SVGProps } from "react";
 import { IconPencil } from "./Icons";
 
 const MODELS = [
+  { id: "muse-spark-1.3-contributor", label: "Muse Spark 1.3" },
   { id: "gemma-4-31B-it", label: "Gemma 4 31B" },
   { id: "deepseek-4-flash", label: "DeepSeek Flash" },
   { id: "deepseek-v4-pro", label: "DeepSeek Pro" },

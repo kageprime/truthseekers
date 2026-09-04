@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import GenerationBar, { type GeneratingEntry } from "../components/GenerationBar";
 import PageLayout from "../components/PageLayout";
 import SectionHeader from "../components/SectionHeader";
-import { BASE } from "@/lib/constants";
 import type { AgentEvent } from "../components/ProcessViewer";
+import { useQueue, useCancelQueueJob, useGenerateArticle, useArticleProgress } from "../hooks";
 import { IconLightning, IconClock, IconCheckCircle, IconXCircle, IconX } from "../components/Icons";
 
 interface QueueJob {
@@ -50,130 +50,77 @@ function jobToEntry(job: QueueJob): GeneratingEntry {
   };
 }
 
+/**
+ * Wraps a single running job with its own SSE connection via
+ * `useArticleProgress`. Local state (agent events, phase) from SSE survives
+ * re-renders caused by the 2 s queue poll — the polled `job` prop is merged
+ * with the SSE-derived state for display.
+ */
+function RunningJobCard({
+  job,
+  onCancel,
+  onDismiss,
+}: {
+  job: QueueJob;
+  onCancel: (slug: string) => void;
+  onDismiss: (slug: string) => void;
+}) {
+  const [agentEvents, setAgentEvents] = useState<AgentEvent[]>(job.agentEvents ?? []);
+  const [phase, setPhase] = useState<string>(job.phase || job.status);
+
+  useArticleProgress(job.slug, true, {
+    onAgentEvent: useCallback((event: AgentEvent) => {
+      setAgentEvents((prev) => [...prev, event]);
+    }, []),
+    onPhase: useCallback((p: string) => {
+      setPhase(p);
+    }, []),
+  });
+
+  const entry: GeneratingEntry = {
+    slug: job.slug,
+    title: job.title || job.slug,
+    phase: phase || job.phase || job.status,
+    error: job.error,
+    agentEvents: agentEvents.length > 0 ? agentEvents : job.agentEvents,
+  };
+
+  return (
+    <div className="relative group">
+      <GenerationBar
+        entry={entry}
+        showWatchLive={true}
+        onRetry={() => onCancel(job.slug)}
+        onDismiss={() => onDismiss(job.slug)}
+      />
+      <button
+        onClick={() => onCancel(job.slug)}
+        className="btn-ghost absolute top-3 right-14 opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ minWidth: "44px", minHeight: "44px", color: "var(--red)" }}
+        title="Cancel job"
+      >
+        <IconX size={16} />
+      </button>
+    </div>
+  );
+}
+
 export default function QueuePage() {
-  const [data, setData] = useState<QueueData | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const agentEventsMapRef = useRef<Record<string, AgentEvent[]>>({});
-  const phaseMapRef = useRef<Record<string, string>>({});
-  const esRefs = useRef<Map<string, EventSource>>(new Map());
-  const activeSlugsRef = useRef<Set<string>>(new Set());
+  const { data } = useQueue(2000);
+  const { mutate: cancelJob } = useCancelQueueJob();
+  const { mutate: generateArticle } = useGenerateArticle();
 
-  const updateJob = useCallback((slug: string, patch: Partial<QueueJob>) => {
-    setData((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        jobs: prev.jobs.map((j) => (j.slug === slug ? { ...j, ...patch } : j)),
-      };
-    });
-  }, []);
-
-  const handleAgentEvent = useCallback((slug: string, event: AgentEvent) => {
-    const events = [...(agentEventsMapRef.current[slug] || []), event];
-    agentEventsMapRef.current[slug] = events;
-    updateJob(slug, { agentEvents: events });
-  }, [updateJob]);
-
-  const handleProgress = useCallback((slug: string, phase: string) => {
-    phaseMapRef.current[slug] = phase;
-    updateJob(slug, { phase });
-  }, [updateJob]);
-
-  // Poll queue status
-  useEffect(() => {
-    let cancelled = false;
-    async function poll() {
-      try {
-        const res = await fetch(`${BASE}/queue`);
-        if (!cancelled && res.ok) {
-          const json: QueueData = await res.json();
-          // Merge in stored agent events
-           const jobsWithEvents = json.jobs.map((j) => ({
-            ...j,
-            phase: phaseMapRef.current[j.slug] || (j.status === "paused" ? "paused" : j.phase),
-            error: j.status === "paused" ? j.error : j.error,
-            agentEvents: agentEventsMapRef.current[j.slug] || j.agentEvents,
-          }));
-          setData({ ...json, jobs: jobsWithEvents });
-        }
-      } catch (e) { console.warn("Queue poll error:", e); }
-    }
-    poll();
-    const interval = setInterval(poll, 2000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, []);
-
-  // Connect SSE for running/non-done jobs
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const nextActive = new Set<string>();
-
-    const targets = data?.jobs.filter(
-      (j) => j.status !== "done" && j.status !== "queued" && !dismissed.has(j.slug)
-    ) ?? [];
-
-    for (const job of targets) {
-      nextActive.add(job.slug);
-      if (esRefs.current.has(job.slug)) continue; // already connected
-
-      const es = new EventSource(`${BASE}/articles/${job.slug}/progress`);
-      esRefs.current.set(job.slug, es);
-
-      es.addEventListener("agent_event", (e: MessageEvent) => {
-        try {
-          const event: AgentEvent = JSON.parse(e.data);
-          handleAgentEvent(job.slug, event);
-        } catch { /* skip malformed event */ }
-      });
-
-      es.addEventListener("progress", (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data);
-          const phase = data.status === "paused" ? "paused" : data.phase;
-          const error = data.status === "paused" ? data.error : undefined;
-          if (phase) {
-            phaseMapRef.current[job.slug] = phase;
-            updateJob(job.slug, { phase, error });
-          }
-        } catch { /* skip malformed progress */ }
-      });
-
-      es.onerror = () => { es.close(); esRefs.current.delete(job.slug); };
-    }
-
-    // Close SSE for slugs no longer active
-    for (const [slug, es] of esRefs.current) {
-      if (!nextActive.has(slug) || nextActive !== activeSlugsRef.current) {
-        es.close();
-        esRefs.current.delete(slug);
-      }
-    }
-    activeSlugsRef.current = nextActive;
-  }, [data?.jobs, dismissed, handleAgentEvent, handleProgress]);
-
-  async function cancelJob(slug: string) {
-    try {
-      const res = await fetch(`${BASE}/queue/${slug}`, { method: "DELETE" });
-      if (res.ok) {
-        // Close SSE for this job
-        esRefs.current.get(slug)?.close();
-        esRefs.current.delete(slug);
-        setData((prev) => {
-          if (!prev) return prev;
-          return { ...prev, jobs: prev.jobs.filter((j) => j.slug !== slug) };
-        });
-      }
-    } catch (e) { console.warn("Cancel job error:", e); }
+  function handleCancel(slug: string) {
+    cancelJob(slug);
   }
 
-  async function retryJob(slug: string) {
-    try {
-      await fetch(`${BASE}/articles/${slug}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ persona: "veritas" }),
-      });
-    } catch (e) { console.warn("Retry job error:", e); }
+  function handleRetry(slug: string) {
+    generateArticle({ slug });
+  }
+
+  function handleDismiss(slug: string) {
+    setDismissed((prev) => new Set(prev).add(slug));
   }
 
   if (!data) {
@@ -188,11 +135,12 @@ export default function QueuePage() {
     );
   }
 
-  const visibleJobs = data.jobs.filter((j) => !dismissed.has(j.slug) && j.status !== "done");
+  const queueData = data as QueueData;
+  const visibleJobs = queueData.jobs.filter((j) => !dismissed.has(j.slug) && j.status !== "done");
   const runningJobs = visibleJobs.filter((j) => j.status !== "queued" && j.status !== "error");
   const queuedJobs = visibleJobs.filter((j) => j.status === "queued");
   const errorJobs = visibleJobs.filter((j) => j.status === "error");
-  const doneCount = data.jobs.filter((j) => j.status === "done").length;
+  const doneCount = queueData.jobs.filter((j) => j.status === "done").length;
 
   return (
     <PageLayout>
@@ -203,8 +151,8 @@ export default function QueuePage() {
             <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>Monitor and manage all generation jobs</p>
           </div>
           <div className="flex gap-4 text-sm">
-            <span className="font-medium" style={{ color: "var(--accent)" }}>{data.stats.active}/{data.stats.maxConcurrent} active</span>
-            <span className="font-medium" style={{ color: "var(--blue)" }}>{data.stats.queued}/{data.stats.maxQueue} queued</span>
+            <span className="font-medium" style={{ color: "var(--accent)" }}>{queueData.stats.active}/{queueData.stats.maxConcurrent} active</span>
+            <span className="font-medium" style={{ color: "var(--blue)" }}>{queueData.stats.queued}/{queueData.stats.maxQueue} queued</span>
           </div>
         </div>
 
@@ -212,12 +160,12 @@ export default function QueuePage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           <div className="glass-card-static p-4 text-center">
             <div className="mb-1"><IconLightning size={28} /></div>
-            <div className="text-xl font-bold" style={{ color: "var(--accent)" }}>{data.stats.active}</div>
+            <div className="text-xl font-bold" style={{ color: "var(--accent)" }}>{queueData.stats.active}</div>
             <div className="text-xs uppercase tracking-wide mt-1" style={{ color: "var(--muted)" }}>Active</div>
           </div>
           <div className="glass-card-static p-4 text-center">
             <div className="mb-1"><IconClock size={28} /></div>
-            <div className="text-xl font-bold" style={{ color: "var(--blue)" }}>{data.stats.queued}</div>
+            <div className="text-xl font-bold" style={{ color: "var(--blue)" }}>{queueData.stats.queued}</div>
             <div className="text-xs uppercase tracking-wide mt-1" style={{ color: "var(--muted)" }}>Queued</div>
           </div>
           <div className="glass-card-static p-4 text-center">
@@ -240,22 +188,12 @@ export default function QueuePage() {
           ) : (
             <div className="space-y-2">
               {runningJobs.map((job) => (
-                <div key={job.slug} className="relative group">
-                  <GenerationBar
-                    entry={jobToEntry(job)}
-                    showWatchLive={true}
-                    onRetry={() => retryJob(job.slug)}
-                    onDismiss={() => setDismissed((prev) => new Set(prev).add(job.slug))}
-                  />
-                  <button
-                    onClick={() => cancelJob(job.slug)}
-                    className="btn-ghost absolute top-3 right-14 opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ minWidth: "44px", minHeight: "44px", color: "var(--red)" }}
-                    title="Cancel job"
-                  >
-                    <IconX size={16} />
-                  </button>
-                </div>
+                <RunningJobCard
+                  key={job.slug}
+                  job={job}
+                  onCancel={handleCancel}
+                  onDismiss={handleDismiss}
+                />
               ))}
             </div>
           )}
@@ -274,7 +212,7 @@ export default function QueuePage() {
                   <span className="text-sm font-medium truncate flex-1" style={{ color: "var(--ink)" }}>{job.title || job.slug}</span>
                   <span className="text-xs" style={{ color: "var(--subtle)" }}>{timeAgo(job.createdAt)}</span>
                   <button
-                    onClick={() => cancelJob(job.slug)}
+                    onClick={() => handleCancel(job.slug)}
                     className="btn-ghost shrink-0"
                     style={{ minWidth: "44px", minHeight: "44px", color: "var(--red)" }}
                     title="Cancel job"
@@ -297,8 +235,8 @@ export default function QueuePage() {
                   key={job.slug}
                   entry={jobToEntry(job)}
                   showWatchLive={false}
-                  onRetry={() => retryJob(job.slug)}
-                  onDismiss={() => setDismissed((prev) => new Set(prev).add(job.slug))}
+                  onRetry={() => handleRetry(job.slug)}
+                  onDismiss={() => handleDismiss(job.slug)}
                 />
               ))}
             </div>
@@ -309,8 +247,8 @@ export default function QueuePage() {
         <div className="mt-12 glass-card-static p-6">
           <h3 className="text-xs font-semibold mb-4 uppercase tracking-wide" style={{ color: "var(--ink)" }}>Configuration</h3>
           <div className="grid sm:grid-cols-2 gap-4 text-sm" style={{ color: "var(--muted)" }}>
-            <div>Max concurrent: <span className="font-bold" style={{ color: "var(--ink)" }}>{data.stats.maxConcurrent}</span></div>
-            <div>Max queue size: <span className="font-bold" style={{ color: "var(--ink)" }}>{data.stats.maxQueue}</span></div>
+            <div>Max concurrent: <span className="font-bold" style={{ color: "var(--ink)" }}>{queueData.stats.maxConcurrent}</span></div>
+            <div>Max queue size: <span className="font-bold" style={{ color: "var(--ink)" }}>{queueData.stats.maxQueue}</span></div>
             <div>Set via env: <span className="font-mono text-xs">ENCARTA_MAX_CONCURRENT</span></div>
             <div>Set via env: <span className="font-mono text-xs">ENCARTA_MAX_QUEUE</span></div>
           </div>

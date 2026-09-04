@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fetchArticle, progressUrl } from "@/lib/api";
-import { BASE } from "@/lib/constants";
-import { useQuota, useGenerateArticle, useRefreshArticle, useTrackView } from "../../hooks";
+import { useQuota, useGenerateArticle, useRefreshArticle, useTrackView, useArticle, useArticleProgress, useArticleStatus, useArticleClaims } from "../../hooks";
 import PageLayout from "../../components/PageLayout";
 import ContentCard from "../../components/ContentCard";
 import GenerationBar from "../../components/GenerationBar";
@@ -13,6 +11,10 @@ import BlockRenderer, { articleToBlocks } from "../../components/BlockRenderer";
 import ClaimGraphViewer from "../../components/ClaimGraphViewer";
 import FreshnessBadge from "../../components/FreshnessBadge";
 import RefreshDiffBanner from "../../components/RefreshDiffBanner";
+import ArticleGapsPanel from "../../components/ArticleGapsPanel";
+import EpisodeFeed from "../../components/EpisodeFeed";
+import LiveBadge from "../../components/LiveBadge";
+import EyebrowTag from "../../components/EyebrowTag";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import type { Article } from "@encarta/core";
 import { IconXCircle, IconBook, IconLightning, IconFile, IconFileText, IconUser, IconRefresh, IconAlert } from "../../components/Icons";
@@ -24,98 +26,70 @@ interface ArticleClientProps {
   initialPhase: string;
 }
 
-export default function ArticleClient({ slug, article: initialArticle, isGenerating, initialPhase }: ArticleClientProps) {
-  const [article, setArticle] = useState<Article | null>(initialArticle);
-  const [loading, setLoading] = useState(!initialArticle && !isGenerating);
+export default function ArticleClient({ slug, article: initialArticle, isGenerating: initialIsGenerating, initialPhase }: ArticleClientProps) {
+  // Prefer the React Query cache (also seeded by the server RSC fetch via
+  // the same hook); fall back to the server-provided prop on first render.
+  const { data: fetched, refetch: refetchArticle } = useArticle(slug);
+  const article: Article | null = initialArticle ?? fetched ?? null;
+  const isLoading = !article && !initialIsGenerating;
   const [error, setError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(isGenerating);
+  const [generating, setGenerating] = useState(initialIsGenerating);
   const [progress, setProgress] = useState(initialPhase);
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
   const [pausedError, setPausedError] = useState<string | undefined>(undefined);
   const [showGraph, setShowGraph] = useState(false);
+  const [dissentMode, setDissentMode] = useState(false);
+  const { data: claimsRes } = useArticleClaims(generating ? undefined : slug);
+  const claimsIndex = useMemo<Record<string, { status?: string; derived_confidence?: number }>>(() => {
+    const map: Record<string, { status?: string; derived_confidence?: number }> = {};
+    const claims = (claimsRes?.claims as Array<{ id: string; status?: string; derived_confidence?: number }> | undefined) ?? [];
+    for (const c of claims) {
+      if (c?.id) map[c.id] = { status: c.status, derived_confidence: c.derived_confidence };
+    }
+    return map;
+  }, [claimsRes]);
   const { data: quota } = useQuota();
   const { mutate: generateArticle } = useGenerateArticle();
   const { mutate: refreshArticle } = useRefreshArticle();
+  const { data: status } = useArticleStatus(generating ? slug : undefined);
   const [quotaBlocked, setQuotaBlocked] = useState(false);
-  const sseRef = useRef<EventSource | null>(null);
   const trackedRef = useRef(false);
   const router = useRouter();
   const trackView = useTrackView();
 
-  useEffect(() => {
-    if (slug && !trackedRef.current) {
-      trackedRef.current = true;
-      trackView(slug);
+  // Track view once per slug
+  if (slug && !trackedRef.current) {
+    trackedRef.current = true;
+    trackView(slug);
+  }
+
+  // Drive the SSE connection while we're generating and don't yet have the
+  // final article. Replaces the inline EventSource + listener block.
+  useArticleProgress(generating ? slug : null, generating, {
+    onAgentEvent: (ev) => setAgentEvents((prev) => [...prev, ev]),
+    onPhase: (phase, err) => {
+      setProgress(phase);
+      setPausedError(phase === "paused" ? err : undefined);
+    },
+    onDone: () => {
+      setGenerating(false);
+      setProgress("done");
+      refetchArticle();
+    },
+    onError: (e) => {
+      setProgress("Error: " + e);
+      setGenerating(false);
+    },
+  });
+
+  // Sync phase from the polling status endpoint (older generation path).
+  // The SSE hook is the source of truth for in-flight generations; this is a
+  // safety net for the very first paint.
+  if (status?.status && status.status !== "not_found" && !generating) {
+    if (status.status === "done" || status.status === "published") {
+      if (article && !fetched) refetchArticle();
     }
-  }, [slug, trackView]);
-
-  useEffect(() => {
-    if (initialArticle || generating || isGenerating) return;
-    setLoading(false);
-  }, [slug, initialArticle, generating, isGenerating]);
-
-  useEffect(() => {
-    if (!generating || article) return;
-
-    const es = new EventSource(progressUrl(slug));
-    sseRef.current = es;
-
-    es.addEventListener("agent_event", (e) => {
-      try {
-        const eventData: AgentEvent = JSON.parse(e.data);
-        setAgentEvents((prev) => [...prev, eventData]);
-      } catch { /* skip malformed events */ }
-    });
-
-    es.addEventListener("progress", (e) => {
-      let data: Record<string, unknown>;
-      try { data = JSON.parse(e.data); } catch { return; /* skip malformed */ }
-      if (data.status === "done") {
-        fetchArticle(slug).then((a) => {
-          if (a) setArticle(a);
-          setGenerating(false);
-          es.close();
-          sseRef.current = null;
-        }).catch(() => { setGenerating(false); });
-      } else if (data.status === "error") {
-        setProgress(`Error: ${data.error}`);
-        setGenerating(false);
-        es.close();
-        sseRef.current = null;
-      } else if (data.status === "not_queued") {
-        setGenerating(false);
-        es.close();
-        sseRef.current = null;
-      } else {
-        const phaseStr = data.status === "paused" ? "paused" : (typeof data.phase === "string" ? data.phase : typeof data.status === "string" ? data.status : "unknown");
-        setProgress(phaseStr);
-        if (data.status === "paused") {
-          setPausedError(data.error as string);
-        } else {
-          setPausedError(undefined);
-        }
-      }
-    });
-
-    es.onerror = () => {
-      es.close();
-      sseRef.current = null;
-    };
-
-    return () => {
-      es.close();
-      sseRef.current = null;
-    };
-  }, [slug, generating, article]);
-
-  useEffect(() => {
-    return () => {
-      if (sseRef.current) {
-        sseRef.current.close();
-        sseRef.current = null;
-      }
-    };
-  }, []);
+  }
 
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
@@ -123,11 +97,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     setQuotaBlocked(false);
     try {
       const result = await generateArticle({ slug });
-      if (result?.status === "already_exists") {
-        try {
-          const a = await fetchArticle(slug);
-          if (a) setArticle(a);
-        } catch { /* fetch failed — stay in generating state */ }
+      if (result?.status === "error") {
+        setError("Failed to generate article");
         setGenerating(false);
       }
     } catch (err) {
@@ -141,7 +112,11 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     setProgress("queued");
     setQuotaBlocked(false);
     try {
-      await refreshArticle(slug);
+      const result = await refreshArticle(slug);
+      if (result?.status === "error") {
+        setError("Failed to refresh article");
+        setGenerating(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to refresh article");
       setGenerating(false);
@@ -150,7 +125,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
   const handleExport = useCallback((format: "json" | "markdown") => {
     if (!article) return;
-    const url = `${BASE}/articles/${slug}/export?format=${format}`;
+    const url = `/api/articles/${slug}/export?format=${format}`;
     window.open(url, "_blank");
   }, [article, slug]);
 
@@ -163,7 +138,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             <h1 className="text-xs font-semibold mb-2" style={{ color: "var(--red)" }}>Error Loading Article</h1>
             <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>{error}</p>
             <button
-              onClick={() => { setError(null); setLoading(true); window.location.reload(); }}
+              onClick={() => { setError(null); window.location.reload(); }}
               className="btn btn-primary cursor-pointer"
             >
               Try Again
@@ -179,7 +154,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     );
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <ContentCard>
         <div className="px-4 sm:px-8 py-10 sm:py-14 max-w-[42rem] mx-auto w-full animate-pulse">
@@ -305,6 +280,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
               onDismiss={() => {}}
               showWatchLive={false}
             />
+            <EpisodeFeed events={agentEvents} />
           </div>
         </div>
       </ContentCard>
@@ -319,14 +295,11 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   return (
     <PageLayout maxWidthClass="max-w-3xl">
       <div
-        style={{
-          borderRadius: "var(--radius-card-lg, 8px)",
-          background: "color-mix(in srgb, var(--surface-elevated) 100%, transparent)",
-          border: "1px solid var(--border-light)",
-          boxShadow: "0 1px 3px rgba(26,22,18,0.04)",
-        }}
+        className="bezel bezel-elevated"
+        style={{ maxWidth: "44rem", margin: "0 auto" }}
       >
-      <article className="px-4 sm:px-8 py-10 sm:py-14 max-w-[42rem] mx-auto w-full animate-appear-up">
+        <div className="bezel-inner">
+      <article className="px-4 sm:px-8 md:px-12 py-12 sm:py-16 md:py-20 max-w-[42rem] mx-auto w-full animate-appear-up">
         {/* Back link — gold badge with hover arrow */}
         <button
           onClick={() => router.back()}
@@ -403,13 +376,18 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         </div>
 
         {/* Title block */}
-        <header className="mb-12 text-center">
+        <header className="mb-14 md:mb-16 text-center">
+          {article.categories && article.categories.length > 0 && (
+            <div className="flex justify-center mb-6">
+              <EyebrowTag label={article.categories[0]} />
+            </div>
+          )}
           <h1
             className="font-display font-bold mb-5"
             style={{
-              fontSize: "clamp(2rem, 1rem + 4vw, 3.25rem)",
-              letterSpacing: "-0.02em",
-              lineHeight: 1.1,
+              fontSize: "clamp(2.25rem, 1.5rem + 3.5vw, 3.5rem)",
+              letterSpacing: "-0.025em",
+              lineHeight: 1.08,
               color: "var(--ink)",
             }}
           >
@@ -457,12 +435,16 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             </>)}
             {article.slug && <FreshnessBadge slug={article.slug} />}
           </div>
+
+          <div className="mt-3 flex justify-center">
+            <LiveBadge slug={slug} />
+          </div>
         </header>
 
         <RefreshDiffBanner slug={slug} />
 
-        {/* Claim graph toggle */}
-        <div className="mb-8">
+        {/* Dissent + Claim graph toggles */}
+        <div className="mb-8 flex flex-wrap items-center gap-2">
           <button
             onClick={() => setShowGraph(!showGraph)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium transition-colors cursor-pointer"
@@ -474,36 +456,55 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           >
             <span aria-hidden>◈</span> {showGraph ? "Hide claim graph" : "Show claim graph"}
           </button>
-          {showGraph && (
-            <div className="mt-3">
-              <ClaimGraphViewer slug={slug} />
-            </div>
-          )}
+          <button
+            onClick={() => setDissentMode(!dissentMode)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium transition-colors cursor-pointer"
+            style={{
+              borderColor: dissentMode ? "rgba(179,60,60,0.45)" : "var(--border-light, #e5e5e5)",
+              color: dissentMode ? "#b33c3c" : "var(--muted)",
+              background: dissentMode ? "rgba(179,60,60,0.06)" : "transparent",
+            }}
+            title="Highlight disputed and weak claims in the body"
+          >
+            <span aria-hidden>⚑</span> {dissentMode ? "Dissent on" : "Highlight dissent"}
+          </button>
         </div>
+        {showGraph && (
+          <div className="mb-6">
+            <ClaimGraphViewer slug={slug} />
+          </div>
+        )}
 
         {/* Article body — reading column */}
         <div className="reading-column stagger-children">
           {hasFullContent ? (
-            <BlockRenderer blocks={
-              article.blocks && article.blocks.length > 0
-                ? article.blocks
-                : articleToBlocks(
-                    article.slug,
-                    article.title,
-                    article.abstract,
-                    article.sections,
-                    article.timeline,
-                    article.crossrefs,
-                    article.citations,
-                  )
-            } />
+            <BlockRenderer
+              blocks={
+                article.blocks && article.blocks.length > 0
+                  ? article.blocks
+                  : articleToBlocks(
+                      article.slug,
+                      article.title,
+                      article.abstract,
+                      article.sections,
+                      article.timeline,
+                      article.crossrefs,
+                      article.citations,
+                    )
+              }
+              claimsIndex={claimsIndex}
+              dissentMode={dissentMode}
+            />
           ) : article.abstract ? (
             <div style={{ fontSize: "0.9375rem", lineHeight: 1.75, color: "var(--ink)" }}>
               <p>{article.abstract}</p>
             </div>
           ) : null}
         </div>
+
+        <ArticleGapsPanel slug={slug} />
       </article>
+        </div>
       </div>
     </PageLayout>
   );

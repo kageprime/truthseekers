@@ -2,18 +2,19 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { fetchArticles, searchArticles, fetchArticle, fetchArticleStatus, progressUrl } from "@/lib/api";
+import {
+  useGenerateArticle, useArticles, useArticleSearch,
+  useArticleProgress, useCheckArticleStatus,
+} from "../hooks";
 import type { ArticleSummary } from "@encarta/core";
-import { useGenerateArticle, useArticleStatus } from "../hooks";
 import { usePageSearch } from "../HeaderSearchContext";
 import PageLayout from "../components/PageLayout";
-import ContentCard from "../components/ContentCard";
 import GenerationBar from "../components/GenerationBar";
 import ArticleCard from "../components/ArticleCard";
-import Spinner from "../components/Spinner";
 import type { AgentEvent } from "../components/ProcessViewer";
-import { IconLightning, IconSearch, IconBook, IconGrid, IconList } from "../components/Icons";
+import { IconLightning, IconSearch, IconGrid, IconList } from "../components/Icons";
 
 interface GeneratingEntry {
   slug: string;
@@ -25,6 +26,56 @@ interface GeneratingEntry {
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
+
+/**
+ * Wraps a single in-flight article generation with its own SSE connection
+ * via `useArticleProgress`. Phase, error, and agent events are tracked
+ * locally; the parent is notified on completion / error / dismiss.
+ */
+function GeneratingCard({
+  slug,
+  title,
+  onDone,
+  onError,
+  onDismiss,
+  onRetry,
+}: {
+  slug: string;
+  title: string;
+  onDone: (slug: string) => void;
+  onError: (slug: string, error: string) => void;
+  onDismiss: (slug: string) => void;
+  onRetry: (slug: string) => void;
+}) {
+  const [phase, setPhase] = useState("queued");
+  const [error, setError] = useState<string | undefined>();
+  const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
+
+  useArticleProgress(slug, true, {
+    onAgentEvent: useCallback((event: AgentEvent) => {
+      setAgentEvents((prev) => [...prev, event]);
+    }, []),
+    onPhase: useCallback((p: string, err?: string) => {
+      setPhase(p);
+      if (err) setError(err);
+    }, []),
+    onDone: useCallback(() => onDone(slug), [slug, onDone]),
+    onError: useCallback((err: string) => {
+      setError(err);
+      onError(slug, err);
+    }, [slug, onError]),
+  });
+
+  const entry: GeneratingEntry = { slug, title, phase, error, agentEvents };
+
+  return (
+    <GenerationBar
+      entry={entry}
+      onRetry={() => onRetry(slug)}
+      onDismiss={() => onDismiss(slug)}
+    />
+  );
+}
 
 function ArticleRow({ article }: { article: ArticleSummary }) {
   return (
@@ -72,22 +123,33 @@ function ArticleRow({ article }: { article: ArticleSummary }) {
 
 export default function ArticlesPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [generating, setGenerating] = useState<Map<string, GeneratingEntry>>(new Map());
-  const [loading, setLoading] = useState(true);
-  const [searching, setSearching] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { mutate: generateArticle } = useGenerateArticle();
-  const sseRef = useRef<Map<string, EventSource>>(new Map());
-  const mountedRef = useRef(true);
+  const { mutate: checkStatus } = useCheckArticleStatus();
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const showSearch = debouncedQuery.trim().length > 0;
+  const articlesQuery = useArticles(showSearch ? 0 : page * PAGE_SIZE, PAGE_SIZE);
+  const searchQuery = useArticleSearch(showSearch ? debouncedQuery.trim() : "");
+
+  const articles: ArticleSummary[] = showSearch
+    ? (searchQuery.data ?? [])
+    : (articlesQuery.data?.data ?? []);
+  const loading = showSearch ? searchQuery.loading : articlesQuery.loading;
+  const searching = showSearch && searchQuery.loading;
+
+  const pagination = articlesQuery.data?.pagination;
+  const totalPages = showSearch
+    ? 1
+    : (pagination?.hasMore ? page + 2 : page + 1);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -96,148 +158,59 @@ export default function ArticlesPage() {
     onClear: () => { setQuery(""); setDebouncedQuery(""); }, placeholder: "Search articles...",
   } : null, [query, debouncedQuery]));
 
-  const loadArticles = useCallback(async (p: number) => {
-    setLoading(true);
-    const data = await fetchArticles(p * PAGE_SIZE, PAGE_SIZE);
-    if (!mountedRef.current) return;
-    const items = (data as any).data ?? [];
-    const pagination = (data as any).pagination;
-    setArticles(items);
-    if (pagination?.total != null) {
-      setTotalPages(Math.ceil(pagination.total / PAGE_SIZE));
-    } else if (pagination) {
-      setTotalPages(p + (pagination.hasMore ? 2 : 1));
-    } else {
-      setTotalPages(items.length < PAGE_SIZE ? p + 1 : p + 2);
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
-    loadArticles(page);
-  }, [mounted, page, loadArticles]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    return () => {
-      sseRef.current.forEach((es) => es.close());
-      sseRef.current.clear();
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    };
-  }, [mounted]);
-
+  // Debounce search input
   useEffect(() => {
     if (!mounted) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
       setDebouncedQuery(query);
+      if (query.trim()) setPage(0);
     }, SEARCH_DEBOUNCE_MS);
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
   }, [mounted, query]);
 
-  useEffect(() => {
-    if (!mounted) return;
-    if (debouncedQuery.trim()) {
-      performSearch(debouncedQuery.trim());
-    } else {
-      setPage(0);
-      loadArticles(0);
-    }
-  }, [mounted, debouncedQuery, loadArticles]);
+  function startGenerate(slug: string) {
+    const title = slug.replace(/-/g, " ");
+    setGenerating((prev) => {
+      const next = new Map(prev);
+      next.set(slug, { slug, title, phase: "queued", agentEvents: [] });
+      return next;
+    });
+    generateArticle({ slug });
+  }
 
-  async function performSearch(searchQuery: string) {
-    setSearching(true);
-    try {
-      const results = await searchArticles(searchQuery);
-      if (mountedRef.current) {
-        setArticles(results);
-        setTotalPages(1);
-      }
-    } catch {
-      if (mountedRef.current) { setArticles([]); setTotalPages(1); }
-    } finally {
-      if (mountedRef.current) { setSearching(false); setLoading(false); }
-    }
+  function handleGenDone(slug: string) {
+    setGenerating((prev) => { const next = new Map(prev); next.delete(slug); return next; });
+    queryClient.invalidateQueries({ queryKey: ["articles"] });
+  }
+
+  function handleGenError(slug: string, error: string) {
+    setGenerating((prev) => {
+      const next = new Map(prev);
+      const entry = next.get(slug);
+      if (entry) next.set(slug, { ...entry, phase: "error", error });
+      return next;
+    });
+  }
+
+  function handleGenDismiss(slug: string) {
+    setGenerating((prev) => { const next = new Map(prev); next.delete(slug); return next; });
   }
 
   const slugify = useCallback((text: string): string => {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   }, []);
 
-  function startGenerate(slug: string) {
-    const entry: GeneratingEntry = { slug, title: slug.replace(/-/g, " "), phase: "queued", agentEvents: [] };
-    setGenerating((prev) => { const next = new Map(prev); next.set(slug, entry); return next; });
-
-    generateArticle({ slug }).then(() => {
-      const existing = sseRef.current.get(slug);
-      if (existing) { existing.close(); sseRef.current.delete(slug); }
-
-      const es = new EventSource(progressUrl(slug));
-      sseRef.current.set(slug, es);
-
-      es.addEventListener("agent_event", (e) => {
-        const eventData: AgentEvent = JSON.parse(e.data);
-        setGenerating((prev) => {
-          const next = new Map(prev);
-          const entry = next.get(slug);
-          if (entry) next.set(slug, { ...entry, agentEvents: [...(entry.agentEvents || []), eventData] });
-          return next;
-        });
-      });
-
-      es.addEventListener("progress", (e) => {
-        const data = JSON.parse(e.data);
-        if (data.status === "done") {
-          fetchArticle(slug).then((article) => {
-            if (!article || !mountedRef.current) return;
-            const summary: ArticleSummary = {
-              slug: article.slug, title: article.title, abstract: article.abstract,
-              metadata: { status: article.metadata?.status || "published", version: article.metadata?.version || 1, updated: article.metadata?.updated || "" },
-              categories: article.categories || [],
-              thumbnail: (article.sections?.[0]?.media?.find((m: any) => m.type === "image" && m.src) as any)?.src,
-            };
-            setArticles((prev) => [summary, ...prev.filter((a) => a.slug !== slug)]);
-            setGenerating((prev) => { const next = new Map(prev); next.delete(slug); return next; });
-          });
-          es.close(); sseRef.current.delete(slug);
-        } else if (data.status === "error") {
-          setGenerating((prev) => {
-            const next = new Map(prev); const e = next.get(slug);
-            if (e) next.set(slug, { ...e, phase: "error", error: data.error || "Unknown error" });
-            return next;
-          });
-          es.close(); sseRef.current.delete(slug);
-        } else {
-          setGenerating((prev) => {
-            const next = new Map(prev); const e = next.get(slug);
-            if (e) next.set(slug, { ...e, phase: data.status === "paused" ? "paused" : (data.phase || data.status), error: data.status === "paused" ? data.error : undefined });
-            return next;
-          });
-        }
-      });
-
-      es.onerror = () => { es.close(); sseRef.current.delete(slug); };
-    }).catch((err) => {
-      setGenerating((prev) => {
-        const next = new Map(prev); const e = next.get(slug);
-        if (e) next.set(slug, { ...e, phase: "error", error: String(err) });
-        return next;
-      });
-    });
-  }
-
-  const allCategories = Array.from(new Set(articles.flatMap(a => a.categories ?? []))).sort();
-  const filteredArticles = selectedCategory
-    ? articles.filter(a => a.categories?.includes(selectedCategory))
-    : articles;
+  const allCategories = useMemo(
+    () => Array.from(new Set(articles.flatMap(a => a.categories ?? []))).sort(),
+    [articles]
+  );
+  const filteredArticles = useMemo(
+    () => selectedCategory ? articles.filter(a => a.categories?.includes(selectedCategory)) : articles,
+    [articles, selectedCategory]
+  );
   const categoryFilterLabel = selectedCategory || "All categories";
 
   return (
@@ -281,7 +254,7 @@ export default function ArticlesPage() {
                 onClick={() => {
                   const slug = slugify(query.trim());
                   if (slug && !generating.has(slug)) {
-                    fetchArticleStatus(slug).then((existing) => {
+                    checkStatus(slug).then((existing) => {
                       if (existing && "status" in existing && existing.status === "published") {
                         router.push(`/article/${slug}`);
                       } else {
@@ -303,14 +276,14 @@ export default function ArticlesPage() {
         {generating.size > 0 && (
           <div className="mb-6 space-y-2 max-w-2xl mx-auto">
             {Array.from(generating.values()).map((gen) => (
-              <GenerationBar
-                key={gen.slug} entry={gen}
-                onRetry={(slug) => startGenerate(slug)}
-                onDismiss={(slug) => {
-                  setGenerating((prev) => { const next = new Map(prev); next.delete(slug); return next; });
-                  const es = sseRef.current.get(slug);
-                  if (es) { es.close(); sseRef.current.delete(slug); }
-                }}
+              <GeneratingCard
+                key={gen.slug}
+                slug={gen.slug}
+                title={gen.title}
+                onDone={handleGenDone}
+                onError={handleGenError}
+                onDismiss={handleGenDismiss}
+                onRetry={startGenerate}
               />
             ))}
           </div>

@@ -91,12 +91,47 @@ function BookIcon({ size }: { size: number }) {
   );
 }
 
+function ClaimGraphIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="6" cy="6" r="2" />
+      <circle cx="18" cy="6" r="2" />
+      <circle cx="12" cy="14" r="2" />
+      <circle cx="6" cy="20" r="1.5" />
+      <circle cx="18" cy="20" r="1.5" />
+      <line x1="7.5" y1="7" x2="10.5" y2="13" />
+      <line x1="16.5" y1="7" x2="13.5" y2="13" />
+      <line x1="11" y1="16" x2="7" y2="19" />
+      <line x1="13" y1="16" x2="17" y2="19" />
+    </svg>
+  );
+}
+
+function PricingIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
+    </svg>
+  );
+}
+
+function CompassIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+    </svg>
+  );
+}
+
 // ─── NAV LINKS ─────────────────────────────────────────────────────
 
 const NAV_LINKS = [
   { href: "/chat/new", label: "Chat", icon: ChatIcon },
   { href: "/articles", label: "Articles", icon: ArticleIcon },
   { href: "/maps", label: "Maps", icon: MapIcon },
+  { href: "/claim-graph", label: "Claim Graph", icon: ClaimGraphIcon },
 ];
 
 // Secondary epistemic dashboards grouped under the "Living" entry point.
@@ -104,6 +139,12 @@ const LIVING_LINKS = [
   { href: "/contested", label: "Contested", icon: ContestedIcon },
   { href: "/gaps", label: "Open Questions", icon: GapIcon },
   { href: "/stale", label: "Stale", icon: StaleIcon },
+];
+
+// Public-facing extras not on the main spine (pricing, style guide, etc).
+const MORE_LINKS = [
+  { href: "/pricing", label: "Pricing", icon: PricingIcon },
+  { href: "/style-guide", label: "Style Guide", icon: CompassIcon },
 ];
 
 // ─── Nav link ────────────────────────────────────────────────────
@@ -195,6 +236,76 @@ function LivingDropdown({ pathname }: { pathname: string }) {
   );
 }
 
+// ─── More dropdown (desktop) ─────────────────────────────────────
+
+function MoreDropdown({ pathname }: { pathname: string }) {
+  const [open, setOpen] = useState(false);
+  const active = MORE_LINKS.some((l) => pathname.startsWith(l.href));
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        onClick={() => setOpen(!open)}
+        className="relative flex items-center gap-1.5 px-2.5 py-1 text-sm font-medium no-underline transition-all duration-200 cursor-pointer"
+        style={{ color: active || open ? "var(--accent)" : "var(--muted)", background: "none", border: "none" }}
+        aria-haspopup="true"
+        aria-expanded={open}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="1" />
+          <circle cx="12" cy="5" r="1" />
+          <circle cx="12" cy="19" r="1" />
+        </svg>
+        <span className="hidden lg:inline">More</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+        {(active || open) && (
+          <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full" style={{ background: "var(--accent)" }} />
+        )}
+      </button>
+
+      {open && (
+        <div
+          className="absolute top-full right-0 mt-1.5 min-w-[14rem] p-1.5 rounded-xl"
+          style={{
+            background: "var(--surface-glass)",
+            backdropFilter: "blur(24px) saturate(1.4)",
+            border: "1px solid var(--glass-border)",
+            boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
+          }}
+        >
+          <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--subtle)" }}>
+            More
+          </div>
+          {MORE_LINKS.map((link) => {
+            const isActive = pathname.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium no-underline rounded-lg transition-colors"
+                style={{
+                  color: isActive ? "var(--accent)" : "var(--ink)",
+                  background: isActive ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",
+                }}
+              >
+                <link.icon size={16} />
+                <span>{link.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Top header ──────────────────────────────────────────────────
 
 function TopHeader({ pathname }: { pathname: string }) {
@@ -225,6 +336,7 @@ function TopHeader({ pathname }: { pathname: string }) {
         ))}
         <div className="w-px h-4 mx-1.5 shrink-0" style={{ background: "var(--glass-border)" }} />
         <LivingDropdown pathname={pathname} />
+        <MoreDropdown pathname={pathname} />
       </nav>
 
       {/* Right: Theme + Avatar */}
@@ -408,6 +520,28 @@ function MobileHeader({ pathname }: { pathname: string }) {
                   Living Encyclopedia
                 </div>
                 {LIVING_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setSidebarOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium rounded-lg no-underline transition-colors hover:bg-accent-bg/15"
+                    style={{
+                      color: pathname.startsWith(link.href) ? "var(--accent)" : "var(--muted)",
+                      background: pathname.startsWith(link.href) ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",
+                    }}
+                  >
+                    <link.icon size={18} />
+                    <span>{link.label}</span>
+                  </Link>
+                ))}
+              </div>
+
+              {/* More group */}
+              <div className="pt-3 mt-3 border-t border-border/30">
+                <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--subtle)" }}>
+                  More
+                </div>
+                {MORE_LINKS.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}

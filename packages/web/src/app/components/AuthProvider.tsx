@@ -1,17 +1,9 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
-import { BASE } from "@/lib/constants";
-import { decodeJwt } from "@/lib/api";
-import type { JwtPayload } from "@/lib/api";
+import { fetchMe, type AuthUser } from "@/lib/api";
 
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  avatar: string;
-  subscriptionTier: string;
-  onboarded: boolean;
+interface User extends AuthUser {
   role: string;
 }
 
@@ -19,7 +11,7 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   token: string | null;
-  tokenPayload: JwtPayload | null;
+  tokenPayload: ReturnType<typeof import("@/lib/api").decodeJwt>;
   login: (email: string) => Promise<{ user: User; token: string } | { error: string }>;
   logout: () => void;
   refresh: () => void;
@@ -84,9 +76,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  const [tokenPayload, setTokenPayload] = useState<JwtPayload | null>(null);
+  const [tokenPayload, setTokenPayload] = useState<ReturnType<typeof import("@/lib/api").decodeJwt>>(null);
   useEffect(() => {
-    setTokenPayload(token ? decodeJwt(token) : null);
+    // Dynamic import avoids a circular dep risk during SSR; the module is tiny.
+    import("@/lib/api").then(({ decodeJwt }) => {
+      setTokenPayload(token ? decodeJwt(token) : null);
+    });
   }, [token]);
 
   const MOCK_USER: User = {
@@ -94,41 +89,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     avatar: "", subscriptionTier: "pro", onboarded: true, role: "admin",
   };
 
-  const fetchMe = useCallback(async (t: string | null): Promise<User | null> => {
+  const fetchMeWithRole = useCallback(async (t: string | null): Promise<User | null> => {
     if (!t) return null;
     if (t === MOCK_KEY) return MOCK_USER;
-    try {
-      const res = await fetch(`${BASE}/auth/me`, {
-        headers: { authorization: `Bearer ${t}` },
-        cache: "no-store",
-      });
-      if (!res.ok) { clearToken(); return null; }
-      const data = await res.json();
-      const u = data.user;
-      // Decode role from JWT payload — the server includes it in the token.
-      const payload = decodeJwt(t);
-      if (u && payload?.role) u.role = payload.role;
-      return u;
-    } catch { return null; }
+    const u = await fetchMe(t);
+    if (!u) { clearToken(); return null; }
+    // Decode role from JWT payload — the server includes it in the token.
+    const { decodeJwt } = await import("@/lib/api");
+    const payload = decodeJwt(t);
+    return { ...u, role: u.role ?? payload?.role ?? "member" };
   }, []);
 
   useEffect(() => {
     setLoading(true);
-    fetchMe(token).then((u) => { setUser(u); setLoading(false); });
-  }, [token, fetchMe]);
+    fetchMeWithRole(token).then((u) => { setUser(u); setLoading(false); });
+  }, [token, fetchMeWithRole]);
 
   const login = async (email: string): Promise<{ user: User; token: string } | { error: string }> => {
     try {
-      const res = await fetch(`${BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      if (!res.ok) return { error: data.error || "Login failed" };
+      const { loginEmail } = await import("@/lib/api");
+      const data = await loginEmail(email);
+      if (data.error || !data.token || !data.user) {
+        return { error: data.error || "Login failed" };
+      }
       storeToken(data.token);
       setToken(data.token);
-      return { user: data.user, token: data.token };
+      return { user: { ...data.user, role: data.user.role ?? "member" }, token: data.token };
     } catch {
       return { error: "Network error" };
     }

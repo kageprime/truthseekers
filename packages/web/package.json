@@ -6,7 +6,8 @@
     "dev": "next dev --port 3001",
     "build": "cd ../.. && npm run build:core && cd packages/web && next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node scripts/check-api-boundary.mjs && tsc --noEmit",
+    "lint": "node scripts/check-api-boundary.mjs",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts"
   },
   "dependencies": {

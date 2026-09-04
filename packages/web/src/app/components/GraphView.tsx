@@ -1,36 +1,17 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useCallback } from "react";
 import { useArticleView } from "../ArticleViewContext";
-import { fetchArticleGraph } from "@/lib/api";
+import { useArticleGraph } from "../hooks";
+import type { GraphNode, GraphLink } from "@/lib/api";
 import ClaimGraph from "./ClaimGraph";
 import ViewSwitcher from "./ViewSwitcher";
-import type { GraphNode, GraphLink } from "@/lib/api";
 
 export default function GraphView() {
   const { article, mode, close } = useArticleView();
-  const [data, setData] = useState<{ nodes: GraphNode[]; links: GraphLink[] } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!article || mode !== "graph") { setData(null); return; }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    // derive slug from title
-    const slug = article.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    fetchArticleGraph(slug).then((res) => {
-      if (cancelled) return;
-      if (res) setData(res);
-      else setError("No graph data available");
-    }).catch((e) => {
-      if (!cancelled) setError(e.message ?? "Failed to load graph");
-    }).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, [article, mode]);
+  // No slug available (e.g. blocks rendered from a chat tool call) — can't
+  // fetch a graph. Avoid synthesizing a wrong slug from the title.
+  const { data, loading, error: queryError } = useArticleGraph(article?.slug ?? undefined);
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -41,6 +22,26 @@ export default function GraphView() {
   }, [article, mode, close]);
 
   if (!article || mode !== "graph") return null;
+  if (!article.slug) {
+    return (
+      <div className="fixed inset-0 flex flex-col bg-surface" style={{ zIndex: "var(--z-explore-press)" }}>
+        <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-rule bg-surface">
+          <button onClick={close} className="inline-flex items-center gap-1.5 text-xs font-medium dateline hover:underline text-gold">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Back to Chat
+          </button>
+          <ViewSwitcher />
+        </div>
+        <div className="flex-1 flex items-center justify-center text-subtle text-xs">
+          Claim graph not available for this content.
+        </div>
+      </div>
+    );
+  }
+
+  const error = !data ? (queryError ?? "No graph data available") : null;
 
   return (
     <div className="fixed inset-0 flex flex-col bg-surface" style={{ zIndex: "var(--z-explore-press)" }}>

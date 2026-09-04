@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BASE } from "@/lib/constants";
+import { useAuth } from "../hooks";
+import { storeToken, clearToken, getStoredToken } from "../components/AuthProvider";
+import { useLoginEmail, useOnboard, useFetchMe } from "../hooks";
 import { IconSend, IconUser } from "../components/Icons";
-import { storeToken, useAuth } from "../hooks/useAuth";
 
 const IS_MOCK = process.env.NEXT_PUBLIC_MOCK === "true";
 
@@ -16,6 +18,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { mutate: loginMutate } = useLoginEmail();
+  const { mutate: fetchMeMutate } = useFetchMe();
 
   useEffect(() => {
     if (!authLoading && user) router.replace("/");
@@ -27,30 +31,21 @@ export default function LoginPage() {
     if (hash.startsWith("#token=")) {
       const token = hash.slice(7);
       storeToken(token);
-      fetch(`${BASE}/auth/me`, { headers: { authorization: `Bearer ${token}` } })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.user?.onboarded) router.replace("/");
-          else router.replace("/onboarding");
-        })
-        .catch(() => router.replace("/"));
+      fetchMeMutate(token).then((u) => {
+        if (u?.onboarded) router.replace("/");
+        else router.replace("/onboarding");
+      }).catch(() => router.replace("/"));
       window.location.hash = "";
     }
-  }, [router]);
+  }, [router, fetchMeMutate]);
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const res = await fetch(`${BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || "Login failed"); setLoading(false); return; }
-
+      const data = (await loginMutate(email)) ?? {};
+      if (data.error) { setError(data.error); setLoading(false); return; }
       if (data.token) {
         storeToken(data.token);
         const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");

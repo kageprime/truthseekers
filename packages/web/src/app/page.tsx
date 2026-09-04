@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AppFooter from "./components/AppFooter";
+import EyebrowTag from "./components/EyebrowTag";
 import { useHealth, useContestedClaims, useAllGaps } from "./hooks";
 
 function useScrollReveal() {
@@ -18,7 +19,7 @@ function useScrollReveal() {
       },
       { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
     );
-    document.querySelectorAll<HTMLElement>(".reveal, .reveal-up, .scrub-text, .stack-card, .scale-fade-img").forEach((el) => observer.observe(el));
+    document.querySelectorAll<HTMLElement>(".reveal, .reveal-up, .reveal-blur, .scrub-text, .stack-card, .scale-fade-img").forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
 }
@@ -109,18 +110,22 @@ function HorizontalAccordion({ panels }: { panels: Array<{ title: string; conten
 function BentoCard({ children, className = "", colSpan = 1, rowSpan = 1 }: { children: React.ReactNode; className?: string; colSpan?: number; rowSpan?: number }) {
   return (
     <div
-      className={"stack-card reveal-up " + className}
+      className={"bezel reveal-blur " + className}
       style={{
         gridColumn: "span " + colSpan,
         gridRow: "span " + rowSpan,
-        border: "1px solid var(--rule)",
-        borderRadius: "var(--radius-sharp)",
-        padding: "clamp(1rem, 2vw, 2rem)",
-        background: "var(--surface-elevated)",
         minHeight: "100%",
       }}
     >
-      {children}
+      <div
+        className="bezel-inner h-full w-full"
+        style={{
+          padding: "clamp(1rem, 2vw, 1.75rem)",
+          background: "var(--surface-elevated)",
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -213,21 +218,36 @@ export default function HomePage() {
       {/* HERO — Cinematic Center */}
       <section className="relative flex items-center justify-center px-6" style={{ paddingTop: "calc(4.5rem + 2rem)", paddingBottom: "clamp(4rem, 10vw, 10rem)", minHeight: "95dvh" }}>
         <div className="max-w-6xl mx-auto text-center">
-          <h1 className="reveal font-display font-bold" style={{ fontSize: "clamp(3rem, 5vw, 5.5rem)", lineHeight: 1.05, letterSpacing: "-0.02em", color: "var(--ink)" }}>
+          <div className="reveal-blur flex justify-center mb-8">
+            <EyebrowTag label="The Living Encyclopedia · 2026" />
+          </div>
+          <h1 className="reveal-blur font-display font-bold" style={{ fontSize: "clamp(3rem, 5vw, 5.5rem)", lineHeight: 1.05, letterSpacing: "-0.02em", color: "var(--ink)" }}>
             An encyclopedia written by
             <InlineImage seed="agent" label="AI agent" /> minds,
             <br className="hidden sm:block" />
             verified by evidence.
           </h1>
-          <p className="reveal scrub-text mt-8 mx-auto max-w-3xl leading-relaxed" style={{ color: "var(--muted)", fontSize: "clamp(1rem, 1.5vw, 1.125rem)" }}>
+          <p className="reveal-blur mt-8 mx-auto max-w-3xl leading-relaxed" style={{ color: "var(--muted)", fontSize: "clamp(1rem, 1.5vw, 1.125rem)" }}>
             Truthseekers generates structured, evidence-grounded articles through a nine-stage epistemic pipeline. Every claim is sourced. Every source is checked.
           </p>
-          <div className="reveal mt-12 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-            <Link href="/chat/new" className="cta-primary inline-flex items-center justify-center gap-1.5 text-sm font-medium transition-all duration-150 w-full sm:w-auto" style={{ padding: "14px 32px", borderRadius: 4 }}>
-              Start researching
+          <div className="reveal-blur mt-12 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+            <Link href="/chat/new" className="cta-bevel group w-full sm:w-auto">
+              <span>Start researching</span>
+              <span className="cta-bevel-icon" aria-hidden>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </span>
             </Link>
-            <Link href="/articles" className="inline-flex items-center justify-center gap-1.5 px-6 py-3.5 sm:py-3 text-sm font-medium transition-all duration-150 w-full sm:w-auto" style={{ borderRadius: 4, border: "1px solid var(--rule)", color: "var(--ink-secondary)", background: "transparent" }}>
-              Browse articles
+            <Link href="/articles" className="cta-bevel cta-bevel-light group w-full sm:w-auto">
+              <span>Browse articles</span>
+              <span className="cta-bevel-icon" style={{ background: "var(--ink)", color: "var(--surface)" }} aria-hidden>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </span>
             </Link>
           </div>
 
@@ -242,47 +262,56 @@ export default function HomePage() {
       </section>
 
       {/* INTEREST — BENTO GRID (gapless, dense) */}
-      <section className="py-16 sm:py-24 md:py-40 px-4 sm:px-6">
+      <section className="section-py px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12 sm:mb-16">
-            <h2 className="reveal-up font-display font-bold" style={{ fontSize: "clamp(1.75rem, 3vw, 2.75rem)", lineHeight: 1.1, color: "var(--ink)" }}>
+          <div className="text-center mb-16 sm:mb-20 md:mb-24">
+            <div className="reveal-blur flex justify-center mb-6">
+              <EyebrowTag label="Process · Nine stages" />
+            </div>
+            <h2 className="reveal-blur font-display font-bold" style={{ fontSize: "clamp(1.85rem, 3vw, 3rem)", lineHeight: 1.08, color: "var(--ink)" }}>
               How it works
             </h2>
-            <p className="reveal-up mt-4 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed" style={{ color: "var(--muted)" }}>
+            <p className="reveal-blur mt-5 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed" style={{ color: "var(--muted)" }}>
               Nine deterministic stages. No hallucination. Complete traceability.
             </p>
           </div>
 
-          <div className="grid grid-cols-5 grid-flow-dense gap-3 sm:gap-4 bento-grid" style={{ background: "var(--rule)", borderRadius: "var(--radius-sharp)", overflow: "hidden" }}>
-            {/* Card 1: Feature image — col-span-3 row-span-2 */}
-            <BentoCard colSpan={3} rowSpan={2} className="!p-0 relative overflow-hidden min-h-0">
+          <div className="bento-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 grid-flow-dense gap-3 sm:gap-4" style={{ gridAutoRows: "minmax(170px, auto)" }}>
+            {/* Card 1: Feature image — col-span-7 row-span-2 (was 3) */}
+            <BentoCard colSpan={7} rowSpan={2} className="!p-0 relative overflow-hidden min-h-0">
               <div className="absolute inset-0 scale-fade-img">
-                <img src="https://picsum.photos/seed/pipeline/1200/900" alt="" className="w-full h-full object-cover" style={{ mixBlendMode: "luminosity", opacity: 0.85 }} />
-                <div className="absolute inset-0" style={{ background: "linear-gradient(to top, var(--surface) 0%, transparent 60%)" }} />
+                <img src="https://picsum.photos/seed/pipeline/1400/1000" alt="" className="w-full h-full object-cover" style={{ mixBlendMode: "luminosity", opacity: 0.85 }} />
+                <div className="absolute inset-0" style={{ background: "linear-gradient(to top, var(--surface) 0%, transparent 65%)" }} />
               </div>
-              <div className="relative p-4 sm:p-8 flex flex-col justify-end h-full">
+              <div className="relative p-5 sm:p-8 md:p-10 flex flex-col justify-end h-full">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: "#E1F3FE", color: "#1F6C9F" }}>Pipeline</span>
+                  <span className="eyebrow !text-[9px]"><span className="eyebrow-dot" />Pipeline</span>
                 </div>
-                <h3 className="font-display font-bold text-lg sm:text-xl mb-2" style={{ color: "var(--ink)" }}>Nine-stage epistemic process</h3>
-                <p className="text-xs sm:text-sm leading-relaxed" style={{ color: "var(--muted)" }}>From retrieval through scrutiny to final resolution. Each stage produces structured output that feeds the next.</p>
+                <h3 className="font-display font-bold text-xl sm:text-2xl mb-2" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>Nine-stage epistemic process</h3>
+                <p className="text-xs sm:text-sm leading-relaxed max-w-md" style={{ color: "var(--muted)" }}>From retrieval through scrutiny to final resolution. Each stage produces structured output that feeds the next.</p>
               </div>
             </BentoCard>
 
-            {/* Card 2: Retrieve — col-span-2 */}
-            <BentoCard colSpan={2}>
-              <h3 className="font-display font-bold text-base sm:text-lg mb-2" style={{ color: "var(--ink)" }}>Retrieve</h3>
+            {/* Card 2: Retrieve — col-span-5 (was 2) */}
+            <BentoCard colSpan={5}>
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <h3 className="font-display font-bold text-base sm:text-lg" style={{ color: "var(--ink)" }}>Retrieve</h3>
+                <span className="eyebrow !text-[9px] !py-1">01</span>
+              </div>
               <p className="text-xs sm:text-sm leading-relaxed" style={{ color: "var(--muted)" }}>Sources are gathered and ranked by relevance and credibility.</p>
             </BentoCard>
 
-            {/* Card 3: Scrutinize — col-span-2 */}
-            <BentoCard colSpan={2}>
-              <h3 className="font-display font-bold text-base sm:text-lg mb-2" style={{ color: "var(--ink)" }}>Scrutinize</h3>
+            {/* Card 3: Scrutinize — col-span-5 (was 2) */}
+            <BentoCard colSpan={5}>
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <h3 className="font-display font-bold text-base sm:text-lg" style={{ color: "var(--ink)" }}>Scrutinize</h3>
+                <span className="eyebrow !text-[9px] !py-1">02</span>
+              </div>
               <p className="text-xs sm:text-sm leading-relaxed" style={{ color: "var(--muted)" }}>Claims are decomposed, verified, and flagged for missing evidence.</p>
             </BentoCard>
 
-            {/* Card 4: Keyboard first — col-span-2 row-span-2 */}
-            <BentoCard colSpan={2} rowSpan={2} className="!bg-[var(--gold-bg)] !border-[var(--gold)]/20">
+            {/* Card 4: Keyboard first — col-span-5 row-span-2 (was 2) */}
+            <BentoCard colSpan={5} rowSpan={2}>
               <div className="flex items-center gap-2 mb-3">
                 <kbd className="px-1.5 py-0.5 rounded border text-xs font-mono" style={{ borderColor: "var(--rule)", background: "var(--surface)" }}>CMD</kbd>
                 <span className="text-xs font-mono" style={{ color: "var(--muted)" }}>+ K</span>
@@ -291,10 +320,13 @@ export default function HomePage() {
               <p className="text-xs sm:text-sm leading-relaxed" style={{ color: "var(--muted)" }}>Every action has a shortcut. Navigate, search, and edit without leaving the keys.</p>
             </BentoCard>
 
-            {/* Card 5: Resolve — col-span-3 row-span-2 */}
-            <BentoCard colSpan={3} rowSpan={2}>
-              <h3 className="font-display font-bold text-base sm:text-lg mb-2" style={{ color: "var(--ink)" }}>Resolve</h3>
-              <p className="text-xs sm:text-sm leading-relaxed" style={{ color: "var(--muted)" }}>The final article is assembled, contradictions flagged, every claim links to its source.</p>
+            {/* Card 5: Resolve — col-span-7 row-span-2 (was 3) */}
+            <BentoCard colSpan={7} rowSpan={2}>
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <h3 className="font-display font-bold text-base sm:text-lg" style={{ color: "var(--ink)" }}>Resolve</h3>
+                <span className="eyebrow !text-[9px] !py-1">03</span>
+              </div>
+              <p className="text-xs sm:text-sm leading-relaxed max-w-lg" style={{ color: "var(--muted)" }}>The final article is assembled, contradictions flagged, every claim links to its source.</p>
             </BentoCard>
           </div>
         </div>
@@ -359,21 +391,25 @@ export default function HomePage() {
       </section>
 
       {/* LIVING ENCYCLOPEDIA — Evidence dashboards */}
-      <section className="py-16 sm:py-24 md:py-32 px-6 border-t" style={{ borderColor: "var(--rule)" }}>
+      <section className="section-py px-6 border-t" style={{ borderColor: "var(--rule)" }}>
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12 sm:mb-16">
-            <div className="reveal-up inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-medium uppercase tracking-[0.12em] border mb-6" style={{ borderColor: "var(--rule)", color: "var(--accent)" }}>
-              <BookGlyph /> The Living Encyclopedia
+          <div className="text-center mb-14 sm:mb-20">
+            <div className="reveal-blur flex justify-center mb-6">
+              <EyebrowTag label="Living Encyclopedia" />
             </div>
-            <h2 className="reveal-up font-display font-bold" style={{ fontSize: "clamp(1.75rem, 3vw, 2.75rem)", lineHeight: 1.1, color: "var(--ink)" }}>
+            <h2
+              className="reveal-blur font-display font-bold"
+              style={{ fontSize: "clamp(1.85rem, 3vw, 3rem)", lineHeight: 1.08, letterSpacing: "-0.02em", color: "var(--ink)" }}
+            >
               Knowledge you can audit, not just read
             </h2>
-            <p className="reveal-up mt-4 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed" style={{ color: "var(--muted)" }}>
+            <p className="reveal-blur mt-5 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed" style={{ color: "var(--muted)" }}>
               Beyond polished articles, Truthseekers exposes the evidence underneath — what&apos;s contested, what&apos;s missing, and what&apos;s going stale.
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <FeatureLink href="/claim-graph" glyph="◈" title="Claim Graph" desc="The global map of every claim, its evidence, and the contradictions between them." />
             <FeatureLink href="/contested" glyph="⚠" title="Contested Claims" desc="The most debated claims across the encyclopedia, ranked by contradiction level." />
             <FeatureLink href="/gaps" glyph="?" title="Open Questions" desc="Claims missing evidence. Upvote gaps and submit sources you&apos;ve found." />
             <FeatureLink href="/stale" glyph="↻" title="Stale Watch" desc="Articles whose evidence is aging. See what needs re-verification first." />
@@ -382,13 +418,19 @@ export default function HomePage() {
       </section>
 
       {/* TESTIMONIALS — Stacked Cards with GSAP */}
-      <section className="py-16 sm:py-24 md:py-40 px-4 sm:px-6" style={{ background: "var(--surface-elevated)" }}>
+      <section className="section-py px-4 sm:px-6" style={{ background: "var(--surface-elevated)" }}>
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12 sm:mb-16">
-            <h2 className="reveal-up font-display font-bold" style={{ fontSize: "clamp(1.75rem, 3vw, 2.75rem)", lineHeight: 1.1, color: "var(--ink)" }}>
+          <div className="text-center mb-14 sm:mb-20">
+            <div className="reveal-blur flex justify-center mb-6">
+              <EyebrowTag label="Researchers · 2026" />
+            </div>
+            <h2
+              className="reveal-blur font-display font-bold"
+              style={{ fontSize: "clamp(1.85rem, 3vw, 3rem)", lineHeight: 1.08, letterSpacing: "-0.02em", color: "var(--ink)" }}
+            >
               What researchers say
             </h2>
-            <p className="reveal-up mt-4 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed" style={{ color: "var(--muted)" }}>
+            <p className="reveal-blur mt-5 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed" style={{ color: "var(--muted)" }}>
               Transparency isn't a feature. It's the foundation.
             </p>
           </div>
@@ -416,20 +458,38 @@ export default function HomePage() {
       </section>
 
       {/* ACTION — CTA */}
-      <section className="py-16 sm:py-32 md:py-48 px-6 text-center border-t" style={{ borderColor: "var(--rule)" }}>
+      <section className="section-py px-6 text-center border-t" style={{ borderColor: "var(--rule)" }}>
         <div className="max-w-2xl mx-auto">
-          <h2 className="reveal-up font-display font-bold" style={{ fontSize: "clamp(1.75rem, 4vw, 3.25rem)", lineHeight: 1.1, color: "var(--ink)" }}>
+          <div className="reveal-blur flex justify-center mb-6">
+            <EyebrowTag label="Begin · No sign-up" />
+          </div>
+          <h2
+            className="reveal-blur font-display font-bold"
+            style={{ fontSize: "clamp(2rem, 1.5rem + 2.5vw, 3.25rem)", lineHeight: 1.06, letterSpacing: "-0.025em", color: "var(--ink)" }}
+          >
             Start building the living encyclopedia
           </h2>
-          <p className="reveal-up mt-6 text-sm sm:text-base leading-relaxed" style={{ color: "var(--muted)" }}>
+          <p className="reveal-blur mt-5 text-sm sm:text-base leading-relaxed" style={{ color: "var(--muted)" }}>
             No sign-up required. Open the chat and start researching any topic.
           </p>
-          <div className="reveal-up mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-            <Link href="/chat/new" className="cta-primary inline-flex items-center justify-center gap-1.5 text-sm font-medium transition-all duration-150 w-full sm:w-auto" style={{ padding: "14px 36px", borderRadius: 4 }}>
-              Start researching
+          <div className="reveal-blur mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+            <Link href="/chat/new" className="cta-bevel group w-full sm:w-auto">
+              <span>Start researching</span>
+              <span className="cta-bevel-icon" aria-hidden>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </span>
             </Link>
-            <Link href="/settings" className="inline-flex items-center justify-center gap-1.5 px-6 py-3.5 sm:py-3 text-sm font-medium transition-all duration-150 w-full sm:w-auto" style={{ borderRadius: 4, border: "1px solid var(--rule)", color: "var(--ink-secondary)", background: "transparent" }}>
-              Settings
+            <Link href="/settings" className="cta-bevel cta-bevel-light group w-full sm:w-auto">
+              <span>View settings</span>
+              <span className="cta-bevel-icon" style={{ background: "var(--ink)", color: "var(--surface)" }} aria-hidden>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </span>
             </Link>
           </div>
         </div>

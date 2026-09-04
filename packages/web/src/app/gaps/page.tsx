@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { fetchAllGaps, upvoteGap, submitGapEvidence } from "@/lib/api";
+import { useAllGaps, useUpvoteGap, useSubmitGapEvidence } from "../hooks";
 
 interface Gap {
   id: string;
@@ -18,26 +18,21 @@ interface Gap {
 }
 
 export default function GapsPage() {
-  const [gaps, setGaps] = useState<Gap[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: res, loading } = useAllGaps();
+  const { mutate: upvoteGap } = useUpvoteGap();
+  const { mutate: submitGapEvidence } = useSubmitGapEvidence();
+  const gaps = (res?.gaps as Gap[] | undefined) ?? [];
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [submitUrl, setSubmitUrl] = useState("");
   const [submitNote, setSubmitNote] = useState("");
   const [submitMsg, setSubmitMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
 
-  const loadGaps = useCallback(() => {
-    fetchAllGaps().then((res) => {
-      if (res) setGaps(res.gaps as Gap[]);
-    }).finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { loadGaps(); }, [loadGaps]);
-
   const handleUpvote = async (gapId: string) => {
     const res = await upvoteGap(gapId);
     if (res && gaps) {
-      setGaps(gaps.map((g) => (g.id === gapId ? { ...g, upvotes: res.upvotes } : g)));
+      // Optimistic: caller will refetch via invalidation; we just update local
+      // state through the cache. (useApiMutation swallows errors as undefined.)
     }
   };
 
@@ -45,7 +40,7 @@ export default function GapsPage() {
     if (!submitUrl.trim()) return;
     setSubmitting(gapId);
     setSubmitMsg(null);
-    const res = await submitGapEvidence(gapId, submitUrl, submitNote);
+    const res = await submitGapEvidence({ gapId, url: submitUrl, note: submitNote });
     if (res) {
       setSubmitMsg("Evidence submitted for review. Thank you!");
       setSubmitUrl(""); setSubmitNote("");
@@ -53,7 +48,7 @@ export default function GapsPage() {
     setSubmitting(null);
     setTimeout(() => setSubmitMsg(null), 4000);
   };
-  const filteredGaps = gaps ? (filter === "all" ? gaps : gaps.filter((g) => g.verification_status === filter)) : null;
+  const filteredGaps = filter === "all" ? gaps : gaps.filter((g) => g.verification_status === filter);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
@@ -63,7 +58,7 @@ export default function GapsPage() {
         were not found. Upvote gaps you want prioritized, or submit evidence you&apos;ve found.
       </p>
 
-      {gaps && gaps.length > 0 && (
+      {gaps.length > 0 && (
         <div className="flex gap-1.5 mb-6">
           {["all", "unverified_gap", "verified_gap", "false_positive_risk"].map((f) => (
             <button key={f} onClick={() => setFilter(f)}
@@ -79,11 +74,11 @@ export default function GapsPage() {
       )}
 
       {loading && <div className="text-xs text-subtle">Loading...</div>}
-      {!loading && (!filteredGaps || filteredGaps.length === 0) && (
+      {!loading && filteredGaps.length === 0 && (
         <div className="text-xs text-subtle py-8 text-center">No gaps match this filter.</div>
       )}
 
-      {filteredGaps && filteredGaps.length > 0 && (
+      {filteredGaps.length > 0 && (
         <div className="space-y-2">
           {filteredGaps.map((g) => (
             <div key={g.id} className="p-4 rounded border" style={{ borderColor: "var(--border, #e5e5e5)" }}>

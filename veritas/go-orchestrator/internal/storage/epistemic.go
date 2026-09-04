@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // ────────────────────────────────────────────────────────────
@@ -583,6 +585,176 @@ func statusRank(s string) int {
 	default:
 		return 2
 	}
+}
+
+// ClaimWithArticle extends Claim with the article slug it's attached to. Used
+// by the global claim graph endpoint so claim nodes can link back to articles.
+type ClaimWithArticle struct {
+	*Claim
+	ArticleSlug string `json:"article_slug"`
+}
+
+// GetMostContestedClaimsWithArticle returns the top N most-contested claims
+// across the whole encyclopedia along with the article slug they're attached
+// to. When a claim spans multiple articles, the first matching slug wins
+// (Ponytail: deterministic enough for a graph; pick the canonical article on
+// save later if it matters).
+func (d *DB) GetMostContestedClaimsWithArticle(limit int, minContradiction float64) ([]*ClaimWithArticle, error) {
+	if d.mockMode {
+		if d.fs == nil {
+			return nil, nil
+		}
+		type ca struct {
+			c    *Claim
+			slug string
+		}
+		all := []ca{}
+		seen := map[string]bool{}
+		for slug, cs := range d.fs.claims {
+			for _, c := range cs {
+				if !seen[c.ID] {
+					seen[c.ID] = true
+					all = append(all, ca{c: c, slug: slug})
+				}
+			}
+		}
+		cl := func(c *Claim) float64 {
+			if v, ok := c.ConfidenceVector["contradiction_level"].(float64); ok {
+				return v
+			}
+			return 0
+		}
+		sort.Slice(all, func(i, j int) bool {
+			si, sj := statusRank(all[i].c.Status), statusRank(all[j].c.Status)
+			if si != sj {
+				return si < sj
+			}
+			return cl(all[i].c) > cl(all[j].c)
+		})
+		out := []*ClaimWithArticle{}
+		for i, c := range all {
+			if i >= limit {
+				break
+			}
+			if cl(c.c) < minContradiction {
+				continue
+			}
+			out = append(out, &ClaimWithArticle{Claim: c.c, ArticleSlug: c.slug})
+		}
+		return out, nil
+	}
+	rows, err := d.db.Query(`
+		SELECT DISTINCT ON (c.id)
+			c.id, c.text, c.signature, c.type, c.status, c.confidence_vector,
+			c.derived_confidence, c.created_at, c.updated_at, a.slug
+		FROM claims c
+		JOIN article_claims ac ON c.id = ac.claim_id
+		JOIN articles a ON ac.article_id = a.id
+		WHERE c.status IN ('disputed','weak')
+		  AND COALESCE((c.confidence_vector->>'contradiction_level')::float, 0) >= $2
+		ORDER BY c.id, (c.confidence_vector->>'contradiction_level')::float DESC NULLS LAST
+		LIMIT $1
+	`, limit, minContradiction)
+	if err != nil {
+		return nil, fmt.Errorf("get most contested claims with article: %w", err)
+	}
+	defer rows.Close()
+	var list []*ClaimWithArticle
+	for rows.Next() {
+		var c Claim
+		var cvJson []byte
+		var slug string
+		if err := rows.Scan(&c.ID, &c.Text, &c.Signature, &c.Type, &c.Status, &cvJson, &c.DerivedConfidence, &c.CreatedAt, &c.UpdatedAt, &slug); err != nil {
+			return nil, err
+		}
+		if len(cvJson) > 0 {
+			json.Unmarshal(cvJson, &c.ConfidenceVector)
+		}
+		list = append(list, &ClaimWithArticle{Claim: &c, ArticleSlug: slug})
+	}
+	return list, nil
+}
+
+// GetEvidenceForClaims returns all evidence linked to any of the given claim
+// IDs in one round-trip. Used by the global claim graph to build the
+// evidence→claim edges without N+1 queries.
+func (d *DB) GetEvidenceForClaims(claimIDs []string) (map[string][]*Evidence, error) {
+	out := map[string][]*Evidence{}
+	if len(claimIDs) == 0 {
+		return out, nil
+	}
+	if d.mockMode {
+		if d.fs == nil {
+			return out, nil
+		}
+		for _, cid := range claimIDs {
+			out[cid] = d.fs.evidence[cid]
+		}
+		return out, nil
+	}
+	rows, err := d.db.Query(`
+		SELECT id, claim_id, type, url, chain_of_custody, acquisition_method,
+			accessibility, supports_claim, source_id, created_at
+		FROM evidence WHERE claim_id = ANY($1)
+	`, pq.Array(claimIDs))
+	if err != nil {
+		return nil, fmt.Errorf("get evidence for claims: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var e Evidence
+		if err := rows.Scan(&e.ID, &e.ClaimID, &e.Type, &e.URL, &e.ChainOfCustody,
+			&e.AcquisitionMethod, &e.Accessibility, &e.SupportsClaim, &e.SourceID, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		out[e.ClaimID] = append(out[e.ClaimID], &e)
+	}
+	return out, nil
+}
+
+// GetClaimRelationshipsForClaims returns all claim→claim relationships where
+// both endpoints are in the given claim set. Used by the global claim graph
+// to surface inter-claim edges.
+func (d *DB) GetClaimRelationshipsForClaims(claimIDs []string) ([]*ClaimRelationship, error) {
+	if len(claimIDs) == 0 {
+		return nil, nil
+	}
+	if d.mockMode {
+		if d.fs == nil {
+			return nil, nil
+		}
+		set := map[string]bool{}
+		for _, id := range claimIDs {
+			set[id] = true
+		}
+		var out []*ClaimRelationship
+		for _, rels := range d.fs.relationships {
+			for _, r := range rels {
+				if set[r.SourceClaimID] && set[r.TargetClaimID] {
+					out = append(out, r)
+				}
+			}
+		}
+		return out, nil
+	}
+	rows, err := d.db.Query(`
+		SELECT source_claim_id, target_claim_id, relationship_type, strength
+		FROM claim_relationships
+		WHERE source_claim_id = ANY($1) AND target_claim_id = ANY($1)
+	`, pq.Array(claimIDs))
+	if err != nil {
+		return nil, fmt.Errorf("get claim relationships for claims: %w", err)
+	}
+	defer rows.Close()
+	var list []*ClaimRelationship
+	for rows.Next() {
+		var r ClaimRelationship
+		if err := rows.Scan(&r.SourceClaimID, &r.TargetClaimID, &r.RelationshipType, &r.Strength); err != nil {
+			return nil, err
+		}
+		list = append(list, &r)
+	}
+	return list, nil
 }
 
 // ListArticleIDsForClaim returns all article IDs linked to a claim.

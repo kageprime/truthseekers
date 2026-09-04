@@ -12,7 +12,7 @@ func TestDefaultCatalog(t *testing.T) {
 	for _, m := range catalog {
 		models[m.Name] = true
 	}
-	for _, name := range []string{"gemma-4-31B-it", "deepseek-4-flash", "llama-4-scout-17b-16e-instruct"} {
+	for _, name := range []string{"gemma-4-31B-it", "deepseek-4-flash", "llama-4-scout-17b-16e-instruct", "muse-spark-1.3-contributor"} {
 		if !models[name] {
 			t.Errorf("expected model %q in catalog", name)
 		}
@@ -45,12 +45,19 @@ func TestEstimateCost(t *testing.T) {
 }
 
 func TestResolveProvider(t *testing.T) {
-	p := ResolveProvider("gemma-4-31B-it", "do-key", "groq-key")
+	p := ResolveProvider("gemma-4-31B-it", "do-key", "groq-key", "meta-key")
 	if p.APIKey != "do-key" {
 		t.Errorf("expected do-key, got %s", p.APIKey)
 	}
-	p = ResolveProvider("llama-4-scout-17b-16e-instruct", "do-key", "groq-key")
+	p = ResolveProvider("llama-4-scout-17b-16e-instruct", "do-key", "groq-key", "meta-key")
 	if p.APIKey != "groq-key" {
 		t.Errorf("expected groq-key, got %s", p.APIKey)
+	}
+	p = ResolveProvider("muse-spark-1.3-contributor", "do-key", "groq-key", "meta-key")
+	if p.APIKey != "meta-key" {
+		t.Errorf("expected meta-key, got %s", p.APIKey)
+	}
+	if p.BaseURL != "https://api.meta.ai/v1" {
+		t.Errorf("expected meta base URL, got %s", p.BaseURL)
 	}
 }

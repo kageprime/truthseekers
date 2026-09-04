@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import type { ClaimStatus } from "@/lib/claim-parser";
-import { BASE } from "@/lib/constants";
+import { useClaimEvidence } from "../hooks";
 import ConfidenceRadar from "./ConfidenceRadar";
 
 const CHIP_COLORS: Record<string, { dot: string; bg: string; border: string }> = {
@@ -14,40 +14,35 @@ const CHIP_COLORS: Record<string, { dot: string; bg: string; border: string }> =
 
 export function ProvenanceChipInline({ claimId, status }: { claimId: string; status?: string }) {
   const [open, setOpen] = useState(false);
-  const [claimData, setClaimData] = useState<ClaimStatus | null>(null);
-  const [freshness, setFreshness] = useState<number | null>(null);
   const ref = useRef<HTMLSpanElement>(null);
 
   const s = status || "unknown";
   const colors = CHIP_COLORS[s] || CHIP_COLORS.unknown;
 
-  useEffect(() => {
-    if (!open || claimData) return;
-    fetch(`${BASE}/claims/${claimId}/evidence`)
-      .then((r) => r.json())
-      .then((data) => {
-        setClaimData({
-          claim_id: claimId,
-          text: "",
-          status: s as ClaimStatus["status"],
-          derived_confidence: 0,
-          confidence_vector: {},
-          ...data.claim,
-        });
-        const evidence = data.evidence || [];
-        if (evidence.length > 0) {
-          const ages = evidence.map((e: any) => {
-            const created = e.created_at ? new Date(e.created_at).getTime() : Date.now();
-            return (Date.now() - created) / (1000 * 86400);
-          });
-          const avgAge = ages.reduce((a: number, b: number) => a + b, 0) / ages.length;
-          setFreshness(1 / (1 + avgAge / 180));
-        } else {
-          setFreshness(0.5);
-        }
-      })
-      .catch(() => setFreshness(0.5));
-  }, [open, claimId, claimData, s]);
+  const { data } = useClaimEvidence(open ? claimId : undefined);
+
+  const { claimData, freshness } = useMemo(() => {
+    if (!data) return { claimData: null, freshness: null as number | null };
+    const claimData: ClaimStatus = {
+      claim_id: claimId,
+      text: "",
+      status: s as ClaimStatus["status"],
+      derived_confidence: 0,
+      confidence_vector: {},
+      ...(data as any).claim,
+    };
+    const evidence = (data as any).evidence || [];
+    let freshness: number | null = 0.5;
+    if (evidence.length > 0) {
+      const ages = evidence.map((e: any) => {
+        const created = e.created_at ? new Date(e.created_at).getTime() : Date.now();
+        return (Date.now() - created) / (1000 * 86400);
+      });
+      const avgAge = ages.reduce((a: number, b: number) => a + b, 0) / ages.length;
+      freshness = 1 / (1 + avgAge / 180);
+    }
+    return { claimData, freshness };
+  }, [data, claimId, s]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {

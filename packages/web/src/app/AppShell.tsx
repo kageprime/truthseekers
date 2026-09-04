@@ -8,6 +8,7 @@ import PressView from "./components/PressView";
 import GraphView from "./components/GraphView";
 import ViewSwitcher from "./components/ViewSwitcher";
 import FloatIslandNav from "./components/FloatIslandNav";
+import LiveNowTicker from "./components/LiveNowTicker";
 import { useFloatingChat } from "./FloatingChatContext";
 import { useArticleView } from "./ArticleViewContext";
 import { useAuth } from "./hooks/useAuth";
@@ -55,6 +56,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="h-dvh overflow-hidden flex flex-col">
       {!isOverlayRoute && !isHidden && <FloatIslandNav />}
+      {!isOverlayRoute && !isHidden && <LiveNowTicker />}
       <div className="flex-1 flex min-h-0 min-w-0 relative overflow-hidden">
         <main
           className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col"

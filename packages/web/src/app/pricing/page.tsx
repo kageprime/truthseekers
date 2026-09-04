@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useAuth } from "../hooks/useAuth";
-import { BASE } from "@/lib/constants";
+import { useAuth, useStripeCheckout } from "../hooks";
 import { IconCheck, IconLightning } from "../components/Icons";
 
 const PLANS = [
@@ -63,18 +62,14 @@ const ROTATIONS = [-1.2, 0.8, -0.5];
 export default function PricingPage() {
   const { user, token } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
+  const { mutate: checkout } = useStripeCheckout();
 
   async function handleUpgrade(priceId: string) {
     if (!token) return;
     setLoading(priceId);
     try {
-      const res = await fetch(`${BASE}/stripe/checkout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify({ priceId, successUrl: `${window.location.origin}/settings`, cancelUrl: `${window.location.origin}/pricing` }),
-      });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
+      const data = await checkout(priceId);
+      if (data?.url) window.location.href = data.url;
     } catch {}
     setLoading(null);
   }

@@ -37,7 +37,7 @@ export default function FloatingChatWidget() {
   const [loading, setLoading] = useState(false);
   const [convId, setConvId] = useState<string | null>(null);
   const [view, setView] = useState<"chat" | "console">("chat");
-  const [model, setModel] = useState("deepseek-4-flash");
+  const [model, setModel] = useState("muse-spark-1.3-contributor");
   const agentEventsRef = useRef<AgentEvent[]>([]);
   const finalizedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);

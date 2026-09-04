@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../components/ThemeProvider";
-import { useQuota, useUpdateProfile } from "../hooks";
+import { useQuota, useUpdateProfile, useStripePortal } from "../hooks";
 import PageLayout from "../components/PageLayout";
-import { BASE } from "@/lib/constants";
 import { IconUser, IconLightning, IconPalette, IconLogout, IconCheck, IconX, IconTrash } from "../components/Icons";
 
 const tierMeta: Record<string, { label: string; bg: string; fg: string }> = {
@@ -29,7 +28,15 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const updateProfile = useUpdateProfile();
+  const { mutate: updateProfile, loading: updating } = useUpdateProfile();
+  const { mutate: portal } = useStripePortal();
+
+  async function handlePortal() {
+    try {
+      const data = await portal();
+      if (data?.url) window.location.href = data.url;
+    } catch {}
+  }
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
@@ -42,7 +49,7 @@ export default function SettingsPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true); setError(""); setSaved(false);
-    const ok = await updateProfile(name, avatar || undefined);
+    const ok = await updateProfile({ name, avatar: avatar || undefined });
     if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2000); }
     else { setError("Failed to save"); }
     setSaving(false);
@@ -131,7 +138,7 @@ export default function SettingsPage() {
             <span className="text-[11px] font-semibold uppercase px-3 py-1 rounded-full" style={{ background: tier.bg, color: tier.fg }}>{tier.label}</span>
             {user.subscriptionTier === "free" && <Link href="/pricing" className="text-xs font-medium underline underline-offset-2" style={{ color: "var(--accent)" }}>Upgrade plan</Link>}
             {user.subscriptionTier === "pro" && (
-              <button onClick={async () => { try { const res = await fetch(`${BASE}/stripe/portal`, { headers: { authorization: `Bearer ${token}` } }); const data = await res.json(); if (data.url) window.location.href = data.url; } catch {} }} className="text-xs font-medium underline underline-offset-2 cursor-pointer" style={{ color: "var(--muted)", background: "none", border: "none" }}>Manage billing</button>
+              <button onClick={() => handlePortal()} className="text-xs font-medium underline underline-offset-2 cursor-pointer" style={{ color: "var(--muted)", background: "none", border: "none" }}>Manage billing</button>
             )}
           </div>
         </div>

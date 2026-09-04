@@ -28,16 +28,23 @@ func BroadcastProgress(slug string, event string, data interface{}) {
 	chans, ok := progressChannels[slug]
 	progressChannelsMu.RUnlock()
 
-	if !ok || len(chans) == 0 {
-		return
-	}
-
 	rawJSON, err := json.Marshal(data)
 	if err != nil {
 		return
 	}
-
 	payload := fmt.Sprintf("event: %s\ndata: %s\n\n", event, string(rawJSON))
+
+	// Live-feed hooks: every progress tick is also live activity. These
+	// are no-ops when nobody is subscribed, so the hot path stays cheap.
+	phase, text := extractLiveSignal(event, data)
+	if phase != "" || text != "" {
+		markActivity(slug, phase, text)
+		pushActivity(slug, event, phase, text)
+	}
+
+	if !ok || len(chans) == 0 {
+		return
+	}
 
 	// Store in ring buffer for late-joining subscribers
 	progressRingMu.Lock()
@@ -56,6 +63,36 @@ func BroadcastProgress(slug string, event string, data interface{}) {
 		default:
 		}
 	}
+}
+
+// extractLiveSignal pulls a human-readable phase + text from a progress event
+// for the live-feed layer. The shape is loose because callers pass arbitrary
+// payloads; we accept anything that *looks* like a phase and ignore the rest.
+func extractLiveSignal(event string, data interface{}) (phase, text string) {
+	m, ok := data.(map[string]interface{})
+	if !ok {
+		if event == "article_complete" {
+			return "complete", "article published"
+		}
+		return "", ""
+	}
+	if p, ok := m["phase"].(string); ok && p != "" {
+		phase = p
+	}
+	if s, ok := m["status"].(string); ok && s != "" && phase == "" {
+		phase = s
+	}
+	if phase == "" && event == "article_complete" {
+		phase = "complete"
+	}
+	if t, ok := m["text"].(string); ok && t != "" {
+		text = t
+	} else if t, ok := m["message"].(string); ok && t != "" {
+		text = t
+	} else if t, ok := m["title"].(string); ok && t != "" {
+		text = t
+	}
+	return phase, text
 }
 
 func registerProgressChannel(slug string, ch chan string) {
@@ -507,6 +544,208 @@ func (s *Server) handleArticleClaimGraph(w http.ResponseWriter, r *http.Request,
 	json.NewEncoder(w).Encode(map[string]interface{}{"nodes": nodes, "edges": edges})
 }
 
+// handleArticleEpistemic returns the full epistemic surface for an article in
+// one round-trip: claims, gaps, freshness (overall + per-claim), refresh-diff,
+// and the claim-level graph. Used by the article page to avoid 4 parallel
+// fetches on every render.
+func (s *Server) handleArticleEpistemic(w http.ResponseWriter, r *http.Request, slug string) {
+	reqLog(r, "article epistemic slug=%s", slug)
+
+	claims, err := s.db.GetClaimsByArticle(slug)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	gaps, err := s.db.GetGapsByArticle(slug)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	type claimFreshness struct {
+		ClaimID        string  `json:"claim_id"`
+		Text           string  `json:"text"`
+		FreshnessScore float64 `json:"freshness_score"`
+		EvidenceCount  int     `json:"evidence_count"`
+	}
+	var claimFresh []claimFreshness
+	var totalScore float64
+	for _, cl := range claims {
+		info, err := s.db.ComputeClaimFreshness(cl.ID)
+		if err != nil || info == nil {
+			continue
+		}
+		claimFresh = append(claimFresh, claimFreshness{
+			ClaimID:        cl.ID,
+			Text:           cl.Text,
+			FreshnessScore: info.FreshnessScore,
+			EvidenceCount:  info.EvidenceCount,
+		})
+		totalScore += info.FreshnessScore
+	}
+	overall := 0.5
+	if len(claims) > 0 {
+		overall = totalScore / float64(len(claims))
+	}
+
+	diff, _ := s.db.GetRefreshDiff(slug)
+	if diff == nil {
+		diff = map[string]interface{}{
+			"slug": slug, "total_claims": 0, "upgraded": 0,
+			"downgraded": 0, "status_changed": 0, "claim_diffs": []interface{}{},
+		}
+	}
+
+	rels, _ := s.db.GetClaimRelationships(slug)
+	var nodes []map[string]interface{}
+	edges := []map[string]interface{}{}
+	seen := map[string]bool{}
+	for _, c := range claims {
+		if !seen["claim|"+c.ID] {
+			nodes = append(nodes, map[string]interface{}{
+				"id": c.ID, "type": "claim", "label": c.Text,
+				"status": c.Status, "confidence": c.DerivedConfidence,
+				"confidence_vector": c.ConfidenceVector, "article_slug": slug,
+			})
+			seen["claim|"+c.ID] = true
+		}
+		evs, _ := s.db.GetEvidenceByClaim(c.ID)
+		for _, e := range evs {
+			if !seen["evidence|"+e.ID] {
+				nodes = append(nodes, map[string]interface{}{
+					"id": e.ID, "type": "evidence", "label": e.URL,
+					"supports": e.SupportsClaim, "chain_of_custody": e.ChainOfCustody,
+					"accessibility": e.Accessibility,
+				})
+				seen["evidence|"+e.ID] = true
+			}
+			rel := "contradicts"
+			if e.SupportsClaim {
+				rel = "supports"
+			}
+			edges = append(edges, map[string]interface{}{
+				"source": e.ID, "target": c.ID,
+				"type": "evidence", "relationship": rel,
+			})
+		}
+	}
+	for _, rel := range rels {
+		edges = append(edges, map[string]interface{}{
+			"source": rel.SourceClaimID, "target": rel.TargetClaimID,
+			"type": "claim", "relationship": rel.RelationshipType, "strength": rel.Strength,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"slug":           slug,
+		"claims":         claims,
+		"gaps":           gaps,
+		"freshness":      map[string]interface{}{"overall_score": overall, "claim_freshness": claimFresh},
+		"refresh_diff":   diff,
+		"claim_graph":    map[string]interface{}{"nodes": nodes, "edges": edges},
+	})
+}
+
+// handleGetGlobalClaimGraph returns a cross-encyclopedia claim graph for the
+// /claim-graph homepage view. Picks the top N most-contested claims (optionally
+// filtered by minimum contradiction level), their evidence, and the
+// claim→claim relationships within the resulting set. Each claim node carries
+// the article_slug so the frontend can link to the originating article.
+func (s *Server) handleGetGlobalClaimGraph(w http.ResponseWriter, r *http.Request) {
+	reqLog(r, "global claim graph")
+	limitStr := r.URL.Query().Get("limit")
+	minStr := r.URL.Query().Get("min_contradiction")
+	limit := 150
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 500 {
+		limit = l
+	}
+	minContradiction := 0.0
+	if v, err := strconv.ParseFloat(minStr, 64); err == nil {
+		minContradiction = v
+	}
+
+	claims, err := s.db.GetMostContestedClaimsWithArticle(limit, minContradiction)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	claimIDs := make([]string, 0, len(claims))
+	for _, c := range claims {
+		claimIDs = append(claimIDs, c.ID)
+	}
+	evidenceByClaim, err := s.db.GetEvidenceForClaims(claimIDs)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	rels, err := s.db.GetClaimRelationshipsForClaims(claimIDs)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	nodes := []map[string]interface{}{}
+	seen := map[string]bool{}
+	for _, c := range claims {
+		nodes = append(nodes, map[string]interface{}{
+			"id": c.ID, "type": "claim", "label": c.Text,
+			"status": c.Status, "confidence": c.DerivedConfidence,
+			"confidence_vector": c.ConfidenceVector, "article_slug": c.ArticleSlug,
+		})
+		seen["claim|"+c.ID] = true
+		for _, e := range evidenceByClaim[c.ID] {
+			if seen["evidence|"+e.ID] {
+				continue
+			}
+			seen["evidence|"+e.ID] = true
+			nodes = append(nodes, map[string]interface{}{
+				"id": e.ID, "type": "evidence", "label": e.URL,
+				"supports": e.SupportsClaim, "chain_of_custody": e.ChainOfCustody,
+				"accessibility": e.Accessibility,
+			})
+		}
+	}
+
+	edges := []map[string]interface{}{}
+	seenEdge := map[string]bool{}
+	addEdge := func(e map[string]interface{}) {
+		key := e["source"].(string) + "|" + e["target"].(string) + "|" + e["relationship"].(string)
+		if seenEdge[key] {
+			return
+		}
+		seenEdge[key] = true
+		edges = append(edges, e)
+	}
+	for _, c := range claims {
+		for _, e := range evidenceByClaim[c.ID] {
+			rel := "contradicts"
+			if e.SupportsClaim {
+				rel = "supports"
+			}
+			addEdge(map[string]interface{}{
+				"source": e.ID, "target": c.ID,
+				"type": "evidence", "relationship": rel,
+			})
+		}
+	}
+	for _, r := range rels {
+		addEdge(map[string]interface{}{
+			"source": r.SourceClaimID, "target": r.TargetClaimID,
+			"type": "claim", "relationship": r.RelationshipType, "strength": r.Strength,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"nodes":             nodes,
+		"edges":             edges,
+		"claim_count":       len(claims),
+		"min_contradiction": minContradiction,
+	})
+}
+
 // handleGetContestedClaims returns the most contested claims across the whole
 // encyclopedia (disputed/weak, ranked by contradiction level) for the
 // /contested dashboard.
@@ -726,7 +965,7 @@ func (s *Server) handleGetArticleProgress(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	ch := make(chan string, 10)
+	ch := make(chan string, 64)
 	registerProgressChannel(slug, ch)
 	defer unregisterProgressChannel(slug, ch)
 

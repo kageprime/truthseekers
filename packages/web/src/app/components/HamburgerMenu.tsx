@@ -17,53 +17,85 @@ export default function HamburgerMenu({ children }: { children: React.ReactNode 
     return () => document.removeEventListener("mousedown", clickOutside);
   }, [open]);
 
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => setOpen(!open)}
         className="btn-icon btn-ghost"
-        aria-label="Open menu"
+        aria-label={open ? "Close menu" : "Open menu"}
+        aria-expanded={open}
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
+        <div className="hamburger-morph" data-open={open}>
+          <span /><span /><span />
+        </div>
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 sm:hidden">
-          <div className="absolute inset-0 bg-black/30" />
+        <div className="fixed inset-0 sm:hidden" style={{ zIndex: "var(--z-modal, 9998)" }}>
+          <div
+            className="absolute inset-0"
+            style={{
+              background: "color-mix(in srgb, var(--ink) 40%, transparent)",
+              backdropFilter: "blur(24px) saturate(1.4)",
+              WebkitBackdropFilter: "blur(24px) saturate(1.4)",
+              animation: "fade-in 300ms cubic-bezier(0.32, 0.72, 0, 1) both",
+            }}
+          />
           <div
             ref={panelRef}
-            className="absolute top-0 right-0 h-full w-[85vw] max-w-[320px] glass-lg flex flex-col"
-            style={{ animation: "slideIn 0.2s ease-out" }}
+            className="absolute top-0 right-0 h-full w-[85vw] max-w-[340px] flex flex-col"
+            style={{
+              background: "var(--glass)",
+              backdropFilter: "blur(40px) saturate(1.5)",
+              WebkitBackdropFilter: "blur(40px) saturate(1.5)",
+              borderLeft: "1px solid var(--glass-border)",
+              boxShadow: "-24px 0 60px -12px rgba(26,22,18,0.25)",
+              animation: "mask-panel-in 600ms cubic-bezier(0.32, 0.72, 0, 1) both",
+            }}
           >
-            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border-light)" }}>
-              <span className="font-semibold text-sm">Menu</span>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border-light)" }}>
+              <span className="font-display font-bold text-sm" style={{ letterSpacing: "-0.01em" }}>Menu</span>
               <button
                 onClick={() => setOpen(false)}
                 className="btn-icon btn-ghost"
                 aria-label="Close menu"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+                <div className="hamburger-morph" data-open={true}>
+                  <span /><span /><span />
+                </div>
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-1" onClick={() => setOpen(false)}>
-              {children}
-            </div>
-            <div className="px-5 py-3 border-t text-xs text-center" style={{ borderColor: "var(--border-light)", color: "var(--subtle)" }}>
-              <img src="/logo-text.png" alt="Truthseekers" style={{ height: 14, width: "auto", objectFit: "contain", opacity: 0.5 }} />
+            <nav className="flex-1 overflow-y-auto p-5 space-y-1" onClick={() => setOpen(false)}>
+              {Array.isArray(children)
+                ? children.map((child, i) => (
+                    <div key={i} className="mask-link-in">{child}</div>
+                  ))
+                : <div className="mask-link-in">{children}</div>}
+            </nav>
+            <div className="px-5 py-4 text-xs text-center" style={{ borderTop: "1px solid var(--border-light)", color: "var(--subtle)" }}>
+              <img src="/logo-text.png" alt="Truthseekers" style={{ height: 14, width: "auto", objectFit: "contain", opacity: 0.5, margin: "0 auto" }} />
             </div>
           </div>
         </div>
       )}
 
       <style>{`
-        @keyframes slideIn {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
+        @keyframes mask-panel-in {
+          from { transform: translateX(20px); opacity: 0; filter: blur(8px); }
+          to   { transform: translateX(0); opacity: 1; filter: blur(0); }
+        }
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
       `}</style>
     </>

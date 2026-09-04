@@ -1,16 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { fetchContestedClaims } from "@/lib/api";
+import { useState } from "react";
+import { useContestedClaims } from "../hooks";
 import ConfidenceRadar from "@/app/components/ConfidenceRadar";
-
-interface ContestedClaim {
-  id: string;
-  text: string;
-  status: string;
-  derived_confidence: number;
-  confidence_vector?: Record<string, number>;
-}
 
 const STATUS_COLOR: Record<string, string> = {
   disputed: "#b33c3c",
@@ -19,22 +11,12 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function ContestedPage() {
-  const [claims, setClaims] = useState<ContestedClaim[] | null>(null);
-  const [loading, setLoading] = useState(true);
   const [limit, setLimit] = useState(50);
-
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    fetchContestedClaims(limit).then((res) => {
-      if (!alive) return;
-      setClaims((res?.claims as ContestedClaim[]) || []);
-      setLoading(false);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [limit]);
+  const { data: res, loading } = useContestedClaims(limit);
+  const claims = (res?.claims as Array<{
+    id: string; text: string; status: string;
+    derived_confidence: number; confidence_vector?: Record<string, number>;
+  }> | undefined) ?? [];
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
@@ -64,11 +46,11 @@ export default function ContestedPage() {
 
       {loading && <div className="text-xs text-subtle">Loading…</div>}
 
-      {!loading && (!claims || claims.length === 0) && (
+      {!loading && claims.length === 0 && (
         <div className="text-xs text-subtle py-16 text-center">No contested claims recorded yet.</div>
       )}
 
-      {claims && claims.length > 0 && (
+      {claims.length > 0 && (
         <div className="space-y-2">
           {claims.map((c, i) => {
             const col = STATUS_COLOR[c.status] || "#8a8a8a";

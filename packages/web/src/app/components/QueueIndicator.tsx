@@ -2,62 +2,13 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { BASE } from "@/lib/constants";
+import { useQueue } from "../hooks";
 import { IconClock, IconLightning, IconPencil, IconSearch, IconPalette, IconDatabase } from "./Icons";
 
-interface QueueJob {
-  slug: string;
-  title?: string;
-  status: string;
-  phase: string;
-  createdAt: string;
-  error?: string;
-}
-
-interface QueueStats {
-  queued: number;
-  active: number;
-  maxConcurrent: number;
-  maxQueue: number;
-}
-
-interface QueueData {
-  jobs: QueueJob[];
-  stats: QueueStats;
-}
-
 export default function QueueIndicator() {
-  const [data, setData] = useState<QueueData | null>(null);
+  const { data, error } = useQueue(5000);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    let backoff = 5000;
-    let timer: ReturnType<typeof setTimeout>;
-
-    async function poll() {
-      if (cancelled) return;
-      try {
-        const res = await fetch(`${BASE}/queue`, { cache: "no-store" });
-        if (res.status === 429) {
-          backoff = Math.min(backoff * 2, 30000);
-        } else {
-          backoff = 5000;
-          if (res.ok && !cancelled) {
-            const json = await res.json();
-            if (!cancelled) setData(json);
-          }
-        }
-      } catch {
-        // server not available
-      }
-      timer = setTimeout(poll, backoff);
-    }
-
-    poll();
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, []);
 
   useEffect(() => {
     function clickOutside(e: MouseEvent) {

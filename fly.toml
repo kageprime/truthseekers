@@ -6,7 +6,7 @@ primary_region = "ams"
 [env]
   PORT = "4097"
   CORS_ORIGIN = "https://www.terranet.tech,https://truthopedia-web.vercel.app"
-  DO_MODEL = "gemma-4-31B-it"
+  DO_MODEL = "muse-spark-1.3-contributor"
 
 [mounts]
   source = "encarta_data"

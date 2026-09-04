@@ -1,10 +1,13 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
 	"time"
 
 	"github.com/kageprime/veritas/go-orchestrator/internal/agent"
@@ -115,6 +118,7 @@ func (s *Server) processArticle(slug string, persona string) {
 				generatedOutput = update.Output
 			}
 			log.Printf("✓ [generate] node %s completed", update.NodeID)
+			s.streamNodeOutputs(slug, update.NodeID, update.Output)
 		}
 	}
 
@@ -148,6 +152,44 @@ func (s *Server) processArticle(slug string, persona string) {
 		"timestamp":          time.Now().Unix(),
 	})
 	log.Printf("✓ [generate] complete slug=%s title=%q in %s", slug, art.Title, time.Since(start).Round(time.Millisecond))
+
+	// Fire-and-forget revalidation so the static article page + dashboards
+	// reflect the fresh content without waiting for the 60s ISR window. The
+	// frontend handles this via POST /api/revalidate with a shared secret.
+	s.notifyFrontendRevalidate(slug)
+}
+
+// notifyFrontendRevalidate POSTs to the Next.js revalidation endpoint in a
+// background goroutine. Failures are logged and ignored — the ISR window is
+// the safety net.
+func (s *Server) notifyFrontendRevalidate(slug string) {
+	apiURL := os.Getenv("NEXT_PUBLIC_API_URL")
+	secret := os.Getenv("REVALIDATE_SECRET")
+	if apiURL == "" || secret == "" {
+		return
+	}
+	go func() {
+		body, _ := json.Marshal(map[string]string{"slug": slug})
+		req, err := http.NewRequest("POST", apiURL+"/api/revalidate", bytes.NewReader(body))
+		if err != nil {
+			log.Printf("[revalidate] build request: %v", err)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Revalidate-Secret", secret)
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("[revalidate] call %s: %v", apiURL, err)
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 300 {
+			log.Printf("[revalidate] non-2xx status=%d slug=%s", resp.StatusCode, slug)
+			return
+		}
+		log.Printf("[revalidate] ok slug=%s", slug)
+	}()
 }
 
 // failArticle marks the job as errored and notifies subscribers.
@@ -161,6 +203,204 @@ func (s *Server) failArticle(slug string, reason string) {
 		"timestamp": time.Now().Unix(),
 	})
 	log.Printf("💥 [generate] failed slug=%s: %s", slug, reason)
+}
+
+// streamNodeOutputs broadcasts per-item events from a node's output to the live
+// SSE channel so the article page can show the claim graph assembling in real
+// time. Runs in a goroutine with a small inter-event delay so the frontend
+// renders events with visible spacing instead of a single burst.
+func (s *Server) streamNodeOutputs(slug string, nodeID string, raw interface{}) {
+	if raw == nil {
+		return
+	}
+	events := extractLiveEvents(nodeID, raw)
+	if len(events) == 0 {
+		return
+	}
+	go func() {
+		for _, ev := range events {
+			BroadcastProgress(slug, "agent_event", ev)
+			time.Sleep(70 * time.Millisecond)
+		}
+	}()
+}
+
+func mkEvent(typ, label string, data map[string]interface{}, ts int64) map[string]interface{} {
+	return map[string]interface{}{
+		"type":      typ,
+		"label":     label,
+		"data":      data,
+		"timestamp": ts,
+	}
+}
+
+// extractLiveEvents turns a node's raw LLM output into a flat list of broadcast
+// events in the AgentEvent shape ({type, label, data, timestamp}). The frontend
+// EpisodeFeed renders each event as a card. ponytail: per-node JSON parsing is
+// cheaper than streaming partial JSON from the LLM, and the visible spacing
+// comes from the server-side delay in streamNodeOutputs.
+func extractLiveEvents(nodeID string, raw interface{}) []map[string]interface{} {
+	now := time.Now().Unix()
+	b, err := json.Marshal(raw)
+	if err != nil {
+		return nil
+	}
+	var out []map[string]interface{}
+
+	switch nodeID {
+	case "retrieve":
+		var r struct {
+			Documents map[string][]struct {
+				ID    string `json:"id"`
+				Title string `json:"title"`
+				URL   string `json:"url"`
+			} `json:"documents"`
+		}
+		if json.Unmarshal(b, &r) == nil {
+			for _, docs := range r.Documents {
+				for _, d := range docs {
+					if d.ID == "" {
+						continue
+					}
+					out = append(out, mkEvent("source_found", "source", map[string]interface{}{
+						"id":    d.ID,
+						"title": d.Title,
+						"url":   d.URL,
+					}, now))
+				}
+			}
+		}
+
+	case "extract_claims":
+		var r struct {
+			Claims []struct {
+				ClaimID string `json:"claim_id"`
+				Text    string `json:"text"`
+			} `json:"claims"`
+		}
+		if json.Unmarshal(b, &r) == nil {
+			for _, c := range r.Claims {
+				if c.ClaimID == "" || c.Text == "" {
+					continue
+				}
+				out = append(out, mkEvent("claim_discovered", "claim", map[string]interface{}{
+					"id":   c.ClaimID,
+					"text": c.Text,
+				}, now))
+			}
+		}
+
+	case "map_evidence":
+		var r struct {
+			Mappings []struct {
+				ClaimID      string   `json:"claim_id"`
+				Supporting   []string `json:"supporting"`
+				Contradicting []string `json:"contradicting"`
+			} `json:"claim_evidence_map"`
+		}
+		if json.Unmarshal(b, &r) == nil {
+			for _, m := range r.Mappings {
+				if m.ClaimID == "" {
+					continue
+				}
+				out = append(out, mkEvent("evidence_mapped", "evidence", map[string]interface{}{
+					"claim_id":     m.ClaimID,
+					"supporting":   len(m.Supporting),
+					"contradicting": len(m.Contradicting),
+				}, now))
+			}
+		}
+
+	case "detect_missing":
+		var r struct {
+			Gaps []struct {
+				EvidenceID       string `json:"evidence_id"`
+				ExpectedArtifact string `json:"expected_artifact"`
+				CauseLabel       string `json:"cause_label"`
+			} `json:"gaps"`
+		}
+		if json.Unmarshal(b, &r) == nil {
+			for _, g := range r.Gaps {
+				if g.EvidenceID == "" {
+					continue
+				}
+				out = append(out, mkEvent("gap_detected", "gap", map[string]interface{}{
+					"id":       g.EvidenceID,
+					"artifact": g.ExpectedArtifact,
+					"cause":    g.CauseLabel,
+				}, now))
+			}
+		}
+
+	case "scrutinize":
+		var r struct {
+			Assessments []struct {
+				ClaimID   string  `json:"claim_id"`
+				RiskScore float64 `json:"risk_score"`
+			} `json:"risk_assessments"`
+		}
+		if json.Unmarshal(b, &r) == nil {
+			for _, a := range r.Assessments {
+				if a.ClaimID == "" {
+					continue
+				}
+				out = append(out, mkEvent("claim_scrutinized", "scrutiny", map[string]interface{}{
+					"claim_id": a.ClaimID,
+					"risk":     a.RiskScore,
+				}, now))
+			}
+		}
+
+	case "resolve":
+		var r struct {
+			ResolvedClaims []struct {
+				ClaimID           string  `json:"claim_id"`
+				Status            string  `json:"status"`
+				DerivedConfidence float64 `json:"derived_confidence"`
+			} `json:"resolved_claims"`
+		}
+		if json.Unmarshal(b, &r) == nil {
+			for _, c := range r.ResolvedClaims {
+				if c.ClaimID == "" {
+					continue
+				}
+				out = append(out, mkEvent("claim_resolved", "resolution", map[string]interface{}{
+					"id":         c.ClaimID,
+					"status":     c.Status,
+					"confidence": c.DerivedConfidence,
+				}, now))
+			}
+		}
+
+	case "generate_article":
+		var r struct {
+			Article struct {
+				Sections []struct {
+					ID      string `json:"id"`
+					Title   string `json:"title"`
+					Content string `json:"content"`
+				} `json:"sections"`
+			} `json:"article"`
+		}
+		if json.Unmarshal(b, &r) == nil {
+			for _, s := range r.Article.Sections {
+				if s.ID == "" {
+					continue
+				}
+				preview := s.Content
+				if len(preview) > 220 {
+					preview = preview[:220] + "…"
+				}
+				out = append(out, mkEvent("article_section", "section", map[string]interface{}{
+					"id":      s.ID,
+					"title":   s.Title,
+					"preview": preview,
+				}, now))
+			}
+		}
+	}
+
+	return out
 }
 
 // articlePayload mirrors the generate_article node output:

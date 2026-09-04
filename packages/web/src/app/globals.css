@@ -1213,12 +1213,270 @@ code[class*="language-"] {
 .token.variable { color: var(--prism-text); }
 .token.bold { font-weight: 700; }
 .token.italic { font-style: italic; }
-
 /* ── Reduce motion ───────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   HIGH-END VISUAL DESIGN PRIMITIVES
+   Awwwards-tier surface treatment: Doppelrand, Button-in-Button,
+   blur-on-reveal scroll interpolation, expanded stagger palette.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Double-Bezel (Doppelrand) — nested architecture ────────────
+   Outer shell sits on the surface like an aluminum tray; inner core
+   carries the actual content. Concentric radii keep the curves
+   mathematically perfect. Use:
+     <div class="bezel">
+       <div class="bezel-inner">…</div>
+     </div>
+   ─────────────────────────────────────────────────────────────── */
+.bezel {
+  position: relative;
+  padding: 1.5px;
+  border-radius: 2rem;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--surface) 60%, transparent) inset,
+    0 18px 48px -16px rgba(26, 22, 18, 0.18),
+    0 4px 12px -4px rgba(26, 22, 18, 0.06);
+  transition:
+    transform 600ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow 600ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.bezel:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--surface) 60%, transparent) inset,
+    0 24px 60px -16px rgba(26, 22, 18, 0.24),
+    0 8px 20px -4px rgba(26, 22, 18, 0.08);
+}
+.bezel-inner {
+  position: relative;
+  border-radius: calc(2rem - 1.5px);
+  background: var(--surface-elevated);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 253, 247, 0.6),
+    inset 0 -1px 0 rgba(166, 124, 47, 0.05);
+  overflow: hidden;
+}
+.dark .bezel-inner {
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+.bezel-elevated { padding: 2px; border-radius: 2.5rem; }
+.bezel-elevated .bezel-inner { border-radius: calc(2.5rem - 2px); }
+
+/* ── Button-in-Button (Trailing icon as nested island) ──────────
+   The arrow never sits naked. It is a fully wrapped circular
+   island inside the button's right padding. Magnetic on hover. */
+.cta-bevel {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.5rem 0.5rem 1.5rem;
+  border-radius: 9999px;
+  background: var(--ink);
+  color: var(--surface);
+  font-family: var(--font-ui);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  border: 1px solid color-mix(in srgb, var(--ink) 80%, transparent);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 400ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    background-color 300ms var(--ease-smooth, cubic-bezier(0.25, 0.1, 0.25, 1)),
+    box-shadow 400ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 6px 18px -6px rgba(26, 22, 18, 0.5);
+}
+.cta-bevel:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--ink) 90%, var(--gold) 10%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 12px 28px -8px rgba(26, 22, 18, 0.6);
+}
+.cta-bevel:active { transform: translateY(0) scale(0.98); }
+.cta-bevel .cta-bevel-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  background: var(--gold);
+  color: var(--ink);
+  transition:
+    transform 400ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    background-color 300ms var(--ease-smooth, cubic-bezier(0.25, 0.1, 0.25, 1));
+}
+.cta-bevel:hover .cta-bevel-icon {
+  transform: translate(2px, -2px) scale(1.05);
+  background: var(--gold-soft);
+}
+.cta-bevel-light {
+  background: var(--surface-elevated);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 4px 12px -4px rgba(26, 22, 18, 0.1);
+}
+.cta-bevel-light:hover {
+  background: var(--surface);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 8px 20px -6px rgba(26, 22, 18, 0.18);
+}
+
+/* ── Eyebrow Tag — microscopic pill that precedes H1/H2 ──────── */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3125rem 0.75rem;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent-dark);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  line-height: 1;
+  transition: all 300ms var(--ease-smooth, cubic-bezier(0.25, 0.1, 0.25, 1));
+}
+.eyebrow:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.eyebrow .eyebrow-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  animation: eyebrow-pulse 2.4s ease-in-out infinite;
+}
+@keyframes eyebrow-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+  50%      { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+
+/* ── Blur-on-scroll reveal — heavier than the existing .reveal ── */
+.reveal-blur {
+  opacity: 0;
+  transform: translateY(28px);
+  filter: blur(10px);
+  transition:
+    opacity 900ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform 900ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    filter 900ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  will-change: opacity, transform, filter;
+}
+.reveal-blur.reveal-visible,
+.reveal-blur.in-view {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+  will-change: auto;
+}
+
+/* Expanded stagger palette for the blur reveal */
+.reveal-blur:nth-child(1)  { transition-delay: 0ms; }
+.reveal-blur:nth-child(2)  { transition-delay: 80ms; }
+.reveal-blur:nth-child(3)  { transition-delay: 160ms; }
+.reveal-blur:nth-child(4)  { transition-delay: 240ms; }
+.reveal-blur:nth-child(5)  { transition-delay: 320ms; }
+.reveal-blur:nth-child(6)  { transition-delay: 400ms; }
+.reveal-blur:nth-child(7)  { transition-delay: 480ms; }
+.reveal-blur:nth-child(8)  { transition-delay: 560ms; }
+.reveal-blur:nth-child(9)  { transition-delay: 640ms; }
+.reveal-blur:nth-child(10) { transition-delay: 720ms; }
+.reveal-blur:nth-child(11) { transition-delay: 800ms; }
+.reveal-blur:nth-child(12) { transition-delay: 880ms; }
+
+/* ── Hamburger Morph — lines → X with rotating middle bar ─────── */
+.hamburger-morph {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.hamburger-morph span {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  height: 1.5px;
+  background: currentColor;
+  border-radius: 9999px;
+  transform-origin: center;
+  transition:
+    transform 500ms var(--ease-premium, cubic-bezier(0.32, 0.72, 0, 1)),
+    opacity 300ms var(--ease-premium, cubic-bezier(0.32, 0.72, 0, 1)),
+    top 500ms var(--ease-premium, cubic-bezier(0.32, 0.72, 0, 1));
+}
+.hamburger-morph span:nth-child(1) { top: 6px; }
+.hamburger-morph span:nth-child(2) { top: 10.25px; }
+.hamburger-morph span:nth-child(3) { top: 14.5px; }
+.hamburger-morph[data-open="true"] span:nth-child(1) {
+  top: 10.25px;
+  transform: rotate(45deg);
+}
+.hamburger-morph[data-open="true"] span:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+.hamburger-morph[data-open="true"] span:nth-child(3) {
+  top: 10.25px;
+  transform: rotate(-45deg);
+}
+
+/* ── Modal mask reveal — staggered nav-link entrance ──────────── */
+@keyframes mask-link-in {
+  from { opacity: 0; transform: translateY(32px) scale(0.96); filter: blur(6px); }
+  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.mask-link-in { animation: mask-link-in 700ms var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both; }
+.mask-link-in:nth-child(1) { animation-delay: 100ms; }
+.mask-link-in:nth-child(2) { animation-delay: 160ms; }
+.mask-link-in:nth-child(3) { animation-delay: 220ms; }
+.mask-link-in:nth-child(4) { animation-delay: 280ms; }
+.mask-link-in:nth-child(5) { animation-delay: 340ms; }
+.mask-link-in:nth-child(6) { animation-delay: 400ms; }
+.mask-link-in:nth-child(7) { animation-delay: 460ms; }
+.mask-link-in:nth-child(8) { animation-delay: 520ms; }
+
+/* ── Macro-Whitespace helpers — sections that breathe ─────────── */
+.section-py { padding-top: clamp(4rem, 8vw, 7rem); padding-bottom: clamp(4rem, 8vw, 7rem); }
+.section-pt { padding-top: clamp(4rem, 8vw, 7rem); }
+.section-pb { padding-bottom: clamp(4rem, 8vw, 7rem); }
+
+/* ── Bezel-inset — for inputs and chips that share the look ───── */
+.bezel-inset {
+  background: var(--surface-elevated);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: 9999px;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 253, 247, 0.6),
+    inset 0 -1px 0 color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.dark .bezel-inset {
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
 }

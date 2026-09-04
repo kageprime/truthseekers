@@ -23,6 +23,7 @@ type Gateway struct {
 	Meter        *Meter
 	DoKey        string
 	GroqKey      string
+	MetaKey      string
 	OpenAIKey    string
 	CredStore    KeyStore
 	mu           sync.RWMutex
@@ -51,6 +52,7 @@ func (g *Gateway) HandleCompletion(w http.ResponseWriter, r *http.Request) {
 	// Resolve key from CredStore first, fall back to direct fields.
 	doKey := g.DoKey
 	groqKey := g.GroqKey
+	metaKey := g.MetaKey
 	if g.CredStore != nil {
 		if k := g.CredStore.Get("do"); k != "" {
 			doKey = k
@@ -58,9 +60,12 @@ func (g *Gateway) HandleCompletion(w http.ResponseWriter, r *http.Request) {
 		if k := g.CredStore.Get("groq"); k != "" {
 			groqKey = k
 		}
+		if k := g.CredStore.Get("meta"); k != "" {
+			metaKey = k
+		}
 	}
 
-	provider := ResolveProvider(req.Model, doKey, groqKey)
+	provider := ResolveProvider(req.Model, doKey, groqKey, metaKey)
 	if provider.APIKey == "" {
 		http.Error(w, `{"error":"no API key for model"}`, http.StatusServiceUnavailable)
 		return
