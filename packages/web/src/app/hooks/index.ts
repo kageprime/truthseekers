@@ -15,7 +15,7 @@ export {
   useUpvoteGap, useSubmitGapEvidence,
   useQueue, useCancelQueueJob, useResolveArticle, useCheckArticleStatus,
   useFetchMe,
-  useHealth, useLoginEmail, useVerifyOTP, useOnboard,
+  useHealth, useLoginEmail, useVerifyOTP, useRegisterPassword, useLoginPassword, useOnboard,
   useStripeCheckout, useStripePortal,
 } from "./useApi";
 export { useArticleProgress } from "./useArticleProgress";

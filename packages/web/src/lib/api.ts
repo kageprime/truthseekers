@@ -225,6 +225,38 @@ export async function verifyOTP(email: string, code: string): Promise<LoginRespo
   }
 }
 
+export async function registerPassword(email: string, code: string, password: string): Promise<LoginResponse> {
+  if (MOCK) return loginEmail(email);
+  try {
+    const res = await fetch(`${BASE}/auth/password/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error || "Registration failed" };
+    return data;
+  } catch {
+    return { error: "Network error" };
+  }
+}
+
+export async function loginPassword(email: string, password: string): Promise<LoginResponse> {
+  if (MOCK) return loginEmail(email);
+  try {
+    const res = await fetch(`${BASE}/auth/password/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error || "Invalid email or password" };
+    return data;
+  } catch {
+    return { error: "Network error" };
+  }
+}
+
 export async function onboard(token: string, name: string): Promise<boolean> {
   if (MOCK) return true;
   try {

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { BASE } from "@/lib/constants";
 import { useAuth } from "../hooks";
 import { storeToken, clearToken, getStoredToken } from "../components/AuthProvider";
-import { useLoginEmail, useVerifyOTP, useOnboard, useFetchMe } from "../hooks";
+import { useLoginEmail, useVerifyOTP, useRegisterPassword, useLoginPassword, useOnboard, useFetchMe } from "../hooks";
 import { IconSend, IconUser } from "../components/Icons";
 
 const IS_MOCK = process.env.NEXT_PUBLIC_MOCK === "true";
@@ -14,6 +14,11 @@ const IS_MOCK = process.env.NEXT_PUBLIC_MOCK === "true";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [regCode, setRegCode] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [mode, setMode] = useState<"code" | "password">("code");
+  const [showSetPw, setShowSetPw] = useState(false);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -21,7 +26,22 @@ export default function LoginPage() {
   const router = useRouter();
   const { mutate: loginMutate } = useLoginEmail();
   const { mutate: verifyMutate } = useVerifyOTP();
+  const { mutate: registerPwMutate } = useRegisterPassword();
+  const { mutate: loginPwMutate } = useLoginPassword();
   const { mutate: fetchMeMutate } = useFetchMe();
+
+  const handleToken = (data: { token?: string; user?: { onboarded?: boolean }; error?: string }) => {
+    if (data.error) { setError(data.error); setLoading(false); return false; }
+    if (data.token) {
+      storeToken(data.token);
+      const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+      const redirectTo = params.get("redirect") || "/";
+      if (data.user?.onboarded) router.push(redirectTo);
+      else router.push("/onboarding");
+      return true;
+    }
+    return false;
+  };
 
   useEffect(() => {
     if (!authLoading && user) router.replace("/");
@@ -69,14 +89,33 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = (await verifyMutate({ email, code })) ?? {};
-      if (data.error) { setError(data.error); setLoading(false); return; }
-      if (data.token) {
-        storeToken(data.token);
-        const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-        const redirectTo = params.get("redirect") || "/";
-        if (data.user?.onboarded) router.push(redirectTo);
-        else router.push("/onboarding");
-      }
+      handleToken(data);
+    } catch {
+      setError("Network error");
+    }
+    setLoading(false);
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const data = (await loginPwMutate({ email, password })) ?? {};
+      handleToken(data);
+    } catch {
+      setError("Network error");
+    }
+    setLoading(false);
+  };
+
+  const handlePasswordRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const data = (await registerPwMutate({ email, code: regCode, password: regPassword })) ?? {};
+      handleToken(data);
     } catch {
       setError("Network error");
     }
@@ -254,7 +293,28 @@ export default function LoginPage() {
                   <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
                 </div>
 
-                {/* Email form */}
+                {/* Code / password toggle */}
+                <div className="flex gap-1 mb-5 p-1" style={{ borderRadius: "9999px", background: "var(--surface)" }}>
+                  {(["code", "password"] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => { setMode(m); setError(""); }}
+                      className="flex-1 py-1.5 text-xs font-medium cursor-pointer"
+                      style={{
+                        borderRadius: "9999px",
+                        background: mode === m ? "var(--surface-elevated)" : "transparent",
+                        color: mode === m ? "var(--ink)" : "var(--subtle)",
+                        border: "none",
+                      }}
+                    >
+                      {m === "code" ? "Login code" : "Password"}
+                    </button>
+                  ))}
+                </div>
+
+                {mode === "code" ? (
+                /* Email form */
                 <form onSubmit={handleEmailSubmit} className="space-y-4">
                   <div>
                     <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] mb-1.5" style={{ color: "var(--muted)" }}>Email</label>
@@ -294,8 +354,8 @@ export default function LoginPage() {
                       border: "none",
                     }}
                   >
-                    <span className="flex items-center justify-center gap-2">
-                      {loading ? "Sending..." : "Send login code"}
+                      <span className="flex items-center justify-center gap-2">
+                        {loading ? "Sending..." : "Send login code"}
                       <span
                         className="w-5 h-5 rounded-full flex items-center justify-center transition-all duration-500 group-hover:translate-x-0.5"
                         style={{ background: "rgba(255,255,255,0.15)", transitionTimingFunction: "cubic-bezier(0.32, 0.72, 0, 1)" }}
@@ -307,6 +367,87 @@ export default function LoginPage() {
                     </span>
                   </button>
                 </form>
+                ) : (
+                /* Password form */
+                <div className="space-y-4">
+                  <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] mb-1.5" style={{ color: "var(--muted)" }}>Email</label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        required
+                        className="w-full px-4 py-3 text-sm outline-none"
+                        style={{ borderRadius: "var(--radius-card-lg)", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--ink)" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] mb-1.5" style={{ color: "var(--muted)" }}>Password</label>
+                      <input
+                        type="password"
+                        autoComplete="current-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        required
+                        className="w-full px-4 py-3 text-sm outline-none"
+                        style={{ borderRadius: "var(--radius-card-lg)", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--ink)" }}
+                      />
+                    </div>
+                    {error && (
+                      <div className="text-xs" style={{ color: "var(--red)" }}>{error}</div>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={!email.includes("@") || !password || loading}
+                      className="w-full py-3 px-5 text-sm font-medium cursor-pointer disabled:opacity-30"
+                      style={{ borderRadius: "9999px", background: "var(--accent)", color: "white", border: "none" }}
+                    >
+                      {loading ? "Signing in..." : "Sign in"}
+                    </button>
+                  </form>
+                  {!showSetPw ? (
+                    <button onClick={() => setShowSetPw(true)} className="w-full text-xs font-medium underline underline-offset-2 cursor-pointer" style={{ color: "var(--accent)", background: "none", border: "none" }}>
+                      Set a password with a login code
+                    </button>
+                  ) : (
+                    <form onSubmit={handlePasswordRegister} className="space-y-3 pt-2">
+                      <p className="text-xs" style={{ color: "var(--muted)" }}>Get a code via the Login code tab, then set your password here.</p>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={regCode}
+                        onChange={(e) => setRegCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        placeholder="6-digit code"
+                        required
+                        className="w-full px-4 py-3 text-sm text-center outline-none"
+                        style={{ borderRadius: "var(--radius-card-lg)", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--ink)", letterSpacing: "0.4em" }}
+                      />
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="New password (8+ characters)"
+                        required
+                        minLength={8}
+                        className="w-full px-4 py-3 text-sm outline-none"
+                        style={{ borderRadius: "var(--radius-card-lg)", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--ink)" }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={regCode.length !== 6 || regPassword.length < 8 || loading}
+                        className="w-full py-3 px-5 text-sm font-medium cursor-pointer disabled:opacity-30"
+                        style={{ borderRadius: "9999px", background: "var(--surface-elevated)", color: "var(--ink)", border: "1px solid var(--border)" }}
+                      >
+                        {loading ? "Saving..." : "Set password"}
+                      </button>
+                    </form>
+                  )}
+                </div>
+                )}
 
                 <p className="text-center text-[10px] mt-6" style={{ color: "var(--subtle)" }}>
                   By continuing, you agree to our Terms of Service

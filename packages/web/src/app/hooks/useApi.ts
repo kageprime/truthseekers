@@ -325,6 +325,18 @@ export function useVerifyOTP() {
   );
 }
 
+export function useRegisterPassword() {
+  return useApiMutation(
+    ({ email, code, password }: { email: string; code: string; password: string }) => api.registerPassword(email, code, password),
+  );
+}
+
+export function useLoginPassword() {
+  return useApiMutation(
+    ({ email, password }: { email: string; password: string }) => api.loginPassword(email, password),
+  );
+}
+
 export function useOnboard() {
   return useApiMutation(
     ({ token, name }: { token: string; name: string }) => api.onboard(token, name),

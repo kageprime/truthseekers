@@ -758,6 +758,8 @@ func (s *Server) setupRoutes() {
 	s.mux.Handle("/auth/login", chain(authLimiter.middleware)(http.HandlerFunc(s.handleAuthLogin)))
 	s.mux.Handle("/auth/otp/request", chain(authLimiter.middleware)(http.HandlerFunc(s.handleOTPRequest)))
 	s.mux.Handle("/auth/otp/verify", chain(authLimiter.middleware)(http.HandlerFunc(s.handleOTPVerify)))
+	s.mux.Handle("/auth/password/register", chain(authLimiter.middleware)(http.HandlerFunc(s.handlePasswordRegister)))
+	s.mux.Handle("/auth/password/login", chain(authLimiter.middleware)(http.HandlerFunc(s.handlePasswordLogin)))
 	s.mux.Handle("/auth/me", chain(authLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleAuthMe)))
 	s.mux.Handle("/auth/onboard", chain(authLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleAuthOnboard)))
 

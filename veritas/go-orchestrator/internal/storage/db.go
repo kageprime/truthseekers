@@ -368,6 +368,7 @@ type User struct {
 	Onboarded        bool      `json:"onboarded"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
+	PasswordHash     string    `json:"-"`
 }
 
 func randID() string {
