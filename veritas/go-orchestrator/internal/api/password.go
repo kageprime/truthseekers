@@ -58,7 +58,8 @@ func (s *Server) handlePasswordRegister(w http.ResponseWriter, r *http.Request) 
 	w.Write([]byte(fmt.Sprintf(`{"token":%q,"user":%s}`, token, string(userData))))
 }
 
-// handlePasswordLogin exchanges email+password for a JWT.
+// handlePasswordLogin exchanges email-or-username + password for a JWT.
+// Inactive (unactivated) accounts get 403 until they activate.
 func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 	reqLog(r, "password login")
 	var body struct {
@@ -69,14 +70,25 @@ func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"Email and password required"}`, http.StatusBadRequest)
 		return
 	}
-	email := normalizeEmail(body.Email)
-	if email == "" || body.Password == "" {
+	identifier := strings.TrimSpace(body.Email)
+	if identifier == "" || body.Password == "" {
 		http.Error(w, `{"error":"Email and password required"}`, http.StatusBadRequest)
 		return
 	}
+	email := identifier
+	if !strings.Contains(identifier, "@") {
+		u, err := s.db.FindUserByUsername(identifier)
+		if err != nil {
+			// ponytail: same message either way — no account-enumeration oracle.
+			http.Error(w, `{"error":"Invalid email or password"}`, http.StatusUnauthorized)
+			return
+		}
+		email = u.Email
+	} else {
+		email = normalizeEmail(identifier)
+	}
 	hash, err := s.db.GetPasswordHash(email)
 	if err == sql.ErrNoRows || hash == "" {
-		// ponytail: same message either way — no account-enumeration oracle.
 		http.Error(w, `{"error":"Invalid email or password"}`, http.StatusUnauthorized)
 		return
 	}
@@ -87,6 +99,10 @@ func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 	user, err := s.db.FindOrCreateUserByEmail(email)
 	if err != nil {
 		http.Error(w, `{"error":"Login failed"}`, http.StatusInternalServerError)
+		return
+	}
+	if !user.Activated {
+		http.Error(w, `{"error":"Account not activated — check your email for the code"}`, http.StatusForbidden)
 		return
 	}
 	token := issueToken(user.ID, user.Role)

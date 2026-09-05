@@ -6,18 +6,19 @@ import Link from "next/link";
 import { BASE } from "@/lib/constants";
 import { useAuth } from "../hooks";
 import { storeToken, clearToken, getStoredToken } from "../components/AuthProvider";
-import { useLoginEmail, useVerifyOTP, useRegisterPassword, useLoginPassword, useOnboard, useFetchMe } from "../hooks";
+import { useLoginEmail, useVerifyOTP, useRegisterPassword, useLoginPassword, useSignup, useActivateSignup, useOnboard, useFetchMe } from "../hooks";
 import { IconSend, IconUser } from "../components/Icons";
 
 const IS_MOCK = process.env.NEXT_PUBLIC_MOCK === "true";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [regCode, setRegCode] = useState("");
   const [regPassword, setRegPassword] = useState("");
-  const [mode, setMode] = useState<"code" | "password">("code");
+  const [mode, setMode] = useState<"code" | "password" | "signup">("code");
   const [showSetPw, setShowSetPw] = useState(false);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
@@ -28,6 +29,8 @@ export default function LoginPage() {
   const { mutate: verifyMutate } = useVerifyOTP();
   const { mutate: registerPwMutate } = useRegisterPassword();
   const { mutate: loginPwMutate } = useLoginPassword();
+  const { mutate: signupMutate } = useSignup();
+  const { mutate: activateMutate } = useActivateSignup();
   const { mutate: fetchMeMutate } = useFetchMe();
 
   const handleToken = (data: { token?: string; user?: { onboarded?: boolean }; error?: string }) => {
@@ -122,6 +125,33 @@ export default function LoginPage() {
     setLoading(false);
   };
 
+  const handleSignupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const data = (await signupMutate({ username, email, password })) ?? {};
+      if (data.error) { setError(data.error); setLoading(false); return; }
+      if (data.sent) setSent(true);
+    } catch {
+      setError("Network error");
+    }
+    setLoading(false);
+  };
+
+  const handleActivateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const data = (await activateMutate({ email, code })) ?? {};
+      handleToken(data);
+    } catch {
+      setError("Network error");
+    }
+    setLoading(false);
+  };
+
   const handleOAuth = (provider: "github" | "google") => {
     window.location.href = `${BASE}/auth/${provider}`;
   };
@@ -195,9 +225,9 @@ export default function LoginPage() {
                 </div>
                 <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--ink)" }}>Check your email</h2>
                 <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>
-                  We sent a 6-digit code to <strong>{email}</strong>
+                  {mode === "signup" ? (<>Enter the code to activate <strong>{email}</strong></>) : (<>We sent a 6-digit code to <strong>{email}</strong></>)}
                 </p>
-                <form onSubmit={handleCodeSubmit} className="space-y-3 mb-4">
+                <form onSubmit={mode === "signup" ? handleActivateSubmit : handleCodeSubmit} className="space-y-3 mb-4">
                   <input
                     type="text"
                     inputMode="numeric"
@@ -224,7 +254,7 @@ export default function LoginPage() {
                     className="w-full py-3 px-5 text-sm font-medium cursor-pointer disabled:opacity-30"
                     style={{ borderRadius: "9999px", background: "var(--accent)", color: "white", border: "none" }}
                   >
-                    {loading ? "Verifying..." : "Verify code"}
+                    {loading ? "Verifying..." : mode === "signup" ? "Activate account" : "Verify code"}
                   </button>
                 </form>
                 <button onClick={() => { setSent(false); setCode(""); }} className="text-xs font-medium underline underline-offset-2 cursor-pointer" style={{ color: "var(--accent)", background: "none", border: "none" }}>
@@ -293,9 +323,9 @@ export default function LoginPage() {
                   <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
                 </div>
 
-                {/* Code / password toggle */}
+                {/* Code / password / signup toggle */}
                 <div className="flex gap-1 mb-5 p-1" style={{ borderRadius: "9999px", background: "var(--surface)" }}>
-                  {(["code", "password"] as const).map((m) => (
+                  {(["code", "password", "signup"] as const).map((m) => (
                     <button
                       key={m}
                       type="button"
@@ -308,7 +338,7 @@ export default function LoginPage() {
                         border: "none",
                       }}
                     >
-                      {m === "code" ? "Login code" : "Password"}
+                      {m === "code" ? "Login code" : m === "password" ? "Password" : "Sign up"}
                     </button>
                   ))}
                 </div>
@@ -367,7 +397,7 @@ export default function LoginPage() {
                     </span>
                   </button>
                 </form>
-                ) : (
+                ) : mode === "password" ? (
                 /* Password form */
                 <div className="space-y-4">
                   <form onSubmit={handlePasswordSubmit} className="space-y-4">
@@ -447,6 +477,61 @@ export default function LoginPage() {
                     </form>
                   )}
                 </div>
+                ) : (
+                /* Signup form */
+                <form onSubmit={handleSignupSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] mb-1.5" style={{ color: "var(--muted)" }}>Username</label>
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="yourname"
+                      required
+                      minLength={3}
+                      maxLength={30}
+                      className="w-full px-4 py-3 text-sm outline-none"
+                      style={{ borderRadius: "var(--radius-card-lg)", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--ink)" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] mb-1.5" style={{ color: "var(--muted)" }}>Email</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      required
+                      className="w-full px-4 py-3 text-sm outline-none"
+                      style={{ borderRadius: "var(--radius-card-lg)", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--ink)" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] mb-1.5" style={{ color: "var(--muted)" }}>Password</label>
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="8+ characters"
+                      required
+                      minLength={8}
+                      className="w-full px-4 py-3 text-sm outline-none"
+                      style={{ borderRadius: "var(--radius-card-lg)", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--ink)" }}
+                    />
+                  </div>
+                  {error && (
+                    <div className="text-xs" style={{ color: "var(--red)" }}>{error}</div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={username.length < 3 || !email.includes("@") || password.length < 8 || loading}
+                    className="w-full py-3 px-5 text-sm font-medium cursor-pointer disabled:opacity-30"
+                    style={{ borderRadius: "9999px", background: "var(--accent)", color: "white", border: "none" }}
+                  >
+                    {loading ? "Creating account..." : "Create account"}
+                  </button>
+                </form>
                 )}
 
                 <p className="text-center text-[10px] mt-6" style={{ color: "var(--subtle)" }}>

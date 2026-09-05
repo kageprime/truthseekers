@@ -337,6 +337,18 @@ export function useLoginPassword() {
   );
 }
 
+export function useSignup() {
+  return useApiMutation(
+    ({ username, email, password }: { username: string; email: string; password: string }) => api.signup(username, email, password),
+  );
+}
+
+export function useActivateSignup() {
+  return useApiMutation(
+    ({ email, code }: { email: string; code: string }) => api.activateSignup(email, code),
+  );
+}
+
 export function useOnboard() {
   return useApiMutation(
     ({ token, name }: { token: string; name: string }) => api.onboard(token, name),

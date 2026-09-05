@@ -369,6 +369,8 @@ type User struct {
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 	PasswordHash     string    `json:"-"`
+	Username         string    `json:"username,omitempty"`
+	Activated        bool      `json:"activated"`
 }
 
 func randID() string {
@@ -401,16 +403,18 @@ func (d *DB) FindOrCreateUserByEmail(email string) (*User, error) {
 			Onboarded:        false,
 			CreatedAt:        now,
 			UpdatedAt:        now,
+			Activated:        true,
 		}
 		d.mockUsers[email] = u
 		return u, nil
 	}
 
 	var u User
-	err := d.db.QueryRow("SELECT id, email, name, avatar, role, subscription_tier, onboarded, created_at, updated_at FROM users WHERE email = $1", email).
-		Scan(&u.ID, &u.Email, &u.Name, &u.Avatar, &u.Role, &u.SubscriptionTier, &u.Onboarded, &u.CreatedAt, &u.UpdatedAt)
+	err := d.db.QueryRow("SELECT id, email, name, avatar, role, subscription_tier, onboarded, created_at, updated_at, COALESCE(username,''), activated FROM users WHERE email = $1", email).
+		Scan(&u.ID, &u.Email, &u.Name, &u.Avatar, &u.Role, &u.SubscriptionTier, &u.Onboarded, &u.CreatedAt, &u.UpdatedAt, &u.Username, &u.Activated)
 
 	if err == sql.ErrNoRows {
+		// Callers proved inbox ownership (OTP verify), so new users are active.
 		u = User{
 			ID:               randID(),
 			Email:            email,
@@ -421,6 +425,7 @@ func (d *DB) FindOrCreateUserByEmail(email string) (*User, error) {
 			Onboarded:        false,
 			CreatedAt:        now,
 			UpdatedAt:        now,
+			Activated:        true,
 		}
 		_, err = d.db.Exec("INSERT INTO users (id, email, name, avatar, role, subscription_tier, onboarded, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
 			u.ID, u.Email, u.Name, u.Avatar, u.Role, u.SubscriptionTier, u.Onboarded, u.CreatedAt, u.UpdatedAt)

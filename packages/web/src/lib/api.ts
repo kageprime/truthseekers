@@ -257,6 +257,38 @@ export async function loginPassword(email: string, password: string): Promise<Lo
   }
 }
 
+export async function signup(username: string, email: string, password: string): Promise<LoginResponse> {
+  if (MOCK) return loginEmail(email);
+  try {
+    const res = await fetch(`${BASE}/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error || "Signup failed" };
+    return data;
+  } catch {
+    return { error: "Network error" };
+  }
+}
+
+export async function activateSignup(email: string, code: string): Promise<LoginResponse> {
+  if (MOCK) return loginEmail(email);
+  try {
+    const res = await fetch(`${BASE}/auth/signup/activate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error || "Invalid or expired code" };
+    return data;
+  } catch {
+    return { error: "Network error" };
+  }
+}
+
 export async function onboard(token: string, name: string): Promise<boolean> {
   if (MOCK) return true;
   try {
