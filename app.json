@@ -25,6 +25,10 @@
       "description": "Must match Next.js REVALIDATE_SECRET on Vercel"
     },
     "RESEND_API_KEY": { "description": "Resend API key for email OTP login", "value": "" },
-    "RESEND_FROM": { "description": "Verified sender, e.g. Truthseekers <login@yourdomain.com>", "value": "" }
+    "RESEND_FROM": { "description": "Verified sender, e.g. Truthseekers <login@yourdomain.com>", "value": "" },
+    "QSTASH_TOKEN": { "description": "Upstash QStash token (future use)", "value": "" },
+    "QSTASH_URL": { "description": "Upstash QStash URL (future use)", "value": "" },
+    "QSTASH_CURRENT_SIGNING_KEY": { "description": "QStash webhook signing key", "value": "" },
+    "QSTASH_NEXT_SIGNING_KEY": { "description": "QStash next signing key (rotation)", "value": "" }
   }
 }
