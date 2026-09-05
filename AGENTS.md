@@ -168,13 +168,14 @@ Both pipelines default to the `epistemic_model` (qwen/qwen3-32b) via `SendPrompt
 
 ## Security
 
-- Bearer-token auth via HS256-signed JWT (`internal/api/jwt.go`) with `role` claim in the payload. Default signing key is `veritas-dev-secret-change-me`; panics if unset in production (`VERITAS_ENV=production`).
+- Bearer-token auth via HS256-signed JWT (`internal/api/jwt.go`) with `role` claim in the payload. No default key: panics on boot without `JWT_SECRET` unless `ALLOW_DEV_AUTH=1` (local dev only).
 - CORS allowing all origins (configurable via `CORS_ORIGIN`).
 - Rate limiting (in-memory token bucket per IP, 3 tiers: auth 10/min, chat 30/min, API 60/min).
 - Graceful shutdown on SIGINT/SIGTERM.
-- The `run_command` tool executes arbitrary shell commands — gated off in production (`VERITAS_ENV=production`); explicit opt-in via `ENABLE_RUN_COMMAND=1`. Sandbox or remove for hostile deployments.
+- Chat conversations are ownership-checked (`conv.UserID == userID`, 403 otherwise).
+- The `run_command` tool was deleted (S4) — no LLM-driven shell exec.
 
-> **Note:** Real JWT signing, rate limiting, and input validation are now implemented. Remaining hardening items: `run_command` sandboxing, `randID` crypto hardening, rate limiter cleanup goroutine.
+> **Note:** Real JWT signing, rate limiting, and input validation are now implemented. Remaining hardening items: `randID` crypto hardening, rate limiter cleanup goroutine.
 
 ## Quick Start (Local)
 
@@ -211,8 +212,8 @@ npm run dev                    # from repo root, runs the Next.js app
 | `FIRECRAWL_API_KEY` / `TAVILY_API_KEY` | Web-search backend for the `web_search` tool |
 | `ENCARTA_IMAGE_DIR` | Output dir for generated images (default `public/images`) |
 | `NEXT_PUBLIC_API_URL` | API URL for the frontend (default `http://localhost:4097`) |
-| `VERITAS_ENV` | `production` panics on missing `JWT_SECRET` and disables `run_command` |
-| `ENABLE_RUN_COMMAND` | `1` re-enables the `run_command` tool (prod opt-in, default off) |
+| `JWT_SECRET` | Required — server panics on boot without it unless `ALLOW_DEV_AUTH=1` |
+| `ALLOW_DEV_AUTH` | `1` permits the dev JWT secret (local dev only, never production) |
 
 ## Streaming Transparency
 

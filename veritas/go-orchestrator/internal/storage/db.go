@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -238,6 +239,15 @@ type DB struct {
 	mockMessages      map[string][]*StoredMessage
 	mockUsers         map[string]*User
 	mockConversations map[string]*Conversation
+	otpMu             sync.Mutex
+	mockOTP           map[string]otpEntry
+}
+
+// otpEntry is the mock-mode OTP record (postgres uses the otp_codes table).
+type otpEntry struct {
+	hash     string
+	expires  time.Time
+	attempts int
 }
 
 // StorageMode reports which backing store is active: "postgres" when a real

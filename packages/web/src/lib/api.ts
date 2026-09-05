@@ -209,6 +209,22 @@ export async function loginEmail(email: string): Promise<LoginResponse> {
   }
 }
 
+export async function verifyOTP(email: string, code: string): Promise<LoginResponse> {
+  if (MOCK) return loginEmail(email);
+  try {
+    const res = await fetch(`${BASE}/auth/otp/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error || "Invalid or expired code" };
+    return data;
+  } catch {
+    return { error: "Network error" };
+  }
+}
+
 export async function onboard(token: string, name: string): Promise<boolean> {
   if (MOCK) return true;
   try {

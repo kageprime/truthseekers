@@ -6,19 +6,21 @@ import Link from "next/link";
 import { BASE } from "@/lib/constants";
 import { useAuth } from "../hooks";
 import { storeToken, clearToken, getStoredToken } from "../components/AuthProvider";
-import { useLoginEmail, useOnboard, useFetchMe } from "../hooks";
+import { useLoginEmail, useVerifyOTP, useOnboard, useFetchMe } from "../hooks";
 import { IconSend, IconUser } from "../components/Icons";
 
 const IS_MOCK = process.env.NEXT_PUBLIC_MOCK === "true";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const { mutate: loginMutate } = useLoginEmail();
+  const { mutate: verifyMutate } = useVerifyOTP();
   const { mutate: fetchMeMutate } = useFetchMe();
 
   useEffect(() => {
@@ -54,6 +56,26 @@ export default function LoginPage() {
         else router.push("/onboarding");
       } else if (data.sent) {
         setSent(true);
+      }
+    } catch {
+      setError("Network error");
+    }
+    setLoading(false);
+  };
+
+  const handleCodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const data = (await verifyMutate({ email, code })) ?? {};
+      if (data.error) { setError(data.error); setLoading(false); return; }
+      if (data.token) {
+        storeToken(data.token);
+        const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+        const redirectTo = params.get("redirect") || "/";
+        if (data.user?.onboarded) router.push(redirectTo);
+        else router.push("/onboarding");
       }
     } catch {
       setError("Network error");
@@ -133,10 +155,40 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--ink)" }}>Check your email</h2>
-                <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
-                  We sent a magic link to <strong>{email}</strong>
+                <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>
+                  We sent a 6-digit code to <strong>{email}</strong>
                 </p>
-                <button onClick={() => setSent(false)} className="text-xs font-medium underline underline-offset-2 cursor-pointer" style={{ color: "var(--accent)", background: "none", border: "none" }}>
+                <form onSubmit={handleCodeSubmit} className="space-y-3 mb-4">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="000000"
+                    required
+                    className="w-full px-4 py-3 text-sm text-center outline-none"
+                    style={{
+                      borderRadius: "var(--radius-card-lg)",
+                      background: "var(--surface)",
+                      border: "1px solid var(--border)",
+                      color: "var(--ink)",
+                      letterSpacing: "0.5em",
+                    }}
+                  />
+                  {error && (
+                    <div className="text-xs" style={{ color: "var(--red)" }}>{error}</div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={code.length !== 6 || loading}
+                    className="w-full py-3 px-5 text-sm font-medium cursor-pointer disabled:opacity-30"
+                    style={{ borderRadius: "9999px", background: "var(--accent)", color: "white", border: "none" }}
+                  >
+                    {loading ? "Verifying..." : "Verify code"}
+                  </button>
+                </form>
+                <button onClick={() => { setSent(false); setCode(""); }} className="text-xs font-medium underline underline-offset-2 cursor-pointer" style={{ color: "var(--accent)", background: "none", border: "none" }}>
                   Use a different email
                 </button>
               </div>
@@ -243,7 +295,7 @@ export default function LoginPage() {
                     }}
                   >
                     <span className="flex items-center justify-center gap-2">
-                      {loading ? "Sending..." : "Send magic link"}
+                      {loading ? "Sending..." : "Send login code"}
                       <span
                         className="w-5 h-5 rounded-full flex items-center justify-center transition-all duration-500 group-hover:translate-x-0.5"
                         style={{ background: "rgba(255,255,255,0.15)", transitionTimingFunction: "cubic-bezier(0.32, 0.72, 0, 1)" }}

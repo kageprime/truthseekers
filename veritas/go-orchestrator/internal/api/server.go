@@ -331,6 +331,8 @@ func NewServer(port string, db *storage.DB) *Server {
 		agents: make(map[string]agentRun),
 	}
 
+	_ = jwtSecret() // fail fast at boot when JWT_SECRET is unset (S2)
+
 	// Executor gateway with server-side credential resolution.
 	s.executorGateway = &executor.Gateway{
 		ConnectorResolver: s.resolveConnectorLocal,
@@ -754,6 +756,8 @@ func (s *Server) setupRoutes() {
 	// Auth endpoints - rate limited
 	s.mux.Handle("/auth", chain(authLimiter.middleware)(http.HandlerFunc(s.handleAuthStub)))
 	s.mux.Handle("/auth/login", chain(authLimiter.middleware)(http.HandlerFunc(s.handleAuthLogin)))
+	s.mux.Handle("/auth/otp/request", chain(authLimiter.middleware)(http.HandlerFunc(s.handleOTPRequest)))
+	s.mux.Handle("/auth/otp/verify", chain(authLimiter.middleware)(http.HandlerFunc(s.handleOTPVerify)))
 	s.mux.Handle("/auth/me", chain(authLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleAuthMe)))
 	s.mux.Handle("/auth/onboard", chain(authLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleAuthOnboard)))
 
@@ -1041,30 +1045,11 @@ func (s *Server) handleAuthStub(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"auth_stub_disabled"}`))
 }
 
+// handleAuthLogin is OTP-only since S1: it emails a login code and returns
+// {"sent":true}. The JWT is issued by /auth/otp/verify, never here.
 func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	reqLog(r, "login")
-	var body struct{ Email string `json:"email"` }
-	json.NewDecoder(r.Body).Decode(&body)
-	if body.Email == "" {
-		reqLog(r, "login missing email")
-		http.Error(w, `{"error":"Email required"}`, http.StatusBadRequest)
-		return
-	}
-	reqLog(r, "login email=%s", body.Email)
-
-	user, err := s.db.FindOrCreateUserByEmail(body.Email)
-	if err != nil {
-		reqLog(r, "login db error: %v", err)
-		http.Error(w, `{"error":"Login failed"}`, http.StatusInternalServerError)
-		return
-	}
-
-	token := issueToken(user.ID, user.Role)
-	userData, _ := json.Marshal(user)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf(`{"token":%q,"user":%s}`, token, string(userData))))
+	s.requestOTPCode(w, r)
 }
 
 func (s *Server) handleAuthMe(w http.ResponseWriter, r *http.Request) {

@@ -23,6 +23,8 @@
     "REVALIDATE_SECRET": {
       "generator": "secret",
       "description": "Must match Next.js REVALIDATE_SECRET on Vercel"
-    }
+    },
+    "RESEND_API_KEY": { "description": "Resend API key for email OTP login", "value": "" },
+    "RESEND_FROM": { "description": "Verified sender, e.g. Truthseekers <login@yourdomain.com>", "value": "" }
   }
 }

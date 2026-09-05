@@ -188,17 +188,24 @@ func (s *Server) handleChatByID(w http.ResponseWriter, r *http.Request) {
 
 	reqLog(r, "chat by id user=%s conv=%s %s", userID, id, r.Method)
 
+	// ponytail: ownership enforced once here so GET and PATCH are both covered.
+	conv, err := s.db.GetConversation(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if conv == nil {
+		http.Error(w, `{"error":"Conversation not found"}`, http.StatusNotFound)
+		return
+	}
+	if conv.UserID != userID {
+		reqLog(r, "chat by id user=%s conv=%s — forbidden", userID, id)
+		http.Error(w, `{"error":"Forbidden"}`, http.StatusForbidden)
+		return
+	}
+
 	switch r.Method {
 	case "GET":
-		conv, err := s.db.GetConversation(id)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if conv == nil {
-			http.Error(w, `{"error":"Conversation not found"}`, http.StatusNotFound)
-			return
-		}
 		msgs, err := s.db.GetMessages(id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -268,6 +275,11 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	if conv == nil {
 		http.Error(w, `{"error":"Conversation not found"}`, http.StatusNotFound)
+		return
+	}
+	if conv.UserID != userID {
+		reqLog(r, "chat messages user=%s conv=%s — forbidden", userID, convID)
+		http.Error(w, `{"error":"Forbidden"}`, http.StatusForbidden)
 		return
 	}
 

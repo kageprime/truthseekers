@@ -319,6 +319,12 @@ export function useLoginEmail() {
   );
 }
 
+export function useVerifyOTP() {
+  return useApiMutation(
+    ({ email, code }: { email: string; code: string }) => api.verifyOTP(email, code),
+  );
+}
+
 export function useOnboard() {
   return useApiMutation(
     ({ token, name }: { token: string; name: string }) => api.onboard(token, name),

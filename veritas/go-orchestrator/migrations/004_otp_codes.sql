@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS otp_codes (
+	email TEXT PRIMARY KEY,
+	code_hash TEXT NOT NULL,
+	expires_at TIMESTAMPTZ NOT NULL,
+	attempts INT NOT NULL DEFAULT 0
+);

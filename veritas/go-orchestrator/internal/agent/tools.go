@@ -2,14 +2,12 @@ package agent
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 	"time"
@@ -41,17 +39,10 @@ type RetrievedDoc struct {
 // the LLM-only mode (no external search keys configured).
 var RealRetrieve func(query string) ([]RetrievedDoc, error)
 
-// runCommandEnabled gates the LLM-driven shell tool: on by default in dev,
-// off in production unless explicitly enabled via ENABLE_RUN_COMMAND=1.
-func runCommandEnabled() bool {
-	if os.Getenv("ENABLE_RUN_COMMAND") == "1" {
-		return true
-	}
-	return os.Getenv("VERITAS_ENV") != "production"
-}
-
+// ponytail: run_command deleted (S4) — arbitrary LLM-driven shell exec is not
+// sandboxable at this scope. If ever needed: admin-only + binary allowlist.
 func ChatToolDefinitions() []ToolDefinition {
-	tools := append(
+	return append(
 		EpistemicToolDefinitions(),
 		[]ToolDefinition{
 			{Type: "function", Function: ToolFunctionDef{Name: "web_search", Description: "Search web sources for information on a topic. Supports general web, Reddit, and Internet Archive. Use 'sources' to narrow: web, reddit, archive, or news. Reddit search returns real Reddit results via their public API. Archive search queries the Internet Archive. Defaults to general web (Tavily/Firecrawl).", Parameters: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search query"},"maxResults":{"type":"number","description":"Max results (default 5)"},"sources":{"type":"array","items":{"type":"string","enum":["web","reddit","archive","news"]},"description":"Source types to search (default: [\"web\"])"}},"required":["query"]}`)}},
@@ -70,10 +61,6 @@ func ChatToolDefinitions() []ToolDefinition {
 			{Type: "function", Function: ToolFunctionDef{Name: "mem_recall", Description: "Retrieve stored information about the user from previous conversations.", Parameters: json.RawMessage(`{"type":"object","properties":{"key":{"type":"string","description":"Memory key to look up"}},"required":["key"]}`)}},
 		}...,
 	)
-	if runCommandEnabled() {
-		tools = append(tools, ToolDefinition{Type: "function", Function: ToolFunctionDef{Name: "run_command", Description: "Execute a shell command and return its output. Use for data processing, file operations, or CLI tools. Timeout after 30s.", Parameters: json.RawMessage(`{"type":"object","properties":{"command":{"type":"string","description":"Command to run"},"args":{"type":"array","items":{"type":"string"},"description":"Command arguments"}},"required":["command"]}`)}})
-	}
-	return tools
 }
 
 type ToolExecutors struct {
@@ -83,7 +70,6 @@ type ToolExecutors struct {
 	VerifyCitation  ToolExecutor
 	GenerateImage   ToolExecutor
 	GenerateVideo   ToolExecutor
-	RunCommand      ToolExecutor
 }
 
 func BuiltinToolExecutors() ToolExecutors {
@@ -94,7 +80,6 @@ func BuiltinToolExecutors() ToolExecutors {
 		VerifyCitation:  verifyCitationExecutor,
 		GenerateImage:   generateImageExecutor,
 		GenerateVideo:   generateVideoExecutor,
-		RunCommand:      runCommandExecutor,
 	}
 }
 
@@ -112,9 +97,6 @@ func MergeExecutorsWithEpistemic(builtins ToolExecutors, server map[string]ToolE
 	m["verify_citation"] = builtins.VerifyCitation
 	m["generate_image"] = builtins.GenerateImage
 	m["generate_video"] = builtins.GenerateVideo
-	if runCommandEnabled() {
-		m["run_command"] = builtins.RunCommand
-	}
 	for k, v := range server {
 		m[k] = v
 	}
@@ -651,33 +633,6 @@ func generateVideoExecutor(args json.RawMessage) (ToolResult, error) {
 	}}, nil
 }
 
-func runCommandExecutor(args json.RawMessage) (ToolResult, error) {
-	var p struct {
-		Command string   `json:"command"`
-		Args    []string `json:"args,omitempty"`
-	}
-	if err := json.Unmarshal(args, &p); err != nil || p.Command == "" {
-		return ToolResult{Result: "command required"}, nil
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, p.Command, p.Args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	out := stdout.String()
-	if err != nil {
-		errStr := stderr.String()
-		if out != "" {
-			return ToolResult{Result: fmt.Sprintf("Output:\n%s\n\nError: %v\nStderr: %s", out, err, errStr)}, nil
-		}
-		return ToolResult{Result: fmt.Sprintf("Error: %v\n%s", err, errStr)}, nil
-	}
-	if len(out) > 50000 {
-		out = out[:50000] + "\n... [truncated at 50KB]"
-	}
-	return ToolResult{Result: out}, nil
-}
+
 
 

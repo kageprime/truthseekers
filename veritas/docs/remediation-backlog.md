@@ -17,18 +17,18 @@ After every backend item: `go build ./...` + `go test ./internal/...` from
 
 ## Phase 1 — Critical: auth + RCE
 
-- [ ] **S1 [C]** Email-only login = account impersonation (`internal/api/server.go:1044-1068`).
+- [x] **S1 [C]** Email-only login = account impersonation (`internal/api/server.go:1044-1068`).
   Fix: magic-link OTP before `issueToken`; stop auto-create-on-login.
   Verify: login with an untrusted email no longer yields a JWT.
-- [ ] **S2 [C]** Default JWT secret (`internal/api/jwt.go:24-38`).
+- [x] **S2 [C]** Default JWT secret (`internal/api/jwt.go:24-38`).
   Fix: fail closed unless `ALLOW_DEV_AUTH=1`; require 32+ bytes.
   Verify: unset `JWT_SECRET` → server refuses to boot (non-dev).
-- [ ] **S3 [C]** Chat IDOR — no conversation ownership check
+- [x] **S3 [C]** Chat IDOR — no conversation ownership check
   (`internal/api/chat.go:171-237,239-272`).
   Fix: after `GetConversation`, `if conv.UserID != userID { 403 }` in
   `handleChatByID`, `handleChatMessages`, `handleChatStop`.
   Verify: user B GET/POST on user A's `convID` → 403.
-- [ ] **S4 [C]** `run_command` RCE via prompt injection (`internal/agent/tools.go:46-51,654-681`).
+- [x] **S4 [C]** `run_command` RCE via prompt injection (`internal/agent/tools.go:46-51,654-681`).
   Fix: delete the tool; if kept: admin-only + binary allowlist + no-env sandbox.
   Verify: `grep -r run_command internal/agent/tools.go` → gone or gated.
 

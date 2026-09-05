@@ -14,9 +14,9 @@ import (
 
 // JWT (HMAC-SHA256, stdlib only).
 //
-// Replaces the unsigned alg:none `mockJWT`. The signing key comes from
-// JWT_SECRET, defaulting to a dev-only value so the server still runs with
-// zero configuration. Tokens carry `sub` (user id), `iat`, and `exp` (7 days).
+// The signing key comes from JWT_SECRET. No default: the server panics on boot
+// without it unless ALLOW_DEV_AUTH=1 (local dev only). Tokens carry `sub`
+// (user id), `iat`, and `exp` (7 days).
 //
 // parseJWTSub verifies the signature and expiry before returning the subject,
 // so any tampered or expired token is rejected.
@@ -30,11 +30,13 @@ func jwtSecret() []byte {
 	if s := os.Getenv("JWT_SECRET"); s != "" {
 		return []byte(s)
 	}
-	if os.Getenv("VERITAS_ENV") == "production" {
-		panic("JWT_SECRET must be set in production")
+	// ponytail: fail closed — the old default-secret fallback made forged
+	// owner tokens trivial. Local dev opts in explicitly via ALLOW_DEV_AUTH=1.
+	if os.Getenv("ALLOW_DEV_AUTH") == "1" {
+		log.Printf("WARNING: Using default JWT secret. Set JWT_SECRET for production.")
+		return []byte(jwtDefaultSecret)
 	}
-	log.Printf("WARNING: Using default JWT secret. Set JWT_SECRET for production.")
-	return []byte(jwtDefaultSecret)
+	panic("JWT_SECRET must be set (or ALLOW_DEV_AUTH=1 for local dev)")
 }
 
 func b64enc(b []byte) string {
