@@ -20,12 +20,26 @@ const HIDDEN_ROUTES = ["/login", "/onboarding"];
 const OVERLAY_ROUTES = ["/maps/"];
 const CHAT_ROUTES = ["/chat/"];
 
+// Client-side gate — replaces edge middleware, which could never see the
+// cross-site session (Heroku-domain cookie) and bounced even logged-in users.
+// The browser sees the real session, so this fires only when truly logged
+// out. Backend APIs remain the actual enforcers.
+const PROTECTED_ROUTES = ["/chat", "/admin", "/settings", "/onboarding", "/article/new", "/queue"];
+
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { isOpen, toggle, close, isExpanded } = useFloatingChat();
-  const { user, logout } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
   const { article, mode } = useArticleView();
+
+  useEffect(() => {
+    if (authLoading) return;
+    const gated = PROTECTED_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+    if (gated && !user) {
+      router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+    }
+  }, [authLoading, user, pathname, router]);
 
   const [isMobile, setIsMobile] = useState(false);
 
