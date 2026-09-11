@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -50,6 +51,28 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 	log.Println("Database migrations applied successfully")
+
+	// 2b. Admin bootstrap: ADMIN_EMAILS (comma-separated) are created if
+	// missing and promoted to admin on every boot. This is the only
+	// role-grant path — no HTTP route can self-grant roles.
+	for _, email := range strings.Split(os.Getenv("ADMIN_EMAILS"), ",") {
+		email = strings.ToLower(strings.TrimSpace(email))
+		if email == "" {
+			continue
+		}
+		u, err := db.FindOrCreateUserByEmail(email)
+		if err != nil {
+			log.Fatalf("Admin bootstrap failed for %s: %v", email, err)
+		}
+		if u.Role != "admin" && u.Role != "owner" {
+			if err := db.SetUserRole(u.ID, "admin"); err != nil {
+				log.Fatalf("Admin bootstrap role failed for %s: %v", email, err)
+			}
+			log.Printf("Admin bootstrap: %s promoted to admin", email)
+		} else {
+			log.Printf("Admin bootstrap: %s already %s", email, u.Role)
+		}
+	}
 
 	// 3. Initialize and Start API Server
 	port := os.Getenv("PORT")

@@ -320,10 +320,22 @@ func NewDB(connStr, dataDir string) (*DB, error) {
 		return newMockDB(dataDir), nil
 	}
 	// S14: bound every query server-side so a slow ILIKE can't hold a worker
-	// forever. lib/pq forwards `options` to the server at connect time, which
-	// applies to all pooled connections (SET would only hit one conn).
+	// forever. Appended as a startup `options` param so it applies to every
+	// pooled connection (a SET would only hit one conn). URL-form strings
+	// need &options= — a space-separated suffix corrupts the dbname (this
+	// exact bug silently forced Heroku into file mode).
 	if !strings.Contains(connStr, "statement_timeout") {
-		if db2, err := sql.Open("postgres", connStr+" options='-c statement_timeout=5s'"); err == nil {
+		withTimeout := connStr
+		if strings.Contains(connStr, "://") {
+			sep := "?"
+			if strings.Contains(connStr, "?") {
+				sep = "&"
+			}
+			withTimeout = connStr + sep + "options=-c%20statement_timeout%3D5s"
+		} else {
+			withTimeout = connStr + " options='-c statement_timeout=5s'"
+		}
+		if db2, err := sql.Open("postgres", withTimeout); err == nil {
 			db.Close()
 			db = db2
 		}
@@ -1055,6 +1067,36 @@ func (d *DB) SaveExecution(connectorSlug, action, userID, sessionID, status, ris
 		"INSERT INTO executor_audit (connector_slug, action, user_id, session_id, status, risk) VALUES ($1, $2, $3, $4, $5, $6)",
 		connectorSlug, action, userID, sessionID, status, risk)
 	return err
+}
+
+// SetUserRole updates a user's account role (owner/admin/member). Used by the
+// ADMIN_EMAILS boot bootstrap; there is deliberately no HTTP route for it so
+// roles can't be self-granted through the API.
+func (d *DB) SetUserRole(userID, role string) error {
+	switch role {
+	case "owner", "admin", "member":
+	default:
+		return fmt.Errorf("unknown role: %s", role)
+	}
+	if d.mockMode {
+		for _, u := range d.mockUsers {
+			if u.ID == userID {
+				u.Role = role
+				u.UpdatedAt = time.Now().UTC()
+				return nil
+			}
+		}
+		return sql.ErrNoRows
+	}
+	res, err := d.db.Exec("UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2", role, userID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 // SetSubscriptionTier updates a user's billing tier (Paystack webhook/verify).
