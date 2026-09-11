@@ -16,7 +16,7 @@ export {
   useQueue, useCancelQueueJob, useResolveArticle, useCheckArticleStatus,
   useFetchMe,
   useHealth, useLoginEmail, useVerifyOTP, useRegisterPassword, useLoginPassword, useSignup, useActivateSignup, useOnboard,
-  useStripeCheckout, useStripePortal,
+  useStripeCheckout, useStripePortal, usePaystackInit, usePaystackVerify,
 } from "./useApi";
 export { useArticleProgress } from "./useArticleProgress";
 export type {

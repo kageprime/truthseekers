@@ -361,7 +361,7 @@ export function useFetchMe() {
   );
 }
 
-// ── Stripe (billing) ──
+// ── Stripe (billing — legacy stubs) ──
 
 export function useStripeCheckout() {
   return useApiMutation(
@@ -372,6 +372,20 @@ export function useStripeCheckout() {
 export function useStripePortal() {
   return useApiMutation(
     () => api.stripePortal(),
+  );
+}
+
+// ── Paystack (billing — F3) ──
+
+export function usePaystackInit() {
+  return useApiMutation(
+    (tier: string) => api.paystackInit(tier),
+  );
+}
+
+export function usePaystackVerify() {
+  return useApiMutation(
+    (reference: string) => api.paystackVerify(reference),
   );
 }
 

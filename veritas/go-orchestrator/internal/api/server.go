@@ -502,6 +502,7 @@ func NewServer(port string, db *storage.DB) *Server {
 		"OPENAI_API_KEY":     "openai",
 		"TAVILY_API_KEY":     "tavily",
 		"FIRECRAWL_API_KEY":  "firecrawl",
+		"PAYSTACK_SECRET_KEY": "paystack",
 	})
 	// ponytail: gateway was built before credStore existed — link it now so PATCH /v1/credentials works for meta.
 	s.llmGateway.CredStore = s.credStore
@@ -935,9 +936,15 @@ func (s *Server) setupRoutes() {
 	// members swap server-side LLM/search keys. Rate limited + body validation.
 	s.mux.Handle("/v1/credentials", chain(apiLimiter.middleware, s.requireRole("admin", "admin", "credentials", "token.*"), validateBody(credentialsReq{}))(http.HandlerFunc(s.handleCredentials)))
 
-	// Stripe - auth required
+	// Stripe - auth required (legacy stubs; billing is Paystack — see F3)
 	s.mux.Handle("/stripe", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleStripeRouter)))
 	s.mux.Handle("/stripe/", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleStripeRouter)))
+
+	// Paystack billing (F3): init + verify are authed member routes, the
+	// webhook is HMAC-verified in-handler (no JWT — Paystack calls it).
+	s.mux.Handle("/paystack/initialize", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handlePaystackInit)))
+	s.mux.Handle("/paystack/verify/", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handlePaystackRouter)))
+	s.mux.Handle("/paystack/webhook", chain(apiLimiter.middleware)(http.HandlerFunc(s.handlePaystackWebhook)))
 
 	// Quota, queue, track - auth required + validation
 	s.mux.Handle("/quota", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleGetQuota)))
@@ -1356,10 +1363,10 @@ func (s *Server) handleStripeStub(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleStripeRouter serves /stripe (stub) plus /stripe/checkout and
-// /stripe/portal. The latter two are called by the frontend's pricing and
-// settings pages (both read `data.url` and silently ignore failures), so we
-// return 501 unavailable with no `url` field — the UI then no-ops gracefully
-// instead of hitting a 404. Real Stripe billing is deferred.
+// /stripe/portal. The latter two are called by legacy frontend code paths
+// (both read `data.url` and silently ignore failures), so we return 501
+// unavailable with no `url` field — the UI then no-ops gracefully instead of
+// hitting a 404. Billing is Paystack (F3); these stubs stay frozen.
 func (s *Server) handleStripeRouter(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/stripe")
 	path = strings.Trim(path, "/")

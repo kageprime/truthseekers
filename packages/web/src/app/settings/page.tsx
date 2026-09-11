@@ -5,10 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../components/ThemeProvider";
-import { useQuota, useUpdateProfile, useStripePortal } from "../hooks";
+import { useQuota, useUpdateProfile } from "../hooks";
 import PageLayout from "../components/PageLayout";
 import { IconUser, IconLightning, IconPalette, IconLogout, IconCheck, IconX, IconTrash } from "../components/Icons";
-import { safeCheckoutUrl } from "@/lib/safe-url";
 
 const tierMeta: Record<string, { label: string; bg: string; fg: string }> = {
   free: { label: "Free", bg: "color-mix(in srgb, var(--subtle) 10%, transparent)", fg: "var(--subtle)" },
@@ -30,15 +29,6 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const { mutate: updateProfile, loading: updating } = useUpdateProfile();
-  const { mutate: portal } = useStripePortal();
-
-  async function handlePortal() {
-    try {
-      const data = await portal();
-      const url = safeCheckoutUrl(data?.url);
-      if (url) window.location.href = url;
-    } catch {}
-  }
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
@@ -139,8 +129,8 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3">
             <span className="text-[11px] font-semibold uppercase px-3 py-1 rounded-full" style={{ background: tier.bg, color: tier.fg }}>{tier.label}</span>
             {user.subscriptionTier === "free" && <Link href="/pricing" className="text-xs font-medium underline underline-offset-2" style={{ color: "var(--accent)" }}>Upgrade plan</Link>}
-            {user.subscriptionTier === "pro" && (
-              <button onClick={() => handlePortal()} className="text-xs font-medium underline underline-offset-2 cursor-pointer" style={{ color: "var(--muted)", background: "none", border: "none" }}>Manage billing</button>
+            {user.subscriptionTier !== "free" && (
+              <Link href="/pricing" className="text-xs font-medium underline underline-offset-2" style={{ color: "var(--muted)" }}>Change plan</Link>
             )}
           </div>
         </div>

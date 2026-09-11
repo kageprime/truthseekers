@@ -678,7 +678,7 @@ export async function fetchHealth(): Promise<{ article_count?: number } | null> 
   }
 }
 
-// ── Stripe (billing) ──────────────────────────────────────────
+// ── Stripe (legacy 501 stubs — billing is Paystack, do not use) ─────
 
 export async function stripeCheckout(priceId: string): Promise<{ url?: string } | null> {
   if (MOCK) return null;
@@ -703,6 +703,38 @@ export async function stripePortal(): Promise<{ url?: string } | null> {
     return res.json();
   } catch {
     return null;
+  }
+}
+
+// ── Paystack (billing — F3) ────────────────────────────────────
+
+export async function paystackInit(tier: string): Promise<{ authorization_url?: string; reference?: string; error?: string } | null> {
+  if (MOCK) return { authorization_url: "/", reference: "mock-ref" };
+  try {
+    const res = await fetch(`${BASE}/paystack/initialize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
+      body: JSON.stringify({ tier }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { error: data.error || "Billing unavailable" };
+    return data;
+  } catch {
+    return { error: "Network error" };
+  }
+}
+
+export async function paystackVerify(reference: string): Promise<{ status?: string; tier?: string; error?: string } | null> {
+  if (MOCK) return { status: "success", tier: "pro" };
+  try {
+    const res = await fetch(`${BASE}/paystack/verify/${encodeURIComponent(reference)}`, {
+      headers: { ...authHeaders() }, credentials: "include",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { error: data.error || "Payment not confirmed" };
+    return data;
+  } catch {
+    return { error: "Network error" };
   }
 }
 

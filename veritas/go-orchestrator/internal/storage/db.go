@@ -1057,6 +1057,84 @@ func (d *DB) SaveExecution(connectorSlug, action, userID, sessionID, status, ris
 	return err
 }
 
+// SetSubscriptionTier updates a user's billing tier (Paystack webhook/verify).
+func (d *DB) SetSubscriptionTier(userID, tier string) error {
+	if d.mockMode {
+		for _, u := range d.mockUsers {
+			if u.ID == userID {
+				u.SubscriptionTier = tier
+				u.UpdatedAt = time.Now().UTC()
+				return nil
+			}
+		}
+		return sql.ErrNoRows
+	}
+	res, err := d.db.Exec("UPDATE users SET subscription_tier = $1, updated_at = NOW() WHERE id = $2", tier, userID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// PaystackPayment is one row of the payment intent ledger.
+type PaystackPayment struct {
+	Reference string
+	UserID    string
+	Email     string
+	Tier      string
+	Amount    int
+	Currency  string
+	Status    string
+}
+
+// CreatePayment records a pending intent. Reference conflicts (re-init for the
+// same Paystack reference can't happen — references are Paystack-generated)
+// surface as errors.
+func (d *DB) CreatePayment(p PaystackPayment) error {
+	if d.mockMode {
+		return nil
+	}
+	_, err := d.db.Exec(
+		"INSERT INTO paystack_payments (reference, user_id, email, tier, amount, currency, status) VALUES ($1, $2, $3, $4, $5, $6, 'pending')",
+		p.Reference, p.UserID, p.Email, p.Tier, p.Amount, p.Currency)
+	return err
+}
+
+// GetPaymentByReference fetches an intent for idempotent webhook handling.
+func (d *DB) GetPaymentByReference(reference string) (*PaystackPayment, error) {
+	if d.mockMode {
+		return nil, sql.ErrNoRows
+	}
+	var p PaystackPayment
+	err := d.db.QueryRow(
+		"SELECT reference, user_id, email, tier, amount, currency, status FROM paystack_payments WHERE reference = $1",
+		reference).Scan(&p.Reference, &p.UserID, &p.Email, &p.Tier, &p.Amount, &p.Currency, &p.Status)
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+// MarkPaymentPaid flips an intent to paid exactly once (idempotent — the
+// WHERE status guard makes double webhooks/verifies no-ops).
+func (d *DB) MarkPaymentPaid(reference string) (bool, error) {
+	if d.mockMode {
+		return true, nil
+	}
+	res, err := d.db.Exec(
+		"UPDATE paystack_payments SET status = 'paid', paid_at = NOW() WHERE reference = $1 AND status <> 'paid'",
+		reference)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
 func (d *DB) GetArticleViewCount(slug string) (int, error) {
 	if d.mockMode {
 		if d.fs != nil {

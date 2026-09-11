@@ -148,7 +148,11 @@ After every backend item: `go build ./...` + `go test ./internal/...` from
   (`code-review`, `tdd` already in `.agents/skills/`).
 - [ ] **F2** Re-run this backlog's Verify steps after the Muse Spark switch settles;
   confirm `/v1/llm/*` auth (S5) covers the new `MODEL_API_KEY` path.
-- [ ] **F3** Payments = **Paystack, not Stripe** (decision logged 2026-09-11).
-  The `/stripe/*` routes are stubs returning 501 by design — do not build on
-  them. Full Paystack integration (init/verify webhook, tier entitlements)
-  lands after this security backlog closes.
+- [x] **F3** Payments = **Paystack, not Stripe** (decision logged 2026-09-11).
+  Landed: `POST /paystack/initialize`, `GET /paystack/verify/:ref`,
+  `POST /paystack/webhook` (HMAC-SHA512, re-verified fulfill, idempotent
+  ledger `009`), tier entitlements, tier-aware quota, `/pricing` +
+  `/billing/callback` + settings wired. `/stripe/*` stays frozen 501.
+  To go live set: `PAYSTACK_SECRET_KEY`, `PAYSTACK_PLAN_PRO`,
+  `PAYSTACK_PLAN_ENTERPRISE` (or `PAYSTACK_AMOUNT_*` kobo fallbacks),
+  `PAYSTACK_CURRENCY`, `PAYSTACK_CALLBACK_URL`.

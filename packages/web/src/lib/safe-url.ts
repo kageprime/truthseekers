@@ -22,9 +22,9 @@ export function safeSrc(u?: string | null): string | undefined {
   return undefined;
 }
 
-// safeCheckoutUrl validates a payment redirect URL (S26 — Stripe today,
-// Paystack next). Only https: passes; the backend currently 501s billing,
-// but a compromised/proxied response must never become an open redirect.
+// safeCheckoutUrl validates a payment redirect URL (Paystack — F3).
+// Only https: passes; a compromised/proxied response must never become
+// an open redirect.
 export function safeCheckoutUrl(u?: string | null): string | null {
   if (!u) return null;
   const t = u.trim();

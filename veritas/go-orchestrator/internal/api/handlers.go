@@ -815,14 +815,28 @@ func (s *Server) handleGetContestedClaims(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleGetQuota(w http.ResponseWriter, r *http.Request) {
 	reqLog(r, "quota")
-	// Mock quota handler returning default high-limit. The frontend's QuotaInfo
-	// requires `remaining`, so compute it as limit-used.
-	const (
+	// Tier-aware limits matching the pricing page. Usage counting stays a
+	// stub (used=2) until generation metering lands — the limit side is real.
+	limit := 10
+	tier := "free"
+	if uid := userIDFromContext(r.Context()); uid != "" {
+		if u, err := s.db.GetUser(uid); err == nil && u != nil && u.SubscriptionTier != "" {
+			tier = u.SubscriptionTier
+		}
+	}
+	switch tier {
+	case "pro":
 		limit = 100
-		used  = 2
-	)
+	case "enterprise":
+		limit = 999999
+	}
+	const used = 2
+	remaining := limit - used
+	if remaining < 0 {
+		remaining = 0
+	}
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"allowed":true,"limit":%d,"used":%d,"remaining":%d,"tier":"pro"}`, limit, used, limit-used)
+	fmt.Fprintf(w, `{"allowed":%t,"limit":%d,"used":%d,"remaining":%d,"tier":%q}`, remaining > 0, limit, used, remaining, tier)
 }
 
 func (s *Server) handleGetQueue(w http.ResponseWriter, r *http.Request) {

@@ -68,6 +68,10 @@ Routes are registered in `internal/api/server.go` (`setupRoutes`) and dispatched
 | `/v1/llm/completions` | POST | Unified LLM completion proxy with usage metering |
 | `/v1/llm/usage` | GET | Usage stats per user |
 | `/v1/credentials` | PATCH | Hot-swap an API token: `{"service":"groq","token":"new-key"}` |
+| `/paystack/initialize` | POST | Authed: start a tier transaction → `{authorization_url, reference}` (server-priced) |
+| `/paystack/verify/:reference` | GET | Authed: confirm payment, upgrade tier (caller-bound) |
+| `/paystack/webhook` | POST | Paystack HMAC-SHA512 webhook: `charge.success` fulfills, `subscription.disable` downgrades |
+| `/stripe`, `/stripe/*` | GET/POST | Legacy 501 stubs — billing is Paystack (F3), do not build on these |
 | `/webhook/{slug}` | POST | Webhook-triggered article generation with optional HMAC verification |
 
 ### Frontend ↔ Backend Integration
@@ -86,6 +90,7 @@ Routes are registered in `internal/api/server.go` (`setupRoutes`) and dispatched
 | Maps, Quota, Queue, Tracking | WIRED — existing integrations |
 | Webhook (`/webhook/{slug}`) | NOT WIRED — no frontend UI (backend-only, for external callers) |
 | Executor call (`/v1/executor/call`) | NOT WIRED — gateway is for agent internal routing, not frontend |
+| Paystack billing (`/paystack/*` + `/pricing` + `/billing/callback`) | WIRED — init/verify/webhook, tier entitlements, quota limits per tier |
 
 > **Known gaps vs. the frontend:** `/maps`, `/admin/settings`, and `/stripe/*` sub-routes are now implemented in Go. The internal epistemic pipeline fully persists claims, evidence, gaps, language flags, and scrutiny assessments.
 
@@ -214,6 +219,11 @@ npm run dev                    # from repo root, runs the Next.js app
 | `NEXT_PUBLIC_API_URL` | API URL for the frontend (default `http://localhost:4097`) |
 | `JWT_SECRET` | Required — server panics on boot without it unless `ALLOW_DEV_AUTH=1` |
 | `ALLOW_DEV_AUTH` | `1` permits the dev JWT secret (local dev only, never production) |
+| `PAYSTACK_SECRET_KEY` | Paystack secret key (or hot-swap via `PATCH /v1/credentials` service `paystack`) |
+| `PAYSTACK_PLAN_PRO` / `PAYSTACK_PLAN_ENTERPRISE` | Paystack plan codes for subscriptions (unset → one-time amounts) |
+| `PAYSTACK_AMOUNT_PRO` / `PAYSTACK_AMOUNT_ENTERPRISE` | One-time fallback amounts in kobo |
+| `PAYSTACK_CURRENCY` | Currency code (default `NGN`) |
+| `PAYSTACK_CALLBACK_URL` | Post-payment redirect (default frontend `/billing/callback`) |
 
 ## Streaming Transparency
 

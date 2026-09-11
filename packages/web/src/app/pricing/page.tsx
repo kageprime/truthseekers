@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useAuth, useStripeCheckout } from "../hooks";
+import { useAuth, usePaystackInit } from "../hooks";
 import { IconCheck, IconLightning } from "../components/Icons";
 import { safeCheckoutUrl } from "@/lib/safe-url";
 
@@ -63,16 +63,21 @@ const ROTATIONS = [-1.2, 0.8, -0.5];
 export default function PricingPage() {
   const { user, token } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
-  const { mutate: checkout } = useStripeCheckout();
+  const [payError, setPayError] = useState("");
+  const { mutate: paystackInit } = usePaystackInit();
 
-  async function handleUpgrade(priceId: string) {
+  async function handleUpgrade(tierId: string) {
     if (!token) return;
-    setLoading(priceId);
+    setLoading(tierId);
+    setPayError("");
     try {
-      const data = await checkout(priceId);
-      const url = safeCheckoutUrl(data?.url);
+      const data = await paystackInit(tierId);
+      const url = safeCheckoutUrl(data?.authorization_url);
       if (url) window.location.href = url;
-    } catch {}
+      else setPayError(data?.error || "Billing unavailable right now");
+    } catch {
+      setPayError("Network error");
+    }
     setLoading(null);
   }
 
@@ -109,13 +114,16 @@ export default function PricingPage() {
                 Choose your plan
               </h1>
               <p className="text-sm" style={{ color: "var(--muted)" }}>Pick the tier that fits how you explore</p>
+              {payError && (
+                <p className="text-xs mt-2" style={{ color: "var(--red)" }}>{payError}</p>
+              )}
             </div>
 
             {/* Cards — Z-Axis Cascade */}
             <div className="flex flex-col md:flex-row items-center md:items-stretch justify-center gap-6 md:gap-0 md:px-8">
               {PLANS.map((plan, i) => {
                 const isCurrent = user?.subscriptionTier === plan.id;
-                const isLoading = loading === plan.priceId;
+                const isLoading = loading === plan.id;
                 const rot = ROTATIONS[i] ?? 0;
 
                 return (
@@ -195,7 +203,7 @@ export default function PricingPage() {
                           </Link>
                         ) : (
                           <button
-                            onClick={() => plan.priceId && handleUpgrade(plan.priceId)}
+                            onClick={() => handleUpgrade(plan.id)}
                             disabled={isLoading || !token}
                             className="group w-full py-2.5 px-5 text-sm font-medium rounded-full transition-all duration-300 cursor-pointer disabled:opacity-40"
                             style={{

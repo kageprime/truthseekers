@@ -64,6 +64,26 @@ func (d *DB) CreateInactiveUser(username, email, passwordHash string) (*User, er
 	return u, nil
 }
 
+// GetUserByEmail returns the user with the given email, if any. Unlike
+// FindOrCreateUserByEmail it never creates — for webhook attribution where
+// auto-provisioning would be an account oracle.
+func (d *DB) GetUserByEmail(email string) (*User, error) {
+	if d.mockMode {
+		if u, ok := d.mockUsers[email]; ok {
+			return u, nil
+		}
+		return nil, sql.ErrNoRows
+	}
+	var u User
+	err := d.db.QueryRow(`SELECT id, email, name, avatar, role, subscription_tier, onboarded, created_at, updated_at, COALESCE(username,''), activated
+		FROM users WHERE email = $1`, email).
+		Scan(&u.ID, &u.Email, &u.Name, &u.Avatar, &u.Role, &u.SubscriptionTier, &u.Onboarded, &u.CreatedAt, &u.UpdatedAt, &u.Username, &u.Activated)
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
 // FindUserByUsername returns the user with the given username, if any.
 func (d *DB) FindUserByUsername(username string) (*User, error) {
 	if d.mockMode {
