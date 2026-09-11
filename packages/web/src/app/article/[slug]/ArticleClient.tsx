@@ -7,7 +7,8 @@ import { useQuota, useGenerateArticle, useRefreshArticle, useTrackView, useArtic
 import PageLayout from "../../components/PageLayout";
 import ContentCard from "../../components/ContentCard";
 import GenerationBar from "../../components/GenerationBar";
-import BlockRenderer, { articleToBlocks } from "../../components/BlockRenderer";
+import { articleToBlocks } from "../../components/BlockRenderer";
+import MagazineBody from "../../components/MagazineBody";
 import ClaimGraphViewer from "../../components/ClaimGraphViewer";
 import FreshnessBadge from "../../components/FreshnessBadge";
 import RefreshDiffBanner from "../../components/RefreshDiffBanner";
@@ -475,10 +476,10 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           </div>
         )}
 
-        {/* Article body — reading column */}
-        <div className="reading-column stagger-children">
+        {/* Article body — two-column magazine flow with living figures */}
+        <div className="stagger-children">
           {hasFullContent ? (
-            <BlockRenderer
+            <MagazineBody
               blocks={
                 article.blocks && article.blocks.length > 0
                   ? article.blocks

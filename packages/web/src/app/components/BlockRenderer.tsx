@@ -142,6 +142,21 @@ export default function BlockRenderer({
     </div>
   );
 }
+// BlockItem — one block, same rendering as the linear flow, for composed
+// layouts (magazine flow) that manage their own order and wrappers.
+export function BlockItem({
+  block,
+  claimsIndex,
+  dissentMode,
+  dropCap,
+}: {
+  block: Block;
+  claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
+  dissentMode?: boolean;
+  dropCap?: boolean;
+}) {
+  return <BlockCard block={block} claimsIndex={claimsIndex} dissentMode={dissentMode} dropCap={dropCap} />;
+}
 
 function BlockCard({
   block,
@@ -152,7 +167,7 @@ function BlockCard({
   dissentMode,
 }: {
   block: Block;
-  compact: boolean;
+  compact?: boolean;
   dropCap?: boolean;
   figureNum?: number;
   claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;

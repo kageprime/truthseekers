@@ -376,6 +376,122 @@ body::before {
 .reading-column {
   width: 100%;
 }
+
+/* ── Magazine flow — two-column newspaper body with living exclusions ──
+   Figures float inside the text and prose gives way along their outlines
+   (shape-outside). L-size objects and major headings break across both
+   columns. Reordering or resizing re-breaks the columns natively. */
+.mag-flow {
+  display: flow-root;
+  width: 100%;
+  font-size: 1.08rem;
+  line-height: 1.9;
+}
+@media (min-width: 1024px) {
+  .mag-flow {
+    columns: 2;
+    column-gap: 3rem;
+    column-rule: 1px solid var(--rule);
+  }
+}
+/* Major headings span the spread, never strand beside a float. */
+.mag-flow h1,
+.mag-flow h2 {
+  column-span: all;
+  break-inside: avoid;
+}
+/* Figures never split across the gutter. */
+.mag-float {
+  break-inside: avoid;
+}
+.mag-float-right {
+  float: right;
+  shape-outside: margin-box;
+  shape-margin: 1.25rem;
+  margin: 0.5rem 0 1rem 1.5rem;
+}
+.mag-float-left {
+  float: left;
+  shape-outside: margin-box;
+  shape-margin: 1.25rem;
+  margin: 0.5rem 1.5rem 1rem 0;
+}
+.mag-size-s { width: min(42%, 230px); }
+.mag-size-m { width: min(56%, 340px); }
+.mag-size-l {
+  float: none;
+  width: 100%;
+  margin: 1.5rem 0;
+  column-span: all;
+  shape-outside: none;
+}
+/* Pull quotes intrude at a slant — the pretext gesture. */
+.mag-pull.mag-float-right {
+  shape-outside: polygon(0 0, 100% 0, 78% 100%, 0 100%);
+}
+.mag-pull.mag-float-left {
+  shape-outside: polygon(22% 0, 100% 0, 100% 100%, 0 100%);
+}
+/* Object tools — grip to drag, S/M/L to zoom. Quiet until approached. */
+.mag-float { position: relative; }
+.mag-tools {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  z-index: 2;
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.mag-float:hover .mag-tools,
+.mag-float:focus-within .mag-tools { opacity: 1; }
+@media (hover: none) {
+  .mag-tools { opacity: 1; }
+}
+.mag-grip,
+.mag-zoom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.3rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sharp);
+  cursor: grab;
+  touch-action: none;
+}
+.mag-zoom { cursor: pointer; }
+.mag-grip:active { cursor: grabbing; }
+.mag-dragging { opacity: 0.55; outline: 2px dashed var(--gold); outline-offset: 4px; }
+/* Drop anchors — invisible until a drag is in flight. */
+.mag-anchor { height: 0; }
+.mag-anchor-live { min-height: 12px; }
+.mag-anchor-hot {
+  min-height: 12px;
+  margin: 2px 0;
+  border-radius: 2px;
+  background: var(--gold);
+}
+/* Narrow screens: stack everything, floats become full width. */
+@media (max-width: 1023px) {
+  .mag-flow { columns: 1; }
+}
+@media (max-width: 640px) {
+  .mag-float-right,
+  .mag-float-left {
+    float: none;
+    width: 100%;
+    margin: 1rem 0;
+    shape-outside: none;
+  }
+  .mag-grip { display: none; }
+}
 .reading-column .block-renderer {
   font-size: 1.08rem;
   line-height: 1.9;
