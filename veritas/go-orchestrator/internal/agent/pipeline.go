@@ -704,7 +704,7 @@ func DAGNodeExecutors(systemPrompt string) map[string]func(context.Context, map[
 		"detect_missing":   {promptDetectMissing, map[string]string{"map_evidence": "EVIDENCE MAP"}},
 		"map_language":     {promptMapLanguage, map[string]string{"extract_claims": "CLAIMS"}},
 		"scrutinize":       {promptScrutinize, map[string]string{"map_evidence": "EVIDENCE MAP"}},
-		"resolve":          {promptResolve, map[string]string{"critique": "CRITIQUE", "detect_missing": "MISSING EVIDENCE", "map_language": "LANGUAGE MAP", "scrutinize": "SCRUTINY REPORT"}},
+		"resolve":          {promptResolve, map[string]string{"extract_claims": "CLAIMS", "critique": "CRITIQUE", "detect_missing": "MISSING EVIDENCE", "map_language": "LANGUAGE MAP", "scrutinize": "SCRUTINY REPORT"}},
 		"generate_article": {promptGenerateArticle, map[string]string{"resolve": "RESOLVED CLAIMS"}},
 	}
 
@@ -760,19 +760,72 @@ func DAGNodeExecutors(systemPrompt string) map[string]func(context.Context, map[
 					parts = append(parts, fmt.Sprintf("%s:\n%s", label, s))
 				}
 			}
-			userPrompt := cfg.prompt + "\n\n" + strings.Join(parts, "\n\n") + "\n\nReturn JSON only."
-			result, err := SendPromptJSON(systemPrompt, userPrompt, epistemicModel)
-			if err != nil {
-				return nil, fmt.Errorf("dag node %q: %w", name, err)
-			}
-			var output interface{}
-			if err := json.Unmarshal(result, &output); err != nil {
-				return nil, fmt.Errorf("dag node %q parse: %w", name, err)
-			}
-			return output, nil
+		userPrompt := cfg.prompt + "\n\n" + strings.Join(parts, "\n\n") + "\n\nReturn JSON only."
+		result, err := SendPromptJSON(systemPrompt, userPrompt, epistemicModel)
+		if err != nil {
+			return nil, fmt.Errorf("dag node %q: %w", name, err)
+		}
+		var output interface{}
+		if err := json.Unmarshal(result, &output); err != nil {
+			return nil, fmt.Errorf("dag node %q parse: %w", name, err)
+		}
+		if name == "resolve" {
+			output = backfillClaimTexts(input, output)
+		}
+		return output, nil
 		}
 	}
 	return executors
+}
+
+// backfillClaimTexts merges claim texts from extract_claims into resolved
+// claims missing them. The resolve prompt asks for "text" but its wired
+// inputs were assessments-only (claim IDs, no wording), so compliant models
+// echo IDs with empty text and Layer 3 then writes *about* the claims
+// instead of *from* them. Mechanical merge by claim_id — no LLM round-trip.
+func backfillClaimTexts(input map[string]interface{}, output interface{}) interface{} {
+	texts := map[string]string{}
+	if raw, ok := input["extract_claims"]; ok {
+		b, _ := json.Marshal(raw)
+		var ec struct {
+			Claims []struct {
+				ClaimID string `json:"claim_id"`
+				Text    string `json:"text"`
+			} `json:"claims"`
+		}
+		if json.Unmarshal(b, &ec) == nil {
+			for _, c := range ec.Claims {
+				if c.ClaimID != "" && c.Text != "" {
+					texts[c.ClaimID] = c.Text
+				}
+			}
+		}
+	}
+	if len(texts) == 0 {
+		return output
+	}
+	m, ok := output.(map[string]interface{})
+	if !ok {
+		return output
+	}
+	list, ok := m["resolved_claims"].([]interface{})
+	if !ok {
+		return output
+	}
+	for _, item := range list {
+		cm, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if t, _ := cm["text"].(string); t == "" {
+			if id, _ := cm["claim_id"].(string); id != "" {
+				if full, ok := texts[id]; ok {
+					cm["text"] = full
+				}
+			}
+		}
+	}
+	return output
 }
 
 // indentJSON pretty-prints raw JSON for injection into LLM prompts.
