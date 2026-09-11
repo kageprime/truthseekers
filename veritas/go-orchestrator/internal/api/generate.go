@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/kageprime/veritas/go-orchestrator/internal/agent"
@@ -135,10 +137,21 @@ func (s *Server) processArticle(slug string, persona string) {
 		return
 	}
 
+	// Unify claim identity before anything persists: model-minted IDs are
+	// unstable across runs and the writer fabricates anchors, so anchors can
+	// dangle ("unknown" chips) and regens accumulate duplicate rows.
+	generatedOutput = s.canonicalizeClaimIDs(nodeOutputs, generatedOutput)
+
 	art := transformGeneratedArticle(slug, generatedOutput)
 	if err := s.db.SaveArticle(art); err != nil {
 		s.failArticle(slug, fmt.Sprintf("save article: %v", err))
 		return
+	}
+
+	// Fresh link set per generation (rows + versions are preserved — only
+	// the junction is reset so stale links from prior runs can't linger).
+	if err := s.db.ClearArticleClaimLinks(slug); err != nil {
+		log.Printf("[generate] clear stale links %s: %v", slug, err)
 	}
 
 	// Epistemic persistence — save claims, evidence, gaps, language flags,
@@ -812,6 +825,183 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 			log.Printf("[epistemic] parse scrutinize: %v", err)
 		}
 	}
+}
+
+// canonicalClaimID derives a stable content-addressed ID from claim text by
+// reformatting its signature hash into UUID shape. Same wording always maps
+// to the same ID — across nodes, regenerations, and runs — so re-running the
+// pipeline upserts rows (with version history) instead of accumulating
+// duplicates, and anchors stay valid. Different wording maps differently,
+// which is correct: different wording is a different claim.
+func canonicalClaimID(text string) string {
+	sig := storage.ClaimSignature(text) // 32 hex chars
+	return sig[0:8] + "-" + sig[8:12] + "-" + sig[12:16] + "-" + sig[16:20] + "-" + sig[20:32]
+}
+
+var claimAnchorRe = regexp.MustCompile(`\[claim:([0-9a-fA-F-]+)\]`)
+
+// claimItemList extracts the object list under key from a node output.
+func claimItemList(raw interface{}, key string) []map[string]interface{} {
+	m, ok := raw.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	list, ok := m[key].([]interface{})
+	if !ok {
+		return nil
+	}
+	var out []map[string]interface{}
+	for _, it := range list {
+		if cm, ok := it.(map[string]interface{}); ok {
+			out = append(out, cm)
+		}
+	}
+	return out
+}
+
+func strField(m map[string]interface{}, f string) string {
+	s, _ := m[f].(string)
+	return s
+}
+
+// canonicalizeClaimIDs rewrites model-minted claim IDs to stable identities
+// across extract + resolve outputs and the generated article, and strips
+// anchors that resolve to nothing. Verified failure modes it heals:
+// extract/resolve minting sequential placeholder IDs that drift between runs
+// (duplicate rows, stale anchors), and the writer fabricating anchor IDs
+// that exist nowhere. Dropped and stripped items are logged; the article
+// text is rewritten, node outputs are fixed in place.
+func (s *Server) canonicalizeClaimIDs(nodeOutputs map[string]interface{}, generated interface{}) interface{} {
+	// finalID returns the stable identity for a claim: the surviving row's
+	// ID when the wording already exists (regenerations upsert with version
+	// history instead of forking duplicate rows), else the deterministic
+	// canonical ID so future runs converge. Falls back to the model ID when
+	// there is no wording to work with.
+	finalID := func(modelID, text string) string {
+		if text == "" {
+			return modelID
+		}
+		canon := canonicalClaimID(text)
+		if modelID == canon {
+			return canon
+		}
+		if row, err := s.db.GetClaimBySignature(storage.ClaimSignature(text)); err == nil && row != nil && row.ID != "" {
+			return row.ID
+		}
+		return canon
+	}
+
+	alias := map[string]string{} // unstable model ID -> stable identity
+
+	// Extract claims: identity flows from the wording.
+	for _, c := range claimItemList(nodeOutputs["extract_claims"], "claims") {
+		id, text := strField(c, "claim_id"), strField(c, "text")
+		if id == "" || text == "" {
+			continue
+		}
+		if stable := finalID(id, text); stable != id {
+			alias[id] = stable
+			c["claim_id"] = stable
+		}
+	}
+	// Resolved claims: alias by ID, else stabilize from their own text
+	// (post-backfill they carry it) so resolve-minted IDs heal too.
+	for _, c := range claimItemList(nodeOutputs["resolve"], "resolved_claims") {
+		id := strField(c, "claim_id")
+		if id == "" {
+			continue
+		}
+		if stable, ok := alias[id]; ok {
+			c["claim_id"] = stable
+			continue
+		}
+		if stable := finalID(id, strField(c, "text")); stable != id {
+			alias[id] = stable
+			c["claim_id"] = stable
+		}
+	}
+	// Every other claim_id reference in the epistemic outputs follows the alias.
+	rewriteClaimRefs(nodeOutputs["resolve"], alias)
+	rewriteClaimRefs(nodeOutputs["map_evidence"], alias)
+	rewriteClaimRefs(nodeOutputs["scrutinize"], alias)
+	rewriteClaimRefs(nodeOutputs["map_language"], alias)
+
+	// Valid set = every canonical ID now present in the outputs.
+	valid := map[string]bool{}
+	for _, raw := range nodeOutputs {
+		for _, c := range claimItemList(raw, "claims") {
+			if id := strField(c, "claim_id"); id != "" {
+				valid[id] = true
+			}
+		}
+		for _, c := range claimItemList(raw, "resolved_claims") {
+			if id := strField(c, "claim_id"); id != "" {
+				valid[id] = true
+			}
+		}
+	}
+
+	// Article JSON: rewrite aliased anchors, strip dangling ones.
+	b, err := json.Marshal(generated)
+	if err != nil {
+		return generated
+	}
+	txt := string(b)
+	for old, canon := range alias {
+		txt = strings.ReplaceAll(txt, "[claim:"+old+"]", "[claim:"+canon+"]")
+	}
+	stripped := 0
+	txt = claimAnchorRe.ReplaceAllStringFunc(txt, func(mk string) string {
+		mm := claimAnchorRe.FindStringSubmatch(mk)
+		if len(mm) == 2 && valid[mm[1]] {
+			return mk
+		}
+		stripped++
+		return ""
+	})
+	if len(alias) > 0 || stripped > 0 {
+		log.Printf("[generate] canonicalize: %d ids remapped, %d dangling anchors stripped", len(alias), stripped)
+	}
+	var out interface{}
+	if err := json.Unmarshal([]byte(txt), &out); err != nil {
+		return generated
+	}
+	return out
+}
+
+// rewriteClaimRefs remaps claim_id / source_claim_id / target_claim_id
+// fields inside a node output via the alias map. Evidence references
+// (supporting/contradicting ID lists) are document IDs, not claim IDs,
+// and are deliberately left alone.
+func rewriteClaimRefs(raw interface{}, alias map[string]string) {
+	if len(alias) == 0 {
+		return
+	}
+	m, ok := raw.(map[string]interface{})
+	if !ok {
+		return
+	}
+	remapList := func(key string, fields ...string) {
+		list, ok := m[key].([]interface{})
+		if !ok {
+			return
+		}
+		for _, it := range list {
+			cm, ok := it.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			for _, f := range fields {
+				if v, ok := alias[strField(cm, f)]; ok {
+					cm[f] = v
+				}
+			}
+		}
+	}
+	remapList("claim_evidence_map", "claim_id")
+	remapList("risk_assessments", "claim_id")
+	remapList("language_flags", "claim_id")
+	remapList("claim_relationships", "source_claim_id", "target_claim_id")
 }
 
 // stubArticle returns a minimal renderable article, used only when the

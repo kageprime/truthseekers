@@ -105,6 +105,27 @@ func (d *DB) GetClaimsByArticle(slug string) ([]*Claim, error) {
 	return list, nil
 }
 
+// ClearArticleClaims drops the article→claim link set for a slug without
+// deleting claim rows (history in claims/claim_versions is preserved).
+// Regenerations relink a fresh complete set; without this, stale links from
+// prior runs linger beside the new ones and the index shows duplicates.
+func (d *DB) ClearArticleClaimLinks(slug string) error {
+	if d.mockMode {
+		if d.fs != nil {
+			delete(d.fs.claims, slug)
+		}
+		return nil
+	}
+	var articleID string
+	if err := d.db.QueryRow("SELECT id FROM articles WHERE slug = $1", slug).Scan(&articleID); err != nil {
+		return fmt.Errorf("clear links: resolve slug %q: %w", slug, err)
+	}
+	if _, err := d.db.Exec("DELETE FROM article_claims WHERE article_id = $1", articleID); err != nil {
+		return fmt.Errorf("clear links: %w", err)
+	}
+	return nil
+}
+
 // LinkArticleClaim creates the many-to-many relationship between an
 // article (looked up by slug) and a claim (by claim ID).
 func (d *DB) LinkArticleClaim(slug string, claimID string) error {
