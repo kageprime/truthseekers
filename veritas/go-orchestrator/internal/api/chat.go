@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kageprime/veritas/go-orchestrator/internal/agent"
@@ -331,11 +332,41 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
+	// SSE writes come from two goroutines (the agent OnEvent callback and
+	// the heartbeat ticker below) — serialize them so frames can't interleave.
+	var sseMu sync.Mutex
+	safeSSE := func(event, data string) {
+		sseMu.Lock()
+		defer sseMu.Unlock()
+		writeSSE(w, flusher, event, data)
+	}
+
+	// Heartbeat keeps Heroku's 55s idle-timeout from silently killing slow
+	// runs (reasoning models can take minutes to first token, and the client
+	// only learns the outcome via this stream). Mirrors the 15s heartbeat on
+	// /articles/:slug/progress. The frontend parser ignores unknown types.
+	heartbeatDone := make(chan struct{})
+	defer close(heartbeatDone)
+	go func() {
+		t := time.NewTicker(15 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-heartbeatDone:
+				return
+			case <-r.Context().Done():
+				return
+			case <-t.C:
+				safeSSE("agent_event", `{"type":"heartbeat"}`)
+			}
+		}
+	}()
+
 	defer func() {
 		if rec := recover(); rec != nil {
 			log.Printf("🛑 PANIC in handleChatMessages: %v", rec)
-			writeSSE(w, flusher, "agent_event", `{"type":"error","data":"Internal error"}`)
-			writeSSE(w, flusher, "agent_event", `{"type":"done","msgId":"","content":"","blocks":[]}`)
+			safeSSE("agent_event", `{"type":"error","data":"Internal error"}`)
+			safeSSE("agent_event", `{"type":"done","msgId":"","content":"","blocks":[]}`)
 		}
 	}()
 
@@ -357,7 +388,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		OnEvent: func(ev agent.AgentEvent) {
 			data, _ := json.Marshal(ev)
 			agentEvents = append(agentEvents, data)
-			writeSSE(w, flusher, "agent_event", string(data))
+			safeSSE("agent_event", string(data))
 		},
 	}
 	for name, exec := range allTools {
@@ -444,7 +475,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		"content": result.Text,
 		"blocks":  result.Blocks,
 	})
-	writeSSE(w, flusher, "agent_event", string(doneData))
+	safeSSE("agent_event", string(doneData))
 	flusher.Flush()
 }
 
