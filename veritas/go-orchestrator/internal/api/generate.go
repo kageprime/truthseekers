@@ -72,7 +72,11 @@ func (s *Server) processArticle(slug string, persona string) {
 	log.Printf("🖌️ [generate] starting pipeline slug=%s persona=%s", slug, persona)
 
 	queryJSON, _ := json.Marshal(map[string]string{"topic": slug})
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	// ponytail: 9 nodes, 7-deep sequential chain, each LLM call budgeted up
+	// to 120s — 5m starved generate_article (the heaviest node) with ~30s
+	// left after 8 nodes on a slow reasoning model. 15m fits the worst case
+	// with headroom; the client SSE survives via progress heartbeats.
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
 	workflow := buildArticleWorkflow()

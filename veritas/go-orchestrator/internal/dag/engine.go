@@ -46,6 +46,17 @@ func (w *Workflow) Execute(ctx context.Context, query string) (<-chan ProgressUp
 	go func() {
 		defer close(progressCh)
 
+		// safeSend drops updates that race past shutdown: after ctx timeout
+		// the loop below breaks and closes progressCh while node goroutines
+		// may still be finishing. A plain send then panics ("send on closed
+		// channel") and takes down the whole process — one failed article
+		// must never crash the dyno. Dropped updates are obsolete by
+		// definition (the workflow already moved on).
+		safeSend := func(u ProgressUpdate) {
+			defer func() { _ = recover() }()
+			progressCh <- u
+		}
+
 		var mu sync.RWMutex
 		completed := make(map[string]interface{})
 		inProgress := make(map[string]bool)
@@ -102,12 +113,12 @@ func (w *Workflow) Execute(ctx context.Context, query string) (<-chan ProgressUp
 				inProgress[node.ID] = true
 				mu.Unlock()
 
-				go func(n Node) {
-					progressCh <- ProgressUpdate{
-						NodeID:    n.ID,
-						Status:    "running",
-						Timestamp: time.Now(),
-					}
+			go func(n Node) {
+				safeSend(ProgressUpdate{
+					NodeID:    n.ID,
+					Status:    "running",
+					Timestamp: time.Now(),
+				})
 
 					mu.RLock()
 					// Gather inputs. If it has no dependencies, pass the query.
@@ -163,25 +174,25 @@ func (w *Workflow) Execute(ctx context.Context, query string) (<-chan ProgressUp
 
 					mu.Lock()
 					inProgress[n.ID] = false
-					if err != nil {
-						failed[n.ID] = true
-						mu.Unlock()
-						progressCh <- ProgressUpdate{
-							NodeID:    n.ID,
-							Status:    "failed",
-							Error:     err.Error(),
-							Timestamp: time.Now(),
-						}
-					} else {
-						completed[n.ID] = output
-						mu.Unlock()
-						progressCh <- ProgressUpdate{
-							NodeID:    n.ID,
-							Status:    "completed",
-							Output:    output,
-							Timestamp: time.Now(),
-						}
-					}
+				if err != nil {
+					failed[n.ID] = true
+					mu.Unlock()
+					safeSend(ProgressUpdate{
+						NodeID:    n.ID,
+						Status:    "failed",
+						Error:     err.Error(),
+						Timestamp: time.Now(),
+					})
+				} else {
+					completed[n.ID] = output
+					mu.Unlock()
+					safeSend(ProgressUpdate{
+						NodeID:    n.ID,
+						Status:    "completed",
+						Output:    output,
+						Timestamp: time.Now(),
+					})
+				}
 					doneCh <- struct{}{}
 				}(node)
 			}
