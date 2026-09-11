@@ -250,9 +250,11 @@ func (s *Server) handleArticleLive(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-ctx.Done():
+			// ponytail: unlock BEFORE bumpViewers — it fans out, which takes
+			// liveSubsMu.RLock. RWMutex isn't reentrant: Lock→RLock on one
+			// goroutine deadlocks, wedging every future /articles/:slug/live
+			// at registration (zero bytes, browser reports it as a CORS error).
 			liveSubsMu.Lock()
-			defer liveSubsMu.Unlock()
-			bumpViewers(slug, -1)
 			chans := liveSubs[slug]
 			for i, c := range chans {
 				if c == ch {
@@ -263,6 +265,8 @@ func (s *Server) handleArticleLive(w http.ResponseWriter, r *http.Request) {
 			if len(liveSubs[slug]) == 0 {
 				delete(liveSubs, slug)
 			}
+			liveSubsMu.Unlock()
+			bumpViewers(slug, -1)
 			return
 		case payload := <-ch:
 			fmt.Fprint(w, payload)
