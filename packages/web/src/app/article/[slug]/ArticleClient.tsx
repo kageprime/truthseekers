@@ -157,17 +157,17 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   if (isLoading) {
     return (
       <ContentCard>
-        <div className="px-4 sm:px-8 py-10 sm:py-14 max-w-[42rem] mx-auto w-full animate-pulse">
-          <div className="flex justify-center mb-10">
+        <div className="px-4 sm:px-8 py-10 sm:py-14 w-full animate-pulse">
+          <div className="flex mb-10">
             <div className="w-16 h-16 rounded-full skeleton" />
           </div>
-          <div className="text-center mb-8 space-y-3">
-            <div className="h-8 skeleton w-3/4 mx-auto rounded" />
-            <div className="h-7 skeleton w-1/2 mx-auto rounded" />
-            <div className="mx-auto skeleton" style={{ width: "3rem", height: 2 }} />
-            <div className="h-4 skeleton w-1/3 mx-auto rounded mt-4" />
+          <div className="mb-8 space-y-3">
+            <div className="h-8 skeleton w-3/4 rounded" />
+            <div className="h-7 skeleton w-1/2 rounded" />
+            <div className="skeleton" style={{ width: "3rem", height: 2 }} />
+            <div className="h-4 skeleton w-1/3 rounded mt-4" />
           </div>
-          <div className="space-y-3 max-w-[38em] mx-auto">
+          <div className="space-y-3 w-full">
             {[85, 70, 92, 78, 65, 88].map((w, i) => (
               <div key={i} className="flex gap-3">
                 <div className="h-4 skeleton flex-1 rounded" style={{ width: `${w}%` }} />
@@ -293,13 +293,13 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     (article.sections && article.sections.length > 0);
 
   return (
-    <PageLayout maxWidthClass="max-w-3xl">
+    <PageLayout maxWidthClass="max-w-none">
       <div
         className="bezel bezel-elevated"
-        style={{ maxWidth: "44rem", margin: "0 auto" }}
+        style={{ width: "100%" }}
       >
         <div className="bezel-inner">
-      <article className="px-4 sm:px-8 md:px-12 py-12 sm:py-16 md:py-20 max-w-[42rem] mx-auto w-full animate-appear-up">
+      <article className="px-4 sm:px-8 md:px-12 py-12 sm:py-16 md:py-20 w-full animate-appear-up">
         {/* Back link — gold badge with hover arrow */}
         <button
           onClick={() => router.back()}

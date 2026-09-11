@@ -371,11 +371,10 @@ body::before {
   line-height: 1.6;
 }
 
-/* Reading column — optimal measure (~38em), generous leading,
-   with space for marginalia on very wide screens. */
+/* Reading column — full-bleed measure with generous leading. The frame
+   carries the alignment (even gutters); prose runs the full width. */
 .reading-column {
-  max-width: 38em;
-  margin: 0 auto;
+  width: 100%;
 }
 .reading-column .block-renderer {
   font-size: 1.08rem;
