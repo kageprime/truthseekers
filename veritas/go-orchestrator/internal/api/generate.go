@@ -672,6 +672,15 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 				if err := s.db.SaveClaimVersion(rc.ClaimID, runID, rc.ConfidenceVector, rc.DerivedConfidence); err != nil {
 					log.Printf("[epistemic] save version %s: %v", rc.ClaimID, err)
 				}
+				// Link resolved claims that carry wording so their anchors
+				// resolve. Textless resolve-only IDs are never linked (a chip
+				// opening an empty claim is worse than no chip) and their
+				// anchors are stripped by canonicalization instead.
+				if rc.Text != "" {
+					if err := s.db.LinkArticleClaim(slug, rc.ClaimID); err != nil {
+						log.Printf("[epistemic] link resolved claim %s: %v", rc.ClaimID, err)
+					}
+				}
 			}
 		} else {
 			log.Printf("[epistemic] parse resolve: %v", err)
@@ -926,16 +935,18 @@ func (s *Server) canonicalizeClaimIDs(nodeOutputs map[string]interface{}, genera
 	rewriteClaimRefs(nodeOutputs["scrutinize"], alias)
 	rewriteClaimRefs(nodeOutputs["map_language"], alias)
 
-	// Valid set = every canonical ID now present in the outputs.
+	// Valid set = IDs that will actually be linked: extract claims and
+	// resolved claims that carry wording. Textless IDs are never linked, so
+	// counting them here is what let dangling anchors through as "unknown".
 	valid := map[string]bool{}
 	for _, raw := range nodeOutputs {
 		for _, c := range claimItemList(raw, "claims") {
-			if id := strField(c, "claim_id"); id != "" {
+			if id := strField(c, "claim_id"); id != "" && strField(c, "text") != "" {
 				valid[id] = true
 			}
 		}
 		for _, c := range claimItemList(raw, "resolved_claims") {
-			if id := strField(c, "claim_id"); id != "" {
+			if id := strField(c, "claim_id"); id != "" && strField(c, "text") != "" {
 				valid[id] = true
 			}
 		}
