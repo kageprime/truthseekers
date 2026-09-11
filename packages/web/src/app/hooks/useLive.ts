@@ -35,7 +35,7 @@ export function useLiveArticle(slug: string | null | undefined): LiveState | nul
       setState(null);
       return;
     }
-    const es = new EventSource(`${BASE}/articles/${slug}/live`);
+    const es = new EventSource(`${BASE}/articles/${slug}/live`, { withCredentials: true });
     esRef.current = es;
     es.addEventListener("live", (e: MessageEvent) => {
       try {
@@ -66,7 +66,7 @@ export function useLiveNow(): GlobalActivity[] {
       setStateFallback(setItems);
       return;
     }
-    const es = new EventSource(`${BASE}/live/now`);
+    const es = new EventSource(`${BASE}/live/now`, { withCredentials: true });
     esRef.current = es;
     es.addEventListener("activity", (e: MessageEvent) => {
       try {

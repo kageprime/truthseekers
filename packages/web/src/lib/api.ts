@@ -13,28 +13,28 @@ interface PaginatedResponse<T> {
 
 export async function fetchArticles(offset = 0, limit = 50): Promise<PaginatedResponse<ArticleSummary>> {
   if (MOCK) return { data: mock.MOCK_ARTICLE_SUMMARIES.slice(offset, offset + limit), pagination: { limit, offset, hasMore: offset + limit < mock.MOCK_ARTICLE_SUMMARIES.length, nextOffset: offset + limit < mock.MOCK_ARTICLE_SUMMARIES.length ? offset + limit : null } };
-  const res = await fetch(`${BASE}/articles?limit=${limit}&offset=${offset}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/articles?limit=${limit}&offset=${offset}`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return { data: [], pagination: { limit, offset, hasMore: false, nextOffset: null } };
   return res.json();
 }
 
 export async function searchArticles(query: string): Promise<ArticleSummary[]> {
   if (MOCK) return mock.MOCK_ARTICLE_SUMMARIES.filter((a) => a.title.toLowerCase().includes(query.toLowerCase()) || a.abstract.toLowerCase().includes(query.toLowerCase()));
-  const res = await fetch(`${BASE}/articles/search?q=${encodeURIComponent(query)}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/articles/search?q=${encodeURIComponent(query)}`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function fetchArticle(slug: string): Promise<Article | null> {
   if (MOCK) return mock.MOCK_ARTICLES[slug] || null;
-  const res = await fetch(`${BASE}/articles/${slug}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/articles/${slug}`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function fetchArticleStatus(slug: string): Promise<JobInfo | { status: string } | null> {
   if (MOCK) return mock.MOCK_QUEUE_JOBS.find((j) => j.slug === slug) || { status: "not_found" };
-  const res = await fetch(`${BASE}/articles/${slug}/status`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/articles/${slug}/status`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
@@ -84,7 +84,7 @@ export async function fetchMaps(limit = 50, offset = 0): Promise<{ maps: MapEntr
     const all = mock.MOCK_MAPS;
     return { maps: all.filter((m) => m.type === "static"), interactive: all.filter((m) => m.type === "interactive") };
   }
-  const res = await fetch(`${BASE}/maps?limit=${limit}&offset=${offset}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/maps?limit=${limit}&offset=${offset}`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return { maps: [], interactive: [] };
   const json: MapsResponse = await res.json();
   return { maps: json.data, interactive: json.interactive };
@@ -92,14 +92,14 @@ export async function fetchMaps(limit = 50, offset = 0): Promise<{ maps: MapEntr
 
 export async function searchMaps(query: string): Promise<MapEntry[]> {
   if (MOCK) return mock.MOCK_MAPS.filter((m) => m.title.toLowerCase().includes(query.toLowerCase()));
-  const res = await fetch(`${BASE}/maps/search?q=${encodeURIComponent(query)}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/maps/search?q=${encodeURIComponent(query)}`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function fetchMap(slug: string): Promise<MapEntry | null> {
   if (MOCK) return mock.MOCK_MAPS.find((m) => m.slug === slug) || null;
-  const res = await fetch(`${BASE}/maps/${slug}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/maps/${slug}`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
@@ -362,21 +362,21 @@ export async function trackView(slug: string): Promise<void> {
 
 export async function fetchArticleClaims(slug: string): Promise<{ claims: any[] } | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/articles/${slug}/claims`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/articles/${slug}/claims`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function fetchArticleGaps(slug: string): Promise<{ gaps: any[] } | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/articles/${slug}/gaps`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/articles/${slug}/gaps`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function fetchClaimEvidence(claimId: string): Promise<{ evidence: any[] } | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/claims/${claimId}/evidence`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/claims/${claimId}/evidence`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
@@ -389,35 +389,35 @@ export interface FreshnessInfo {
 
 export async function fetchAllGaps(): Promise<{ gaps: any[] } | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/gaps`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/gaps`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function fetchArticleFreshness(slug: string): Promise<FreshnessInfo | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/articles/${slug}/freshness`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/articles/${slug}/freshness`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function fetchRefreshDiff(slug: string): Promise<any | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/articles/${slug}/refresh-diff`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/articles/${slug}/refresh-diff`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function fetchStaleArticles(limit = 50): Promise<{ articles: any[] } | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/stale?limit=${limit}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/stale?limit=${limit}`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function upvoteGap(gapId: string): Promise<{ gap_id: string; upvotes: number } | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/gaps/${gapId}/upvote`, { method: "POST" });
+  const res = await fetch(`${BASE}/gaps/${gapId}/upvote`, { method: "POST", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
@@ -427,6 +427,7 @@ export async function submitGapEvidence(gapId: string, url: string, note: string
   const res = await fetch(`${BASE}/gaps/${gapId}/submit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({ url, note }),
   });
   if (!res.ok) return null;
@@ -444,7 +445,7 @@ export interface GraphLink {
 
 export async function fetchArticleGraph(slug: string): Promise<{ nodes: GraphNode[]; links: GraphLink[] } | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/articles/${slug}/graph`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/articles/${slug}/graph`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
@@ -473,7 +474,7 @@ export interface ClaimGraphEdge {
 
 export async function fetchArticleClaimGraph(slug: string): Promise<{ nodes: ClaimGraphNode[]; edges: ClaimGraphEdge[] } | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/articles/${slug}/claim-graph`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/articles/${slug}/claim-graph`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
@@ -487,7 +488,7 @@ export async function fetchArticleEpistemic(slug: string): Promise<{
   claim_graph: { nodes: ClaimGraphNode[]; edges: ClaimGraphEdge[] };
 } | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/articles/${slug}/epistemic`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/articles/${slug}/epistemic`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
@@ -499,14 +500,14 @@ export async function fetchGlobalClaimGraph(limit = 150, minContradiction = 0): 
   min_contradiction: number;
 } | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/claim-graph?limit=${limit}&min_contradiction=${minContradiction}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/claim-graph?limit=${limit}&min_contradiction=${minContradiction}`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function fetchContestedClaims(limit = 50): Promise<{ claims: any[] } | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/contested?limit=${limit}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/contested?limit=${limit}`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
@@ -566,7 +567,7 @@ export interface ModelSpec {
 
 export async function fetchModels(): Promise<ModelSpec[]> {
   if (MOCK) return mock.MOCK_MODELS;
-  const res = await fetch(`${BASE}/v1/llm/models`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/v1/llm/models`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return [];
   const json = await res.json();
   return json.value ?? json.models ?? json;
@@ -583,7 +584,7 @@ export interface ConnectorSummary {
 
 export async function fetchConnectors(): Promise<ConnectorSummary[]> {
   if (MOCK) return mock.MOCK_CONNECTORS;
-  const res = await fetch(`${BASE}/v1/executor/connectors`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/v1/executor/connectors`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return [];
   const json = await res.json();
   return json.value ?? json.connectors ?? json;
@@ -670,7 +671,7 @@ export async function resolveArticle(slug: string, action: "approve" | "correct"
 export async function fetchHealth(): Promise<{ article_count?: number } | null> {
   if (MOCK) return { article_count: 0 };
   try {
-    const res = await fetch(`${BASE}/health`, { cache: "no-store" });
+    const res = await fetch(`${BASE}/health`, { cache: "no-store", credentials: "include" });
     if (!res.ok) return null;
     return res.json();
   } catch {
