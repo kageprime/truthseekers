@@ -300,7 +300,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         style={{ width: "100%" }}
       >
         <div className="bezel-inner">
-      <article className="px-4 sm:px-8 md:px-12 py-8 sm:py-10 w-full animate-appear-up">
+      <article className="px-3 sm:px-5 py-6 sm:py-8 w-full animate-appear-up">
         {/* Back link — gold badge with hover arrow */}
         <button
           onClick={() => router.back()}

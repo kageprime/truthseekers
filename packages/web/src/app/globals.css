@@ -384,13 +384,13 @@ body::before {
 .mag-flow {
   display: flow-root;
   width: 100%;
-  font-size: 1.08rem;
-  line-height: 1.9;
+  font-size: 1.02rem;
+  line-height: 1.55;
 }
 @media (min-width: 1024px) {
   .mag-flow {
     columns: 2;
-    column-gap: 3rem;
+    column-gap: 2rem;
     column-rule: 1px solid var(--rule);
   }
 }
@@ -404,24 +404,28 @@ body::before {
 .mag-float {
   break-inside: avoid;
 }
+/* Newsprint rhythm inside the spread only — shared blocks keep their
+   airier defaults everywhere else. */
+.mag-flow .figure-plate { margin: 1rem 0; }
+.mag-flow .pull-quote { margin: 1.25rem 0; }
 .mag-float-right {
   float: right;
   shape-outside: margin-box;
-  shape-margin: 1.25rem;
-  margin: 0.5rem 0 1rem 1.5rem;
+  shape-margin: 1rem;
+  margin: 0.35rem 0 0.75rem 1rem;
 }
 .mag-float-left {
   float: left;
   shape-outside: margin-box;
-  shape-margin: 1.25rem;
-  margin: 0.5rem 1.5rem 1rem 0;
+  shape-margin: 1rem;
+  margin: 0.35rem 1rem 0.75rem 0;
 }
 .mag-size-s { width: min(42%, 230px); }
 .mag-size-m { width: min(56%, 340px); }
 .mag-size-l {
   float: none;
   width: 100%;
-  margin: 1.5rem 0;
+  margin: 1rem 0;
   column-span: all;
   shape-outside: none;
 }
