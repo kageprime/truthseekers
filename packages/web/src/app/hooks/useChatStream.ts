@@ -30,6 +30,7 @@ export function useChatStream() {
           method: "POST",
           keepalive: true,
           headers: { ...authHeaders() },
+          credentials: "include",
         }).catch(() => {});
       } catch {}
     }
@@ -46,6 +47,7 @@ export function useChatStream() {
       const res = await fetch(chatProgressUrl(id), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
+        credentials: "include",
         body: JSON.stringify({ content: msg, ...(model ? { model } : {}) }),
         signal: controller.signal,
       });

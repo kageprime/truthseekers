@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/kageprime/veritas/go-orchestrator/internal/api"
@@ -71,7 +72,7 @@ func main() {
 	<-stop
 	log.Println("Shutting down VERITAS Go Orchestrator...")
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	server.SessionEngine().Stop()

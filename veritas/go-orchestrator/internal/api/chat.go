@@ -148,7 +148,12 @@ func (s *Server) handleChatRoot(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Title string `json:"title"`
 		}
-		json.NewDecoder(r.Body).Decode(&body)
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if len(body.Title) > 200 {
+			http.Error(w, `{"error":"Title too long"}`, http.StatusBadRequest)
+			return
+		}
 		if body.Title == "" {
 			body.Title = "New Chat"
 		}
@@ -226,7 +231,8 @@ func (s *Server) handleChatByID(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Title string `json:"title"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Title == "" {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Title == "" || len(body.Title) > 200 {
 			http.Error(w, `{"error":"Title required"}`, http.StatusBadRequest)
 			return
 		}
@@ -287,7 +293,8 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		Content string `json:"content"`
 		Model   string `json:"model"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Content == "" {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Content == "" || len(body.Content) > 50000 || len(body.Model) > 100 {
 		http.Error(w, `{"error":"Message content required"}`, http.StatusBadRequest)
 		return
 	}
@@ -333,7 +340,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	builtins := agent.BuiltinToolExecutors()
-	serverTools := s.createServerToolExecutors(model)
+	serverTools := s.createServerToolExecutors(model, userID)
 	epistemicTools := agent.EpistemicToolExecutors(chatSystemPrompt)
 	allTools := agent.MergeExecutorsWithEpistemic(builtins, serverTools, epistemicTools)
 
@@ -468,7 +475,7 @@ func (s *Server) handleChatStop(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, `{"stopped":%t}`, stopped)
 }
 
-func (s *Server) createServerToolExecutors(model string) map[string]agent.ToolExecutor {
+func (s *Server) createServerToolExecutors(model string, userID string) map[string]agent.ToolExecutor {
 	return map[string]agent.ToolExecutor{
 		"get_article": func(args json.RawMessage) (agent.ToolResult, error) {
 			var p struct{ Slug string `json:"slug"` }
@@ -550,7 +557,9 @@ func (s *Server) createServerToolExecutors(model string) map[string]agent.ToolEx
 			if err := json.Unmarshal(args, &p); err != nil {
 				return agent.ToolResult{Result: "Invalid arguments"}, nil
 			}
-			if err := s.db.MemStore(p.Key, p.Value); err != nil {
+			// ponytail: scope keys per user (S15) — unscoped keys leaked
+			// memories across users sharing the agent.
+			if err := s.db.MemStore(userID+":"+p.Key, p.Value); err != nil {
 				return agent.ToolResult{Result: fmt.Sprintf("Failed to store: %v", err)}, nil
 			}
 			return agent.ToolResult{Result: fmt.Sprintf("Stored \"%s\"", p.Key)}, nil
@@ -560,7 +569,7 @@ func (s *Server) createServerToolExecutors(model string) map[string]agent.ToolEx
 			if err := json.Unmarshal(args, &p); err != nil {
 				return agent.ToolResult{Result: "Invalid arguments"}, nil
 			}
-			v, err := s.db.MemRecall(p.Key)
+			v, err := s.db.MemRecall(userID + ":" + p.Key)
 			if err != nil || v == "" {
 				return agent.ToolResult{Result: fmt.Sprintf("No stored value for \"%s\"", p.Key)}, nil
 			}
@@ -648,7 +657,13 @@ func findToolDef(name string) *agent.ToolDefinition {
 
 func uuidV4() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	// ponytail: fail closed like storage/session randID (S27).
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("uuidV4: entropy unavailable: %v", err))
+	}
+	// RFC 4122 v4 bits (S27).
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
@@ -658,30 +673,26 @@ func userIDFromRequest(r *http.Request) string {
 }
 
 func userAuthFromRequest(r *http.Request) (string, string) {
-	auth := r.Header.Get("Authorization")
-	if auth == "" {
-		log.Printf("🛑 auth: no Authorization header")
+	// ponytail: Bearer first, HttpOnly cookie second (S7). Cookie path lets
+	// cookie-only frontends (no JS-readable token) stay authenticated.
+	tokenStr := ""
+	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+		tokenStr = strings.TrimPrefix(auth, "Bearer ")
+	} else if c, err := r.Cookie("truthseekers_token"); err == nil {
+		tokenStr = c.Value
+	} else {
+		log.Printf("🛑 auth: no credentials")
 		return "", ""
 	}
-	if !strings.HasPrefix(auth, "Bearer ") {
-		log.Printf("🛑 auth: Authorization header missing Bearer prefix: %q", auth[:min(len(auth), 20)])
-		return "", ""
-	}
-	tokenStr := strings.TrimPrefix(auth, "Bearer ")
 	userID, role, err := verifyJWT(tokenStr)
 	if err != nil {
-		log.Printf("🛑 auth: verifyJWT failed: %v (token preview: %q)", err, tokenStr[:min(len(tokenStr), 40)])
+		// ponytail: never log token bytes (S30) — length is enough to spot
+		// truncation vs forgery.
+		log.Printf("🛑 auth: verifyJWT failed: %v (len=%d)", err, len(tokenStr))
 		return "", ""
 	}
 	log.Printf("✓ auth: user=%s role=%s", userID, role)
 	return userID, role
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func storageToAgentMsg(m *storage.StoredMessage) agent.Message {

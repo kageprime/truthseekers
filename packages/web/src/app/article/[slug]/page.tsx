@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 
 async function fetchArticle(slug: string): Promise<Article | null> {
   try {
-    const res = await fetch(`${BASE}/articles/${slug}`, {
+    const res = await fetch(`${BASE}/articles/${encodeURIComponent(slug)}`, {
       next: { revalidate: 60 },
     });
     if (!res.ok) return null;
@@ -19,7 +19,7 @@ async function fetchArticle(slug: string): Promise<Article | null> {
 
 async function fetchArticleClaims(slug: string): Promise<Array<{ id: string; text: string; status?: string; derived_confidence?: number }>> {
   try {
-    const res = await fetch(`${BASE}/articles/${slug}/claims`, {
+    const res = await fetch(`${BASE}/articles/${encodeURIComponent(slug)}/claims`, {
       next: { revalidate: 60 },
     });
     if (!res.ok) return [];
@@ -32,7 +32,7 @@ async function fetchArticleClaims(slug: string): Promise<Array<{ id: string; tex
 
 async function fetchArticleStatus(slug: string): Promise<{ status: string; phase?: string } | null> {
   try {
-    const res = await fetch(`${BASE}/articles/${slug}/status`, {
+    const res = await fetch(`${BASE}/articles/${encodeURIComponent(slug)}/status`, {
       cache: "no-store",
     });
     if (!res.ok) return null;

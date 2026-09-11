@@ -76,6 +76,11 @@ type Connector struct {
 	AuthType    AuthType
 	AccessToken string  // Resolved server-side credential
 	Actions     []NormalizedAction
+	// Scope gates who may invoke this connector (S19). Zero value ("")
+	// means ShareProject. OwnerID + Grants apply to private/member scopes.
+	Scope   ShareScope
+	OwnerID string
+	Grants  SecretGrant
 }
 
 // ── Audit ───────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import MarkdownRenderer from "./MarkdownRenderer";
 import MermaidDiagram from "./MermaidDiagram";
 import { MediaImage, MediaLightbox } from "./MediaImage";
 import { BASE } from "@/lib/constants";
+import { safeSrc, safeUrl } from "@/lib/safe-url";
 import { IconLink, IconLightning } from "./Icons";
 import { parseClaimAnchors } from "@/lib/claim-parser";
 import { ProvenanceChipInline } from "./ProvenanceChip";
@@ -386,8 +387,10 @@ function ImageBlock({ data, figureNum }: { data: ImageBlockData; figureNum?: num
 function VideoBlock({ data, figureNum }: { data: VideoBlockData; figureNum?: number }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   if (!data?.src) return <div className="text-xs italic" style={{ color: "var(--subtle)" }}>Video not available</div>;
-  const videoSrc = data.src.startsWith("/") ? `${BASE}${data.src}` : data.src;
-  const num = figureNum;
+  // ponytail: backend-controlled URL — javascript: etc. must not reach <source> (S20).
+  const rawSrc = safeSrc(data.src);
+  if (!rawSrc) return <div className="text-xs italic" style={{ color: "var(--subtle)" }}>Video not available</div>;
+  const videoSrc = rawSrc.startsWith("/") ? `${BASE}${rawSrc}` : rawSrc;  const num = figureNum;
   return (
     <>
       <figure className="figure-plate mb-4 cursor-pointer" onClick={() => setLightboxOpen(true)}>
@@ -396,7 +399,7 @@ function VideoBlock({ data, figureNum }: { data: VideoBlockData; figureNum?: num
             controls
             className="w-full"
             style={{ maxHeight: "480px" }}
-            poster={data.poster}
+            poster={safeSrc(data.poster)}
           >
             <source src={videoSrc} type="video/mp4" />
           </video>
@@ -464,7 +467,7 @@ function CitationBlock({ data }: { data: CitationBlockData }) {
   const domain = domainOf(data.url);
   return (
     <a
-      href={data.url}
+      href={safeUrl(data.url)}
       target="_blank"
       rel="noopener noreferrer"
       className="group my-2 flex items-start gap-3 rounded-xl border p-3 pr-4 transition-transform duration-300 hover:-translate-y-0.5"

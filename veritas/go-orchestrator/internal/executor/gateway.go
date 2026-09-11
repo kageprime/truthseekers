@@ -38,6 +38,18 @@ func (g *Gateway) HandleCall(input CallInput) CallResult {
 		return CallResult{Status: "error", Reason: fmt.Sprintf("connector %q not found", input.ConnectorSlug)}
 	}
 
+	// 2b. Sharing-scope enforcement (S19): private/member connectors reject
+	// callers outside their grants before policy evaluation or execution.
+	if !IsSecretUsableBy(conn.Scope, conn.Grants, conn.OwnerID, input.UserID) {
+		argsJSON, _ := json.Marshal(input.Args)
+		g.audit(ExecutionRecord{
+			ConnectorSlug: input.ConnectorSlug, Action: "",
+			UserID: input.UserID, SessionID: input.SessionID,
+			Status: "denied", RawArgs: argsJSON,
+		})
+		return CallResult{Status: "denied", Reason: "connector not shared with caller"}
+	}
+
 	// 2. Resolve action.
 	var action *NormalizedAction
 	for _, a := range conn.Actions {

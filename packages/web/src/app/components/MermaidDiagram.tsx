@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import mermaid from "mermaid";
+import DOMPurify from "dompurify";
 
 let mermaidInit = false;
 function ensureMermaid() {
   if (!mermaidInit) {
-    mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+    // ponytail: strict blocks click/link interactions in diagrams (S23).
+    mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "strict" });
     mermaidInit = true;
   }
 }
@@ -34,7 +36,9 @@ export default function MermaidDiagram({ code, caption }: { code?: string; capti
       const id = `mermaid-${Math.random().toString(36).slice(2, 8)}`;
       const { svg } = await mermaid.render(id, trimmed);
       if (containerRef.current) {
-        containerRef.current.innerHTML = svg;
+        // ponytail: sanitize mermaid's SVG before innerHTML (S23) — diagram
+        // code is backend/user controlled and SVG can carry event handlers.
+        containerRef.current.innerHTML = DOMPurify.sanitize(svg);
         setState("rendered");
       }
     } catch (err) {

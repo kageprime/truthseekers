@@ -6,44 +6,55 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"regexp"
+	"strings"
 )
 
-// WebhookHandler returns an http.Handler that verifies HMAC and dispatches.
-// The secret is used to validate the X-Signature-256 header. When empty,
-// HMAC verification is skipped (dev mode).
+// webhookSlugRe whitelists slugs to block traversal / nested paths.
+var webhookSlugRe = regexp.MustCompile(`^[a-z0-9-]+$`)
+
+// WebhookHandler returns an http.Handler that verifies HMAC over the raw body
+// and dispatches. Secret is required — empty means 503, never open (S10).
 func WebhookHandler(secret string, fn Fn) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "use POST", http.StatusMethodNotAllowed)
 			return
 		}
-		if secret != "" {
-			sig := r.Header.Get("X-Signature-256")
-			if sig == "" {
-				http.Error(w, "missing signature", http.StatusUnauthorized)
-				return
-			}
-			body := make([]byte, r.ContentLength)
-			r.Body.Read(body)
-			mac := hmac.New(sha256.New, []byte(secret))
-			mac.Write(body)
-			expected := hex.EncodeToString(mac.Sum(nil))
-			if !hmac.Equal([]byte(sig), []byte(expected)) {
-				http.Error(w, "invalid signature", http.StatusForbidden)
-				return
-			}
-		}
-		slug := r.PathValue("slug")
-		if slug == "" {
-			http.Error(w, "missing slug", http.StatusBadRequest)
+		if secret == "" {
+			http.Error(w, "webhook not configured", http.StatusServiceUnavailable)
 			return
 		}
-		var body struct {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "unreadable body", http.StatusBadRequest)
+			return
+		}
+		sig := strings.TrimPrefix(r.Header.Get("X-Signature-256"), "sha256=")
+		if sig == "" {
+			http.Error(w, "missing signature", http.StatusUnauthorized)
+			return
+		}
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write(body)
+		expected := hex.EncodeToString(mac.Sum(nil))
+		if !hmac.Equal([]byte(sig), []byte(expected)) {
+			http.Error(w, "invalid signature", http.StatusForbidden)
+			return
+		}
+		slug := r.PathValue("slug")
+		if slug == "" || !webhookSlugRe.MatchString(slug) {
+			http.Error(w, "invalid slug", http.StatusBadRequest)
+			return
+		}
+		var parsed struct {
 			Params map[string]string `json:"params,omitempty"`
 		}
-		json.NewDecoder(r.Body).Decode(&body)
-		params := body.Params
+		_ = json.Unmarshal(body, &parsed)
+		params := parsed.Params
 		if params == nil {
 			params = make(map[string]string)
 		}

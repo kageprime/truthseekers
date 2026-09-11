@@ -8,6 +8,7 @@ import { useTheme } from "../components/ThemeProvider";
 import { useQuota, useUpdateProfile, useStripePortal } from "../hooks";
 import PageLayout from "../components/PageLayout";
 import { IconUser, IconLightning, IconPalette, IconLogout, IconCheck, IconX, IconTrash } from "../components/Icons";
+import { safeCheckoutUrl } from "@/lib/safe-url";
 
 const tierMeta: Record<string, { label: string; bg: string; fg: string }> = {
   free: { label: "Free", bg: "color-mix(in srgb, var(--subtle) 10%, transparent)", fg: "var(--subtle)" },
@@ -34,7 +35,8 @@ export default function SettingsPage() {
   async function handlePortal() {
     try {
       const data = await portal();
-      if (data?.url) window.location.href = data.url;
+      const url = safeCheckoutUrl(data?.url);
+      if (url) window.location.href = url;
     } catch {}
   }
 

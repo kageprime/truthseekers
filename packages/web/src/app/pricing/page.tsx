@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAuth, useStripeCheckout } from "../hooks";
 import { IconCheck, IconLightning } from "../components/Icons";
+import { safeCheckoutUrl } from "@/lib/safe-url";
 
 const PLANS = [
   {
@@ -69,7 +70,8 @@ export default function PricingPage() {
     setLoading(priceId);
     try {
       const data = await checkout(priceId);
-      if (data?.url) window.location.href = data.url;
+      const url = safeCheckoutUrl(data?.url);
+      if (url) window.location.href = url;
     } catch {}
     setLoading(null);
   }

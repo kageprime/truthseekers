@@ -95,10 +95,18 @@ func extractLiveSignal(event string, data interface{}) (phase, text string) {
 	return phase, text
 }
 
-func registerProgressChannel(slug string, ch chan string) {
+// maxProgressSubsPerSlug caps SSE watchers per article (S17) — unbounded
+// subscribers let one slug pin memory + fanout CPU.
+const maxProgressSubsPerSlug = 100
+
+func registerProgressChannel(slug string, ch chan string) bool {
 	progressChannelsMu.Lock()
 	defer progressChannelsMu.Unlock()
+	if len(progressChannels[slug]) >= maxProgressSubsPerSlug {
+		return false
+	}
 	progressChannels[slug] = append(progressChannels[slug], ch)
+	return true
 }
 
 func unregisterProgressChannel(slug string, ch chan string) {
@@ -127,6 +135,9 @@ func (s *Server) handleListArticles(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 		limit = l
+	}
+	if limit > 100 {
+		limit = 100 // S14: bound page size — unbounded LIMIT is a DB DoS
 	}
 	offset := 0
 	if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
@@ -172,6 +183,13 @@ func (s *Server) handleSearchArticles(w http.ResponseWriter, r *http.Request) {
 	limit := 10
 	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 		limit = l
+	}
+	if limit > 50 {
+		limit = 50 // S14: ILIKE scan — keep it small
+	}
+	if len(q) > 200 {
+		http.Error(w, `{"error":"query too long"}`, http.StatusBadRequest)
+		return
 	}
 
 	if q == "" {
@@ -232,7 +250,12 @@ type GenerateRequest struct {
 func (s *Server) handleGenerateArticle(w http.ResponseWriter, r *http.Request, slug string) {
 	reqLog(r, "generate article slug=%s", slug)
 	var req GenerateRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	_ = json.NewDecoder(r.Body).Decode(&req)
+	if len(req.Persona) > 50 {
+		http.Error(w, `{"error":"persona too long"}`, http.StatusBadRequest)
+		return
+	}
 	if req.Persona == "" {
 		req.Persona = "veritas"
 	}
@@ -288,8 +311,26 @@ func (s *Server) handleRefreshArticle(w http.ResponseWriter, r *http.Request, sl
 	w.Write([]byte(fmt.Sprintf(`{"status":"queued","slug":"%s"}`, slug)))
 }
 
-func (s *Server) handleExportArticle(w http.ResponseWriter, r *http.Request, slug string) {
-	reqLog(r, "export article slug=%s", slug)
+// exportFilename sanitizes a slug for Content-Disposition (S16): lowercase
+// alnum + hyphen only, .md suffix, fallback article.md on empty.
+func exportFilename(slug string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(slug) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			b.WriteRune(r)
+		}
+	}
+	name := b.String()
+	if name == "" {
+		name = "article"
+	}
+	if len(name) > 100 {
+		name = name[:100]
+	}
+	return name + ".md"
+}
+
+func (s *Server) handleExportArticle(w http.ResponseWriter, r *http.Request, slug string) {	reqLog(r, "export article slug=%s", slug)
 	article, err := s.db.GetArticle(slug)
 	if err != nil || article == nil {
 		http.Error(w, "Article not found", http.StatusNotFound)
@@ -299,7 +340,9 @@ func (s *Server) handleExportArticle(w http.ResponseWriter, r *http.Request, slu
 	format := r.URL.Query().Get("format")
 	if format == "markdown" {
 		w.Header().Set("Content-Type", "text/markdown")
-		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.md"`, slug))
+		// ponytail: slug is URL-controlled — whitelist for the header (S16).
+		name := exportFilename(slug)
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, name, name))
 		w.Write([]byte(article.Abstract))
 		return
 	}
@@ -312,8 +355,13 @@ func (s *Server) handleResolveArticle(w http.ResponseWriter, r *http.Request, sl
 	reqLog(r, "resolve article slug=%s", slug)
 	// HITL Resolve Webhook stub
 	var body map[string]string
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	action := body["action"]
+	if len(action) > 50 {
+		http.Error(w, `{"error":"action too long"}`, http.StatusBadRequest)
+		return
+	}
 
 	_ = s.db.SaveJob(slug, "writing", "write", map[string]interface{}{"action": action})
 
@@ -786,10 +834,18 @@ func (s *Server) handleGetQueue(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleTrack(w http.ResponseWriter, r *http.Request) {
 	reqLog(r, "track")
-	var body map[string]string
-	_ = json.NewDecoder(r.Body).Decode(&body)
-	slug := body["slug"]
-	event := body["event"]
+	var body trackReq
+	if !getValidatedBody(r, &body) {
+		if !decodeBody(w, r, &body) {
+			return
+		}
+		if err := checkBody(&body); err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusBadRequest)
+			return
+		}
+	}
+	slug := body.Slug
+	event := body.Event
 	if event == "" {
 		event = "view"
 	}
@@ -844,7 +900,8 @@ func (s *Server) handleSubmitGapEvidence(w http.ResponseWriter, r *http.Request)
 		URL  string `json:"url"`
 		Note string `json:"note"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.URL == "" {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.URL == "" || len(body.URL) > 2000 || len(body.Note) > 5000 {
 		http.Error(w, `{"error":"url is required"}`, http.StatusBadRequest)
 		return
 	}
@@ -953,6 +1010,10 @@ func (s *Server) handleGetTopArticles(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetArticleProgress streams SSE progress events to the frontend.
+// In-progress claim text is only streamed to authenticated watchers (S17) —
+// anonymous clients get heartbeats + the final article_complete. Generation
+// itself requires auth, so legitimate watchers always have a session (the
+// browser sends the HttpOnly cookie on same-origin EventSource automatically).
 func (s *Server) handleGetArticleProgress(w http.ResponseWriter, r *http.Request, slug string) {
 	reqLog(r, "article progress slug=%s", slug)
 	flusher, ok := w.(http.Flusher)
@@ -965,17 +1026,25 @@ func (s *Server) handleGetArticleProgress(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
+	authed := userIDFromRequest(r) != ""
+
 	ch := make(chan string, 64)
-	registerProgressChannel(slug, ch)
+	if !registerProgressChannel(slug, ch) {
+		http.Error(w, `{"error":"too many watchers"}`, http.StatusTooManyRequests)
+		return
+	}
 	defer unregisterProgressChannel(slug, ch)
 
-	// Replay ring buffer for late-joining subscribers
-	progressRingMu.RLock()
-	ring := progressRing[slug]
-	progressRingMu.RUnlock()
-	for _, msg := range ring {
-		w.Write([]byte(msg))
-		flusher.Flush()
+	// Replay ring buffer for late-joining AUTHENTICATED subscribers only —
+	// the ring holds in-progress claim text.
+	if authed {
+		progressRingMu.RLock()
+		ring := progressRing[slug]
+		progressRingMu.RUnlock()
+		for _, msg := range ring {
+			w.Write([]byte(msg))
+			flusher.Flush()
+		}
 	}
 
 	// Stream initial heartbeat or status
@@ -988,6 +1057,11 @@ func (s *Server) handleGetArticleProgress(w http.ResponseWriter, r *http.Request
 		case <-ctx.Done():
 			return
 		case msg := <-ch:
+			// ponytail: fail-closed — anonymous sees only completion.
+			// progress + agent_event carry claim text / retrieved sources.
+			if !authed && !strings.HasPrefix(msg, "event: article_complete") {
+				continue
+			}
 			w.Write([]byte(msg))
 			flusher.Flush()
 		case <-time.After(15 * time.Second):

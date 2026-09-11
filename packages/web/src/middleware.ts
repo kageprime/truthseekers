@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Routes that require authentication
-const PROTECTED_ROUTES = ["/chat", "/admin", "/settings", "/onboarding"];
+// Routes that require authentication. Presence-only check (S25): the cookie
+// existing doesn't prove validity — backend auth is the real gate. Client
+// user.role is display-only for the same reason.
+const PROTECTED_ROUTES = ["/chat", "/admin", "/settings", "/onboarding", "/article/new", "/queue"];
 
 // Routes that are exclusively for unauthenticated users
 const AUTH_ROUTES = ["/login"];

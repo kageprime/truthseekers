@@ -2,9 +2,13 @@ package agent
 
 import (
 	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -277,24 +281,122 @@ func RealRetrieveDocuments(query string) ([]RetrievedDoc, error) {
 	return allDocs, nil
 }
 
-// fetchURLText does a simple HTTP GET and strips HTML to return plain text.
+// fetchURLText does a guarded HTTP GET and strips HTML to plain text (S8).
 func fetchURLText(rawURL string) string {
-	client := &http.Client{Timeout: 15 * time.Second}
-	req, _ := http.NewRequest("GET", rawURL, nil)
-	req.Header.Set("User-Agent", "Truthseekers/1.0 (encyclopedia agent)")
-	resp, err := client.Do(req)
+	text, err := fetchSafeText(rawURL, 8000)
 	if err != nil {
 		return ""
 	}
+	return text
+}
+
+// fetchSafeText fetches a URL with SSRF guards: http/https only, no
+// loopback/link-local/private targets (checked at resolve + dial time to
+// blunt DNS rebinding), ≤3 redirects, 2 MB cap.
+func fetchSafeText(rawURL string, maxChars int) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return "", fmt.Errorf("blocked URL")
+	}
+	if hostBlocked(u.Hostname()) {
+		return "", fmt.Errorf("blocked host")
+	}
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "Truthseekers/1.0 (encyclopedia agent)")
+	resp, err := safeClient().Do(req)
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return ""
+		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
-	body, _ := io.ReadAll(resp.Body)
-	text := string(body)
-	text = tagRegex.ReplaceAllString(text, "")
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	text := tagRegex.ReplaceAllString(string(body), "")
 	text = wsRegex.ReplaceAllString(text, " ")
-	return strings.TrimSpace(text)
+	text = strings.TrimSpace(text)
+	if len(text) > maxChars {
+		text = text[:maxChars]
+	}
+	return text, nil
+}
+
+// safeClient returns an HTTP client that refuses private targets. Redirects
+// are capped at 3 and re-validated for scheme; the dialer re-resolves the
+// host so a redirect/DNS swap to 169.254.x or localhost still fails.
+func safeClient() *http.Client {
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				host = addr
+			}
+			if hostBlocked(host) {
+				return nil, fmt.Errorf("blocked host")
+			}
+			if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil {
+				if blockedIP(ip) {
+					return nil, fmt.Errorf("blocked IP")
+				}
+				return dialer.DialContext(ctx, network, addr)
+			}
+			ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+			if err != nil || len(ips) == 0 {
+				return nil, fmt.Errorf("DNS failed")
+			}
+			for _, ip := range ips {
+				if blockedIP(ip.IP) {
+					return nil, fmt.Errorf("blocked IP")
+				}
+			}
+			return dialer.DialContext(ctx, network, addr)
+		},
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+	return &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 3 {
+				return fmt.Errorf("too many redirects")
+			}
+			if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
+				return fmt.Errorf("blocked redirect")
+			}
+			if hostBlocked(req.URL.Hostname()) {
+				return fmt.Errorf("blocked redirect host")
+			}
+			return nil
+		},
+	}
+}
+
+func blockedIP(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsMulticast() || ip.IsUnspecified() || ip.IsPrivate()
+}
+
+// hostBlocked catches literal/metadata names without DNS. IP literals are
+// checked via blockedIP at resolve/dial time.
+func hostBlocked(host string) bool {
+	h := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
+	if h == "" {
+		return true
+	}
+	if h == "localhost" || strings.HasSuffix(h, ".localhost") {
+		return true
+	}
+	if h == "metadata.google.internal" || h == "metadata.google.internal." {
+		return true
+	}
+	if ip := net.ParseIP(strings.Trim(h, "[]")); ip != nil {
+		return blockedIP(ip)
+	}
+	return false
 }
 
 // shortHash returns the first 8 hex chars of an MD5 hash of s (used for
@@ -484,24 +586,9 @@ func webFetchExecutor(args json.RawMessage) (ToolResult, error) {
 	if err := json.Unmarshal(args, &p); err != nil || p.URL == "" {
 		return ToolResult{Result: "Invalid URL"}, nil
 	}
-	client := &http.Client{Timeout: 15 * time.Second}
-	req, _ := http.NewRequest("GET", p.URL, nil)
-	req.Header.Set("User-Agent", "Truthseekers/1.0 (encyclopedia agent)")
-	resp, err := client.Do(req)
+	text, err := fetchSafeText(p.URL, 8000)
 	if err != nil {
-		return ToolResult{Result: fmt.Sprintf("Fetch failed: %v", err)}, nil
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return ToolResult{Result: fmt.Sprintf("HTTP %d: %s", resp.StatusCode, resp.Status)}, nil
-	}
-	raw, _ := io.ReadAll(resp.Body)
-	text := string(raw)
-	text = tagRegex.ReplaceAllString(text, "")
-	text = wsRegex.ReplaceAllString(text, " ")
-	text = strings.TrimSpace(text)
-	if len(text) > 8000 {
-		text = text[:8000]
+		return ToolResult{Result: fmt.Sprintf("Fetch refused/failed: %v", err)}, nil
 	}
 	return ToolResult{Result: text}, nil
 }
@@ -514,21 +601,9 @@ func verifyCitationExecutor(args json.RawMessage) (ToolResult, error) {
 	if err := json.Unmarshal(args, &p); err != nil {
 		return ToolResult{Result: `{"supported":false,"confidence":0,"explanation":"Invalid arguments"}`}, nil
 	}
-	client := &http.Client{Timeout: 15 * time.Second}
-	req, _ := http.NewRequest("GET", p.SourceURL, nil)
-	req.Header.Set("User-Agent", "Truthseekers/1.0 (encyclopedia agent)")
-	resp, err := client.Do(req)
+	text, err := fetchSafeText(p.SourceURL, 6000)
 	if err != nil {
 		return ToolResult{Result: fmt.Sprintf(`{"supported":false,"confidence":0,"explanation":"Failed to fetch: %v"}`, err)}, nil
-	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
-	html := string(raw)
-	text := tagRegex.ReplaceAllString(html, " ")
-	text = wsRegex.ReplaceAllString(text, " ")
-	text = strings.TrimSpace(text)
-	if len(text) > 6000 {
-		text = text[:6000]
 	}
 	if text == "" {
 		return ToolResult{Result: `{"supported":false,"confidence":0,"explanation":"No readable text extracted from source"}`}, nil
@@ -600,10 +675,18 @@ func generateImageExecutor(args json.RawMessage) (ToolResult, error) {
 		imageDir = wd + "/public/images"
 	}
 	os.MkdirAll(imageDir, 0755)
-	filename := fmt.Sprintf("chat-%d.png", time.Now().UnixMilli())
+	// ponytail: decode payload + random name (S18, same as server executor).
+	raw, err := base64.StdEncoding.DecodeString(doResp.Data[0].B64JSON)
+	if err != nil || len(raw) == 0 || len(raw) > 10<<20 {
+		return ToolResult{Result: "Image generation returned an invalid result"}, nil
+	}
+	var rb [8]byte
+	if _, err := rand.Read(rb[:]); err != nil {
+		return ToolResult{Result: "Image save failed: entropy unavailable"}, nil
+	}
+	filename := fmt.Sprintf("chat-%x.png", rb)
 	path := imageDir + "/" + filename
-	decoded := doResp.Data[0].B64JSON
-	if err := os.WriteFile(path, []byte(decoded), 0644); err != nil {
+	if err := os.WriteFile(path, raw, 0644); err != nil {
 		return ToolResult{Result: fmt.Sprintf("Image save failed: %v", err)}, nil
 	}
 	publicURL := os.Getenv("ENCARTA_PUBLIC_URL")

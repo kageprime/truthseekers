@@ -16,14 +16,18 @@ type SecretGrant struct {
 }
 
 // IsSecretUsableBy checks if a subject (userID) may use a connector given its
-// sharing scope and grants.
-func IsSecretUsableBy(scope ShareScope, grants SecretGrant, userID string) bool {
+// sharing scope, grants, and author. Empty scope means ShareProject (all
+// built-in connectors) for backward compatibility. SharePrivate requires an
+// exact owner match — fail closed when owner is unknown.
+func IsSecretUsableBy(scope ShareScope, grants SecretGrant, ownerID, userID string) bool {
+	if scope == "" {
+		scope = ShareProject
+	}
 	switch scope {
 	case ShareProject:
 		return true
 	case SharePrivate:
-		// Only the author — would need an authorID field; for now, allow all.
-		return true
+		return ownerID != "" && userID != "" && ownerID == userID
 	case ShareMembers:
 		for _, uid := range grants.UserIDs {
 			if uid == userID {

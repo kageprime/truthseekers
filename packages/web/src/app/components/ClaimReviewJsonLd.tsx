@@ -51,7 +51,8 @@ export default function ClaimReviewJsonLd({ slug, article, claims }: ClaimReview
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(payload) }}
+      // ponytail: escape < so claim text containing </script> can't break out (S21).
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(payload).replace(/</g, "\\u003c") }}
     />
   );
 }

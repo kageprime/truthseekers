@@ -3,12 +3,19 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -92,7 +99,8 @@ type agentRun struct {
 // Middleware: Rate Limiting + Authorization
 // ────────────────────────────────────────────────────────────
 
-// rateLimiter provides simple in-memory token-bucket rate limiting per IP.
+// rateLimiter provides simple in-memory token-bucket rate limiting per key
+// (IP for outer middleware, userID for inner per-user middleware).
 type rateLimiter struct {
 	mu       sync.Mutex
 	buckets  map[string]*tokenBucket
@@ -106,11 +114,27 @@ type tokenBucket struct {
 }
 
 func newRateLimiter(rate int, window time.Duration) *rateLimiter {
-	return &rateLimiter{
+	rl := &rateLimiter{
 		buckets: make(map[string]*tokenBucket),
 		rate:    rate,
 		window:  window,
 	}
+	// ponytail: evict stale buckets so the map can't grow unbounded (S12).
+	go func() {
+		ticker := time.NewTicker(window)
+		defer ticker.Stop()
+		for range ticker.C {
+			now := time.Now()
+			rl.mu.Lock()
+			for k, b := range rl.buckets {
+				if now.Sub(b.lastRefill) >= 2*rl.window {
+					delete(rl.buckets, k)
+				}
+			}
+			rl.mu.Unlock()
+		}
+	}()
+	return rl
 }
 
 func (rl *rateLimiter) allow(ip string) bool {
@@ -132,7 +156,24 @@ func (rl *rateLimiter) allow(ip string) bool {
 func (rl *rateLimiter) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := clientIP(r)
-		if !rl.allow(ip) {
+		if !rl.allow("ip:"+ip) {
+			http.Error(w, `{"error":"rate limit exceeded"}`, http.StatusTooManyRequests)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// userMiddleware limits by authenticated userID. Chain AFTER authMiddleware:
+// chain(limiter, auth, userLimiter)(h). Falls back to IP when no user in ctx
+// (shouldn't happen behind auth, but safe for tests).
+func (rl *rateLimiter) userMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := "user:" + userIDFromContext(r.Context())
+		if key == "user:" {
+			key = "ip:" + clientIP(r)
+		}
+		if !rl.allow(key) {
 			http.Error(w, `{"error":"rate limit exceeded"}`, http.StatusTooManyRequests)
 			return
 		}
@@ -141,13 +182,21 @@ func (rl *rateLimiter) middleware(next http.Handler) http.Handler {
 }
 
 func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		return strings.Split(xff, ",")[0]
+	// ponytail: XFF/X-Real-IP are attacker-controlled unless a trusted proxy
+	// strips them. Only honor them when TRUST_PROXY=1 (S12).
+	if os.Getenv("TRUST_PROXY") == "1" {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			return strings.TrimSpace(strings.Split(xff, ",")[0])
+		}
+		if xri := r.Header.Get("X-Real-IP"); xri != "" {
+			return strings.TrimSpace(xri)
+		}
 	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
 	}
-	return strings.Split(r.RemoteAddr, ":")[0]
+	return host
 }
 
 // authMiddleware validates JWT and injects userID/role into request context.
@@ -192,11 +241,20 @@ func requireCtxAuth(w http.ResponseWriter, r *http.Request) bool {
 }
 
 // requireRole ensures the user has at least the minimum role for the resource.
+// The role is re-fetched from the DB (S11) so a stale/forged token role can't
+// escalate: demote a user and their old JWT stops working on privileged
+// routes within one request. Fail closed on DB error / unknown user.
 func (s *Server) requireRole(minRole string, resourceType string, resourceID string, action string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return s.authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID := r.Context().Value("userID").(string)
 			userRole := r.Context().Value("userRole").(string)
-			_ = r.Context().Value("userID").(string)
+			if u, err := s.db.GetUser(userID); err != nil || u == nil {
+				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+				return
+			} else if u.Role != "" {
+				userRole = u.Role
+			}
 
 			var projectRole *iam.ProjectRole
 			// For now, we don't have project membership - use implicit role
@@ -235,9 +293,10 @@ func chain(middlewares ...func(http.Handler) http.Handler) func(http.Handler) ht
 	}
 }
 
-// validateBody wraps a handler to validate the JSON request body against a struct.
-// Usage: validateBody(&MyStruct{}, handler) where MyStruct has validation tags.
-// Only validates on POST/PUT/PATCH methods.
+// validateBody caps the body at 1 MB, decodes it once into the model,
+// hand-checks lengths (the `validate:` tags are documentation — no validator
+// lib is wired), and re-wraps r.Body so handlers that re-decode still work.
+// Store + retrieve via getValidatedBody to avoid double-decode.
 func validateBody(model interface{}) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -245,8 +304,11 @@ func validateBody(model interface{}) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			// Limit body size to prevent abuse (1MB)
-			r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+			raw, err := io.ReadAll(io.LimitReader(r.Body, (1<<20)+1))
+			if err != nil || len(raw) > 1<<20 {
+				http.Error(w, `{"error":"body too large"}`, http.StatusRequestEntityTooLarge)
+				return
+			}
 			var target interface{}
 			switch v := model.(type) {
 			case func() interface{}:
@@ -254,15 +316,84 @@ func validateBody(model interface{}) func(http.Handler) http.Handler {
 			default:
 				target = model
 			}
-			if err := json.NewDecoder(r.Body).Decode(target); err != nil {
+			if err := json.Unmarshal(raw, target); err != nil {
 				http.Error(w, `{"error":"Invalid JSON body"}`, http.StatusBadRequest)
 				return
 			}
-			// Store validated body in context for handler to retrieve
+			if err := checkBody(target); err != nil {
+				http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusBadRequest)
+				return
+			}
+			// Re-wrap so downstream re-decodes see the same bytes (S13).
+			r.Body = io.NopCloser(bytes.NewReader(raw))
 			ctx := context.WithValue(r.Context(), "validatedBody", target)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// checkBody enforces the required/max lengths declared on the Validation
+// request types. Keep in sync when adding fields.
+func checkBody(target interface{}) error {
+	tooLong := func(name string, s string, max int) error {
+		if len(s) > max {
+			return fmt.Errorf("%s too long (max %d)", name, max)
+		}
+		return nil
+	}
+	switch t := target.(type) {
+	case *generateArticleReq:
+		return tooLong("persona", t.Persona, 50)
+	case *credentialsReq:
+		if t.Service == "" || t.Token == "" {
+			return fmt.Errorf("service and token required")
+		}
+		if err := tooLong("service", t.Service, 100); err != nil {
+			return err
+		}
+		return tooLong("token", t.Token, 5000)
+	case *adminSettingsReq:
+		if len(t.Settings) == 0 {
+			return fmt.Errorf("no settings provided")
+		}
+		return nil
+	case *createChatReq:
+		return tooLong("title", t.Title, 200)
+	case *updateChatReq:
+		if t.Title == "" {
+			return fmt.Errorf("title required")
+		}
+		return tooLong("title", t.Title, 200)
+	case *sendMessageReq:
+		if t.Content == "" {
+			return fmt.Errorf("content required")
+		}
+		if err := tooLong("content", t.Content, 50000); err != nil {
+			return err
+		}
+		return tooLong("model", t.Model, 100)
+	case *trackReq:
+		if t.Slug == "" {
+			return fmt.Errorf("slug required")
+		}
+		if err := tooLong("slug", t.Slug, 200); err != nil {
+			return err
+		}
+		return tooLong("event", t.Event, 50)
+	default:
+		return nil
+	}
+}
+
+// decodeBody caps an unprotected handler body at 1 MB and decodes once.
+// Use at every json.NewDecoder(r.Body) site NOT behind validateBody.
+func decodeBody(w http.ResponseWriter, r *http.Request, dst interface{}) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		http.Error(w, `{"error":"Invalid JSON body"}`, http.StatusBadRequest)
+		return false
+	}
+	return true
 }
 
 // validatedBody retrieves the validated request body from context.
@@ -506,9 +637,13 @@ func (s *Server) resolveConnectorLocal(projectID, slug string) (*executor.Connec
 	}
 }
 
-// recordExecutionLocal is the audit sink for the executor gateway. For now it logs;
-// in production it writes to the DB.
+// recordExecutionLocal is the audit sink for the executor gateway. Persists
+// to executor_audit (S19, migration 008) and logs; DB failure never fails
+// the tool call itself.
 func (s *Server) recordExecutionLocal(rec executor.ExecutionRecord) error {
+	if err := s.db.SaveExecution(rec.ConnectorSlug, rec.Action, rec.UserID, rec.SessionID, rec.Status, string(rec.Risk)); err != nil {
+		log.Printf("[executor] audit persist failed: %v", err)
+	}
 	log.Printf("[executor] %s/%s by %s → %s (risk=%s)", rec.ConnectorSlug, rec.Action, rec.UserID, rec.Status, rec.Risk)
 	return nil
 }
@@ -602,9 +737,18 @@ func (s *Server) generateImageExecutorCustom(input executor.CallInput, conn *exe
 		imageDir = wd + "/public/images"
 	}
 	os.MkdirAll(imageDir, 0755)
-	filename := fmt.Sprintf("chat-%d.png", time.Now().UnixMilli())
+	// ponytail: decode the payload (S18) — the old code wrote base64 TEXT to
+	// a .png. Random name so outputs aren't enumerable.
+	raw, err := base64.StdEncoding.DecodeString(doResp.Data[0].B64JSON)
+	if err != nil {
+		return executor.CallResult{Status: "error", Reason: "invalid image payload"}
+	}
+	if len(raw) == 0 || len(raw) > 10<<20 {
+		return executor.CallResult{Status: "error", Reason: "invalid image size"}
+	}
+	filename := fmt.Sprintf("chat-%s.png", randFilename())
 	path := imageDir + "/" + filename
-	if err := os.WriteFile(path, []byte(doResp.Data[0].B64JSON), 0644); err != nil {
+	if err := os.WriteFile(path, raw, 0644); err != nil {
 		return executor.CallResult{Status: "error", Reason: fmt.Sprintf("save failed: %v", err)}
 	}
 	publicURL := os.Getenv("ENCARTA_PUBLIC_URL")
@@ -617,6 +761,17 @@ func (s *Server) generateImageExecutorCustom(input executor.CallInput, conn *exe
 	}
 	data, _ := json.Marshal(map[string]string{"url": src, "caption": caption})
 	return executor.CallResult{Status: "ok", Data: json.RawMessage(data)}
+}
+
+// randFilename returns 16 hex chars from crypto/rand for image names.
+func randFilename() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// ponytail: fallback is time-based but still non-sequential enough
+		// for a filename; crypto failure is already unlikely.
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b[:])
 }
 
 // webSearchExecutorCustom is a custom executor for web_search that calls Tavily
@@ -742,13 +897,23 @@ func (s *Server) setupRoutes() {
 	authLimiter := newRateLimiter(10, time.Minute)  // 10 req/min for auth
 	chatLimiter := newRateLimiter(30, time.Minute)   // 30 req/min for chat
 	apiLimiter := newRateLimiter(60, time.Minute)    // 60 req/min for general API
+	userLimiter := newRateLimiter(60, time.Minute)   // 60 req/min per user (S12)
 
-	// Mount executor gateway routes.
+	// Mount executor gateway routes — call path is authed (S5): anon callers
+	// must not burn server-side keys. Connectors list stays rate-limited
+	// public (empty stub, used by admin debug UI pre-login).
 	execHandler := &executor.Handler{Gateway: s.executorGateway}
-	execHandler.RegisterRoutes(s.mux)
+	s.mux.Handle("/v1/executor/call", chain(apiLimiter.middleware, s.authMiddleware, userLimiter.userMiddleware)(http.HandlerFunc(execHandler.HandleCallHTTP)))
+	s.mux.Handle("/v1/executor/connectors", chain(apiLimiter.middleware)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"connectors":[]}`))
+	})))
 
-	// Mount LLM gateway routes.
-	s.llmGateway.RegisterRoutes(s.mux)
+	// Mount LLM gateway routes — completions + usage are authed per-user
+	// (S5); catalog stays public (no key spend, needed by chat model picker).
+	s.mux.Handle("/v1/llm/completions", chain(apiLimiter.middleware, s.authMiddleware, userLimiter.userMiddleware)(http.HandlerFunc(s.llmGateway.HandleCompletion)))
+	s.mux.Handle("/v1/llm/usage", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.llmGateway.HandleUsage)))
+	s.mux.Handle("/v1/llm/models", chain(apiLimiter.middleware)(http.HandlerFunc(s.llmGateway.HandleModels)))
 
 	// Health - no auth, no rate limit (for load balancers)
 	s.mux.Handle("/health", chain()(http.HandlerFunc(s.handleHealth)))
@@ -764,9 +929,11 @@ func (s *Server) setupRoutes() {
 	s.mux.Handle("/auth/signup/activate", chain(authLimiter.middleware)(http.HandlerFunc(s.handleSignupActivate)))
 	s.mux.Handle("/auth/me", chain(authLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleAuthMe)))
 	s.mux.Handle("/auth/onboard", chain(authLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleAuthOnboard)))
+	s.mux.Handle("/auth/logout", chain(authLimiter.middleware)(http.HandlerFunc(s.handleAuthLogout)))
 
-	// Credential hot-swap - auth required + rate limited + body validation
-	s.mux.Handle("/v1/credentials", chain(apiLimiter.middleware, s.authMiddleware, validateBody(credentialsReq{}))(http.HandlerFunc(s.handleCredentials)))
+	// Credential hot-swap — admin only (S6): any-member rotation let phished
+	// members swap server-side LLM/search keys. Rate limited + body validation.
+	s.mux.Handle("/v1/credentials", chain(apiLimiter.middleware, s.requireRole("admin", "admin", "credentials", "token.*"), validateBody(credentialsReq{}))(http.HandlerFunc(s.handleCredentials)))
 
 	// Stripe - auth required
 	s.mux.Handle("/stripe", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleStripeRouter)))
@@ -781,8 +948,8 @@ func (s *Server) setupRoutes() {
 	s.mux.Handle("/articles/top", chain(apiLimiter.middleware, s.optionalAuthMiddleware)(http.HandlerFunc(s.handleGetTopArticles)))
 	s.mux.Handle("/articles/search", chain(apiLimiter.middleware, s.optionalAuthMiddleware)(http.HandlerFunc(s.handleSearchArticles)))
 
-	// Chat - auth required + rate limited
-	chatAuth := chain(chatLimiter.middleware, s.authMiddleware)
+	// Chat - auth required + IP + per-user rate limited (S12)
+	chatAuth := chain(chatLimiter.middleware, s.authMiddleware, userLimiter.userMiddleware)
 	s.mux.Handle("/chat", chatAuth(http.HandlerFunc(s.handleChatRoot)))
 
 	// Chat router needs special handling for sub-paths
@@ -812,7 +979,9 @@ func (s *Server) setupRoutes() {
 	s.mux.Handle("/live/now", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleGlobalLive)))
 
 	// Admin - auth + admin role required + validation on PUT
-	s.mux.Handle("/admin/settings", chain(apiLimiter.middleware, s.requireRole("admin", "admin", "settings", "write"), validateBody(adminSettingsReq{}))(http.HandlerFunc(s.handleAdminSettings)))
+	// ponytail: action must be the full "admin.settings.write" — bare "write"
+	// never matched a perm so even admins got 403.
+	s.mux.Handle("/admin/settings", chain(apiLimiter.middleware, s.requireRole("admin", "admin", "settings", "admin.settings.write"), validateBody(adminSettingsReq{}))(http.HandlerFunc(s.handleAdminSettings)))
 
 	// Webhook - HMAC verified in handler, no auth middleware
 	s.mux.Handle("/webhook/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleWebhook)))
@@ -887,26 +1056,31 @@ func (s *Server) handleCredentials(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"use PATCH"}`, http.StatusMethodNotAllowed)
 		return
 	}
-	var body struct {
-		Service string `json:"service"`
-		Token   string `json:"token"`
+	var body credentialsReq
+	if !getValidatedBody(r, &body) {
+		// No middleware (tests / direct calls): decode capped + check.
+		if !decodeBody(w, r, &body) {
+			return
+		}
+		if err := checkBody(&body); err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusBadRequest)
+			return
+		}
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
-		return
-	}
-	if body.Service == "" || body.Token == "" {
-		http.Error(w, `{"error":"service and token required"}`, http.StatusBadRequest)
-		return
-	}
+	prev := s.credStore.Get(body.Service)
 	s.credStore.Set(body.Service, body.Token)
-	log.Printf("[credstore] %s updated", body.Service)
+	// ponytail: audit hashes only — never log raw tokens.
+	log.Printf("[credstore] service=%s rotated by user=%s old=%s new=%s",
+		body.Service, userIDFromContext(r.Context()),
+		hashPrefix(prev), hashPrefix(body.Token))
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 // handleWebhook receives POST /webhook/{slug} and triggers article generation.
-// It reads the slug from the URL path.
+// Auth is HMAC-SHA256 over the raw request body (header X-Signature-256,
+// hex, optional "sha256=" prefix). WEBHOOK_SECRET is required — empty means
+// 503, never open. Slugs are whitelisted to [a-z0-9-] to block traversal.
 func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error":"use POST"}`, http.StatusMethodNotAllowed)
@@ -915,16 +1089,29 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	// Extract slug from path: /webhook/{slug}
 	slug := strings.TrimPrefix(r.URL.Path, "/webhook/")
 	slug = strings.TrimSuffix(slug, "/")
-	if slug == "" {
-		http.Error(w, `{"error":"missing slug"}`, http.StatusBadRequest)
+	if slug == "" || !webhookSlugRe.MatchString(slug) {
+		http.Error(w, `{"error":"invalid slug"}`, http.StatusBadRequest)
 		return
 	}
 	secret := os.Getenv("WEBHOOK_SECRET")
-	if secret != "" {
-		if err := triggers.VerifyHMAC([]byte(secret), []byte(slug), r.Header.Get("X-Signature-256")); err != nil {
-			http.Error(w, `{"error":"invalid signature"}`, http.StatusForbidden)
-			return
-		}
+	if secret == "" {
+		http.Error(w, `{"error":"webhook not configured"}`, http.StatusServiceUnavailable)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, `{"error":"unreadable body"}`, http.StatusBadRequest)
+		return
+	}
+	sig := strings.TrimPrefix(r.Header.Get("X-Signature-256"), "sha256=")
+	if sig == "" {
+		http.Error(w, `{"error":"missing signature"}`, http.StatusUnauthorized)
+		return
+	}
+	if err := triggers.VerifyHMAC([]byte(secret), raw, sig); err != nil {
+		http.Error(w, `{"error":"invalid signature"}`, http.StatusForbidden)
+		return
 	}
 	s.triggerAction("create_article", map[string]string{"slug": slug})
 	w.WriteHeader(http.StatusAccepted)
@@ -1009,8 +1196,18 @@ func (s *Server) triggerAction(action string, params map[string]string) {
 }
 
 func (s *Server) corsHandler(next http.Handler) http.Handler {
+	allowlist := parseCORSOrigins(os.Getenv("CORS_ORIGIN"))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := r.Header.Get("Origin")
+		if len(allowlist) == 0 {
+			// ponytail: dev default preserves old behavior; set CORS_ORIGIN
+			// in prod so auth responses are never readable cross-origin.
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		} else if origin != "" && allowlist[origin] {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Vary", "Origin")
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
@@ -1041,6 +1238,40 @@ func reqLog(r *http.Request, format string, args ...interface{}) {
 	log.Printf("📋 [%s] %s → %s", r.Method, r.URL.Path, msg)
 }
 
+// parseCORSOrigins splits CORS_ORIGIN on commas. Empty → nil (dev-open).
+// A single "*" entry means explicitly open (same as unset, but intentional).
+func parseCORSOrigins(raw string) map[string]bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	out := map[string]bool{}
+	for _, o := range strings.Split(raw, ",") {
+		o = strings.TrimSpace(strings.TrimSuffix(o, "/"))
+		if o != "" {
+			out[o] = true
+		}
+	}
+	if out["*"] {
+		return nil
+	}
+	return out
+}
+
+// hashPrefix returns the first 8 hex chars of sha256(s) for audit logs.
+// Empty input yields "none" so rotation from unset is visible.
+func hashPrefix(s string) string {
+	if s == "" {
+		return "none"
+	}
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])[:8]
+}
+
+// webhookSlugRe whitelists URL slugs so "/webhook/../admin" style traversal
+// and nested paths can't trigger arbitrary sessions.
+var webhookSlugRe = regexp.MustCompile(`^[a-z0-9-]+$`)
+
 // Stubs for Auth and Stripe
 func (s *Server) handleAuthStub(w http.ResponseWriter, r *http.Request) {
 	reqLog(r, "auth stub")
@@ -1054,6 +1285,18 @@ func (s *Server) handleAuthStub(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	reqLog(r, "login")
 	s.requestOTPCode(w, r)
+}
+
+// handleAuthLogout clears the session cookie. No auth required — a user with
+// an expired token must still be able to log out. Best-effort for the client.
+func (s *Server) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"use POST"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	clearAuthCookie(w)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"logged_out":true}`))
 }
 
 func (s *Server) handleAuthMe(w http.ResponseWriter, r *http.Request) {

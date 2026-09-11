@@ -8,6 +8,7 @@ import {
   toolIcon, toolLabel, toolColor, formatTime, argsDisplay, parseRichResult,
 } from "./truth-console/registry";
 import { LIVE_SEGMENT_ID, type AgentEvent, type TraceSegment } from "./truth-console/types";
+import { safeSrc } from "@/lib/safe-url";
 
 // Re-export for any external consumers that imported AgentEvent from here.
 export type { AgentEvent };
@@ -43,7 +44,7 @@ function ImageResult({ url, alt, prompt }: { url: string; alt: string; prompt?: 
         <div className="aspect-video relative flex items-center justify-center bg-surface-elevated/50">
           {!loaded && <Spinner size={20} />}
           <img
-            src={url}
+            src={safeSrc(url)}
             alt={alt}
             onLoad={() => setLoaded(true)}
             className={`w-full h-full object-cover transition-opacity ${loaded ? "opacity-100" : "opacity-0"}`}

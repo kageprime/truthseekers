@@ -228,6 +228,12 @@ func (s *Server) handleArticleLive(w http.ResponseWriter, r *http.Request) {
 
 	ch := make(chan string, 16)
 	liveSubsMu.Lock()
+	// S17: cap watchers per slug — unbounded fanout is a memory/CPU DoS.
+	if len(liveSubs[slug]) >= 100 {
+		liveSubsMu.Unlock()
+		http.Error(w, `{"error":"too many watchers"}`, http.StatusTooManyRequests)
+		return
+	}
 	liveSubs[slug] = append(liveSubs[slug], ch)
 	liveSubsMu.Unlock()
 	bumpViewers(slug, 1)
@@ -285,6 +291,12 @@ func (s *Server) handleGlobalLive(w http.ResponseWriter, r *http.Request) {
 
 	ch := make(chan string, 8)
 	globalSubsMu.Lock()
+	// S17: cap global ticker subscribers.
+	if len(globalSubs) >= 1000 {
+		globalSubsMu.Unlock()
+		http.Error(w, `{"error":"too many watchers"}`, http.StatusTooManyRequests)
+		return
+	}
 	globalSubs = append(globalSubs, ch)
 	globalSubsMu.Unlock()
 

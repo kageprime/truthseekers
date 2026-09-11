@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -16,14 +17,14 @@ import (
 //
 // The signing key comes from JWT_SECRET. No default: the server panics on boot
 // without it unless ALLOW_DEV_AUTH=1 (local dev only). Tokens carry `sub`
-// (user id), `iat`, and `exp` (7 days).
+// (user id), `iat`, and `exp` (24 hours).
 //
 // parseJWTSub verifies the signature and expiry before returning the subject,
 // so any tampered or expired token is rejected.
 
 const (
 	jwtDefaultSecret = "veritas-dev-secret-change-me"
-	jwtTTL           = 7 * 24 * time.Hour
+	jwtTTL           = 24 * time.Hour
 )
 
 func jwtSecret() []byte {
@@ -73,6 +74,40 @@ func signJWT(sub string, role ...string) (string, error) {
 	return signingInput + "." + sig, nil
 }
 
+// setAuthCookie stores the JWT in an HttpOnly cookie (S7) so it is never
+// exposed to page JS. The JSON token response is kept for backward compat
+// with older frontends; new frontends rely on the cookie + credentials:include.
+// Secure is set on TLS or when COOKIE_SECURE=1 / X-Forwarded-Proto=https
+// (Heroku/Vercel terminate TLS at the edge).
+func setAuthCookie(w http.ResponseWriter, r *http.Request, token string) {
+	secure := r.TLS != nil ||
+		os.Getenv("COOKIE_SECURE") == "1" ||
+		r.Header.Get("X-Forwarded-Proto") == "https"
+	http.SetCookie(w, &http.Cookie{
+		Name:     "truthseekers_token",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int((jwtTTL + time.Second).Seconds()),
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// clearAuthCookie expires the session cookie. Same Path/SameSite so the
+// browser actually drops it; Secure omitted (an expired insecure cookie still
+// overwrites per RFC 6265 §5.3 step 12 — Secure only gates sending).
+func clearAuthCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "truthseekers_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
 // jwtClaims holds the fields we read from a verified token.
 type jwtClaims struct {
 	SubStr string `json:"sub"`
@@ -82,8 +117,8 @@ type jwtClaims struct {
 }
 
 // verifyJWT validates the HS256 signature and expiry, returning the subject
-// and role. It rejects alg:none tokens outright so the old mockJWT tokens no
-// longer pass.
+// and role. The alg header is pinned to HS256 — anything else (none, RS256,
+// ...) is rejected so algorithm-confusion tokens never pass.
 func verifyJWT(tokenStr string) (sub string, role string, err error) {
 	parts := strings.Split(tokenStr, ".")
 	if len(parts) != 3 {
@@ -91,7 +126,6 @@ func verifyJWT(tokenStr string) (sub string, role string, err error) {
 	}
 	signingInput := parts[0] + "." + parts[1]
 
-	// Reject alg:none — the legacy mockJWT shape. No unsigned tokens.
 	var header struct {
 		Alg string `json:"alg"`
 		Typ string `json:"typ"`
@@ -100,8 +134,8 @@ func verifyJWT(tokenStr string) (sub string, role string, err error) {
 		return "", "", fmt.Errorf("decode header: %w", err)
 	} else if err := json.Unmarshal(hBytes, &header); err != nil {
 		return "", "", fmt.Errorf("parse header: %w", err)
-	} else if strings.EqualFold(header.Alg, "none") {
-		return "", "", fmt.Errorf("alg:none tokens are not accepted")
+	} else if !strings.EqualFold(header.Alg, "HS256") {
+		return "", "", fmt.Errorf("unexpected JWT alg %q", header.Alg)
 	}
 
 	// Verify signature (constant-time compare).

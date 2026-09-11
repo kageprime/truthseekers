@@ -7,6 +7,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypePrism from "rehype-prism-plus";
 import "katex/dist/katex.min.css";
+import { safeUrl } from "@/lib/safe-url";
 
 interface MarkdownRendererProps {
   content: string;
@@ -124,7 +125,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
         a({ href, children }) {
           return (
             <a
-              href={href}
+              href={safeUrl(href)}
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: "var(--accent)", textDecoration: "underline", textUnderlineOffset: "2px", textDecorationColor: "var(--border)" }}

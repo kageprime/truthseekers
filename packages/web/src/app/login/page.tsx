@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BASE } from "@/lib/constants";
+import { safeRedirect } from "@/lib/safe-url";
 import { useAuth } from "../hooks";
 import { storeToken, clearToken, getStoredToken } from "../components/AuthProvider";
 import { useLoginEmail, useVerifyOTP, useRegisterPassword, useLoginPassword, useSignup, useActivateSignup, useOnboard, useFetchMe } from "../hooks";
@@ -38,7 +39,7 @@ export default function LoginPage() {
     if (data.token) {
       storeToken(data.token);
       const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-      const redirectTo = params.get("redirect") || "/";
+      const redirectTo = safeRedirect(params.get("redirect"));
       if (data.user?.onboarded) router.push(redirectTo);
       else router.push("/onboarding");
       return true;
@@ -74,7 +75,7 @@ export default function LoginPage() {
       if (data.token) {
         storeToken(data.token);
         const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-        const redirectTo = params.get("redirect") || "/";
+        const redirectTo = safeRedirect(params.get("redirect"));
         if (data.user?.onboarded) router.push(redirectTo);
         else router.push("/onboarding");
       } else if (data.sent) {

@@ -75,11 +75,14 @@ func normalizeEmail(email string) string {
 // /auth/login (legacy route, now OTP-only) and /auth/otp/request.
 func (s *Server) requestOTPCode(w http.ResponseWriter, r *http.Request) {
 	var body struct{ Email string `json:"email"` }
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, `{"error":"Email required"}`, http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	email := normalizeEmail(body.Email)
+	if len(email) > 254 {
+		http.Error(w, `{"error":"Valid email required"}`, http.StatusBadRequest)
+		return
+	}
 	if !strings.Contains(email, "@") {
 		http.Error(w, `{"error":"Valid email required"}`, http.StatusBadRequest)
 		return
@@ -121,12 +124,12 @@ func (s *Server) handleOTPVerify(w http.ResponseWriter, r *http.Request) {
 		Email string `json:"email"`
 		Code  string `json:"code"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, `{"error":"Email and code required"}`, http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	email := normalizeEmail(body.Email)
-	if email == "" || strings.TrimSpace(body.Code) == "" {
+	if len(email) > 254 || len(body.Code) > 32 ||
+		email == "" || strings.TrimSpace(body.Code) == "" {
 		http.Error(w, `{"error":"Email and code required"}`, http.StatusBadRequest)
 		return
 	}
@@ -144,6 +147,7 @@ func (s *Server) handleOTPVerify(w http.ResponseWriter, r *http.Request) {
 	token := issueToken(user.ID, user.Role)
 	userData, _ := json.Marshal(user)
 	reqLog(r, "otp login email=%s", email)
+	setAuthCookie(w, r, token)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(fmt.Sprintf(`{"token":%q,"user":%s}`, token, string(userData))))
 }

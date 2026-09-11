@@ -24,13 +24,13 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, `{"error":"Username, email and password required"}`, http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	username := strings.TrimSpace(body.Username)
 	email := normalizeEmail(body.Email)
-	if !storage.ValidUsername(username) || !strings.Contains(email, "@") || len(body.Password) < minPasswordLen {
+	if len(username) > 30 || len(email) > 254 || len(body.Password) > 1024 ||
+		!storage.ValidUsername(username) || !strings.Contains(email, "@") || len(body.Password) < minPasswordLen {
 		http.Error(w, `{"error":"Username (3-30 letters/numbers/_/-), valid email and 8+ character password required"}`, http.StatusBadRequest)
 		return
 	}
@@ -75,12 +75,12 @@ func (s *Server) handleSignupActivate(w http.ResponseWriter, r *http.Request) {
 		Email string `json:"email"`
 		Code  string `json:"code"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, `{"error":"Email and code required"}`, http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	email := normalizeEmail(body.Email)
-	if email == "" || strings.TrimSpace(body.Code) == "" {
+	if len(email) > 254 || len(body.Code) > 32 ||
+		email == "" || strings.TrimSpace(body.Code) == "" {
 		http.Error(w, `{"error":"Email and code required"}`, http.StatusBadRequest)
 		return
 	}
@@ -103,6 +103,7 @@ func (s *Server) handleSignupActivate(w http.ResponseWriter, r *http.Request) {
 	token := issueToken(user.ID, user.Role)
 	userData, _ := json.Marshal(user)
 	reqLog(r, "signup activated email=%s", email)
+	setAuthCookie(w, r, token)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(fmt.Sprintf(`{"token":%q,"user":%s}`, token, string(userData))))
 }

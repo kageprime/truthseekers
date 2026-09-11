@@ -21,7 +21,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const TOKEN_KEY = "truthseekers_token";
 const MOCK_KEY = "truthseekers_mock";
-const TOKEN_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+
+// In-memory token (S7): new logins are never written to localStorage or a
+// JS-readable cookie — the server also sets an HttpOnly cookie which the
+// browser sends via credentials:include. Module scope survives navigations
+// (client component) but not reloads; reloads restore via fetchMeCookie().
+let memoryToken: string | null = null;
 
 function parseCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
@@ -29,36 +34,32 @@ function parseCookie(name: string): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-function setCookie(name: string, value: string, maxAge: number): void {
-  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax`;
-}
-
-function deleteCookie(name: string): void {
-  document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
-}
-
-function migrateToken(): void {
-  if (typeof window === "undefined") return;
-  const legacy = localStorage.getItem(TOKEN_KEY);
-  if (legacy && !parseCookie(TOKEN_KEY)) {
-    setCookie(TOKEN_KEY, legacy, TOKEN_MAX_AGE);
-  }
-}
-
 export function getStoredToken(): string | null {
-  if (typeof window === "undefined") return null;
-  migrateToken();
-  return parseCookie(TOKEN_KEY);
+  if (typeof window === "undefined") return memoryToken;
+  if (memoryToken) return memoryToken;
+  // One-way legacy migration: a readable cookie/localStorage entry predates
+  // HttpOnly cookies. Promote to memory and delete the persistent copies.
+  const legacy = parseCookie(TOKEN_KEY) ?? (() => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } })();
+  if (legacy) {
+    memoryToken = legacy;
+    try { localStorage.removeItem(TOKEN_KEY); } catch {}
+    return legacy;
+  }
+  return null;
 }
 
 export function storeToken(token: string): void {
-  setCookie(TOKEN_KEY, token, TOKEN_MAX_AGE);
-  try { localStorage.setItem(TOKEN_KEY, token); } catch {}
+  // ponytail: memory only — never localStorage/document.cookie (S7).
+  memoryToken = token;
+  try { localStorage.removeItem(TOKEN_KEY); } catch {}
 }
 
 export function clearToken(): void {
-  deleteCookie(TOKEN_KEY);
+  memoryToken = null;
   try { localStorage.removeItem(TOKEN_KEY); } catch {}
+  // NOTE: do NOT delete document.cookie here — an expired non-HttpOnly
+  // cookie would overwrite the server's HttpOnly session cookie key.
+  // Server-side logout (/auth/logout) expires it instead; see logout().
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -101,8 +102,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    fetchMeWithRole(token).then((u) => { setUser(u); setLoading(false); });
+    (async () => {
+      if (!token) {
+        // Cookie-only session (S7): no JS token (e.g. after reload) — the
+        // browser still sends the HttpOnly cookie via credentials:include.
+        const { fetchMeCookie } = await import("@/lib/api");
+        const u = await fetchMeCookie();
+        if (!cancelled) {
+          setUser(u ? { ...u, role: u.role ?? "member" } : null);
+          setLoading(false);
+        }
+        return;
+      }
+      const u = await fetchMeWithRole(token);
+      if (!cancelled) { setUser(u); setLoading(false); }
+    })();
+    return () => { cancelled = true; };
   }, [token, fetchMeWithRole]);
 
   const login = async (email: string): Promise<{ user: User; token: string } | { error: string }> => {
@@ -121,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    import("@/lib/api").then(({ logoutServer }) => logoutServer()).catch(() => {});
     clearToken();
     setToken(null);
     setUser(null);

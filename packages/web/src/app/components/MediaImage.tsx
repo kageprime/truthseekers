@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { BASE } from "@/lib/constants";
+import { safeSrc } from "@/lib/safe-url";
 import { IconImage, IconX } from "./Icons";
 
 export function SkeletonImage({ caption }: { caption?: string }) {
@@ -72,6 +73,9 @@ export function MediaLightbox({ src, caption, onClose }: { src: string; caption?
     };
   }, [handleKeyDown]);
 
+  // ponytail: backend-controlled src — resolve through safeSrc (S20).
+  const safe = safeSrc(src);
+  const full = safe && safe.startsWith("/") ? `${BASE}${safe}` : safe;
   return (
     <div
       className="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm" style={{ zIndex: "var(--z-lightbox)" }}
@@ -85,10 +89,10 @@ export function MediaLightbox({ src, caption, onClose }: { src: string; caption?
         <IconX size={24} />
       </button>
       <div onClick={(e) => e.stopPropagation()} className="max-w-[90vw] max-h-[90vh] flex flex-col items-center">
-        {src.endsWith(".mp4") ? (
-          <video src={src.startsWith("/") ? `${BASE}${src}` : src} controls autoPlay className="max-w-full max-h-[85vh] rounded-lg" />
+        {safe?.endsWith(".mp4") ? (
+          <video src={full} controls autoPlay className="max-w-full max-h-[85vh] rounded-lg" />
         ) : (
-          <img src={src.startsWith("/") ? `${BASE}${src}` : src} alt={caption || ""} className="max-w-full max-h-[85vh] object-contain rounded-lg" loading="lazy" />
+          <img src={full} alt={caption || ""} className="max-w-full max-h-[85vh] object-contain rounded-lg" loading="lazy" />
         )}
         {caption && <p className="text-white/80 text-sm mt-3 text-center max-w-xl">{caption}</p>}
       </div>
@@ -113,7 +117,8 @@ export function MediaImage({ src, caption, prompt }: { src?: string; caption?: s
 }
 
 export function FigureImage({ src, caption, source, onClick }: { src: string; caption: string; source?: string; onClick?: () => void }) {
-  const resolvedSrc = src.startsWith("/") ? `${BASE}${src}` : src;
+  const safe = safeSrc(src);
+  const resolvedSrc = safe ? (safe.startsWith("/") ? `${BASE}${safe}` : safe) : undefined;
   return (
     <figure className="glass-card-static p-3 my-2 cursor-pointer group" onClick={onClick}>
       <div className="flex items-center justify-between mb-2">

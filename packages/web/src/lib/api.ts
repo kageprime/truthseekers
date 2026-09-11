@@ -41,7 +41,7 @@ export async function fetchArticleStatus(slug: string): Promise<JobInfo | { stat
 
 export async function fetchQuota(): Promise<QuotaInfo | null> {
   if (MOCK) return mock.MOCK_QUOTA;
-  const res = await fetch(`${BASE}/quota`, { cache: "no-store", headers: { ...authHeaders() } });
+  const res = await fetch(`${BASE}/quota`, { cache: "no-store", headers: { ...authHeaders() }, credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
@@ -50,7 +50,7 @@ export async function generateArticle(slug: string, persona?: string): Promise<{
   if (MOCK) return { status: "queued", persona: persona || "veritas" };
   const res = await fetch(`${BASE}/articles/${slug}/generate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
     body: JSON.stringify({ persona: persona || "veritas" }),
   });
   if (!res.ok) return { status: "error" };
@@ -61,7 +61,7 @@ export async function refreshArticle(slug: string): Promise<{ status: string; qu
   if (MOCK) return { status: "queued" };
   const res = await fetch(`${BASE}/articles/${slug}/refresh`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
   });
   if (!res.ok) return { status: "error" };
   return res.json();
@@ -120,7 +120,7 @@ export async function createChat(title?: string): Promise<ConversationSummary | 
   if (MOCK) return { id: `conv-mock-${Date.now()}`, title: title || "New Chat", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), messageCount: 0 };
   const res = await fetch(`${BASE}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
     body: JSON.stringify({ title }),
   });
   if (!res.ok) { console.error("createChat failed", res.status, await res.text().catch(() => "")); return null; }
@@ -129,14 +129,14 @@ export async function createChat(title?: string): Promise<ConversationSummary | 
 
 export async function fetchChats(): Promise<ConversationSummary[]> {
   if (MOCK) return mock.MOCK_CONVERSATIONS;
-  const res = await fetch(`${BASE}/chat`, { cache: "no-store", headers: { ...authHeaders() } });
+  const res = await fetch(`${BASE}/chat`, { cache: "no-store", headers: { ...authHeaders() }, credentials: "include" });
   if (!res.ok) { console.warn("fetchChats failed", res.status, res.statusText); return []; }
   return res.json();
 }
 
 export async function fetchChat(id: string): Promise<ConversationDetail | null> {
   if (MOCK) return mock.MOCK_CONVERSATION_DETAILS[id] || null;
-  const res = await fetch(`${BASE}/chat/${id}`, { cache: "no-store", headers: { ...authHeaders() } });
+  const res = await fetch(`${BASE}/chat/${id}`, { cache: "no-store", headers: { ...authHeaders() }, credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
@@ -145,7 +145,7 @@ export async function updateChatTitle(id: string, title: string): Promise<boolea
   if (MOCK) return true;
   const res = await fetch(`${BASE}/chat/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
     body: JSON.stringify({ title }),
   });
   return res.ok;
@@ -177,6 +177,7 @@ export async function fetchMe(token: string): Promise<AuthUser | null> {
     const res = await fetch(`${BASE}/auth/me`, {
       headers: { authorization: `Bearer ${token}` },
       cache: "no-store",
+      credentials: "include",
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -184,6 +185,28 @@ export async function fetchMe(token: string): Promise<AuthUser | null> {
   } catch {
     return null;
   }
+}
+
+// fetchMeCookie restores the session from the HttpOnly cookie (S7) — for
+// cookie-only users with no JS-readable token (e.g. after reload).
+export async function fetchMeCookie(): Promise<AuthUser | null> {
+  if (MOCK) return null;
+  try {
+    const res = await fetch(`${BASE}/auth/me`, { cache: "no-store", credentials: "include" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.user ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// logoutServer expires the HttpOnly session cookie (S7). Fire-and-forget.
+export async function logoutServer(): Promise<void> {
+  if (MOCK) return;
+  try {
+    await fetch(`${BASE}/auth/logout`, { method: "POST", credentials: "include" });
+  } catch { /* best-effort */ }
 }
 
 export interface LoginResponse {
@@ -215,6 +238,7 @@ export async function verifyOTP(email: string, code: string): Promise<LoginRespo
     const res = await fetch(`${BASE}/auth/otp/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ email, code }),
     });
     const data = await res.json();
@@ -231,6 +255,7 @@ export async function registerPassword(email: string, code: string, password: st
     const res = await fetch(`${BASE}/auth/password/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ email, code, password }),
     });
     const data = await res.json();
@@ -247,6 +272,7 @@ export async function loginPassword(email: string, password: string): Promise<Lo
     const res = await fetch(`${BASE}/auth/password/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ email, password }),
     });
     const data = await res.json();
@@ -263,6 +289,7 @@ export async function signup(username: string, email: string, password: string):
     const res = await fetch(`${BASE}/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ username, email, password }),
     });
     const data = await res.json();
@@ -279,6 +306,7 @@ export async function activateSignup(email: string, code: string): Promise<Login
     const res = await fetch(`${BASE}/auth/signup/activate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ email, code }),
     });
     const data = await res.json();
@@ -295,6 +323,7 @@ export async function onboard(token: string, name: string): Promise<boolean> {
     const res = await fetch(`${BASE}/auth/onboard`, {
       method: "POST",
       headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
+      credentials: "include",
       body: JSON.stringify({ name }),
     });
     return res.ok;
@@ -308,7 +337,7 @@ export async function updateProfile(name: string, avatar?: string): Promise<bool
   try {
     const res = await fetch(`${BASE}/auth/me`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
       body: JSON.stringify({ name, avatar: avatar || undefined }),
     });
     return res.ok;
@@ -323,6 +352,7 @@ export async function trackView(slug: string): Promise<void> {
     await fetch(`${BASE}/track`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ slug, event: "view" }),
     });
   } catch { /* fire-and-forget */ }
@@ -485,7 +515,7 @@ export async function fetchContestedClaims(limit = 50): Promise<{ claims: any[] 
 
 export async function fetchSettings(): Promise<Record<string, string>> {
   if (MOCK) return mock.MOCK_SETTINGS;
-  const res = await fetch(`${BASE}/admin/settings`, { cache: "no-store", headers: { ...authHeaders() } });
+  const res = await fetch(`${BASE}/admin/settings`, { cache: "no-store", headers: { ...authHeaders() }, credentials: "include" });
   if (!res.ok) return {};
   return res.json();
 }
@@ -494,7 +524,7 @@ export async function updateSettings(settings: Record<string, string>): Promise<
   if (MOCK) return true;
   const res = await fetch(`${BASE}/admin/settings`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
     body: JSON.stringify({ settings }),
   });
   return res.ok;
@@ -565,7 +595,7 @@ export async function updateCredential(service: string, token: string): Promise<
   if (MOCK) return true;
   const res = await fetch(`${BASE}/v1/credentials`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
     body: JSON.stringify({ service, token }),
   });
   return res.ok;
@@ -581,7 +611,7 @@ export interface UsageStats {
 
 export async function fetchUsageStats(): Promise<UsageStats | null> {
   if (MOCK) return mock.MOCK_USAGE;
-  const res = await fetch(`${BASE}/v1/llm/usage`, { cache: "no-store", headers: { ...authHeaders() } });
+  const res = await fetch(`${BASE}/v1/llm/usage`, { cache: "no-store", headers: { ...authHeaders() }, credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
@@ -612,14 +642,14 @@ export interface QueueData {
 
 export async function fetchQueue(): Promise<QueueData | null> {
   if (MOCK) return { jobs: [], stats: { queued: 0, active: 0, maxConcurrent: 3, maxQueue: 10 } };
-  const res = await fetch(`${BASE}/queue`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/queue`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function cancelQueueJob(slug: string): Promise<boolean> {
   if (MOCK) return true;
-  const res = await fetch(`${BASE}/queue/${slug}`, { method: "DELETE" });
+  const res = await fetch(`${BASE}/queue/${slug}`, { method: "DELETE", credentials: "include" });
   return res.ok;
 }
 
@@ -629,7 +659,7 @@ export async function resolveArticle(slug: string, action: "approve" | "correct"
   if (MOCK) return true;
   const res = await fetch(`${BASE}/articles/${slug}/resolve`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
     body: JSON.stringify({ action }),
   });
   return res.ok;
@@ -655,7 +685,7 @@ export async function stripeCheckout(priceId: string): Promise<{ url?: string } 
   try {
     const res = await fetch(`${BASE}/stripe/checkout`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
+      headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
       body: JSON.stringify({ priceId }),
     });
     if (!res.ok) return null;
@@ -668,7 +698,7 @@ export async function stripeCheckout(priceId: string): Promise<{ url?: string } 
 export async function stripePortal(): Promise<{ url?: string } | null> {
   if (MOCK) return null;
   try {
-    const res = await fetch(`${BASE}/stripe/portal`, { headers: { ...authHeaders() } });
+    const res = await fetch(`${BASE}/stripe/portal`, { headers: { ...authHeaders() }, credentials: "include" });
     if (!res.ok) return null;
     return res.json();
   } catch {

@@ -24,12 +24,12 @@ func (s *Server) handlePasswordRegister(w http.ResponseWriter, r *http.Request) 
 		Code     string `json:"code"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, `{"error":"Email, code and password required"}`, http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	email := normalizeEmail(body.Email)
-	if email == "" || strings.TrimSpace(body.Code) == "" || len(body.Password) < minPasswordLen {
+	if len(email) > 254 || len(body.Code) > 32 || len(body.Password) > 1024 ||
+		email == "" || strings.TrimSpace(body.Code) == "" || len(body.Password) < minPasswordLen {
 		http.Error(w, `{"error":"Valid email, code and 8+ character password required"}`, http.StatusBadRequest)
 		return
 	}
@@ -54,6 +54,7 @@ func (s *Server) handlePasswordRegister(w http.ResponseWriter, r *http.Request) 
 	token := issueToken(user.ID, user.Role)
 	userData, _ := json.Marshal(user)
 	reqLog(r, "password register email=%s", email)
+	setAuthCookie(w, r, token)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(fmt.Sprintf(`{"token":%q,"user":%s}`, token, string(userData))))
 }
@@ -66,12 +67,12 @@ func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, `{"error":"Email and password required"}`, http.StatusBadRequest)
+	if !decodeBody(w, r, &body) {
 		return
 	}
 	identifier := strings.TrimSpace(body.Email)
-	if identifier == "" || body.Password == "" {
+	if len(identifier) > 254 || len(body.Password) > 1024 ||
+		identifier == "" || body.Password == "" {
 		http.Error(w, `{"error":"Email and password required"}`, http.StatusBadRequest)
 		return
 	}
@@ -108,6 +109,7 @@ func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 	token := issueToken(user.ID, user.Role)
 	userData, _ := json.Marshal(user)
 	reqLog(r, "password login email=%s", email)
+	setAuthCookie(w, r, token)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(fmt.Sprintf(`{"token":%q,"user":%s}`, token, string(userData))))
 }

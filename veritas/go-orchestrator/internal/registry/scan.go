@@ -11,9 +11,19 @@ import (
 // to the working directory. Override by setting the REGISTRY_DIR env var.
 const DefaultRegistryDir = "veritas/registry"
 
+// maxSkillFile caps SKILL.md reads (S29) — registry content flows into agent
+// context, so a hostile multi-MB file must not balloon prompts.
+const maxSkillFile = 64 * 1024
+
+// maxSkillDescription caps frontmatter descriptions kept for agent context.
+const maxSkillDescription = 500
+
 // Scan walks the registry directory and discovers all skills, tools, and
 // commands. Missing directory is not an error — returns an empty registry.
 func Scan(root string) (*Registry, error) {
+	if root == "" {
+		root = os.Getenv("REGISTRY_DIR")
+	}
 	if root == "" {
 		root = DefaultRegistryDir
 	}
@@ -50,6 +60,10 @@ func scanSkills(dir string) ([]SkillEntry, error) {
 		}
 		skillDir := filepath.Join(dir, info.Name())
 		skillFile := filepath.Join(skillDir, "SKILL.md")
+		st, err := os.Stat(skillFile)
+		if err != nil || st.Size() > maxSkillFile {
+			continue
+		}
 		f, err := os.Open(skillFile)
 		if err != nil {
 			continue
@@ -64,11 +78,24 @@ func scanSkills(dir string) ([]SkillEntry, error) {
 			if n, ok := fm["name"]; ok {
 				entry.Name = n
 			}
-			entry.Description = fm["description"]
+			// ponytail: truncate + strip newlines (S29) — descriptions land
+			// in agent context where embedded instructions could steer it.
+			entry.Description = sanitizeDescription(fm["description"])
 		}
 		entries = append(entries, entry)
 	}
 	return entries, nil
+}
+
+// sanitizeDescription truncates a skill description for agent context and
+// collapses whitespace so multi-line instruction smuggling stands out less.
+// Registry content is trusted-but-unreviewed; caps bound prompt bloat.
+func sanitizeDescription(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if len(s) > maxSkillDescription {
+		s = s[:maxSkillDescription]
+	}
+	return s
 }
 
 // scanTools discovers .json and .ts tool definition files under dir.

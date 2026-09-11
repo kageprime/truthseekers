@@ -42,7 +42,14 @@ type CompletionRequest struct {
 
 // HandleCompletion proxies a completion request through the appropriate
 // provider, meters usage, and returns the response.
+// NOTE: production Server mounts this behind auth middleware — userID is read
+// from context (see ctxUserID), never trusted from headers/body.
 func (g *Gateway) HandleCompletion(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req CompletionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
@@ -190,7 +197,10 @@ func (g *Gateway) recordUsage(r *http.Request, model string, inputTokens, output
 	if spec != nil {
 		cost = EstimateCost(*spec, inputTokens, outputTokens)
 	}
-	userID := r.Header.Get("X-User-ID")
+	userID := ctxUserID(r)
+	if userID == "" {
+		userID = r.Header.Get("X-User-ID")
+	}
 	if userID == "" {
 		userID = "anonymous"
 	}
@@ -211,13 +221,18 @@ func (g *Gateway) HandleModels(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(g.Catalog)
 }
 
-// HandleUsage returns usage stats for a user.
+// HandleUsage returns usage stats for the authenticated user.
+// The ?userId query / X-User-ID header are only honored when no auth context
+// exists (tests); otherwise the ctx user wins so users can't read each other.
 func (g *Gateway) HandleUsage(w http.ResponseWriter, r *http.Request) {
 	if g.Meter == nil {
 		w.Write([]byte(`{"totals":{}}`))
 		return
 	}
-	userID := r.URL.Query().Get("userId")
+	userID := ctxUserID(r)
+	if userID == "" {
+		userID = r.URL.Query().Get("userId")
+	}
 	if userID == "" {
 		userID = r.Header.Get("X-User-ID")
 	}
@@ -233,8 +248,19 @@ func (g *Gateway) HandleUsage(w http.ResponseWriter, r *http.Request) {
 }
 
 // RegisterRoutes mounts LLM gateway routes on a ServeMux.
+// NOTE: production Server mounts completions/usage with auth explicitly.
 func (g *Gateway) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/llm/completions", g.HandleCompletion)
 	mux.HandleFunc("/v1/llm/models", g.HandleModels)
 	mux.HandleFunc("/v1/llm/usage", g.HandleUsage)
+}
+
+// ctxUserID reads the "userID" set by api.authMiddleware without importing it.
+func ctxUserID(r *http.Request) string {
+	if v := r.Context().Value("userID"); v != nil {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
 }

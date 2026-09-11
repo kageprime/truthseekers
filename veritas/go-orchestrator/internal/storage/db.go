@@ -319,6 +319,15 @@ func NewDB(connStr, dataDir string) (*DB, error) {
 		fmt.Printf("WARNING: postgres connection failed (%v). Entering File-backed Mode.\n", err)
 		return newMockDB(dataDir), nil
 	}
+	// S14: bound every query server-side so a slow ILIKE can't hold a worker
+	// forever. lib/pq forwards `options` to the server at connect time, which
+	// applies to all pooled connections (SET would only hit one conn).
+	if !strings.Contains(connStr, "statement_timeout") {
+		if db2, err := sql.Open("postgres", connStr+" options='-c statement_timeout=5s'"); err == nil {
+			db.Close()
+			db = db2
+		}
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -375,7 +384,15 @@ type User struct {
 
 func randID() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	// ponytail: fail closed on entropy failure (S27) — a weak fallback ID
+	// backing users/articles would be worse than a loud crash. crypto/rand
+	// fails only on total system entropy death; net/http recovers per-request.
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("randID: entropy unavailable: %v", err))
+	}
+	// RFC 4122 v4: version + variant bits.
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
@@ -881,8 +898,15 @@ func (d *DB) ListArticles(limit, offset int) ([]*Article, error) {
 	return list, nil
 }
 
-func (d *DB) SearchArticles(searchQuery string, limit int) ([]*Article, error) {
-	if d.mockMode {
+// escapeLIKE neutralizes % _ and the escape char so user search input can't
+// turn an ILIKE into a full-table wildcard bomb (S14). Callers add their own
+// surrounding % and use ESCAPE '\'.
+func escapeLIKE(s string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return r.Replace(s)
+}
+
+func (d *DB) SearchArticles(searchQuery string, limit int) ([]*Article, error) {	if d.mockMode {
 		if d.fs == nil {
 			return []*Article{}, nil
 		}
@@ -899,11 +923,11 @@ func (d *DB) SearchArticles(searchQuery string, limit int) ([]*Article, error) {
 		return out, nil
 	}
 
-	q := "%" + searchQuery + "%"
+	q := "%" + escapeLIKE(searchQuery) + "%"
 	rows, err := d.db.Query(`
 		SELECT slug, title, abstract, blocks, confidence_vector, derived_confidence, 
 		       sections, timeline, categories, crossrefs, citations, metadata, created_at, updated_at 
-		FROM articles WHERE title ILIKE $1 OR abstract ILIKE $1 ORDER BY created_at DESC LIMIT $2`, q, limit)
+		FROM articles WHERE title ILIKE $1 ESCAPE '\' OR abstract ILIKE $1 ESCAPE '\' ORDER BY created_at DESC LIMIT $2`, q, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search articles failed: %w", err)
 	}
@@ -1018,6 +1042,18 @@ func (d *DB) TrackArticleView(slug string, ip string, event string) error {
 		return nil
 	}
 	_, err := d.db.Exec("INSERT INTO article_views (slug, ip, event, created_at) VALUES ($1, $2, $3, $4)", slug, ip, event, time.Now().UTC())
+	return err
+}
+
+// SaveExecution persists one executor gateway audit record (S19). Best-effort
+// callers log on error; mock mode drops it like other write-only telemetry.
+func (d *DB) SaveExecution(connectorSlug, action, userID, sessionID, status, risk string) error {
+	if d.mockMode {
+		return nil
+	}
+	_, err := d.db.Exec(
+		"INSERT INTO executor_audit (connector_slug, action, user_id, session_id, status, risk) VALUES ($1, $2, $3, $4, $5, $6)",
+		connectorSlug, action, userID, sessionID, status, risk)
 	return err
 }
 
@@ -1396,6 +1432,117 @@ func (d *DB) SaveEpistemicPipeline(data *EpistemicPipelineData) error {
 	return tx.Commit()
 }
 
+// maxINParams caps IN-clause size (S30).
+const maxINParams = 500
+
+func chunkStrings(in []string, n int) [][]string {
+	var out [][]string
+	for i := 0; i < len(in); i += n {
+		end := i + n
+		if end > len(in) {
+			end = len(in)
+		}
+		out = append(out, in[i:end])
+	}
+	return out
+}
+
+func inClause(ids []string) (string, []interface{}) {
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+	return strings.Join(placeholders, ","), args
+}
+
+// fetchEpistemicChunk loads claims + evidence + gaps + language flags +
+// scrutiny for one ID chunk into data. One query per table per chunk keeps
+// statements small while avoiding N+1 queries.
+func (d *DB) fetchEpistemicChunk(data *EpistemicPipelineData, ids []string) error {
+	in, args := inClause(ids)
+
+	rows, err := d.db.Query(fmt.Sprintf("SELECT id, text, type, status, confidence_vector, derived_confidence, created_at, updated_at FROM claims WHERE id IN (%s)", in), args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var c Claim
+		var cvJson []byte
+		if err := rows.Scan(&c.ID, &c.Text, &c.Type, &c.Status, &cvJson, &c.DerivedConfidence, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return err
+		}
+		if len(cvJson) > 0 { json.Unmarshal(cvJson, &c.ConfidenceVector) }
+		data.Claims = append(data.Claims, c)
+	}
+	rows.Close()
+
+	rows, err = d.db.Query(fmt.Sprintf("SELECT id, claim_id, type, url, chain_of_custody, acquisition_method, accessibility, supports_claim, source_id, created_at FROM evidence WHERE claim_id IN (%s)", in), args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var e Evidence
+		var sourceID sql.NullString
+		if err := rows.Scan(&e.ID, &e.ClaimID, &e.Type, &e.URL, &e.ChainOfCustody, &e.AcquisitionMethod, &e.Accessibility, &e.SupportsClaim, &sourceID, &e.CreatedAt); err != nil {
+			return err
+		}
+		if sourceID.Valid { e.SourceID = &sourceID.String }
+		data.Evidence = append(data.Evidence, e)
+	}
+	rows.Close()
+
+	rows, err = d.db.Query(fmt.Sprintf("SELECT id, claim_id, gap_type, expected_artifact, verification_status, external_metadata, cause_label, cause_confidence, detected_at FROM evidence_gaps WHERE claim_id IN (%s)", in), args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var g EvidenceGap
+		var emJson []byte
+		if err := rows.Scan(&g.ID, &g.ClaimID, &g.GapType, &g.ExpectedArtifact, &g.VerificationStatus, &emJson, &g.CauseLabel, &g.CauseConfidence, &g.DetectedAt); err != nil {
+			return err
+		}
+		if len(emJson) > 0 { json.Unmarshal(emJson, &g.ExternalMetadata) }
+		data.Gaps = append(data.Gaps, g)
+	}
+	rows.Close()
+
+	rows, err = d.db.Query(fmt.Sprintf("SELECT id, claim_id, source_phrase, precision_upgrade, framing_origin, framing_function, confidence, detected_at FROM language_flags WHERE claim_id IN (%s)", in), args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var lf LanguageFlag
+		if err := rows.Scan(&lf.ID, &lf.ClaimID, &lf.SourcePhrase, &lf.PrecisionUpgrade, &lf.FramingOrigin, &lf.FramingFunction, &lf.Confidence, &lf.DetectedAt); err != nil {
+			return err
+		}
+		data.LangFlags = append(data.LangFlags, lf)
+	}
+	rows.Close()
+
+	rows, err = d.db.Query(fmt.Sprintf("SELECT id, claim_id, risk_factors, risk_score, action_required, assessed_at FROM scrutiny_assessments WHERE claim_id IN (%s)", in), args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var s ScrutinyAssessment
+		var rfJson, arJson []byte
+		if err := rows.Scan(&s.ID, &s.ClaimID, &rfJson, &s.RiskScore, &arJson, &s.AssessedAt); err != nil {
+			return err
+		}
+		if len(rfJson) > 0 { json.Unmarshal(rfJson, &s.RiskFactors) }
+		if len(arJson) > 0 { json.Unmarshal(arJson, &s.ActionRequired) }
+		data.Scrutinies = append(data.Scrutinies, s)
+	}
+	return rows.Err()
+}
+
 func (d *DB) GetEpistemicPipelineForArticle(articleID string) (*EpistemicPipelineData, error) {
 	if d.mockMode {
 		return &EpistemicPipelineData{}, nil
@@ -1422,92 +1569,12 @@ func (d *DB) GetEpistemicPipelineForArticle(articleID string) (*EpistemicPipelin
 		return data, nil
 	}
 
-	// Build placeholders for IN clause
-	placeholders := make([]string, len(claimIDs))
-	args := make([]interface{}, len(claimIDs))
-	for i, id := range claimIDs {
-		placeholders[i] = fmt.Sprintf("$%d", i+1)
-		args[i] = id
-	}
-	inClause := strings.Join(placeholders, ",")
-
-	// Get Claims
-	rows, err = d.db.Query(fmt.Sprintf("SELECT id, text, type, status, confidence_vector, derived_confidence, created_at, updated_at FROM claims WHERE id IN (%s)", inClause), args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var c Claim
-		var cvJson []byte
-		if err := rows.Scan(&c.ID, &c.Text, &c.Type, &c.Status, &cvJson, &c.DerivedConfidence, &c.CreatedAt, &c.UpdatedAt); err != nil {
+	// S30: chunk IN lists — one article with thousands of claims must not
+	// build a megabyte query or pin the planner.
+	for _, chunk := range chunkStrings(claimIDs, maxINParams) {
+		if err := d.fetchEpistemicChunk(data, chunk); err != nil {
 			return nil, err
 		}
-		if len(cvJson) > 0 { json.Unmarshal(cvJson, &c.ConfidenceVector) }
-		data.Claims = append(data.Claims, c)
-	}
-
-	// Get Evidence for these claims
-	rows, err = d.db.Query(fmt.Sprintf("SELECT id, claim_id, type, url, chain_of_custody, acquisition_method, accessibility, supports_claim, source_id, created_at FROM evidence WHERE claim_id IN (%s)", inClause), args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var e Evidence
-		var sourceID sql.NullString
-		if err := rows.Scan(&e.ID, &e.ClaimID, &e.Type, &e.URL, &e.ChainOfCustody, &e.AcquisitionMethod, &e.Accessibility, &e.SupportsClaim, &sourceID, &e.CreatedAt); err != nil {
-			return nil, err
-		}
-		if sourceID.Valid { e.SourceID = &sourceID.String }
-		data.Evidence = append(data.Evidence, e)
-	}
-
-	// Get Evidence Gaps
-	rows, err = d.db.Query(fmt.Sprintf("SELECT id, claim_id, gap_type, expected_artifact, verification_status, external_metadata, cause_label, cause_confidence, detected_at FROM evidence_gaps WHERE claim_id IN (%s)", inClause), args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var g EvidenceGap
-		var emJson []byte
-		if err := rows.Scan(&g.ID, &g.ClaimID, &g.GapType, &g.ExpectedArtifact, &g.VerificationStatus, &emJson, &g.CauseLabel, &g.CauseConfidence, &g.DetectedAt); err != nil {
-			return nil, err
-		}
-		if len(emJson) > 0 { json.Unmarshal(emJson, &g.ExternalMetadata) }
-		data.Gaps = append(data.Gaps, g)
-	}
-
-	// Get Language Flags
-	rows, err = d.db.Query(fmt.Sprintf("SELECT id, claim_id, source_phrase, precision_upgrade, framing_origin, framing_function, confidence, detected_at FROM language_flags WHERE claim_id IN (%s)", inClause), args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var lf LanguageFlag
-		if err := rows.Scan(&lf.ID, &lf.ClaimID, &lf.SourcePhrase, &lf.PrecisionUpgrade, &lf.FramingOrigin, &lf.FramingFunction, &lf.Confidence, &lf.DetectedAt); err != nil {
-			return nil, err
-		}
-		data.LangFlags = append(data.LangFlags, lf)
-	}
-
-	// Get Scrutiny Assessments
-	rows, err = d.db.Query(fmt.Sprintf("SELECT id, claim_id, risk_factors, risk_score, action_required, assessed_at FROM scrutiny_assessments WHERE claim_id IN (%s)", inClause), args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var s ScrutinyAssessment
-		var rfJson, arJson []byte
-		if err := rows.Scan(&s.ID, &s.ClaimID, &rfJson, &s.RiskScore, &arJson, &s.AssessedAt); err != nil {
-			return nil, err
-		}
-		if len(rfJson) > 0 { json.Unmarshal(rfJson, &s.RiskFactors) }
-		if len(arJson) > 0 { json.Unmarshal(arJson, &s.ActionRequired) }
-		data.Scrutinies = append(data.Scrutinies, s)
 	}
 
 	// Get Sources referenced by evidence
@@ -1522,26 +1589,23 @@ func (d *DB) GetEpistemicPipelineForArticle(articleID string) (*EpistemicPipelin
 		for id := range sourceIDs {
 			srcIDs = append(srcIDs, id)
 		}
-		srcPlaceholders := make([]string, len(srcIDs))
-		srcArgs := make([]interface{}, len(srcIDs))
-		for i, id := range srcIDs {
-			srcPlaceholders[i] = fmt.Sprintf("$%d", i+1)
-			srcArgs[i] = id
-		}
-		srcInClause := strings.Join(srcPlaceholders, ",")
-		rows, err = d.db.Query(fmt.Sprintf("SELECT id, name, type, credibility_vector, created_at FROM sources WHERE id IN (%s)", srcInClause), srcArgs...)
-		if err != nil {
-			return nil, err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var s Source
-			var cvJson []byte
-			if err := rows.Scan(&s.ID, &s.Name, &s.Type, &cvJson, &s.CreatedAt); err != nil {
+		for _, chunk := range chunkStrings(srcIDs, maxINParams) {
+			srcIn, srcArgs := inClause(chunk)
+			srows, err := d.db.Query(fmt.Sprintf("SELECT id, name, type, credibility_vector, created_at FROM sources WHERE id IN (%s)", srcIn), srcArgs...)
+			if err != nil {
 				return nil, err
 			}
-			if len(cvJson) > 0 { json.Unmarshal(cvJson, &s.CredibilityVector) }
-			data.Sources = append(data.Sources, s)
+			for srows.Next() {
+				var s Source
+				var cvJson []byte
+				if err := srows.Scan(&s.ID, &s.Name, &s.Type, &cvJson, &s.CreatedAt); err != nil {
+					srows.Close()
+					return nil, err
+				}
+				if len(cvJson) > 0 { json.Unmarshal(cvJson, &s.CredibilityVector) }
+				data.Sources = append(data.Sources, s)
+			}
+			srows.Close()
 		}
 	}
 

@@ -52,7 +52,9 @@ export function useArticleProgress(
     // Don't double-connect.
     if (esRef.current) return;
 
-    const es = new EventSource(progressUrl(slug));
+    // withCredentials so cross-origin browsers send the HttpOnly session
+    // cookie — required to receive live progress (S17 gates it on auth).
+    const es = new EventSource(progressUrl(slug), { withCredentials: true });
     esRef.current = es;
 
     es.addEventListener("agent_event", (e: MessageEvent) => {
