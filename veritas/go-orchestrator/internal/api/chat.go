@@ -307,10 +307,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 
 	// Load existing messages (before this new one)
 	stored, _ := s.db.GetMessages(convID)
-	var history []agent.Message
-	for _, m := range stored {
-		history = append(history, storageToAgentMsg(m))
-	}
+	history := storageHistoryToAgentMsgs(stored)
 
 	// Persist the user's message immediately so it's in the database for any concurrent GET requests
 	userMsg := toStoredMessage(convID, "user", body.Content, nil, nil, nil)
@@ -422,7 +419,12 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	log.Printf("🤖 Agent run complete: iterations=%d, text_len=%d, tools=%d, blocks=%d, msgs=%d",
 		result.IterationCount, len(result.Text), len(result.ToolResults), len(result.Blocks), len(result.Messages))
 
-	// Persist messages after agent run (user + tool + only last assistant)
+	// Persist messages after agent run (user + tool + every assistant).
+	// Every assistant turn is kept WITH its tool_calls: dropping intermediate
+	// assistants orphaned the tool messages that answer them, and providers
+	// reject the next turn's history with 400 (no matching assistant
+	// tool_calls for tool_call_id). Blocks/agentEvents attach to the last
+	// assistant only — they're the run's final output.
 	existingCount := len(history)
 	finalMsgs := result.Messages
 
@@ -438,11 +440,16 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		msgID := uuidV4()
 		switch m.Role {
 		case agent.RoleAssistant:
-			if i != lastAssistantIdx {
-				continue
+			isLast := i == lastAssistantIdx
+			if isLast {
+				assistantMsgID = msgID
 			}
-			assistantMsgID = msgID
-			sm := toStoredMessage(convID, "assistant", m.Content, result.Blocks, nil, agentEvents)
+			var blocks []agent.Block
+			var evs []json.RawMessage
+			if isLast {
+				blocks, evs = result.Blocks, agentEvents
+			}
+			sm := toStoredMessage(convID, "assistant", m.Content, blocks, agentToolCallsToStored(m.ToolCalls), evs)
 			sm.ID = msgID
 			if err := s.db.AddMessage(sm); err != nil {
 				log.Printf("Failed to persist assistant message: %v", err)
@@ -724,6 +731,59 @@ func userAuthFromRequest(r *http.Request) (string, string) {
 	}
 	log.Printf("✓ auth: user=%s role=%s", userID, role)
 	return userID, role
+}
+
+// agentToolCallsToStored converts agent tool calls to the OpenAI-shaped maps
+// storageToAgentMsg reads back. Assistant turns must persist WITH their
+// tool_calls — see the persist loop.
+func agentToolCallsToStored(tcs []agent.ToolCall) []interface{} {
+	if len(tcs) == 0 {
+		return nil
+	}
+	out := make([]interface{}, 0, len(tcs))
+	for _, tc := range tcs {
+		t := tc.Type
+		if t == "" {
+			t = "function"
+		}
+		out = append(out, map[string]interface{}{
+			"id":   tc.ID,
+			"type": t,
+			"function": map[string]interface{}{
+				"name":      tc.Function.Name,
+				"arguments": tc.Function.Arguments,
+			},
+		})
+	}
+	return out
+}
+
+// storageHistoryToAgentMsgs rebuilds LLM history, dropping tool messages
+// orphaned by the pre-fix persister (it kept tool results but dropped the
+// assistant tool_calls they answer). Orphans make providers 400 the whole
+// turn; skipping them heals old conversations without a migration.
+func storageHistoryToAgentMsgs(stored []*storage.StoredMessage) []agent.Message {
+	valid := map[string]bool{}
+	for _, m := range stored {
+		if m.Role != "assistant" {
+			continue
+		}
+		for _, tc := range m.ToolCalls {
+			if tcMap, ok := tc.(map[string]interface{}); ok {
+				if id, _ := tcMap["id"].(string); id != "" {
+					valid[id] = true
+				}
+			}
+		}
+	}
+	history := make([]agent.Message, 0, len(stored))
+	for _, m := range stored {
+		if m.Role == "tool" && m.ToolCallID != "" && !valid[m.ToolCallID] {
+			continue
+		}
+		history = append(history, storageToAgentMsg(m))
+	}
+	return history
 }
 
 func storageToAgentMsg(m *storage.StoredMessage) agent.Message {
