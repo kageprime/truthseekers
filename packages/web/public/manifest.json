@@ -1,13 +1,36 @@
 {
-  "name": "Truthseekers",
+  "name": "Truthseekers — Living Encyclopedia",
   "short_name": "Truthseekers",
-  "description": "An LLM-powered interactive encyclopedia",
+  "description": "An LLM-powered interactive encyclopedia. Research, write, verify.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0f0f0f",
-  "theme_color": "#f97316",
+  "orientation": "portrait",
+  "background_color": "#f5efe0",
+  "theme_color": "#f5efe0",
+  "categories": ["education", "books", "reference"],
   "icons": [
-    { "src": "/logo-icon.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/logo-icon.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Chat",
+      "url": "/chat/new",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Articles",
+      "url": "/articles",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Claim Graph",
+      "url": "/claim-graph",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
   ]
 }

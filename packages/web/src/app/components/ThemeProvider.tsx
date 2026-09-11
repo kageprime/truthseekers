@@ -37,6 +37,10 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
     const isDark = t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", isDark);
     setResolved(isDark ? "dark" : "light");
+    // ponytail: keep the PWA theme-color (status bar / task switcher) in
+    // sync with the active surface instead of the static metadata value.
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", isDark ? "#1a1714" : "#f5efe0");
   }, []);
 
   useEffect(() => {

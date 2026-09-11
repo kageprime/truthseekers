@@ -8,6 +8,7 @@ import { ChatProvider } from "./chat/ChatContext";
 import { HeaderSearchProvider } from "./HeaderSearchContext";
 import { ArticleViewProvider } from "./ArticleViewContext";
 import { AuthProvider } from "./components/AuthProvider";
+import RegisterSw from "./components/RegisterSw";
 import ScrollReveal from "./components/ScrollReveal";
 import { ToastProvider } from "./components/Toast";
 import AppShell from "./AppShell";
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "Truthseekers", statusBarStyle: "black-translucent" },
   icons: [
     { rel: "icon", url: "/logo-icon.png" },
-    { rel: "apple-touch-icon", url: "/logo-icon.png" },
+    { rel: "apple-touch-icon", url: "/icons/apple-touch-icon.png" },
   ],
 };
 
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         <ArticleViewProvider>
                           <ToastProvider>
                           <ScrollReveal />
+                          <RegisterSw />
                           <AppShell>{children}</AppShell>
                           </ToastProvider>
                         </ArticleViewProvider>
