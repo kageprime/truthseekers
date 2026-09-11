@@ -198,7 +198,7 @@ export default function FloatingChatWidget() {
               </svg>
             </button>
             {switcherOpen && (
-              <div className="absolute left-0 top-full mt-1 w-56 rounded-lg py-1 shadow-xl z-50 bg-surface border border-border max-h-[300px] overflow-y-auto">
+              <div className="absolute left-0 top-full mt-1 w-56 rounded-lg py-1 shadow-elev-2 z-50 bg-surface border border-border max-h-[300px] overflow-y-auto">
                 {chatsLoading ? (
                   <div className="flex items-center justify-center py-4">
                     <Spinner size={16} />

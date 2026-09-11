@@ -71,7 +71,7 @@ export default function ChatTour({ onComplete }: { onComplete: () => void }) {
       onClick={handleDismiss}
     >
       <div
-        className={`w-full max-w-md rounded-2xl p-6 sm:p-8 shadow-xl transition-all duration-300 ${leaving ? "opacity-0 translate-y-4" : "opacity-100 translate-y-0"}`}
+        className={`w-full max-w-md rounded-2xl p-6 sm:p-8 shadow-elev-3 transition-all duration-300 ${leaving ? "opacity-0 translate-y-4" : "opacity-100 translate-y-0"}`}
         style={{ background: "var(--surface)" }}
         onClick={(e) => e.stopPropagation()}
       >

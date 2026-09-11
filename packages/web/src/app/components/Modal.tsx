@@ -36,7 +36,7 @@ export default function Modal({ open, onClose, title, children, className = "" }
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className={`relative rounded-xl shadow-2xl border w-full max-w-lg max-h-[85vh] overflow-y-auto ${className}`}
+            className={`relative rounded-xl shadow-elev-3 border w-full max-w-lg max-h-[85vh] overflow-y-auto ${className}`}
             style={{ background: "var(--surface-elevated)", borderColor: "var(--border)" }}
           >
             {title && (

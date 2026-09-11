@@ -60,10 +60,13 @@ module.exports = {
         lg: "calc(var(--radius) + 2px)",
       },
       boxShadow: {
-        card: "0 1px 2px rgba(26,22,18,0.04)",
-        "card-hover": "0 4px 16px rgba(26,22,18,0.10)",
-        "card-lg": "0 4px 16px rgba(26,22,18,0.08)",
+        card: "var(--shadow-1)",
+        "card-hover": "var(--shadow-2)",
+        "card-lg": "var(--shadow-2)",
         glass: "var(--glass-shadow)",
+        "elev-1": "var(--shadow-1)",
+        "elev-2": "var(--shadow-2)",
+        "elev-3": "var(--shadow-3)",
       },
       animation: {
         "spring-in": "spring-in 0.4s cubic-bezier(0.23, 1, 0.32, 1)",

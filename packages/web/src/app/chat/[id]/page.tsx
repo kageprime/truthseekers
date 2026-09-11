@@ -240,7 +240,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       {mobileSidebarOpen && (
         <div className="md:hidden fixed inset-0" style={{ zIndex: 50 }}>
           <div className="absolute inset-0 bg-black/40 animate-appear-blur" onClick={() => setMobileSidebarOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 flex flex-col bg-surface border-r border-border/30 shadow-2xl animate-slide-in-left">
+          <aside className="absolute left-0 top-0 bottom-0 w-72 flex flex-col bg-surface border-r border-border/30 shadow-elev-3 animate-slide-in-left">
             {/* Sidebar header */}
             <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-border/30">
               <div className="flex items-center gap-2">

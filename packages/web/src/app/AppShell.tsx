@@ -86,7 +86,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         {showChat && !isOverlay && (
           <>
             <div className="fixed inset-0 bg-black/20 lg:hidden" onClick={close} style={{ zIndex: "var(--z-chat-backdrop)" }} />
-            <aside className="fixed right-0 top-0 bottom-0 w-[400px] overflow-hidden border-l border-border bg-surface shadow-xl animate-slide-in-right" style={{ zIndex: "var(--z-chat-panel)" }}>
+            <aside className="fixed right-0 top-0 bottom-0 w-[400px] overflow-hidden border-l border-border bg-surface shadow-elev-3 animate-slide-in-right" style={{ zIndex: "var(--z-chat-panel)" }}>
               <FloatingChatWidget />
             </aside>
           </>
@@ -97,7 +97,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {showChat && isOverlay && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end pointer-events-none">
           <div className="absolute inset-0 bg-black/30 pointer-events-auto animate-appear-blur" onClick={close} />
-          <div className="relative pointer-events-auto rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden bg-surface border border-border chat-shell chat-message-enter">
+          <div className="relative pointer-events-auto rounded-t-3xl shadow-elev-3 max-h-[85vh] overflow-hidden bg-surface border border-border chat-shell chat-message-enter">
             <div className="flex justify-center pt-3 pb-2">
               <div className="w-12 h-1.5 rounded-full bg-subtle/50" />
             </div>
@@ -126,7 +126,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       {/* Floating ViewSwitcher for stream mode — clear mobile nav */}
       {article && mode === "stream" && (
-        <div className="fixed md:bottom-6 bottom-24 left-1/2 -translate-x-1/2 shadow-lg rounded-full p-0.5 bg-surface-elevated border border-rule animate-appear-up" style={{ zIndex: "var(--z-view-switcher)" }}>
+        <div className="fixed md:bottom-6 bottom-24 left-1/2 -translate-x-1/2 shadow-elev-2 rounded-full p-0.5 bg-surface-elevated border border-rule animate-appear-up" style={{ zIndex: "var(--z-view-switcher)" }}>
           <ViewSwitcher />
         </div>
       )}

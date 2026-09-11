@@ -129,6 +129,13 @@
   --radius-card-lg: 8px;
   --radius-pill: 9999px;
 
+  /* Elevation — one shared depth language. Levels, not vibes:
+     1 resting cards, 2 lifted/hover, 3 overlays and modals. Shadows are
+     warm ink on paper, true black in dark mode where ink goes invisible. */
+  --shadow-1: 0 1px 2px rgba(26, 22, 18, 0.04);
+  --shadow-2: 0 4px 16px rgba(26, 22, 18, 0.10);
+  --shadow-3: 0 12px 48px rgba(26, 22, 18, 0.16);
+
   /* Z-index scale — single source of truth */
   --z-base: 0;
   --z-grain: 0;
@@ -208,6 +215,10 @@
   --glass: rgba(26, 23, 20, 0.85);
   --glass-border: rgba(236, 227, 210, 0.08);
   --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-3: 0 16px 56px rgba(0, 0, 0, 0.60);
 
   --skeleton-start: #2e2820;
   --skeleton-end: #3a3228;
@@ -777,7 +788,7 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
     backdrop-filter: blur(40px) saturate(1.5);
     -webkit-backdrop-filter: blur(40px) saturate(1.5);
     border: 1px solid var(--glass-border);
-    box-shadow: 0 8px 40px rgba(26,22,18,0.10);
+    box-shadow: var(--shadow-3);
   }
 
   /* ── Plate ──────────────────────────────────────────── */
@@ -792,7 +803,7 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
   }
   .group:hover .article-plate {
     transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(26,22,18,0.12);
+    box-shadow: var(--shadow-2);
   }
   .glass-card,
   .glass-card-static {

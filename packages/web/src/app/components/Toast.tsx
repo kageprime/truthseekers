@@ -55,7 +55,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
               transition={{ type: "spring", stiffness: 400, damping: 30 }}
-              className="pointer-events-auto rounded-xl px-4 py-3 shadow-lg border min-w-[280px] max-w-[400px]"
+              className="pointer-events-auto rounded-xl px-4 py-3 shadow-elev-2 border min-w-[280px] max-w-[400px]"
               style={{
                 background: "var(--surface-elevated)",
                 borderColor: "var(--border)",

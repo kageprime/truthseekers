@@ -108,7 +108,7 @@ export default function ChatInput({
               </button>
               {modelOpen && (
                 <div
-                  className="absolute bottom-full left-0 mb-1 rounded-lg py-1 shadow-xl z-50"
+                  className="absolute bottom-full left-0 mb-1 rounded-lg py-1 shadow-elev-2 z-50"
                   style={{ background: "var(--surface)", border: "1px solid var(--border)", minWidth: "150px" }}
                 >
                   {MODELS.map((m) => (
