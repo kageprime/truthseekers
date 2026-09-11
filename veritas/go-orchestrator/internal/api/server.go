@@ -1301,7 +1301,7 @@ func (s *Server) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"use POST"}`, http.StatusMethodNotAllowed)
 		return
 	}
-	clearAuthCookie(w)
+	clearAuthCookie(w, r)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"logged_out":true}`))
 }

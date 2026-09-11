@@ -118,7 +118,8 @@ export function useChats() {
 }
 
 export function useChat(id: string | undefined) {
-  return useApiQuery(["chat", id], () => api.fetchChat(id!), { enabled: !!id, staleTime: 30000 });
+  // ponytail: "new" is a route sentinel, not a conversation — never fetch it.
+  return useApiQuery(["chat", id], () => api.fetchChat(id!), { enabled: !!id && id !== "new", staleTime: 30000 });
 }
 
 export function useCreateChat() {

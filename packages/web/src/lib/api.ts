@@ -1,4 +1,5 @@
 import { BASE } from "./constants";
+import { getStoredToken } from "./token";
 import type { Article, JobInfo, ArticleSummary, QuotaInfo, ConversationSummary, ConversationDetail, MapEntry } from "@encarta/core";
 import * as mock from "./mock-data";
 
@@ -106,13 +107,12 @@ export async function fetchMap(slug: string): Promise<MapEntry | null> {
 
 // ── Chat ──
 
-// Canonical auth header builder — cookie-first, localStorage fallback.
-// Pure: no side effects (the cookie migration lives in AuthProvider.getStoredToken).
-// Used by every authenticated fetch so token retrieval stays consistent.
+// Canonical auth header builder — memory token first, legacy readable
+// cookie/localStorage fallback via getStoredToken. Every authenticated fetch
+// uses this so the OTP-login JWT (memory-only, S7) is actually attached;
+// without it, freshly-logged-in users sent no credentials cross-origin.
 export function authHeaders(): Record<string, string> {
-  if (typeof document === "undefined") return {};
-  const fromCookie = document.cookie.match(/(?:^|; )truthseekers_token=([^;]*)/);
-  const token = fromCookie ? decodeURIComponent(fromCookie[1]) : localStorage.getItem("truthseekers_token");
+  const token = getStoredToken();
   return token ? { authorization: `Bearer ${token}` } : {};
 }
 

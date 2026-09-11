@@ -48,7 +48,12 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    if (!authLoading && user) router.replace("/");
+    // ponytail: honor ?redirect= (e.g. middleware bounced /chat/new here) —
+    // hardcoded "/" dropped it and logged-in users landed on the homepage.
+    if (!authLoading && user) {
+      const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+      router.replace(safeRedirect(params.get("redirect")));
+    }
   }, [user, authLoading, router]);
 
   useEffect(() => {

@@ -78,11 +78,17 @@ func signJWT(sub string, role ...string) (string, error) {
 // exposed to page JS. The JSON token response is kept for backward compat
 // with older frontends; new frontends rely on the cookie + credentials:include.
 // Secure is set on TLS or when COOKIE_SECURE=1 / X-Forwarded-Proto=https
-// (Heroku/Vercel terminate TLS at the edge).
+// (Heroku/Vercel terminate TLS at the edge). SameSite=None when Secure so
+// the cookie is sent on cross-site fetches/EventSource (Vercel → Heroku);
+// Lax otherwise (local-dev same-site, where None would be wrong).
 func setAuthCookie(w http.ResponseWriter, r *http.Request, token string) {
 	secure := r.TLS != nil ||
 		os.Getenv("COOKIE_SECURE") == "1" ||
 		r.Header.Get("X-Forwarded-Proto") == "https"
+	sameSite := http.SameSiteLaxMode
+	if secure {
+		sameSite = http.SameSiteNoneMode
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "truthseekers_token",
 		Value:    token,
@@ -90,21 +96,29 @@ func setAuthCookie(w http.ResponseWriter, r *http.Request, token string) {
 		MaxAge:   int((jwtTTL + time.Second).Seconds()),
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 	})
 }
 
-// clearAuthCookie expires the session cookie. Same Path/SameSite so the
-// browser actually drops it; Secure omitted (an expired insecure cookie still
-// overwrites per RFC 6265 §5.3 step 12 — Secure only gates sending).
-func clearAuthCookie(w http.ResponseWriter) {
+// clearAuthCookie expires the session cookie. Mirrors setAuthCookie's
+// Path/Secure/SameSite so the browser actually drops it (per RFC 6265 §5.3
+// the domain+path must match; Secure/SameSite mirror the live cookie).
+func clearAuthCookie(w http.ResponseWriter, r *http.Request) {
+	secure := r.TLS != nil ||
+		os.Getenv("COOKIE_SECURE") == "1" ||
+		r.Header.Get("X-Forwarded-Proto") == "https"
+	sameSite := http.SameSiteLaxMode
+	if secure {
+		sameSite = http.SameSiteNoneMode
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "truthseekers_token",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
+		SameSite: sameSite,
 	})
 }
 
