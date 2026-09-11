@@ -237,6 +237,7 @@ func doLLMRequest(route ModelRoute, payload []byte, onEvent func(AgentEvent)) (L
 	if resp.StatusCode != 200 {
 		respBody, _ := io.ReadAll(resp.Body)
 		retryable := resp.StatusCode == 429 || resp.StatusCode >= 500
+		logLLMReject(route, payload, resp.StatusCode, respBody)
 		return LLMResponse{}, retryable, fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
 	}
 
@@ -249,6 +250,42 @@ func doLLMRequest(route ModelRoute, payload []byte, onEvent func(AgentEvent)) (L
 		return LLMResponse{}, retryable, err
 	}
 	return response, false, nil
+}
+
+// logLLMReject records the request SHAPE on provider rejection (status +
+// roles + counts only — never message content, never credentials) so a
+// generic 400 like "invalid parameters" can be bisected from Heroku logs.
+func logLLMReject(route ModelRoute, payload []byte, status int, body []byte) {
+	var dbg struct {
+		Model       string `json:"model"`
+		Messages    []struct {
+			Role string `json:"role"`
+		} `json:"messages"`
+		Temperature *float64          `json:"temperature"`
+		MaxTokens   *int              `json:"max_tokens"`
+		Tools       []json.RawMessage `json:"tools"`
+		Stream      *bool             `json:"stream"`
+	}
+	_ = json.Unmarshal(payload, &dbg)
+	roles := make([]string, 0, len(dbg.Messages))
+	for _, m := range dbg.Messages {
+		roles = append(roles, m.Role)
+	}
+	temp, maxtok, stream := "nil", "nil", "nil"
+	if dbg.Temperature != nil {
+		temp = fmt.Sprintf("%v", *dbg.Temperature)
+	}
+	if dbg.MaxTokens != nil {
+		maxtok = fmt.Sprintf("%d", *dbg.MaxTokens)
+	}
+	if dbg.Stream != nil {
+		stream = fmt.Sprintf("%v", *dbg.Stream)
+	}
+	if len(body) > 300 {
+		body = body[:300]
+	}
+	log.Printf("[llm] reject model=%s endpoint=%s status=%d roles=%s tools=%d temp=%s maxtok=%s stream=%s body=%s",
+		route.ModelID, route.BaseURL, status, strings.Join(roles, ","), len(dbg.Tools), temp, maxtok, stream, strings.TrimSpace(string(body)))
 }
 
 func parseStream(rd io.Reader, onEvent func(AgentEvent)) (LLMResponse, error) {

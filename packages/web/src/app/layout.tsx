@@ -8,6 +8,7 @@ import { ChatProvider } from "./chat/ChatContext";
 import { HeaderSearchProvider } from "./HeaderSearchContext";
 import { ArticleViewProvider } from "./ArticleViewContext";
 import { AuthProvider } from "./components/AuthProvider";
+import ScrollReveal from "./components/ScrollReveal";
 import { ToastProvider } from "./components/Toast";
 import AppShell from "./AppShell";
 
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       <HeaderSearchProvider>
                         <ArticleViewProvider>
                           <ToastProvider>
+                          <ScrollReveal />
                           <AppShell>{children}</AppShell>
                           </ToastProvider>
                         </ArticleViewProvider>
