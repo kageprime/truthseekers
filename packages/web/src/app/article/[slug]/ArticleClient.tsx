@@ -300,11 +300,11 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         style={{ width: "100%" }}
       >
         <div className="bezel-inner">
-      <article className="px-4 sm:px-8 md:px-12 py-12 sm:py-16 md:py-20 w-full animate-appear-up">
+      <article className="px-4 sm:px-8 md:px-12 py-8 sm:py-10 w-full animate-appear-up">
         {/* Back link — gold badge with hover arrow */}
         <button
           onClick={() => router.back()}
-          className="group inline-flex items-center gap-2 mb-10 no-underline cursor-pointer"
+          className="group inline-flex items-center gap-2 mb-5 no-underline cursor-pointer"
           style={{ color: "var(--muted)", background: "none", border: "none", padding: 0 }}
         >
           <span className="flex items-center justify-center w-7 h-7 rounded-full transition-all duration-500" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)", transitionTimingFunction: "cubic-bezier(0.32, 0.72, 0, 1)" }}>
@@ -379,14 +379,14 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         {/* Title block */}
         <header className="mb-14 md:mb-16 text-center">
           {article.categories && article.categories.length > 0 && (
-            <div className="flex justify-center mb-6">
+            <div className="flex mb-3">
               <EyebrowTag label={article.categories[0]} />
             </div>
           )}
           <h1
-            className="font-display font-bold mb-5"
+            className="font-display font-bold mb-3"
             style={{
-              fontSize: "clamp(2.25rem, 1.5rem + 3.5vw, 3.5rem)",
+              fontSize: "clamp(1.9rem, 1.4rem + 2.5vw, 2.75rem)",
               letterSpacing: "-0.025em",
               lineHeight: 1.08,
               color: "var(--ink)",
@@ -409,7 +409,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
           {/* Dateline — small-caps meta */}
           <div
-            className="mt-5"
+            className="mt-3"
             style={{
               display: "flex",
               justifyContent: "center",
@@ -437,16 +437,10 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             {article.slug && <FreshnessBadge slug={article.slug} />}
           </div>
 
-          <div className="mt-3 flex justify-center">
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
             <LiveBadge slug={slug} />
-          </div>
-        </header>
-
-        <RefreshDiffBanner slug={slug} />
-
-        {/* Dissent + Claim graph toggles */}
-        <div className="mb-8 flex flex-wrap items-center gap-2">
-          <button
+            <span style={{ color: "var(--rule)" }}>·</span>
+            <button
             onClick={() => setShowGraph(!showGraph)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium transition-colors cursor-pointer"
             style={{
@@ -470,6 +464,11 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             <span aria-hidden>⚑</span> {dissentMode ? "Dissent on" : "Highlight dissent"}
           </button>
         </div>
+        </header>
+
+        <RefreshDiffBanner slug={slug} />
+
+        <div className="mb-6" />
         {showGraph && (
           <div className="mb-6">
             <ClaimGraphViewer slug={slug} />
