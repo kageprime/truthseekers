@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import MarkdownRenderer from "./MarkdownRenderer";
-import MermaidDiagram from "./MermaidDiagram";
 import { MediaImage, MediaLightbox } from "./MediaImage";
 import { BASE } from "@/lib/constants";
 import { safeSrc, safeUrl } from "@/lib/safe-url";
@@ -14,6 +13,16 @@ import { ProvenanceChipInline } from "./ProvenanceChip";
 const InteractiveTimeline = dynamic(() => import("./InteractiveTimeline"), { ssr: false });
 const MapViewer = dynamic(() => import("./MapViewer"), { ssr: false });
 const ThreeDMapViewer = dynamic(() => import("./ThreeDMapViewer"), { ssr: false });
+// ponytail: mermaid is the heaviest renderer by far and only needed when a
+// diagram block exists — never in the initial bundle.
+const MermaidDiagram = dynamic(() => import("./MermaidDiagram"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-32 border-2 border-dashed border-[var(--border)] bg-[var(--surface-elevated)]/50">
+      <p className="text-xs" style={{ color: "var(--subtle)" }}>Loading diagram…</p>
+    </div>
+  ),
+});
 
 export { articleToBlocks } from "@encarta/core";
 import { useState, useMemo } from "react";
