@@ -320,8 +320,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         </button>
 
         {/* Admin float-island — floating pill at top-right */}
-        <div
-          className="flex items-center gap-1 mb-8 ml-auto w-max"
+          <div
+            className="flex items-center gap-1 mb-4 ml-auto w-max"
           style={{
             padding: "3px",
             borderRadius: "9999px",
@@ -376,8 +376,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           </div>
         </div>
 
-        {/* Title block */}
-        <header className="mb-14 md:mb-16 text-center">
+        {/* Title block — flush-left masthead on the body edge */}
+        <header className="mb-6 text-left">
           {article.categories && article.categories.length > 0 && (
             <div className="flex mb-3">
               <EyebrowTag label={article.categories[0]} />
@@ -397,7 +397,6 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
           {/* Animated gold rule */}
           <div
-            className="mx-auto"
             style={{
               height: 2,
               width: "3rem",
@@ -412,7 +411,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             className="mt-3"
             style={{
               display: "flex",
-              justifyContent: "center",
+              justifyContent: "flex-start",
               flexWrap: "wrap",
               gap: "0 0.35em",
               fontFamily: "var(--font-ui)",
@@ -437,7 +436,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             {article.slug && <FreshnessBadge slug={article.slug} />}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+          <div className="mt-3 flex flex-wrap items-center justify-start gap-x-3 gap-y-2">
             <LiveBadge slug={slug} />
             <span style={{ color: "var(--rule)" }}>·</span>
             <button
