@@ -148,6 +148,7 @@ func (s *Server) processArticle(slug string, persona string, note string) {
 	// dangle ("unknown" chips) and regens accumulate duplicate rows.
 	logNodeShapes(slug, nodeOutputs)
 	generatedOutput = s.canonicalizeClaimIDs(nodeOutputs, generatedOutput)
+	lintArticleProse(slug, generatedOutput)
 
 	art := transformGeneratedArticle(slug, generatedOutput)
 	if err := s.db.SaveArticle(art); err != nil {
@@ -1139,6 +1140,85 @@ func rewriteClaimRefs(raw interface{}, alias map[string]string) {
 	remapList("risk_assessments", "claim_id")
 	remapList("language_flags", "claim_id")
 	remapList("claim_relationships", "source_claim_id", "target_claim_id")
+}
+
+// metaTalk patterns catch process narration leaking into article prose.
+// Matches are logged, never auto-edited — mutating prose risks breaking
+// anchors, and the log is what tunes the writer prompt over time.
+var metaTalkPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)layer\s+[0-9]`),
+	regexp.MustCompile(`(?i)interpretive assessment only`),
+	regexp.MustCompile(`(?i)no .*claims were (provided|supplied)`),
+	regexp.MustCompile(`(?i)no factual assertions`),
+	regexp.MustCompile(`(?i)as an ai\b`),
+	regexp.MustCompile(`(?i)confidence vector`),
+	regexp.MustCompile(`(?i)epistemic (pipeline|layer|node)`),
+	regexp.MustCompile(`(?i)resolved claim (list|set)`),
+}
+
+var sentenceSplitRe = regexp.MustCompile(`[.!?]+\s+`)
+var anchorStripRe = regexp.MustCompile(`\[claim:[0-9a-fA-F-]+\]`)
+var normSpaceRe = regexp.MustCompile(`[^a-z0-9 ]+`)
+
+// lintArticleProse scans generated prose for process narration and verbatim
+// restatement. Findings are logged loudly for prompt tuning; the article is
+// never mutated here (anchor safety).
+func lintArticleProse(slug string, generated interface{}) {
+	b, err := json.Marshal(generated)
+	if err != nil {
+		return
+	}
+	var payload articlePayload
+	if err := json.Unmarshal(b, &payload); err != nil {
+		return
+	}
+	texts := []string{payload.Article.Abstract}
+	for _, s := range payload.Article.Sections {
+		texts = append(texts, s.Content)
+	}
+	for _, t := range texts {
+		for _, re := range metaTalkPatterns {
+			if loc := re.FindStringIndex(t); loc != nil {
+				start := loc[0] - 60
+				if start < 0 {
+					start = 0
+				}
+				end := loc[1] + 60
+				if end > len(t) {
+					end = len(t)
+				}
+				log.Printf("[generate] lint slug=%s meta-talk %q near: …%s…", slug, re.String(), strings.TrimSpace(t[start:end]))
+			}
+		}
+	}
+	seen := map[string]int{}
+	for _, t := range texts {
+		clean := anchorStripRe.ReplaceAllString(t, " ")
+		for _, s := range sentenceSplitRe.Split(clean, -1) {
+			norm := normSpaceRe.ReplaceAllString(strings.ToLower(s), " ")
+			norm = strings.Join(strings.Fields(norm), " ")
+			if len(strings.Fields(norm)) < 8 {
+				continue
+			}
+			seen[norm]++
+		}
+	}
+	dupes := 0
+	for sent, n := range seen {
+		if n >= 2 {
+			dupes++
+			if dupes <= 3 {
+				preview := sent
+				if len(preview) > 100 {
+					preview = preview[:100] + "…"
+				}
+				log.Printf("[generate] lint slug=%s restated x%d: %q", slug, n, preview)
+			}
+		}
+	}
+	if dupes > 3 {
+		log.Printf("[generate] lint slug=%s …and %d more restated sentences", slug, dupes-3)
+	}
 }
 
 // stubArticle returns a minimal renderable article, used only when the

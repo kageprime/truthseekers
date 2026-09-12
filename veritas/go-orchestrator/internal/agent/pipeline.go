@@ -446,17 +446,24 @@ OUTPUT FORMAT:
 
 	promptGenerateArticle = `AGENT ROLE: Article Generator Node — Layer 3 (Knowledge Construction)
 
-FUNCTION: Generate the final encyclopedia article as a structured view over the resolved claim graph.
+FUNCTION: Write a finished encyclopedia article synthesized from the resolved claim graph. The reader must never see the machinery — no layers, no nodes, no scores, no process narration.
 
 SUPPLEMENTAL INSTRUCTIONS:
+- LEDE FIRST: open with a definitional paragraph dense with checkable facts (what it is, where/when, why it matters). Never open with throat-clearing about the task, the evidence, or what follows.
+- ORGANIZE BY TOPIC, not by method: group claims into subject sections (origins, mechanism, history, controversy) the way a reference work does. Never emit one section per analysis category (no "single-source claims" sections, no per-stage reports).
+- ATTRIBUTE EVERY CONTESTED SENTENCE IN THE PROSE: disputed and weak claims travel with their carrier ("according to X", "critics argue", "one account holds"). The anchor is the receipt, not the attribution. Consensus statements need no carrier.
+- STATE EACH FACT ONCE: a claim is asserted in full in exactly one place and referenced elsewhere by anchor. Restating the same claim across sections is a defect, not thoroughness.
+- QUOTE SPARINGLY AND EXACTLY: where a resolved wording is decisive, quote it briefly with its anchor. Never paraphrase a quote into a new claim.
+- CONFIDENCE AS PROSE: express certainty the way reference works do ("historians agree", "accounts differ", "evidence suggests"). Never print vectors, scores, or confidence numbers in the article body.
+- MACHINERY IN ONE APPENDIX: evidence gaps, dissenting perspectives, the confidence note, and language notes belong at the end, once. No uncertainty notes trailing individual sections, no interpretive throat-clearing inside the narrative.
+- META-TALK IS FORBIDDEN IN THE BODY: never mention layers, nodes, pipelines, claim counts, resolution, or the generation process. Never write sentences like "interpretive assessment only" or "no claims were provided". If the input is too thin to support an article section, omit the section — sparsity is honest, narration about sparsity is not.
+- TIMELINE YEARS ARE SINGLE INTEGERS: one year per event, no ranges, no prose dates. Skip undatable events rather than approximating.
 - Build the article from the resolved claims; do not introduce new claims.
 - Use precise language. If Layer 2 offered precision upgrades, you may adopt them, but must show the original phrasing in language notes.
-- Include sections for Evidence Gaps, Dissenting Perspectives, and Confidence Note.
 - Every factual statement MUST be traceable to a specific claim_id.
-- Insert claim anchors in the content using the format: [claim:{claim_id}]
+- Insert claim anchors in the content using the format: [claim:{claim_id}]. Copy IDs exactly as given; never invent, shorten, or renumber them.
 - Example: "The mission launched on July 16, 1969. [claim:abc-123]"
 - Do NOT add claim anchors to interpretive or speculative statements.
-- Mark uncertainty clearly. The reader must see what is solid and what is interpretive.
 - Never invent evidence, drop provenance, or re-label an interpretive claim as factual.
 
 OUTPUT FORMAT (return a JSON object with root "article" key):
