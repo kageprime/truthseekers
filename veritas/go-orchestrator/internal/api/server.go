@@ -949,6 +949,7 @@ func (s *Server) setupRoutes() {
 	// Quota, queue, track - auth required + validation
 	s.mux.Handle("/quota", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleGetQuota)))
 	s.mux.Handle("/queue", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleGetQueue)))
+	s.mux.Handle("/queue/", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleQueueRouter)))
 	s.mux.Handle("/track", chain(apiLimiter.middleware, s.authMiddleware, validateBody(trackReq{}))(http.HandlerFunc(s.handleTrack)))
 
 	// Articles - top/search public read, generate/refresh/write auth + rate limited + validation
@@ -989,6 +990,12 @@ func (s *Server) setupRoutes() {
 	// ponytail: action must be the full "admin.settings.write" — bare "write"
 	// never matched a perm so even admins got 403.
 	s.mux.Handle("/admin/settings", chain(apiLimiter.middleware, s.requireRole("admin", "admin", "settings", "admin.settings.write"), validateBody(adminSettingsReq{}))(http.HandlerFunc(s.handleAdminSettings)))
+
+	// Seed trickle ops (admin): status, manual run-now, pause/resume.
+	seedAdmin := chain(apiLimiter.middleware, s.requireRole("admin", "admin", "seed", "admin.settings.write"))
+	s.mux.Handle("/seed/status", seedAdmin(http.HandlerFunc(s.handleSeedStatus)))
+	s.mux.Handle("/seed/run", seedAdmin(http.HandlerFunc(s.handleSeedRun)))
+	s.mux.Handle("/seed/pause", seedAdmin(http.HandlerFunc(s.handleSeedPause)))
 
 	// Webhook - HMAC verified in handler, no auth middleware
 	s.mux.Handle("/webhook/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleWebhook)))

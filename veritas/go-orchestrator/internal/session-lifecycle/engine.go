@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"sort"
 	"sync"
 	"time"
 )
@@ -122,6 +123,18 @@ func (e *Engine) GetSessionBySlug(slug string) *Session {
 	return nil
 }
 
+// ListSessions returns copies of all sessions, newest first.
+func (e *Engine) ListSessions() []Session {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	out := make([]Session, 0, len(e.sessions))
+	for _, s := range e.sessions {
+		out = append(out, *s)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+	return out
+}
+
 // Transition moves a session to a new status, validating the transition.
 func (e *Engine) Transition(cmd TransitionCommand) error {
 	e.mu.Lock()
@@ -180,6 +193,9 @@ func (e *Engine) Stats() (active int, queued int) {
 	defer e.mu.RUnlock()
 	return e.active, len(e.queue)
 }
+
+// Limits exposes the backpressure ceiling for ops surfaces.
+func (e *Engine) Limits() (maxActiveSessions int) { return maxActive }
 
 // ── Internal ────────────────────────────────────────────────
 

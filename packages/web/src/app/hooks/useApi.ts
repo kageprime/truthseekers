@@ -208,6 +208,28 @@ export function useUsageStats() {
   return useApiQuery(["usage"], () => api.fetchUsageStats());
 }
 
+// ── Seed Trickle (admin ops) ──
+
+export function useSeedStatus(pollMs: number | false = false) {
+  return useApiQuery(["seed", "status"], () => api.fetchSeedStatus(), { refetchInterval: pollMs });
+}
+
+export function useSeedRun() {
+  const queryClient = useQueryClient();
+  return useApiMutation(
+    (force: boolean) => api.runSeedNow(force),
+    { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["seed", "status"] }) },
+  );
+}
+
+export function useSeedPause() {
+  const queryClient = useQueryClient();
+  return useApiMutation(
+    (paused: boolean) => api.setSeedPaused(paused),
+    { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["seed", "status"] }) },
+  );
+}
+
 // ── Epistemic: Contested / Gaps / Stale / Freshness / Refresh-diff ──
 
 export function useContestedClaims(limit = 50) {

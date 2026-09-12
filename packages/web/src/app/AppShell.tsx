@@ -30,8 +30,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { isOpen, toggle, close, isExpanded } = useFloatingChat();
-  const { user, logout, loading: authLoading } = useAuth();
+  const { user, logout, loading: authLoading, cookieOk } = useAuth();
   const { article, mode } = useArticleView();
+  const [cookieWarnDismissed, setCookieWarnDismissed] = useState(() => {
+    try { return localStorage.getItem("truthseekers_cookie_warn") === "1"; } catch { return false; }
+  });
 
   useEffect(() => {
     if (authLoading) return;
@@ -69,6 +72,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="h-dvh overflow-hidden flex flex-col">
+      {/* B1: third-party-cookie warning — session lives on this tab only */}
+      {user && cookieOk === false && !cookieWarnDismissed && (
+        <div className="flex items-center justify-center gap-3 px-4 py-1.5 text-xs" style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>
+          <span>Your browser is blocking third-party cookies — you&apos;ll stay logged in on this tab, but a reload will sign you out.</span>
+          <button
+            onClick={() => { try { localStorage.setItem("truthseekers_cookie_warn", "1"); } catch {} setCookieWarnDismissed(true); }}
+            className="font-medium hover:underline cursor-pointer"
+            style={{ background: "none", border: "none", padding: 0, color: "inherit" }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       {!isOverlayRoute && !isHidden && <FloatIslandNav />}
       {!isOverlayRoute && !isHidden && <LiveNowTicker />}
       <div className="flex-1 flex min-h-0 min-w-0 relative overflow-hidden">

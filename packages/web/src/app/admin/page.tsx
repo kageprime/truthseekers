@@ -3,8 +3,88 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import PageLayout from "../components/PageLayout";
-import { useAuth, useAdminSettings, useArticleSearch, useModels, useConnectors, useUpdateCredential, useUsageStats } from "../hooks";
-import { IconBook, IconX, IconSearch, IconCheck, IconKey, IconCpu, IconActivity } from "../components/Icons";
+import { useAuth, useAdminSettings, useArticleSearch, useModels, useConnectors, useUpdateCredential, useUsageStats, useSeedStatus, useSeedRun, useSeedPause } from "../hooks";
+import { IconBook, IconX, IconSearch, IconCheck, IconKey, IconCpu, IconActivity, IconLightning } from "../components/Icons";
+
+function SeedPanel() {
+  const { data: seed } = useSeedStatus(10000);
+  const { mutate: runNow, loading: running } = useSeedRun();
+  const { mutate: setPaused, loading: pausing } = useSeedPause();
+  const [force, setForce] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function handleRun() {
+    setMsg("");
+    const res = await runNow(force);
+    if (!res) { setMsg("Run failed"); return; }
+    setMsg(res.queued ? `Queued ${res.queued}` : (res.reason || "Idle"));
+  }
+
+  async function handlePause(paused: boolean) {
+    setMsg("");
+    const ok = await setPaused(paused);
+    setMsg(ok ? (paused ? "Trickle paused" : "Trickle resumed") : "Failed");
+    setTimeout(() => setMsg(""), 2500);
+  }
+
+  return (
+    <section className="plate p-6 space-y-4">
+      <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: "var(--ink)" }}>
+        <IconLightning size={18} /> Seed Trickle
+      </h2>
+      {!seed ? (
+        <div className="text-sm" style={{ color: "var(--subtle)" }}>Loading…</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
+              <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>{seed.today.count}/{seed.today.limit}</div>
+              <div className="text-xs" style={{ color: "var(--subtle)" }}>Today ({seed.today.date})</div>
+            </div>
+            <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
+              <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>{seed.bench.live.length}/{seed.bench.total}</div>
+              <div className="text-xs" style={{ color: "var(--subtle)" }}>Bench live</div>
+            </div>
+            <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
+              <div className="text-lg font-bold" style={{ color: seed.paused ? "var(--oxblood)" : "var(--green)" }}>{seed.paused ? "Paused" : "Live"}</div>
+              <div className="text-xs" style={{ color: "var(--subtle)" }}>Next tick {new Date(seed.next_tick).toLocaleTimeString()}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <button onClick={handleRun} disabled={running} className="btn btn-primary btn-sm">
+              {running ? "Queueing…" : "Run now"}
+            </button>
+            <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--subtle)" }}>
+              <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
+              Override daily ceiling
+            </label>
+            <button
+              onClick={() => handlePause(!seed.paused)}
+              disabled={pausing}
+              className="btn btn-sm"
+              style={{ border: "1px solid var(--border)" }}
+            >
+              {seed.paused ? "Resume" : "Pause"}
+            </button>
+            {seed.auto_gaps && <span className="text-xs" style={{ color: "var(--gold)" }}>gap phase armed</span>}
+          </div>
+          {msg && <div className="text-xs" style={{ color: "var(--subtle)" }}>{msg}</div>}
+          {seed.bench.pending.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {seed.bench.pending.map((slug) => (
+                <span key={slug} className="text-xs px-2 py-0.5 rounded" style={{ background: "var(--surface)", border: "1px solid var(--border-light)", color: "var(--subtle)" }}>
+                  {slug}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs" style={{ color: "var(--green)" }}>Bench complete — trickle idles{seed.auto_gaps ? " (gap phase active)" : ""}.</div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
@@ -87,6 +167,9 @@ export default function AdminPage() {
           </div>
           {credMsg && <span className="text-xs" style={{ color: credMsg === "Token updated" ? "var(--green)" : "var(--oxblood)" }}>{credMsg}</span>}
         </section>
+
+        {/* ── Seed Trickle (auto-generation ops) ── */}
+        <SeedPanel />
 
         {/* ── Featured Articles ── */}
         <section className="plate p-6 space-y-5">

@@ -355,9 +355,10 @@ export default function LoginPage() {
                   <div>
                     <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] mb-1.5" style={{ color: "var(--muted)" }}>Email</label>
                     <div className="p-[2px]" style={{ borderRadius: "var(--radius-card-lg)", background: "color-mix(in srgb, var(--border) 12%, transparent)" }}>
-                      <input
-                        type="email"
-                        value={email}
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="you@example.com"
                         required
@@ -411,6 +412,7 @@ export default function LoginPage() {
                       <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] mb-1.5" style={{ color: "var(--muted)" }}>Email</label>
                       <input
                         type="email"
+                        autoComplete="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="you@example.com"
@@ -502,9 +504,10 @@ export default function LoginPage() {
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] mb-1.5" style={{ color: "var(--muted)" }}>Email</label>
-                    <input
-                      type="email"
-                      value={email}
+                      <input
+                        type="email"
+                        autoComplete="email"
+                        value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@example.com"
                       required

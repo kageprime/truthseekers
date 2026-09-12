@@ -841,9 +841,72 @@ func (s *Server) handleGetQuota(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetQueue(w http.ResponseWriter, r *http.Request) {
 	reqLog(r, "queue")
-	// Mock queue summary returning empty queue
+	// Live session listing — the /queue page polls this every 2s. Shape
+	// matches the frontend QueueData contract ({jobs, stats}).
+	type jobJSON struct {
+		Slug      string `json:"slug"`
+		Status    string `json:"status"`
+		Phase     string `json:"phase"`
+		CreatedAt string `json:"createdAt"`
+		Source    string `json:"source,omitempty"`
+		Error     string `json:"error,omitempty"`
+	}
+	jobs := make([]jobJSON, 0)
+	for _, sess := range s.sessionEngine.ListSessions() {
+		status := string(sess.Status)
+		switch sess.Status {
+		case sessionlifecycle.StatusCompleted:
+			status = "done"
+		case sessionlifecycle.StatusFailed:
+			status = "error"
+		}
+		jobs = append(jobs, jobJSON{
+			Slug:      sess.Slug,
+			Status:    status,
+			Phase:     status,
+			CreatedAt: sess.CreatedAt.UTC().Format(time.RFC3339),
+			Source:    sess.Source,
+			Error:     sess.Error,
+		})
+	}
+	active, queued := s.sessionEngine.Stats()
+	jobsJSON, _ := json.Marshal(jobs)
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"jobs":[],"stats":{"active":0,"queued":0,"completed":0}}`))
+	fmt.Fprintf(w, `{"jobs":%s,"stats":{"active":%d,"queued":%d,"maxConcurrent":%d,"maxQueue":%d}}`,
+		string(jobsJSON), active, queued, s.sessionEngine.Limits(), s.sessionEngine.Limits())
+}
+
+// handleQueueRouter dispatches DELETE /queue/:slug (cancel a session).
+func (s *Server) handleQueueRouter(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	slug := strings.TrimPrefix(r.URL.Path, "/queue/")
+	slug = strings.Trim(slug, "/")
+	if slug == "" {
+		http.Error(w, `{"error":"slug required"}`, http.StatusBadRequest)
+		return
+	}
+	sess := s.sessionEngine.GetSessionBySlug(slug)
+	if sess == nil {
+		http.Error(w, `{"error":"no session for slug"}`, http.StatusNotFound)
+		return
+	}
+	if sessionlifecycle.IsTerminal(sess.Status) {
+		http.Error(w, fmt.Sprintf(`{"error":"session already %s"}`, sess.Status), http.StatusConflict)
+		return
+	}
+	if err := s.sessionEngine.Transition(sessionlifecycle.TransitionCommand{
+		SessionID: sess.ID,
+		ToStatus:  sessionlifecycle.StatusStopped,
+	}); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusConflict)
+		return
+	}
+	reqLog(r, "queue-cancel slug=%s", slug)
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"cancelled":true,"slug":%q}`, slug)
 }
 
 func (s *Server) handleTrack(w http.ResponseWriter, r *http.Request) {

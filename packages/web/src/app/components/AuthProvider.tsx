@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { fetchMe, type AuthUser } from "@/lib/api";
 
 interface User extends AuthUser {
@@ -11,6 +11,8 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   token: string | null;
+  // B1: null = unknown, true = cookie persists, false = browser blocks it.
+  cookieOk: boolean | null;
   tokenPayload: ReturnType<typeof import("@/lib/api").decodeJwt>;
   login: (email: string) => Promise<{ user: User; token: string } | { error: string }>;
   logout: () => void;
@@ -30,6 +32,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
+  const [cookieOk, setCookieOk] = useState<boolean | null>(null);
+  const userRef = useRef<User | null>(null);
+  userRef.current = user;
+  const lastReval = useRef(0);
 
   // Sync token state from storage (catches changes across navigations)
   useEffect(() => {
@@ -113,14 +119,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearToken();
     setToken(null);
     setUser(null);
+    setCookieOk(null);
   };
 
   const refresh = () => {
     setToken(getStoredToken());
   };
 
+  // B2: throttled revalidation — window focus + 15 min interval. Picks up
+  // server-side token rotation for long-lived tabs so the session never ages
+  // out underneath the user. Skipped when logged out (no focus-ping noise)
+  // and within 5 min of the last check; transport blips keep the session.
+  const revalidate = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastReval.current < 5 * 60 * 1000) return;
+    const t = getStoredToken();
+    if (!t && !userRef.current) return;
+    lastReval.current = now;
+    try {
+      if (t) {
+        setUser(await fetchMeWithRole(t));
+      } else {
+        const { fetchMeCookie } = await import("@/lib/api");
+        const u = await fetchMeCookie();
+        setUser(u ? { ...u, role: u.role ?? "member" } : null);
+      }
+    } catch { /* blips keep the session */ }
+  }, [fetchMeWithRole]);
+
+  useEffect(() => {
+    const id = setInterval(revalidate, 15 * 60 * 1000);
+    window.addEventListener("focus", revalidate);
+    return () => { window.removeEventListener("focus", revalidate); clearInterval(id); };
+  }, [revalidate]);
+
+  // B1: cookie-block probe — runs once per login. fetchMe succeeding proves
+  // the session is alive, so a cookie-only 401 strictly means the browser
+  // rejected the cross-site cookie (reloads will sign the user out).
+  useEffect(() => {
+    if (!user || cookieOk !== null) return;
+    let cancelled = false;
+    import("@/lib/api").then(async ({ probeCookieSession }) => {
+      const ok = await probeCookieSession();
+      if (!cancelled) setCookieOk(ok);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [user, cookieOk]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, token, tokenPayload, login, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, token, tokenPayload, cookieOk, login, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

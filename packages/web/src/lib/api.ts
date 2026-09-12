@@ -49,9 +49,8 @@ export async function fetchQuota(): Promise<QuotaInfo | null> {
 
 export async function generateArticle(slug: string, persona?: string): Promise<{ status: string; persona?: string; quota?: QuotaInfo }> {
   if (MOCK) return { status: "queued", persona: persona || "veritas" };
-  const res = await fetch(`${BASE}/articles/${slug}/generate`, {
+  const res = await authed(`/articles/${slug}/generate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
     body: JSON.stringify({ persona: persona || "veritas" }),
   });
   if (!res.ok) return { status: "error" };
@@ -60,10 +59,7 @@ export async function generateArticle(slug: string, persona?: string): Promise<{
 
 export async function refreshArticle(slug: string): Promise<{ status: string; quota?: QuotaInfo }> {
   if (MOCK) return { status: "queued" };
-  const res = await fetch(`${BASE}/articles/${slug}/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
-  });
+  const res = await authed(`/articles/${slug}/refresh`, { method: "POST" });
   if (!res.ok) return { status: "error" };
   return res.json();
 }
@@ -116,11 +112,46 @@ export function authHeaders(): Record<string, string> {
   return token ? { authorization: `Bearer ${token}` } : {};
 }
 
+// B3: a 401 from a user-initiated mutation means the session died mid-task.
+// Route to login with the current path preserved instead of surfacing a
+// misleading operation error. Background reads/pings never call this.
+export function redirectToLogin(): void {
+  if (typeof window === "undefined") return;
+  const next = window.location.pathname + window.location.search;
+  if (next.startsWith("/login")) return;
+  window.location.assign(`/login?redirect=${encodeURIComponent(next)}`);
+}
+
+// authed() is the single wrapper for user-initiated mutations: attaches the
+// session, sends cookies, and routes genuine 401s to login. Callers keep
+// their own fallback returns for the (now-redirecting) failure path.
+async function authed(path: string, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(`${BASE}${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...(init.headers || {}) },
+    credentials: "include",
+  });
+  if (res.status === 401) redirectToLogin();
+  return res;
+}
+
+// B1: cookie-block probe — same session check as fetchMeCookie but WITHOUT
+// the Bearer header, so the verdict is strictly about the HttpOnly cookie.
+// A transport blip returns true (unknown ≠ blocked); only a clean 401 warns.
+export async function probeCookieSession(): Promise<boolean> {
+  if (MOCK) return true;
+  try {
+    const res = await fetch(`${BASE}/auth/me`, { cache: "no-store", credentials: "include" });
+    return res.ok;
+  } catch {
+    return true;
+  }
+}
+
 export async function createChat(title?: string): Promise<ConversationSummary | null> {
   if (MOCK) return { id: `conv-mock-${Date.now()}`, title: title || "New Chat", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), messageCount: 0 };
-  const res = await fetch(`${BASE}/chat`, {
+  const res = await authed(`/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
     body: JSON.stringify({ title }),
   });
   if (!res.ok) { console.error("createChat failed", res.status, await res.text().catch(() => "")); return null; }
@@ -143,9 +174,8 @@ export async function fetchChat(id: string): Promise<ConversationDetail | null> 
 
 export async function updateChatTitle(id: string, title: string): Promise<boolean> {
   if (MOCK) return true;
-  const res = await fetch(`${BASE}/chat/${id}`, {
+  const res = await authed(`/chat/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
     body: JSON.stringify({ title }),
   });
   return res.ok;
@@ -323,10 +353,8 @@ export async function activateSignup(email: string, code: string): Promise<Login
 export async function onboard(token: string, name: string): Promise<boolean> {
   if (MOCK) return true;
   try {
-    const res = await fetch(`${BASE}/auth/onboard`, {
+    const res = await authed(`/auth/onboard`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
-      credentials: "include",
       body: JSON.stringify({ name }),
     });
     return res.ok;
@@ -338,9 +366,8 @@ export async function onboard(token: string, name: string): Promise<boolean> {
 export async function updateProfile(name: string, avatar?: string): Promise<boolean> {
   if (MOCK) return true;
   try {
-    const res = await fetch(`${BASE}/auth/me`, {
+    const res = await authed(`/auth/me`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
       body: JSON.stringify({ name, avatar: avatar || undefined }),
     });
     return res.ok;
@@ -420,17 +447,15 @@ export async function fetchStaleArticles(limit = 50): Promise<{ articles: any[] 
 
 export async function upvoteGap(gapId: string): Promise<{ gap_id: string; upvotes: number } | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/gaps/${gapId}/upvote`, { method: "POST", credentials: "include" });
+  const res = await authed(`/gaps/${gapId}/upvote`, { method: "POST" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function submitGapEvidence(gapId: string, url: string, note: string): Promise<any | null> {
   if (MOCK) return null;
-  const res = await fetch(`${BASE}/gaps/${gapId}/submit`, {
+  const res = await authed(`/gaps/${gapId}/submit`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
     body: JSON.stringify({ url, note }),
   });
   if (!res.ok) return null;
@@ -526,9 +551,8 @@ export async function fetchSettings(): Promise<Record<string, string>> {
 
 export async function updateSettings(settings: Record<string, string>): Promise<boolean> {
   if (MOCK) return true;
-  const res = await fetch(`${BASE}/admin/settings`, {
+  const res = await authed(`/admin/settings`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
     body: JSON.stringify({ settings }),
   });
   return res.ok;
@@ -597,9 +621,8 @@ export async function fetchConnectors(): Promise<ConnectorSummary[]> {
 
 export async function updateCredential(service: string, token: string): Promise<boolean> {
   if (MOCK) return true;
-  const res = await fetch(`${BASE}/v1/credentials`, {
+  const res = await authed(`/v1/credentials`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
     body: JSON.stringify({ service, token }),
   });
   return res.ok;
@@ -653,7 +676,40 @@ export async function fetchQueue(): Promise<QueueData | null> {
 
 export async function cancelQueueJob(slug: string): Promise<boolean> {
   if (MOCK) return true;
-  const res = await fetch(`${BASE}/queue/${slug}`, { method: "DELETE", credentials: "include" });
+  const res = await authed(`/queue/${slug}`, { method: "DELETE" });
+  return res.ok;
+}
+
+// ── Seed Trickle (admin ops) ─────────────────────────────────────
+
+export interface SeedStatus {
+  paused: boolean;
+  schedule: string;
+  next_tick: string;
+  today: { date: string; count: number; limit: number };
+  bench: { total: number; live: string[]; pending: string[] };
+  auto_gaps: boolean;
+}
+
+export async function fetchSeedStatus(): Promise<SeedStatus | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/seed/status`, { cache: "no-store", headers: { ...authHeaders() }, credentials: "include" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function runSeedNow(force = false): Promise<{ queued: string; reason: string } | null> {
+  if (MOCK) return null;
+  const res = await authed(`/seed/run${force ? "?force=1" : ""}`, { method: "POST" });
+  return res.json().catch(() => null);
+}
+
+export async function setSeedPaused(paused: boolean): Promise<boolean> {
+  if (MOCK) return true;
+  const res = await authed(`/seed/pause`, {
+    method: "POST",
+    body: JSON.stringify({ paused }),
+  });
   return res.ok;
 }
 
@@ -661,9 +717,8 @@ export async function cancelQueueJob(slug: string): Promise<boolean> {
 
 export async function resolveArticle(slug: string, action: "approve" | "correct"): Promise<boolean> {
   if (MOCK) return true;
-  const res = await fetch(`${BASE}/articles/${slug}/resolve`, {
+  const res = await authed(`/articles/${slug}/resolve`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
     body: JSON.stringify({ action }),
   });
   return res.ok;
@@ -682,9 +737,8 @@ export interface ContestResult {
 export async function contestArticle(slug: string, argument: string): Promise<ContestResult> {
   if (MOCK) return { status: "no_change", reasoning: "Mock mode: challenge recorded, article stands." };
   try {
-    const res = await fetch(`${BASE}/articles/${slug}/contest`, {
+    const res = await authed(`/articles/${slug}/contest`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
       body: JSON.stringify({ argument }),
     });
     const data = await res.json().catch(() => ({}));
@@ -743,9 +797,8 @@ export async function stripePortal(): Promise<{ url?: string } | null> {
 export async function paystackInit(tier: string): Promise<{ authorization_url?: string; reference?: string; error?: string } | null> {
   if (MOCK) return { authorization_url: "/", reference: "mock-ref" };
   try {
-    const res = await fetch(`${BASE}/paystack/initialize`, {
+    const res = await authed(`/paystack/initialize`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
       body: JSON.stringify({ tier }),
     });
     const data = await res.json().catch(() => ({}));
@@ -759,9 +812,7 @@ export async function paystackInit(tier: string): Promise<{ authorization_url?: 
 export async function paystackVerify(reference: string): Promise<{ status?: string; tier?: string; error?: string } | null> {
   if (MOCK) return { status: "success", tier: "pro" };
   try {
-    const res = await fetch(`${BASE}/paystack/verify/${encodeURIComponent(reference)}`, {
-      headers: { ...authHeaders() }, credentials: "include",
-    });
+    const res = await authed(`/paystack/verify/${encodeURIComponent(reference)}`, {});
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return { error: data.error || "Payment not confirmed" };
     return data;
