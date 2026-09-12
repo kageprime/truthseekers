@@ -380,7 +380,7 @@ body::before {
 }
 
 /* ── Plate masthead — natural-history title block ── */
-.plate-head { margin-bottom: 1.5rem; }
+.plate-head { margin-bottom: 1rem; }
 .plate-folio {
   display: flex;
   justify-content: space-between;
@@ -390,16 +390,16 @@ body::before {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink);
-  margin-bottom: 1rem;
+  margin-bottom: 0.6rem;
 }
 .plate-folio > span:last-child { text-align: right; }
 .plate-title {
   font-family: var(--font-display);
   font-weight: 900;
   text-transform: uppercase;
-  font-size: clamp(2.6rem, 1.4rem + 6vw, 5.25rem);
-  line-height: 0.85;
-  letter-spacing: -0.03em;
+  font-size: clamp(1.75rem, 1.1rem + 3vw, 2.6rem);
+  line-height: 1.0;
+  letter-spacing: -0.02em;
   color: var(--ink);
   text-wrap: balance;
   margin: 0;
@@ -407,14 +407,18 @@ body::before {
 .plate-deck {
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: clamp(1.05rem, 0.95rem + 0.8vw, 1.35rem);
+  font-size: 0.95rem;
   line-height: 1.5;
   color: var(--ink-secondary);
-  margin: 1rem 0 0;
+  margin: 0.6rem 0 0;
   max-width: 44rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 /* Thick over thin, full measure. */
-.plate-rule { border-top: 3px solid var(--ink); margin-top: 1.25rem; }
+.plate-rule { border-top: 3px solid var(--ink); margin-top: 0.75rem; }
 .plate-rule::after {
   content: "";
   display: block;
@@ -426,7 +430,7 @@ body::before {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 0.75rem;
-  margin-top: 0.85rem;
+  margin-top: 0.6rem;
 }
 .plate-byline {
   display: inline-flex;
@@ -488,6 +492,30 @@ body::before {
   padding: 0.55rem 0.75rem;
   overflow-wrap: anywhere;
 }
+
+/* ── In-text citations — superscript markers inside the sentence ── */
+.mag-text { margin: 0.5rem 0; }
+.cite-wrap { position: relative; display: inline-block; }
+.cite-mark {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 0 0.15em;
+  margin: 0 0.05em;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 0.72em;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--cite, var(--subtle));
+  border-radius: 3px;
+  vertical-align: super;
+}
+.cite-mark:hover { background: color-mix(in srgb, var(--cite, var(--subtle)) 12%, transparent); }
+.cite-mark:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.cite-mark sup { font-size: 1em; line-height: 1; }
+.cite-active { box-shadow: 0 0 0 2px color-mix(in srgb, var(--cite, var(--subtle)) 35%, transparent); }
 
 /* ── Folio grid — single text column with a margin rail ──
    The rail hosts claim sidenotes. It collapses away while

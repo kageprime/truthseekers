@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { markdownComponents } from "./markdownComponents";
+import { markdownComponents, markdownInlineComponents } from "./markdownComponents";
 
 // Fences, display math, and \(...\) / \[...\] — single dollars are plain
 // text (singleDollarTextMath is off), so prices never trigger the rich chunk.
@@ -12,6 +12,16 @@ const RICH_RE = /```|\$\$|\\\(|\\\[/;
 function MarkdownLite({ content }: { content: string }) {
   return (
     <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+      {content}
+    </ReactMarkdown>
+  );
+}
+
+// Inline fragment renderer for anchored sentences: same GFM handling, but
+// block elements collapse so text and citation markers share one line.
+export function MarkdownInline({ content }: { content: string }) {
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownInlineComponents}>
       {content}
     </ReactMarkdown>
   );

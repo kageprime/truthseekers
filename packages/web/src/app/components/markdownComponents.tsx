@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
 import { safeUrl } from "@/lib/safe-url";
 
@@ -211,4 +212,31 @@ export const markdownComponents = {
   em({ children }: any) {
     return <em style={{ fontStyle: "italic" }}>{children}</em>;
   },
+};
+
+// Inline variant for citation flow: block elements collapse to spans so
+// anchored sentences render as one unbroken line with superscript markers.
+const asInlineSpan =
+  (style?: CSSProperties) =>
+  ({ children }: any) =>
+    <span style={style}>{children}</span>;
+
+export const markdownInlineComponents = {
+  ...markdownComponents,
+  p: asInlineSpan(),
+  h1: asInlineSpan({ fontWeight: 700 }),
+  h2: asInlineSpan({ fontWeight: 600 }),
+  h3: asInlineSpan({ fontWeight: 600 }),
+  blockquote: asInlineSpan({ fontStyle: "italic" }),
+  ul: asInlineSpan(),
+  ol: asInlineSpan(),
+  li: asInlineSpan(),
+  table: asInlineSpan(),
+  thead: asInlineSpan(),
+  tbody: asInlineSpan(),
+  tr: asInlineSpan(),
+  th: asInlineSpan(),
+  td: asInlineSpan(),
+  pre: asInlineSpan(),
+  hr: () => <span> — </span>,
 };

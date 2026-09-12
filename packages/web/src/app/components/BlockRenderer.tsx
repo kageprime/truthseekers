@@ -7,7 +7,8 @@ import { MediaImage, MediaLightbox } from "./MediaImage";
 import { BASE } from "@/lib/constants";
 import { safeSrc, safeUrl } from "@/lib/safe-url";
 import { IconLink, IconLightning } from "./Icons";
-import { parseClaimAnchors } from "@/lib/claim-parser";
+import { parseClaimAnchors, collectAnchorNumbers } from "@/lib/claim-parser";
+import { MarkdownInline } from "./MarkdownRenderer";
 import { ProvenanceChipInline } from "./ProvenanceChip";
 
 const InteractiveTimeline = dynamic(() => import("./InteractiveTimeline"), { ssr: false });
@@ -92,14 +93,21 @@ export default function BlockRenderer({
   compact = false,
   claimsIndex,
   dissentMode = false,
+  citeNumbers,
 }: {
   blocks: Block[];
   compact?: boolean;
-  claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
+  claimsIndex?: Record<string, { status?: string; derived_confidence?: number; text?: string }>;
   dissentMode?: boolean;
+  citeNumbers?: Record<string, number> | null;
 }) {
-  // Normalize + derive firstTextIdx + figure numbers in a single memoized pass.
-  // Previously this ran 3× per block per render and mutated the cached props.
+  // Citation numbers across this list when the caller didn't supply an
+  // article-level map (chat messages number their own scope).
+  const numbers = useMemo(
+    () => citeNumbers ?? collectAnchorNumbers(blocks),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [citeNumbers, blocks]
+  );
   const { normalized, firstTextIdx, figureNums } = useMemo(() => {
     if (!blocks || blocks.length === 0) {
       return { normalized: [] as Block[], firstTextIdx: -1, figureNums: [] as (number | undefined)[] };
@@ -137,6 +145,7 @@ export default function BlockRenderer({
           figureNum={figureNums[i]}
           claimsIndex={claimsIndex}
           dissentMode={dissentMode}
+          citeNumbers={numbers}
         />
       ))}
     </div>
@@ -151,15 +160,17 @@ export function BlockItem({
   dropCap,
   activeClaimId,
   onClaimSelect,
+  citeNumbers,
 }: {
   block: Block;
-  claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
+  claimsIndex?: Record<string, { status?: string; derived_confidence?: number; text?: string }>;
   dissentMode?: boolean;
   dropCap?: boolean;
   activeClaimId?: string | null;
   onClaimSelect?: (id: string) => void;
+  citeNumbers?: Record<string, number> | null;
 }) {
-  return <BlockCard block={block} claimsIndex={claimsIndex} dissentMode={dissentMode} dropCap={dropCap} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} />;
+  return <BlockCard block={block} claimsIndex={claimsIndex} dissentMode={dissentMode} dropCap={dropCap} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} citeNumbers={citeNumbers} />;
 }
 
 function BlockCard({
@@ -171,15 +182,17 @@ function BlockCard({
   dissentMode,
   activeClaimId,
   onClaimSelect,
+  citeNumbers,
 }: {
   block: Block;
   compact?: boolean;
   dropCap?: boolean;
   figureNum?: number;
-  claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
+  claimsIndex?: Record<string, { status?: string; derived_confidence?: number; text?: string }>;
   dissentMode?: boolean;
   activeClaimId?: string | null;
   onClaimSelect?: (id: string) => void;
+  citeNumbers?: Record<string, number> | null;
 }) {
   switch (block.type) {
     case "heading":
@@ -193,10 +206,11 @@ function BlockCard({
           dissentMode={dissentMode}
           activeClaimId={activeClaimId}
           onClaimSelect={onClaimSelect}
+          citeNumbers={citeNumbers}
         />
       );
     case "section":
-      return <SectionBlock data={block.data as unknown as SectionBlockData} claimsIndex={claimsIndex} dissentMode={dissentMode} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} />;
+      return <SectionBlock data={block.data as unknown as SectionBlockData} claimsIndex={claimsIndex} dissentMode={dissentMode} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} citeNumbers={citeNumbers} />;
     case "timeline":
       return <TimelineBlock data={block.data as unknown as TimelineBlockData} />;
     case "map_2d":
@@ -291,16 +305,61 @@ function TextBlock({
   dissentMode,
   activeClaimId,
   onClaimSelect,
+  citeNumbers,
 }: {
   data: TextBlockData;
   dropCap?: boolean;
-  claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
+  claimsIndex?: Record<string, { status?: string; derived_confidence?: number; text?: string }>;
   dissentMode?: boolean;
   activeClaimId?: string | null;
   onClaimSelect?: (id: string) => void;
+  citeNumbers?: Record<string, number> | null;
 }) {
   if (!data) return null;
   const content = (data as any).content || (data as any).text || "";
+  // Inline citation flow: one unbroken line where superscript markers sit
+  // inside the sentence instead of on their own row. Paragraphs without
+  // anchors take the same path with zero markers.
+  const { parts } = parseClaimAnchors(content);
+  const body = (
+    <>
+      {parts.map((part, i) => {
+        if (part.type === "text") {
+          if (!part.value) return null;
+          return <MarkdownInline key={i} content={part.value} />;
+        }
+        const meta = claimsIndex?.[part.value];
+        const status = meta?.status || "unknown";
+        const chip = (
+          <ProvenanceChipInline
+            key={i}
+            claimId={part.value}
+            status={status}
+            active={activeClaimId === part.value}
+            onSelect={onClaimSelect}
+            n={citeNumbers?.[part.value] ?? null}
+            titleText={meta?.text ? meta.text.slice(0, 140) : undefined}
+          />
+        );
+        const isDisputed = dissentMode && (status === "disputed" || status === "weak");
+        if (!isDisputed) return chip;
+        return (
+          <span
+            key={i + "-hl"}
+            className="dissent-highlight"
+            style={{
+              boxShadow: "0 0 0 2px rgba(179,60,60,0.18)",
+              borderRadius: "3px",
+              padding: "1px 2px",
+              margin: "0 1px",
+            }}
+          >
+            {chip}
+          </span>
+        );
+      })}
+    </>
+  );
   if (!content.includes("[claim:")) {
     return (
       <div className={dropCap ? "drop-cap" : ""}>
@@ -308,54 +367,25 @@ function TextBlock({
       </div>
     );
   }
-  const { parts } = parseClaimAnchors(content);
   return (
-    <div className={dropCap ? "drop-cap" : ""}>
-      {parts.map((part, i) => {
-        if (part.type === "text") {
-          if (dissentMode) {
-            return (
-              <span
-                key={i}
-                className="rounded px-0.5 transition-colors"
-                style={{ background: "rgba(184,122,46,0.05)" }}
-              >
-                <MarkdownRenderer content={part.value} />
-              </span>
-            );
-          }
-          return <MarkdownRenderer key={i} content={part.value} />;
-        }
-        const meta = claimsIndex?.[part.value];
-        const status = meta?.status || "unknown";
-        const isDisputed = dissentMode && (status === "disputed" || status === "weak");
-        return (
-          <span
-            key={i}
-            className={isDisputed ? "dissent-highlight" : ""}
-            style={isDisputed ? {
-              boxShadow: "0 0 0 2px rgba(179,60,60,0.18)",
-              borderRadius: "3px",
-              padding: "1px 2px",
-              margin: "0 1px",
-            } : undefined}
-          >
-            <ProvenanceChipInline claimId={part.value} status={status} active={activeClaimId === part.value} onSelect={onClaimSelect} />
-          </span>
-        );
-      })}
+    <div className={"mag-text" + (dropCap ? " drop-cap" : "")}>
+      {dissentMode ? (
+        <span className="rounded px-0.5 transition-colors" style={{ background: "rgba(184,122,46,0.05)" }}>
+          {body}
+        </span>
+      ) : body}
     </div>
   );
 }
 
-function SectionBlock({ data, claimsIndex, dissentMode, activeClaimId, onClaimSelect }: { data: SectionBlockData; claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>; dissentMode?: boolean; activeClaimId?: string | null; onClaimSelect?: (id: string) => void }) {
+function SectionBlock({ data, claimsIndex, dissentMode, activeClaimId, onClaimSelect, citeNumbers }: { data: SectionBlockData; claimsIndex?: Record<string, { status?: string; derived_confidence?: number; text?: string }>; dissentMode?: boolean; activeClaimId?: string | null; onClaimSelect?: (id: string) => void; citeNumbers?: Record<string, number> | null }) {
   if (!data) return null;
   return (
     <details className="plate p-3 mb-4">
       <summary className="font-display text-[0.95rem] cursor-pointer" style={{ color: "var(--ink)" }}>
         {data.title}
       </summary>
-      {data.blocks && <div className="mt-3">{data.blocks.map((b, i) => <BlockCard key={b.id ?? `section-block-${i}`} block={b} compact={false} claimsIndex={claimsIndex} dissentMode={dissentMode} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} />)}</div>}
+      {data.blocks && <div className="mt-3">{data.blocks.map((b, i) => <BlockCard key={b.id ?? `section-block-${i}`} block={b} compact={false} claimsIndex={claimsIndex} dissentMode={dissentMode} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} citeNumbers={citeNumbers} />)}</div>}
     </details>
   );
 }

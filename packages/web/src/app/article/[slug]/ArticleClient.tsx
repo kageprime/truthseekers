@@ -8,6 +8,7 @@ import PageLayout from "../../components/PageLayout";
 import ContentCard from "../../components/ContentCard";
 import GenerationBar from "../../components/GenerationBar";
 import { articleToBlocks } from "../../components/BlockRenderer";
+import { collectAnchorNumbers, stripClaimAnchors } from "@/lib/claim-parser";
 import MagazineBody from "../../components/MagazineBody";
 import ContestDialog from "../../components/ContestDialog";
 import FactFile from "../../components/FactFile";
@@ -49,13 +50,29 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     const list = (epistemic as any)?.claims;
     return Array.isArray(list) ? list : [];
   }, [epistemic]);
-  const claimsIndex = useMemo<Record<string, { status?: string; derived_confidence?: number }>>(() => {
-    const map: Record<string, { status?: string; derived_confidence?: number }> = {};
-    for (const c of epistemicClaims as Array<{ id: string; status?: string; derived_confidence?: number }>) {
-      if (c?.id) map[c.id] = { status: c.status, derived_confidence: c.derived_confidence };
+  const claimsIndex = useMemo<Record<string, { status?: string; derived_confidence?: number; text?: string }>>(() => {
+    const map: Record<string, { status?: string; derived_confidence?: number; text?: string }> = {};
+    for (const c of epistemicClaims as Array<{ id: string; status?: string; derived_confidence?: number; text?: string }>) {
+      if (c?.id) map[c.id] = { status: c.status, derived_confidence: c.derived_confidence, text: c.text };
     }
     return map;
   }, [epistemicClaims]);
+  // Single block source for body, numbering, and deck — one reading order.
+  const bodyBlocks = useMemo(() => {
+    if (!article) return [];
+    return article.blocks && article.blocks.length > 0
+      ? article.blocks
+      : articleToBlocks(
+          article.slug,
+          article.title,
+          article.abstract,
+          article.sections,
+          article.timeline,
+          article.crossrefs,
+          article.citations,
+        );
+  }, [article]);
+  const citeNumbers = useMemo(() => collectAnchorNumbers(bodyBlocks), [bodyBlocks]);
   const evidenceCounts = useMemo<Record<string, { supports: number; contradicts: number }>>(() => {
     const counts: Record<string, { supports: number; contradicts: number }> = {};
     const edges = (epistemic as any)?.claim_graph?.edges;
@@ -344,11 +361,11 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     <PageLayout maxWidthClass="max-w-[88rem]">
       {/* No card frame — the page itself is the surface. */}
       <div className="w-full">
-      <article className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 w-full animate-appear-up">
+      <article className="px-4 sm:px-6 lg:px-10 pt-3 sm:pt-4 pb-6 sm:pb-8 w-full animate-appear-up">
         {/* Back link — gold badge with hover arrow */}
         <button
           onClick={() => router.back()}
-          className="group inline-flex items-center gap-2 mb-5 no-underline cursor-pointer"
+          className="group inline-flex items-center gap-2 mb-4 no-underline cursor-pointer"
           style={{ color: "var(--muted)", background: "none", border: "none", padding: 0 }}
         >
           <span className="flex items-center justify-center w-7 h-7 rounded-full transition-all duration-500" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)", transitionTimingFunction: "cubic-bezier(0.32, 0.72, 0, 1)" }}>
@@ -365,7 +382,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
         {/* Admin float-island — floating pill at top-right */}
           <div
-            className="flex items-center gap-1 mb-4 ml-auto w-max"
+            className="flex items-center gap-1 mb-3 ml-auto w-max"
           style={{
             padding: "3px",
             borderRadius: "9999px",
@@ -436,7 +453,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
           {article.abstract && (
             <p className="plate-deck">
-              {article.abstract}
+              {stripClaimAnchors(article.abstract)}
             </p>
           )}
 
@@ -487,8 +504,6 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         </div>
         </header>
 
-        <FactFile article={article} />
-
         <RefreshDiffBanner slug={slug} />
 
         <div className="mb-6" />
@@ -503,23 +518,12 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         <div className="stagger-children">
           {hasFullContent ? (
             <MagazineBody
-              blocks={
-                article.blocks && article.blocks.length > 0
-                  ? article.blocks
-                  : articleToBlocks(
-                      article.slug,
-                      article.title,
-                      article.abstract,
-                      article.sections,
-                      article.timeline,
-                      article.crossrefs,
-                      article.citations,
-                    )
-              }
+              blocks={bodyBlocks}
               claimsIndex={claimsIndex}
               dissentMode={dissentMode}
               activeClaimId={activeClaimId}
               onClaimSelect={handleChipSelect}
+              citeNumbers={citeNumbers}
             />
           ) : article.abstract ? (
             <div style={{ fontSize: "0.9375rem", lineHeight: 1.75, color: "var(--ink)" }}>

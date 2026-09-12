@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -170,21 +170,66 @@ function NavLink({ href, isActive, icon: Icon, label }: {
   );
 }
 
+// ─── Shared dropdown behavior ────────────────────────────────────────
+// Hover opens instantly; leaving forgives a short delay so the pointer can
+// travel the gap; Escape or an outside tap always closes; items meet the
+// 40px touch target. One hook drives both desktop menus.
+function useDropdown() {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const cancelClose = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setOpen(false), 180);
+  };
+
+  useEffect(() => {
+    function onDown(e: PointerEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    if (open) {
+      document.addEventListener("pointerdown", onDown);
+      document.addEventListener("keydown", onKey);
+      return () => {
+        document.removeEventListener("pointerdown", onDown);
+        document.removeEventListener("keydown", onKey);
+      };
+    }
+  }, [open ]);
+
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  }, []);
+
+  return { open, setOpen, ref, cancelClose, scheduleClose };
+}
+
 // ─── Living dropdown (desktop) ───────────────────────────────────
 
 function LivingDropdown({ pathname }: { pathname: string }) {
-  const [open, setOpen] = useState(false);
+  const { open, setOpen, ref, cancelClose, scheduleClose } = useDropdown();
   const active = LIVING_LINKS.some((l) => pathname.startsWith(l.href));
 
   return (
     <div
+      ref={ref}
       className="relative"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={() => { cancelClose(); setOpen(true); }}
+      onMouseLeave={scheduleClose}
     >
       <button
         onClick={() => setOpen(!open)}
-        className="relative flex items-center gap-1.5 px-2.5 py-1 text-sm font-medium no-underline transition-all duration-200 cursor-pointer"
+        className="relative flex items-center gap-1.5 px-2.5 py-1 text-sm font-medium no-underline transition-all duration-200 cursor-pointer min-h-[36px]"
         style={{ color: active || open ? "var(--accent)" : "var(--muted)", background: "none", border: "none" }}
         aria-haspopup="true"
         aria-expanded={open}
@@ -219,7 +264,7 @@ function LivingDropdown({ pathname }: { pathname: string }) {
                 key={link.href}
                 href={link.href}
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium no-underline rounded-lg transition-colors"
+                className="flex items-center gap-2.5 px-2.5 py-2.5 min-h-[40px] text-[13px] font-medium no-underline rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-[var(--gold)]"
                 style={{
                   color: isActive ? "var(--accent)" : "var(--ink)",
                   background: isActive ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",
@@ -239,18 +284,19 @@ function LivingDropdown({ pathname }: { pathname: string }) {
 // ─── More dropdown (desktop) ─────────────────────────────────────
 
 function MoreDropdown({ pathname }: { pathname: string }) {
-  const [open, setOpen] = useState(false);
+  const { open, setOpen, ref, cancelClose, scheduleClose } = useDropdown();
   const active = MORE_LINKS.some((l) => pathname.startsWith(l.href));
 
   return (
     <div
+      ref={ref}
       className="relative"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={() => { cancelClose(); setOpen(true); }}
+      onMouseLeave={scheduleClose}
     >
       <button
         onClick={() => setOpen(!open)}
-        className="relative flex items-center gap-1.5 px-2.5 py-1 text-sm font-medium no-underline transition-all duration-200 cursor-pointer"
+        className="relative flex items-center gap-1.5 px-2.5 py-1 text-sm font-medium no-underline transition-colors cursor-pointer min-h-[36px]"
         style={{ color: active || open ? "var(--accent)" : "var(--muted)", background: "none", border: "none" }}
         aria-haspopup="true"
         aria-expanded={open}
@@ -289,7 +335,7 @@ function MoreDropdown({ pathname }: { pathname: string }) {
                 key={link.href}
                 href={link.href}
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium no-underline rounded-lg transition-colors"
+                className="flex items-center gap-2.5 px-2.5 py-2.5 min-h-[40px] text-[13px] font-medium no-underline rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-[var(--gold)]"
                 style={{
                   color: isActive ? "var(--accent)" : "var(--ink)",
                   background: isActive ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",

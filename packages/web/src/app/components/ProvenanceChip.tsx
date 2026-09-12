@@ -12,7 +12,7 @@ const CHIP_COLORS: Record<string, { dot: string; bg: string; border: string }> =
   unknown: { dot: "#888", bg: "rgba(136,136,136,0.08)", border: "rgba(136,136,136,0.25)" },
 };
 
-export function ProvenanceChipInline({ claimId, status, active, onSelect }: { claimId: string; status?: string; active?: boolean; onSelect?: (id: string) => void }) {
+export function ProvenanceChipInline({ claimId, status, active, onSelect, n, titleText }: { claimId: string; status?: string; active?: boolean; onSelect?: (id: string) => void; n?: number | null; titleText?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
 
@@ -57,14 +57,15 @@ export function ProvenanceChipInline({ claimId, status, active, onSelect }: { cl
   const freshnessColor = freshness === null ? "#888" : freshness > 0.7 ? "#2b7a4b" : freshness > 0.4 ? "#b87a2e" : "#b33c3c";
 
   return (
-    <span ref={ref} className="relative inline-block mx-0.5 align-middle">
+    <span ref={ref} className="cite-wrap">
       <button
         onClick={() => { setOpen(!open); if (!open) onSelect?.(claimId); }}
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium cursor-pointer border leading-none"
-        style={{ color: colors.dot, borderColor: colors.border, background: colors.bg, boxShadow: active ? `0 0 0 2px ${colors.dot}55` : undefined }}
+        className={"cite-mark" + (active ? " cite-active" : "")}
+        style={{ ["--cite" as string]: colors.dot }}
+        title={titleText || (status === "unknown" ? "Unresolved claim reference" : `Claim · ${s}`)}
+        aria-label={`Citation ${n ?? ""} · status ${s}`}
       >
-        <span className="w-1.5 h-1.5 rounded-full" style={{ background: colors.dot }} />
-        {s}
+        <sup>{n ?? "?"}</sup>
       </button>
       {open && (
         <div className="absolute z-50 w-72 p-3 rounded-lg shadow-elev-2 border" style={{

@@ -25,12 +25,14 @@ export default function MagazineBody({
   dissentMode,
   activeClaimId,
   onClaimSelect,
+  citeNumbers,
 }: {
   blocks: Block[];
-  claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
+  claimsIndex?: Record<string, { status?: string; derived_confidence?: number; text?: string }>;
   dissentMode?: boolean;
   activeClaimId?: string | null;
   onClaimSelect?: (id: string) => void;
+  citeNumbers?: Record<string, number> | null;
 }) {
   const nodes = useMemo<FlowNode[]>(
     () =>
@@ -123,10 +125,11 @@ export default function MagazineBody({
               onSize={() => cycleSize(n.key)}
               activeClaimId={activeClaimId}
               onClaimSelect={onClaimSelect}
+              citeNumbers={citeNumbers}
             />
           ) : (
             <div className="mag-prose">
-              <BlockItem block={n.block} claimsIndex={claimsIndex} dissentMode={dissentMode} dropCap={n.key === firstTextKey} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} />
+              <BlockItem block={n.block} claimsIndex={claimsIndex} dissentMode={dissentMode} dropCap={n.key === firstTextKey} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} citeNumbers={citeNumbers} />
             </div>
           )}
         </Fragment>
@@ -158,18 +161,20 @@ function FloatObject({
   onSize,
   activeClaimId,
   onClaimSelect,
+  citeNumbers,
 }: {
   nodeKey: string;
   block: Block;
   side: Side;
   size: Size;
-  claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
+  claimsIndex?: Record<string, { status?: string; derived_confidence?: number; text?: string }>;
   dissentMode?: boolean;
   dragging: boolean;
   onGripDown: (e: React.PointerEvent, key: string) => void;
   onSize: () => void;
   activeClaimId?: string | null;
   onClaimSelect?: (id: string) => void;
+  citeNumbers?: Record<string, number> | null;
 }) {
   const pull = block.type === "pullquote";
   return (
@@ -190,7 +195,7 @@ function FloatObject({
           {SIZE_LABEL[size]}
         </button>
       </div>
-      <BlockItem block={block} claimsIndex={claimsIndex} dissentMode={dissentMode} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} />
+      <BlockItem block={block} claimsIndex={claimsIndex} dissentMode={dissentMode} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} citeNumbers={citeNumbers} />
     </figure>
   );
 }
