@@ -668,11 +668,14 @@ type ClaimWithArticle struct {
 	ArticleSlug string `json:"article_slug"`
 }
 
-// GetMostContestedClaimsWithArticle returns the top N most-contested claims
-// across the whole encyclopedia along with the article slug they're attached
-// to. When a claim spans multiple articles, the first matching slug wins
-// (Ponytail: deterministic enough for a graph; pick the canonical article on
-// save later if it matters).
+// GetMostContestedClaimsWithArticle returns the top N claims across the
+// whole encyclopedia along with the article slug they're attached to, ranked
+// most-contradicted first (minContradiction filters). All statuses are
+// included — the global graph promises every claim, not just disputed ones;
+// contradiction ranking keeps the hottest disputes on top. When a claim
+// spans multiple articles, the first matching slug wins (Ponytail:
+// deterministic enough for a graph; pick the canonical article on save
+// later if it matters).
 func (d *DB) GetMostContestedClaimsWithArticle(limit int, minContradiction float64) ([]*ClaimWithArticle, error) {
 	if d.mockMode {
 		if d.fs == nil {
@@ -718,15 +721,17 @@ func (d *DB) GetMostContestedClaimsWithArticle(limit int, minContradiction float
 		return out, nil
 	}
 	rows, err := d.db.Query(`
-		SELECT DISTINCT ON (c.id)
-			c.id, c.text, c.signature, c.type, c.status, c.confidence_vector,
-			c.derived_confidence, c.created_at, c.updated_at, a.slug
-		FROM claims c
-		JOIN article_claims ac ON c.id = ac.claim_id
-		JOIN articles a ON ac.article_id = a.id
-		WHERE c.status IN ('disputed','weak')
-		  AND COALESCE((c.confidence_vector->>'contradiction_level')::float, 0) >= $2
-		ORDER BY c.id, (c.confidence_vector->>'contradiction_level')::float DESC NULLS LAST
+		SELECT * FROM (
+			SELECT DISTINCT ON (c.id)
+				c.id, c.text, c.signature, c.type, c.status, c.confidence_vector,
+				c.derived_confidence, c.created_at, c.updated_at, a.slug
+			FROM claims c
+			JOIN article_claims ac ON c.id = ac.claim_id
+			JOIN articles a ON ac.article_id = a.id
+			WHERE COALESCE((c.confidence_vector->>'contradiction_level')::float, 0) >= $2
+			ORDER BY c.id
+		) s
+		ORDER BY COALESCE((s.confidence_vector->>'contradiction_level')::float, 0) DESC NULLS LAST, s.updated_at DESC
 		LIMIT $1
 	`, limit, minContradiction)
 	if err != nil {
