@@ -339,10 +339,10 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     (article.sections && article.sections.length > 0);
 
   return (
-    <PageLayout maxWidthClass="max-w-none">
+    <PageLayout maxWidthClass="max-w-[88rem]">
       {/* No card frame — the page itself is the surface. */}
       <div className="w-full">
-      <article className="px-3 sm:px-5 py-6 sm:py-8 w-full animate-appear-up">
+      <article className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 w-full animate-appear-up">
         {/* Back link — gold badge with hover arrow */}
         <button
           onClick={() => router.back()}
