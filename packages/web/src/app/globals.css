@@ -377,8 +377,113 @@ body::before {
   width: 100%;
 }
 
+/* ── Plate masthead — natural-history title block ── */
+.plate-head { margin-bottom: 1.5rem; }
+.plate-folio {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin-bottom: 1rem;
+}
+.plate-folio > span:last-child { text-align: right; }
+.plate-title {
+  font-family: var(--font-display);
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: clamp(2.6rem, 1.4rem + 6vw, 5.25rem);
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-wrap: balance;
+  margin: 0;
+}
+.plate-deck {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.05rem, 0.95rem + 0.8vw, 1.35rem);
+  line-height: 1.5;
+  color: var(--ink-secondary);
+  margin: 1rem 0 0;
+  max-width: 44rem;
+}
+/* Thick over thin, full measure. */
+.plate-rule { border-top: 3px solid var(--ink); margin-top: 1.25rem; }
+.plate-rule::after {
+  content: "";
+  display: block;
+  border-top: 1px solid var(--ink);
+  margin-top: 3px;
+}
+.plate-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.85rem;
+}
+.plate-byline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.plate-sep { color: var(--rule); }
+/* ── File box — taxonomy grid, ruled like the plate ── */
+.factfile {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin: 0 0 1.5rem;
+  border-top: 3px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+@media (min-width: 640px) {
+  .factfile { grid-template-columns: 1fr 1fr; }
+  .factfile-row:nth-child(odd) { border-right: 1px solid var(--rule); }
+  .factfile-row:nth-child(odd) > dd { padding-right: 1rem; }
+  .factfile-row:nth-child(even) > dt { padding-left: 1rem; }
+}
+.factfile-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+.factfile-row:last-child { border-bottom: none; }
+@media (min-width: 640px) {
+  .factfile-row:nth-last-child(2):nth-child(odd) { border-bottom: none; }
+}
+.factfile-row > dt {
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.factfile-row > dd {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
 /* ── Folio grid — single text column with a margin rail ──
-   The rail hosts claim sidenotes (next slice). It collapses away while
+   The rail hosts claim sidenotes. It collapses away while
    empty so the grid degrades to a plain column with zero layout cost. */
 .folio-grid {
   display: grid;
@@ -396,7 +501,168 @@ body::before {
   .folio-grid:has(.folio-rail:empty) {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* Sticky rail so notes stay reachable on long reads. */
+  .folio-rail .claim-rail { position: sticky; top: 5rem; max-height: calc(100vh - 6rem); overflow-y: auto; }
 }
+/* Below the spread the rail retires — chips open the trail drawer directly. */
+@media (max-width: 1279px) {
+  .folio-rail { display: none; }
+}
+
+/* ── Claim sidenotes — glanceable, never a second article ── */
+.claim-rail-title {
+  font-family: var(--font-ui);
+  font-variant: all-small-caps;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--subtle);
+  margin: 0 0 0.6rem;
+}
+.claim-rail-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.claim-note {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.6rem 0.7rem 0.6rem 0.85rem;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--note-dot, var(--subtle));
+  border-radius: var(--radius-sharp);
+  cursor: pointer;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+.claim-note:hover { border-color: var(--gold); }
+.claim-note-active { border-color: var(--gold); box-shadow: var(--shadow-1); }
+.claim-note-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.claim-note-num { font-family: var(--font-ui); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; color: var(--subtle); }
+.claim-note-status { font-size: 0.68rem; font-weight: 600; color: var(--note-dot, var(--subtle)); }
+.claim-note-text {
+  font-family: var(--font-serif);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--ink-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.claim-note-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.claim-note-conf { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.7rem; color: var(--muted); }
+.claim-note-bar { display: inline-block; width: 3.5rem; height: 4px; border-radius: 2px; background: var(--border-light); overflow: hidden; }
+.claim-note-bar > span { display: block; height: 100%; background: var(--note-dot, var(--subtle)); }
+.claim-note-ev { display: inline-flex; gap: 0.4rem; font-size: 0.7rem; }
+.claim-note-sup { color: #2b7a4b; }
+.claim-note-con { color: #b33c3c; }
+.dark .claim-note-sup { color: #4ade80; }
+.dark .claim-note-con { color: #c46666; }
+
+/* ── Claim trail drawer — the full path outward from one claim ── */
+.trail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  justify-content: flex-end;
+}
+.trail-drawer {
+  width: min(420px, 100%);
+  height: 100%;
+  overflow-y: auto;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-3);
+  padding: 1.25rem 1.25rem 2rem;
+  animation: trail-in 220ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes trail-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@media (max-width: 640px) {
+  .trail-backdrop { align-items: flex-end; }
+  .trail-drawer { width: 100%; max-height: 88vh; height: auto; border-left: none; border-top: 1px solid var(--border); border-radius: 1rem 1rem 0 0; }
+}
+.trail-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+.trail-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid;
+  border-radius: 9999px;
+  padding: 0.25rem 0.65rem;
+}
+.trail-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; }
+.trail-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.trail-close:hover { color: var(--ink); background: var(--accent-bg); }
+.trail-text { font-family: var(--font-serif); font-size: 1.02rem; line-height: 1.6; color: var(--ink); margin: 0 0 0.75rem; }
+.trail-conf, .trail-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.35rem; }
+.trail-k { width: 7rem; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trail-bar { flex: 1; height: 5px; border-radius: 3px; background: var(--border-light); overflow: hidden; }
+.trail-bar > span { display: block; height: 100%; }
+.trail-section { margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--border-light); }
+.trail-label {
+  font-family: var(--font-ui);
+  font-variant: all-small-caps;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--subtle);
+  margin: 0 0 0.55rem;
+}
+.trail-empty { font-size: 0.8rem; color: var(--subtle); margin: 0; }
+.trail-ev {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.65rem;
+  margin-bottom: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sharp);
+  background: var(--surface-elevated);
+  text-decoration: none;
+  cursor: pointer;
+}
+.trail-ev:hover { border-color: var(--gold); }
+.trail-verdict { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; }
+.trail-url { font-size: 0.78rem; color: var(--ink-secondary); overflow-wrap: anywhere; }
+.trail-linked {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  margin-bottom: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sharp);
+  background: var(--surface-elevated);
+  cursor: pointer;
+}
+.trail-linked:hover { border-color: var(--gold); }
+.trail-rel { font-size: 0.68rem; font-weight: 600; color: var(--subtle); }
+.trail-linked-text { font-family: var(--font-serif); font-size: 0.82rem; line-height: 1.5; color: var(--ink-secondary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.trail-gap { padding: 0.55rem 0.65rem; margin-bottom: 0.4rem; border-left: 3px solid var(--gold); background: var(--surface-elevated); }
+.trail-gap-type { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); margin: 0 0 0.2rem; }
+.trail-gap-text { font-size: 0.78rem; color: var(--ink-secondary); margin: 0; }
 
 /* ── Magazine flow — living figures inside the prose ──
    Figures float inside the text and prose gives way along their outlines

@@ -3,19 +3,21 @@
 import { useState, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuota, useGenerateArticle, useRefreshArticle, useTrackView, useArticle, useArticleProgress, useArticleStatus, useArticleClaims } from "../../hooks";
+import { useQuota, useGenerateArticle, useRefreshArticle, useTrackView, useArticle, useArticleProgress, useArticleStatus, useArticleEpistemic } from "../../hooks";
 import PageLayout from "../../components/PageLayout";
 import ContentCard from "../../components/ContentCard";
 import GenerationBar from "../../components/GenerationBar";
 import { articleToBlocks } from "../../components/BlockRenderer";
 import MagazineBody from "../../components/MagazineBody";
+import FactFile from "../../components/FactFile";
+import ClaimRail from "../../components/ClaimRail";
+import ClaimDetail from "../../components/ClaimDetail";
 import ClaimGraphViewer from "../../components/ClaimGraphViewer";
 import FreshnessBadge from "../../components/FreshnessBadge";
 import RefreshDiffBanner from "../../components/RefreshDiffBanner";
 import ArticleGapsPanel from "../../components/ArticleGapsPanel";
 import EpisodeFeed from "../../components/EpisodeFeed";
 import LiveBadge from "../../components/LiveBadge";
-import EyebrowTag from "../../components/EyebrowTag";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import type { Article } from "@encarta/core";
 import { IconXCircle, IconBook, IconLightning, IconFile, IconFileText, IconUser, IconRefresh, IconAlert } from "../../components/Icons";
@@ -40,15 +42,58 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   const [pausedError, setPausedError] = useState<string | undefined>(undefined);
   const [showGraph, setShowGraph] = useState(false);
   const [dissentMode, setDissentMode] = useState(false);
-  const { data: claimsRes } = useArticleClaims(generating ? undefined : slug);
+  const { data: epistemic } = useArticleEpistemic(generating ? undefined : slug);
+  const epistemicClaims = useMemo(() => {
+    const list = (epistemic as any)?.claims;
+    return Array.isArray(list) ? list : [];
+  }, [epistemic]);
   const claimsIndex = useMemo<Record<string, { status?: string; derived_confidence?: number }>>(() => {
     const map: Record<string, { status?: string; derived_confidence?: number }> = {};
-    const claims = (claimsRes?.claims as Array<{ id: string; status?: string; derived_confidence?: number }> | undefined) ?? [];
-    for (const c of claims) {
+    for (const c of epistemicClaims as Array<{ id: string; status?: string; derived_confidence?: number }>) {
       if (c?.id) map[c.id] = { status: c.status, derived_confidence: c.derived_confidence };
     }
     return map;
-  }, [claimsRes]);
+  }, [epistemicClaims]);
+  const evidenceCounts = useMemo<Record<string, { supports: number; contradicts: number }>>(() => {
+    const counts: Record<string, { supports: number; contradicts: number }> = {};
+    const edges = (epistemic as any)?.claim_graph?.edges;
+    if (Array.isArray(edges)) {
+      for (const e of edges) {
+        if (e?.type !== "evidence" || !e?.target) continue;
+        const c = counts[e.target] ?? (counts[e.target] = { supports: 0, contradicts: 0 });
+        if (e.relationship === "supports") c.supports++;
+        else c.contradicts++;
+      }
+    }
+    return counts;
+  }, [epistemic]);
+  // Claim trail state: active highlights chip + note together; trail opens
+  // the drawer. Chips select without opening (their popover is the glance).
+  const [activeClaimId, setActiveClaimId] = useState<string | null>(null);
+  const [trailClaimId, setTrailClaimId] = useState<string | null>(null);
+  const handleChipSelect = useCallback((id: string) => {
+    setActiveClaimId(id);
+    requestAnimationFrame(() => {
+      document.getElementById(`claim-note-${id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  }, []);
+  const openTrail = useCallback((id: string) => {
+    setActiveClaimId(id);
+    setTrailClaimId(id);
+  }, []);
+  const closeTrail = useCallback(() => {
+    setTrailClaimId(null);
+    setActiveClaimId(null);
+  }, []);
+  const trailClaim = useMemo(
+    () => (epistemicClaims as Array<{ id: string }>).find((c) => c?.id === trailClaimId) ?? null,
+    [epistemicClaims, trailClaimId]
+  );
+  const trailGaps = useMemo(() => {
+    const gaps = (epistemic as any)?.gaps;
+    if (!Array.isArray(gaps) || !trailClaimId) return [];
+    return gaps.filter((g: any) => g?.claim_id === trailClaimId);
+  }, [epistemic, trailClaimId]);
   const { data: quota } = useQuota();
   const { mutate: generateArticle } = useGenerateArticle();
   const { mutate: refreshArticle } = useRefreshArticle();
@@ -373,76 +418,35 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           </div>
         </div>
 
-        {/* Title block — flush-left masthead on the body edge */}
-        <header className="mb-6 text-left">
-          {article.categories && article.categories.length > 0 && (
-            <div className="flex mb-3">
-              <EyebrowTag label={article.categories[0]} />
-            </div>
-          )}
-          <h1
-            className="font-display font-bold mb-3"
-            style={{
-              fontSize: "clamp(1.9rem, 1.4rem + 2.5vw, 2.75rem)",
-              letterSpacing: "-0.025em",
-              lineHeight: 1.08,
-              color: "var(--ink)",
-            }}
-          >
+        {/* Masthead — natural-history plate: folio row, Didone headline,
+            italic deck, double rule, single controls row. */}
+        <header className="plate-head">
+          <div className="plate-folio">
+            <span>/ {article.categories?.[0] ?? "article"}</span>
+            <span>/ Vol. I{article.metadata?.version != null && ` · Rev. ${article.metadata.version}`}</span>
+            {article.metadata?.updated && (
+              <span>/ {new Date(article.metadata.updated).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+            )}
+          </div>
+          <h1 className="plate-title">
             {article.title || slug.replace(/-/g, " ")}
           </h1>
 
-          {/* Animated gold rule */}
-          <div
-            style={{
-              height: 2,
-              width: "3rem",
-              background: "var(--gold)",
-              animation: "gold-rule-enter 1s cubic-bezier(0.32, 0.72, 0, 1) 0.2s both",
-              transformOrigin: "left center",
-            }}
-          />
-
-          {/* Deck — the abstract set as folio lede */}
           {article.abstract && (
-            <p className="mt-4 font-serif" style={{ fontSize: "1.15rem", lineHeight: 1.6, color: "var(--muted)" }}>
+            <p className="plate-deck">
               {article.abstract}
             </p>
           )}
 
-          {/* Dateline — small-caps meta */}
-          <div
-            className="mt-3"
-            style={{
-              display: "flex",
-              justifyContent: "flex-start",
-              flexWrap: "wrap",
-              gap: "0 0.35em",
-              fontFamily: "var(--font-ui)",
-              fontVariant: "all-small-caps",
-              letterSpacing: "0.12em",
-              fontSize: "0.75rem",
-              color: "var(--muted)",
-            }}
-          >
-            <span>Vol. I</span>
-            {article.metadata?.version != null && (<>
-              <span style={{ color: "var(--rule)" }}>·</span><span>Rev. {article.metadata.version}</span>
-            </>)}
-            {article.metadata?.updated && (<>
-              <span style={{ color: "var(--rule)" }}>·</span>
-              <span>{new Date(article.metadata.updated).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
-            </>)}
-            {article.metadata?.generatedBy && (<>
-              <span style={{ color: "var(--rule)" }}>·</span>
-              <span><IconUser size={11} /> {article.metadata.generatedBy.slice(0, 12)}</span>
-            </>)}
-            {article.slug && <FreshnessBadge slug={article.slug} />}
-          </div>
+          <div className="plate-rule" aria-hidden="true" />
 
-          <div className="mt-3 flex flex-wrap items-center justify-start gap-x-3 gap-y-2">
+          <div className="plate-controls">
+            {article.metadata?.generatedBy && (
+              <span className="plate-byline"><IconUser size={11} /> {article.metadata.generatedBy.slice(0, 12)}</span>
+            )}
+            {article.slug && <FreshnessBadge slug={article.slug} />}
             <LiveBadge slug={slug} />
-            <span style={{ color: "var(--rule)" }}>·</span>
+            <span className="plate-sep" aria-hidden="true">·</span>
             <button
             onClick={() => setShowGraph(!showGraph)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium transition-colors cursor-pointer"
@@ -468,6 +472,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           </button>
         </div>
         </header>
+
+        <FactFile article={article} />
 
         <RefreshDiffBanner slug={slug} />
 
@@ -498,6 +504,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
               }
               claimsIndex={claimsIndex}
               dissentMode={dissentMode}
+              activeClaimId={activeClaimId}
+              onClaimSelect={handleChipSelect}
             />
           ) : article.abstract ? (
             <div style={{ fontSize: "0.9375rem", lineHeight: 1.75, color: "var(--ink)" }}>
@@ -507,12 +515,31 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         </div>
         {/* Margin rail — claim sidenotes land here next slice. Empty rails
             collapse via :empty with zero layout cost. */}
-        <aside className="folio-rail" aria-label="Claim notes" />
+        <aside className="folio-rail" aria-label="Claim notes">
+          {epistemicClaims.length > 0 && (
+            <ClaimRail
+              claims={epistemicClaims}
+              evidenceCounts={evidenceCounts}
+              activeId={activeClaimId}
+              onSelect={openTrail}
+            />
+          )}
+        </aside>
         </div>
 
         <ArticleGapsPanel slug={slug} />
       </article>
       </div>
+      {trailClaim && (
+        <ClaimDetail
+          claim={trailClaim}
+          graph={(epistemic as any)?.claim_graph ?? null}
+          gaps={trailGaps}
+          allClaims={epistemicClaims}
+          onClose={closeTrail}
+          onSelectClaim={openTrail}
+        />
+      )}
     </PageLayout>
   );
 }
