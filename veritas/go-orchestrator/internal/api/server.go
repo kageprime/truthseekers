@@ -1001,6 +1001,13 @@ func (s *Server) setupRoutes() {
 		triggers.StartScheduler(s.manifest.Triggers, s.triggerAction)
 	}
 
+	// Seed trickle: always-on cadence (4/day) through the curated bench.
+	// Programmatic trigger — no veritas.json dependency, so it deploys
+	// identically locally and on Heroku.
+	triggers.StartScheduler([]manifest.TriggerSpec{
+		{Name: "seed-trickle", Schedule: seedTrickleCron, Action: "seed_trickle"},
+	}, s.triggerAction)
+
 	// Articles dynamic routes — GET reads are public (an encyclopedia must be
 	// readable without login); POST writes (generate/refresh/resolve) are
 	// gated inside the handler via requireCtxAuth.
@@ -1197,6 +1204,8 @@ func (s *Server) triggerAction(action string, params map[string]string) {
 		})
 	case "refresh_stale":
 		s.refreshStaleArticles()
+	case "seed_trickle":
+		s.runSeedTrickle()
 	default:
 		log.Printf("[triggers] unknown action: %s", action)
 	}
