@@ -511,7 +511,7 @@ func (d *DB) GetClaimRelationships(slug string) ([]*ClaimRelationship, error) {
 	rows, err := d.db.Query(`
 		SELECT r.source_claim_id, r.target_claim_id, r.relationship_type, r.strength
 		FROM claim_relationships r
-		JOIN article_claims ac ON r.source_claim_id = ac.claim_id
+		JOIN article_claims ac ON r.source_claim_id = ac.claim_id::text
 		JOIN articles a ON ac.article_id = a.id
 		WHERE a.slug = $1
 	`, slug)
