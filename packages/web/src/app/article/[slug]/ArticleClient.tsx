@@ -403,6 +403,13 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             }}
           />
 
+          {/* Deck — the abstract set as folio lede */}
+          {article.abstract && (
+            <p className="mt-4 font-serif" style={{ fontSize: "1.15rem", lineHeight: 1.6, color: "var(--muted)" }}>
+              {article.abstract}
+            </p>
+          )}
+
           {/* Dateline — small-caps meta */}
           <div
             className="mt-3"
@@ -471,7 +478,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           </div>
         )}
 
-        {/* Article body — two-column magazine flow with living figures */}
+        {/* Article body — folio grid: text column plus margin rail */}
+        <div className="folio-grid">
         <div className="stagger-children">
           {hasFullContent ? (
             <MagazineBody
@@ -496,6 +504,10 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
               <p>{article.abstract}</p>
             </div>
           ) : null}
+        </div>
+        {/* Margin rail — claim sidenotes land here next slice. Empty rails
+            collapse via :empty with zero layout cost. */}
+        <aside className="folio-rail" aria-label="Claim notes" />
         </div>
 
         <ArticleGapsPanel slug={slug} />

@@ -377,27 +377,41 @@ body::before {
   width: 100%;
 }
 
-/* ── Magazine flow — two-column newspaper body with living exclusions ──
+/* ── Folio grid — single text column with a margin rail ──
+   The rail hosts claim sidenotes (next slice). It collapses away while
+   empty so the grid degrades to a plain column with zero layout cost. */
+.folio-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+}
+.folio-rail { min-width: 0; }
+.folio-rail:empty { display: none; }
+@media (min-width: 1280px) {
+  .folio-grid {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 2.5rem;
+    align-items: start;
+  }
+  .folio-grid:has(.folio-rail:empty) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── Magazine flow — living figures inside the prose ──
    Figures float inside the text and prose gives way along their outlines
-   (shape-outside). L-size objects and major headings break across both
-   columns. Reordering or resizing re-breaks the columns natively. */
+   (shape-outside). L-size objects break full width. Reordering or resizing
+   re-breaks the flow natively. Single column: the folio rail owns the
+   wide-screen margin, not a second text column. */
 .mag-flow {
   display: flow-root;
   width: 100%;
   font-size: 1.02rem;
   line-height: 1.55;
 }
-@media (min-width: 1024px) {
-  .mag-flow {
-    columns: 2;
-    column-gap: 2rem;
-    column-rule: 1px solid var(--rule);
-  }
-}
-/* Major headings span the spread, never strand beside a float. */
+/* Major headings never strand beside a float. */
 .mag-flow h1,
 .mag-flow h2 {
-  column-span: all;
   break-inside: avoid;
 }
 /* Figures never split across the gutter. */
@@ -426,7 +440,6 @@ body::before {
   float: none;
   width: 100%;
   margin: 1rem 0;
-  column-span: all;
   shape-outside: none;
 }
 /* Pull quotes intrude at a slant — the pretext gesture. */
