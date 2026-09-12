@@ -1327,9 +1327,32 @@ func (s *Server) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reqLog(r, "auth/me user=%s email=%s", userID, user.Email)
+
+	// Sliding renewal: re-issue inside the window so active readers stay
+	// logged in while idle sessions still die at the TTL. The fresh token
+	// rides the cookie (rotated server-side) and, when present, the JSON
+	// body the client persists to memory.
+	renewed := ""
+	if _, role, exp, err := verifyJWT(tokenFromRequest(r)); err == nil && exp > 0 &&
+		time.Until(time.Unix(exp, 0)) < jwtRefreshWindow {
+		if user.Role != "" {
+			role = user.Role
+		}
+		if tok, err := signJWT(userID, role); err == nil {
+			setAuthCookie(w, r, tok)
+			renewed = tok
+			reqLog(r, "auth/me user=%s token renewed", userID)
+		}
+	}
+
 	userData, _ := json.Marshal(user)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	if renewed != "" {
+		renewedJSON, _ := json.Marshal(renewed)
+		w.Write([]byte(fmt.Sprintf(`{"user":%s,"token":%s}`, string(userData), string(renewedJSON))))
+		return
+	}
 	w.Write([]byte(fmt.Sprintf(`{"user":%s}`, string(userData))))
 }
 

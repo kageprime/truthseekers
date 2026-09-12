@@ -1,5 +1,5 @@
 import { BASE } from "./constants";
-import { getStoredToken } from "./token";
+import { getStoredToken, storeToken } from "./token";
 import type { Article, JobInfo, ArticleSummary, QuotaInfo, ConversationSummary, ConversationDetail, MapEntry } from "@encarta/core";
 import * as mock from "./mock-data";
 
@@ -173,32 +173,35 @@ export interface AuthUser {
 
 export async function fetchMe(token: string): Promise<AuthUser | null> {
   if (MOCK) return null; // AuthProvider handles mock with MOCK_USER
-  try {
-    const res = await fetch(`${BASE}/auth/me`, {
-      headers: { authorization: `Bearer ${token}` },
-      cache: "no-store",
-      credentials: "include",
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.user ?? null;
-  } catch {
-    return null;
-  }
+  // Contract: null means genuine rejection (401 / user gone) — the caller
+  // may clear credentials. Anything else throws so transient failures
+  // (network, 5xx, restart) never masquerade as logout.
+  const res = await fetch(`${BASE}/auth/me`, {
+    headers: { authorization: `Bearer ${token}` },
+    cache: "no-store",
+    credentials: "include",
+  });
+  if (res.status === 401) return null;
+  if (!res.ok) throw new Error(`session check failed: ${res.status}`);
+  const data = await res.json();
+  // Sliding renewal: the server rotates the token inside the expiry window.
+  // Persist it so memory and cookie stay in step (the provider's poller
+  // picks up the new value without a reload).
+  if (typeof data?.token === "string" && data.token) storeToken(data.token);
+  return data.user ?? null;
 }
 
 // fetchMeCookie restores the session from the HttpOnly cookie (S7) — for
-// cookie-only users with no JS-readable token (e.g. after reload).
+// cookie-only users with no JS-readable token (e.g. after reload). Same
+// contract as fetchMe: null is rejection, anything else throws.
 export async function fetchMeCookie(): Promise<AuthUser | null> {
   if (MOCK) return null;
-  try {
-    const res = await fetch(`${BASE}/auth/me`, { cache: "no-store", credentials: "include" });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.user ?? null;
-  } catch {
-    return null;
-  }
+  const res = await fetch(`${BASE}/auth/me`, { cache: "no-store", credentials: "include" });
+  if (res.status === 401) return null;
+  if (!res.ok) throw new Error(`session check failed: ${res.status}`);
+  const data = await res.json();
+  if (typeof data?.token === "string" && data.token) storeToken(data.token);
+  return data.user ?? null;
 }
 
 // logoutServer expires the HttpOnly session cookie (S7). Fire-and-forget.

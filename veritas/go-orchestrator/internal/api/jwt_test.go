@@ -22,12 +22,16 @@ func TestSignVerifyRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sign: %v", err)
 	}
-	sub, role, err := verifyJWT(tok)
+	sub, role, exp, err := verifyJWT(tok)
 	if err != nil {
 		t.Fatalf("verify: %v", err)
 	}
 	if sub != "user-123" || role != "admin" {
 		t.Fatalf("got sub=%q role=%q", sub, role)
+	}
+	// Expiry must ride along for sliding renewal, ~TTL out.
+	if want := time.Now().Add(jwtTTL).Unix(); exp < want-60 || exp > want+60 {
+		t.Fatalf("exp=%d, want ~%d", exp, want)
 	}
 }
 
@@ -36,7 +40,7 @@ func TestRejectAlgNone(t *testing.T) {
 	t.Setenv("ALLOW_DEV_AUTH", "1")
 	tok := b64enc([]byte(`{"alg":"none","typ":"JWT"}`)) + "." +
 		b64enc([]byte(`{"sub":"mallory","role":"owner"}`)) + "."
-	if _, _, err := verifyJWT(tok); err == nil {
+	if _, _, _, err := verifyJWT(tok); err == nil {
 		t.Fatal("alg:none accepted")
 	}
 }
@@ -47,7 +51,7 @@ func TestRejectAlgConfusion(t *testing.T) {
 	tok, _ := signJWT("user-123", "member")
 	parts := strings.Split(tok, ".")
 	fake := b64enc([]byte(`{"alg":"RS256","typ":"JWT"}`)) + "." + parts[1] + "." + parts[2]
-	if _, _, err := verifyJWT(fake); err == nil {
+	if _, _, _, err := verifyJWT(fake); err == nil {
 		t.Fatal("re-labeled alg accepted")
 	}
 }
@@ -62,7 +66,7 @@ func TestRejectExpired(t *testing.T) {
 	})
 	input := b64enc([]byte(`{"alg":"HS256","typ":"JWT"}`)) + "." + b64enc(payload)
 	mac := b64enc(hmacOf(input))
-	if _, _, err := verifyJWT(input + "." + mac); err == nil {
+	if _, _, _, err := verifyJWT(input + "." + mac); err == nil {
 		t.Fatal("expired token accepted")
 	}
 }

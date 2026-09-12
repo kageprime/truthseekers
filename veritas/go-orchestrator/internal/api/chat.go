@@ -711,18 +711,31 @@ func userIDFromRequest(r *http.Request) string {
 }
 
 func userAuthFromRequest(r *http.Request) (string, string) {
+	return userIDFromToken(tokenFromRequest(r))
+}
+
+// tokenFromRequest extracts the presented credential: Bearer first,
+// HttpOnly cookie second (S7). Empty when no credentials ride along.
+func tokenFromRequest(r *http.Request) string {
+	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+		return strings.TrimPrefix(auth, "Bearer ")
+	}
+	if c, err := r.Cookie("truthseekers_token"); err == nil {
+		return c.Value
+	}
+	return ""
+}
+
+// userIDFromToken verifies one token string. Split from request plumbing so
+// handlers that need the expiry (sliding renewal) can re-verify directly.
+func userIDFromToken(tokenStr string) (string, string) {
 	// ponytail: Bearer first, HttpOnly cookie second (S7). Cookie path lets
 	// cookie-only frontends (no JS-readable token) stay authenticated.
-	tokenStr := ""
-	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
-		tokenStr = strings.TrimPrefix(auth, "Bearer ")
-	} else if c, err := r.Cookie("truthseekers_token"); err == nil {
-		tokenStr = c.Value
-	} else {
+	if tokenStr == "" {
 		log.Printf("🛑 auth: no credentials")
 		return "", ""
 	}
-	userID, role, err := verifyJWT(tokenStr)
+	userID, role, _, err := verifyJWT(tokenStr)
 	if err != nil {
 		// ponytail: never log token bytes (S30) — length is enough to spot
 		// truncation vs forgery.

@@ -69,19 +69,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      if (!token) {
-        // Cookie-only session (S7): no JS token (e.g. after reload) — the
-        // browser still sends the HttpOnly cookie via credentials:include.
-        const { fetchMeCookie } = await import("@/lib/api");
-        const u = await fetchMeCookie();
-        if (!cancelled) {
-          setUser(u ? { ...u, role: u.role ?? "member" } : null);
-          setLoading(false);
+      try {
+        if (!token) {
+          // Cookie-only session (S7): no JS token (e.g. after reload) — the
+          // browser still sends the HttpOnly cookie via credentials:include.
+          const { fetchMeCookie } = await import("@/lib/api");
+          const u = await fetchMeCookie();
+          if (!cancelled) {
+            setUser(u ? { ...u, role: u.role ?? "member" } : null);
+            setLoading(false);
+          }
+          return;
         }
-        return;
+        const u = await fetchMeWithRole(token);
+        if (!cancelled) { setUser(u); setLoading(false); }
+      } catch {
+        // Transport/server failure (never a rejection — those return null
+        // above): keep the existing session and user visible instead of
+        // logging out on a blip. The next navigation or token sync retries.
+        if (!cancelled) setLoading(false);
       }
-      const u = await fetchMeWithRole(token);
-      if (!cancelled) { setUser(u); setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, [token, fetchMeWithRole]);

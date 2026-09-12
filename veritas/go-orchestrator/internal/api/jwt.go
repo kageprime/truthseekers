@@ -24,7 +24,12 @@ import (
 
 const (
 	jwtDefaultSecret = "veritas-dev-secret-change-me"
-	jwtTTL           = 24 * time.Hour
+	// 7-day absolute cap with sliding renewal (see jwtRefreshWindow):
+	// active readers stay logged in, idle sessions still die on schedule.
+	jwtTTL = 7 * 24 * time.Hour
+	// Re-issue when less than this remains. Daily-active users renew
+	// forever; anyone idle longer than the TTL is logged out regardless.
+	jwtRefreshWindow = 24 * time.Hour
 )
 
 func jwtSecret() []byte {
@@ -130,13 +135,13 @@ type jwtClaims struct {
 	Role   string `json:"role"`
 }
 
-// verifyJWT validates the HS256 signature and expiry, returning the subject
-// and role. The alg header is pinned to HS256 — anything else (none, RS256,
-// ...) is rejected so algorithm-confusion tokens never pass.
-func verifyJWT(tokenStr string) (sub string, role string, err error) {
+// verifyJWT validates the HS256 signature and expiry, returning the subject,
+// role, and expiry. The alg header is pinned to HS256 — anything else (none,
+// RS256, ...) is rejected so algorithm-confusion tokens never pass.
+func verifyJWT(tokenStr string) (sub string, role string, exp int64, err error) {
 	parts := strings.Split(tokenStr, ".")
 	if len(parts) != 3 {
-		return "", "", fmt.Errorf("invalid JWT (expected 3 segments)")
+		return "", "", 0, fmt.Errorf("invalid JWT (expected 3 segments)")
 	}
 	signingInput := parts[0] + "." + parts[1]
 
@@ -145,42 +150,42 @@ func verifyJWT(tokenStr string) (sub string, role string, err error) {
 		Typ string `json:"typ"`
 	}
 	if hBytes, err := b64dec(parts[0]); err != nil {
-		return "", "", fmt.Errorf("decode header: %w", err)
+		return "", "", 0, fmt.Errorf("decode header: %w", err)
 	} else if err := json.Unmarshal(hBytes, &header); err != nil {
-		return "", "", fmt.Errorf("parse header: %w", err)
+		return "", "", 0, fmt.Errorf("parse header: %w", err)
 	} else if !strings.EqualFold(header.Alg, "HS256") {
-		return "", "", fmt.Errorf("unexpected JWT alg %q", header.Alg)
+		return "", "", 0, fmt.Errorf("unexpected JWT alg %q", header.Alg)
 	}
 
 	// Verify signature (constant-time compare).
 	sig, err := b64dec(parts[2])
 	if err != nil {
-		return "", "", fmt.Errorf("decode signature: %w", err)
+		return "", "", 0, fmt.Errorf("decode signature: %w", err)
 	}
 	mac := hmac.New(sha256.New, jwtSecret())
 	mac.Write([]byte(signingInput))
 	if !hmac.Equal(mac.Sum(nil), sig) {
-		return "", "", fmt.Errorf("signature mismatch")
+		return "", "", 0, fmt.Errorf("signature mismatch")
 	}
 
 	// Decode + validate claims.
 	payloadBytes, err := b64dec(parts[1])
 	if err != nil {
-		return "", "", fmt.Errorf("decode payload: %w", err)
+		return "", "", 0, fmt.Errorf("decode payload: %w", err)
 	}
 	var claims jwtClaims
 	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
-		return "", "", fmt.Errorf("parse claims: %w", err)
+		return "", "", 0, fmt.Errorf("parse claims: %w", err)
 	}
 	if claims.Exp > 0 && time.Now().Unix() > claims.Exp {
-		return "", "", fmt.Errorf("token expired")
+		return "", "", 0, fmt.Errorf("token expired")
 	}
 	if claims.SubStr == "" {
-		return "", "", fmt.Errorf("missing sub claim")
+		return "", "", 0, fmt.Errorf("missing sub claim")
 	}
 	usrRole := claims.Role
 	if usrRole == "" {
 		usrRole = "member"
 	}
-	return claims.SubStr, usrRole, nil
+	return claims.SubStr, usrRole, claims.Exp, nil
 }
