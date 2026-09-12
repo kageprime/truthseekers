@@ -12,7 +12,7 @@ const CHIP_COLORS: Record<string, { dot: string; bg: string; border: string }> =
   unknown: { dot: "#888", bg: "rgba(136,136,136,0.08)", border: "rgba(136,136,136,0.25)" },
 };
 
-export function ProvenanceChipInline({ claimId, status }: { claimId: string; status?: string }) {
+export function ProvenanceChipInline({ claimId, status, active, onSelect }: { claimId: string; status?: string; active?: boolean; onSelect?: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
 
@@ -59,9 +59,9 @@ export function ProvenanceChipInline({ claimId, status }: { claimId: string; sta
   return (
     <span ref={ref} className="relative inline-block mx-0.5 align-middle">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => { setOpen(!open); if (!open) onSelect?.(claimId); }}
         className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium cursor-pointer border leading-none"
-        style={{ color: colors.dot, borderColor: colors.border, background: colors.bg }}
+        style={{ color: colors.dot, borderColor: colors.border, background: colors.bg, boxShadow: active ? `0 0 0 2px ${colors.dot}55` : undefined }}
       >
         <span className="w-1.5 h-1.5 rounded-full" style={{ background: colors.dot }} />
         {s}

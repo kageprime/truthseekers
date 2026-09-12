@@ -39,12 +39,11 @@ function makeBlocks(articleSlug: string): Block[] {  return [
 // mode. Mermaid, years, and markers are all valid by construction.
 function makeShowcaseBlocks(): Block[] {
   return [
-    { id: "sh-lede", type: "text", data: { content: "Around 1440, a goldsmith in Mainz combined the punch, the matrix, the mould, and the press into a single system. Within fifty years, more books had been printed than scribes had copied in the previous thousand. [claim:demo-press-1]" } as any },
-    { id: "sh-press-img", type: "image", data: { src: "https://picsum.photos/seed/press/1200/800", caption: "A reconstruction of a wooden common press, the machine at the center of it all." } as any },
+    { id: "sh-lede", type: "text", data: { content: "Around 1440, a goldsmith in Mainz combined the punch, the matrix, the mould, and the press into a single system. Within fifty years, more books had been printed than scribes had copied in the previous thousand. [claim:demo-press-1]" } as any },    { id: "sh-press-img", type: "image", data: { src: "https://picsum.photos/seed/press/1200/800", caption: "A reconstruction of a wooden common press, the machine at the center of it all." } as any },
     { id: "sh-h1", type: "heading", data: { level: 2, text: "Origins in Mainz" } as any },
     { id: "sh-origins", type: "text", data: { content: "Johannes Gutenberg was trained as a metalworker, and every part of his invention reads like a goldsmith's answer to the scribe's bottleneck. Letter punches were cut in steel, struck into copper matrices, and cast in their hundreds from a hand mould — identical, interchangeable, inexhaustible." } as any },
     { id: "sh-quote", type: "pullquote", data: { text: "What gunpowder did for war, the printing press has done for the mind.", attribution: "Wendell Phillips" } as any },
-    { id: "sh-spread", type: "text", data: { content: "The idea traveled faster than any army. By 1470 presses ran in Venice, Paris, and Seville; by 1500 some twenty million volumes had been printed across Europe, an output the scriptoria could never have approached." } as any },
+    { id: "sh-spread", type: "text", data: { content: "The idea traveled faster than any army. By 1470 presses ran in Venice, Paris, and Seville; by 1500 some twenty million volumes had been printed across Europe, an output the scriptoria could never have approached. [claim:demo-press-2]" } as any },
     { id: "sh-diagram", type: "diagram", data: { code: "flowchart TD\n    A[Punchcutting] --> B[Matrix fitting]\n    B --> C[Typecasting]\n    C --> D[Composition]\n    D --> E[Impression]\n    E --> F[Binding]", caption: "From punch to bound book in six stages." } as any },
     { id: "sh-h2", type: "heading", data: { level: 2, text: "An Unfolding Century" } as any },
     {
@@ -68,7 +67,7 @@ function makeShowcaseBlocks(): Block[] {
         centerLat: 48.5, centerLng: 10, zoom: 4,
       } as any,
     },
-    { id: "sh-output", type: "text", data: { content: "The numbers tell the story more bluntly than any narrative. Output doubled and doubled again while prices fell far enough for students, clergy, and merchants to own books for the first time." } as any },
+    { id: "sh-output", type: "text", data: { content: "The numbers tell the story more bluntly than any narrative. Output doubled and doubled again while prices fell far enough for students, clergy, and merchants to own books for the first time. [claim:demo-press-3]" } as any },
     {
       id: "sh-table", type: "table", data: {
         caption: "Estimated European book output by decade",
@@ -89,7 +88,7 @@ function makeShowcaseBlocks(): Block[] {
         ],
       } as any,
     },
-    { id: "sh-scene", type: "text", data: { content: "Walk the reconstructed workshop and the logic becomes physical: type cases within arm's reach, the press at the center, drying racks overhead. Every step minimized handling, because handling was cost." } as any },
+    { id: "sh-scene", type: "text", data: { content: "Walk the reconstructed workshop and the logic becomes physical: type cases within arm's reach, the press at the center, drying racks overhead. Every step minimized handling, because handling was cost. [claim:demo-press-4]" } as any },
     {
       id: "sh-map3d", type: "map_3d", data: {
         id: "mainz-workshop", title: "Mainz workshop", centerLat: 50.0, centerLng: 8.27, zoom: 14,
@@ -117,8 +116,7 @@ function makeShowcaseBlocks(): Block[] {
   ];
 }
 
-export const MOCK_ARTICLES: Record<string, Article> = {
-  "fall-of-constantinople": {
+export const MOCK_ARTICLES: Record<string, Article> = {  "fall-of-constantinople": {
     slug: "fall-of-constantinople",
     title: "The Fall of Constantinople",
     abstract: "The capital of the Eastern Roman Empire fell on 29 May 1453 after a fifty-three-day siege by the Ottoman army under Sultan Mehmed II. The event marked the end of the Byzantine Empire and a pivotal shift in Eurasian power.",
@@ -289,4 +287,75 @@ export const MOCK_USAGE = {
   userId: "anonymous",
   totals: { totalTokens: 0, totalCost: 0, callCount: 0 },
   recent: [],
+};
+
+// Epistemic composite for the showcase article — claims, one gap, freshness
+// and a small claim graph with a supports edge, a contradicts edge, and a
+// claim-to-claim dispute, so the margin rail and trail drawer review fully.
+export const MOCK_EPISTEMIC = {
+  slug: "the-printing-press",
+  claims: [
+    {
+      id: "demo-press-1",
+      text: "Around 1440, a goldsmith in Mainz combined the punch, the matrix, the mould, and the press into a single system.",
+      status: "supported",
+      derived_confidence: 0.82,
+      confidence_vector: { evidence_strength: 0.85, corroboration_index: 0.8, source_diversity: 0.7, recency: 0.9, contradiction_level: 0.1, bias_risk: 0.2 },
+    },
+    {
+      id: "demo-press-2",
+      text: "By 1500 some twenty million volumes had been printed across Europe.",
+      status: "supported",
+      derived_confidence: 0.71,
+      confidence_vector: { evidence_strength: 0.7, corroboration_index: 0.75, source_diversity: 0.6, recency: 0.8, contradiction_level: 0.2, bias_risk: 0.3 },
+    },
+    {
+      id: "demo-press-3",
+      text: "Output doubled and doubled again while prices fell far enough for ordinary readers to own books.",
+      status: "disputed",
+      derived_confidence: 0.44,
+      confidence_vector: { evidence_strength: 0.4, corroboration_index: 0.35, source_diversity: 0.4, recency: 0.7, contradiction_level: 0.65, bias_risk: 0.5 },
+    },
+    {
+      id: "demo-press-4",
+      text: "Every step of the workshop minimized handling, because handling was cost.",
+      status: "weak",
+      derived_confidence: 0.38,
+      confidence_vector: { evidence_strength: 0.35, corroboration_index: 0.3, source_diversity: 0.3, recency: 0.6, contradiction_level: 0.3, bias_risk: 0.55 },
+    },
+  ],
+  gaps: [
+    {
+      id: "demo-gap-1",
+      claim_id: "demo-press-3",
+      gap_type: "missing_dataset",
+      expected_artifact: "Decade-by-decade print-run ledgers",
+      verification_status: "unverified",
+      cause_label: "No surviving ledgers for small shops",
+      cause_confidence: 0.7,
+    },
+  ],
+  freshness: {
+    overall_score: 0.66,
+    claim_freshness: [
+      { claim_id: "demo-press-1", text: "Mainz system, c. 1440", freshness_score: 0.8, evidence_count: 2 },
+      { claim_id: "demo-press-3", text: "Output doubling", freshness_score: 0.45, evidence_count: 1 },
+    ],
+  },
+  refresh_diff: null,
+  claim_graph: {
+    nodes: [
+      { id: "demo-press-1", type: "claim" as const, label: "Mainz system, c. 1440", status: "supported", confidence: 0.82 },
+      { id: "demo-press-2", type: "claim" as const, label: "Twenty million volumes by 1500", status: "supported", confidence: 0.71 },
+      { id: "demo-press-3", type: "claim" as const, label: "Output doubling, falling prices", status: "disputed", confidence: 0.44 },
+      { id: "demo-ev-1", type: "evidence" as const, label: "https://www.gutenberg.org/ebooks/2456", supports: true },
+      { id: "demo-ev-2", type: "evidence" as const, label: "https://en.wikipedia.org/wiki/Printing_press", supports: false },
+    ],
+    edges: [
+      { source: "demo-ev-1", target: "demo-press-1", type: "evidence" as const, relationship: "supports" },
+      { source: "demo-ev-1", target: "demo-press-2", type: "evidence" as const, relationship: "supports" },
+      { source: "demo-ev-2", target: "demo-press-3", type: "evidence" as const, relationship: "contradicts" },
+      { source: "demo-press-2", target: "demo-press-3", type: "claim" as const, relationship: "contradicts", strength: 0.6 },
+    ],
+  },
 };

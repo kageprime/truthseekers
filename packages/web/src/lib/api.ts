@@ -487,7 +487,7 @@ export async function fetchArticleEpistemic(slug: string): Promise<{
   refresh_diff: any;
   claim_graph: { nodes: ClaimGraphNode[]; edges: ClaimGraphEdge[] };
 } | null> {
-  if (MOCK) return null;
+  if (MOCK) return mock.MOCK_EPISTEMIC;
   const res = await fetch(`${BASE}/articles/${slug}/epistemic`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();

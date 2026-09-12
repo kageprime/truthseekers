@@ -23,10 +23,14 @@ export default function MagazineBody({
   blocks,
   claimsIndex,
   dissentMode,
+  activeClaimId,
+  onClaimSelect,
 }: {
   blocks: Block[];
   claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
   dissentMode?: boolean;
+  activeClaimId?: string | null;
+  onClaimSelect?: (id: string) => void;
 }) {
   const nodes = useMemo<FlowNode[]>(
     () =>
@@ -117,10 +121,12 @@ export default function MagazineBody({
               dragging={dragKey === n.key}
               onGripDown={onGripDown}
               onSize={() => cycleSize(n.key)}
+              activeClaimId={activeClaimId}
+              onClaimSelect={onClaimSelect}
             />
           ) : (
             <div className="mag-prose">
-              <BlockItem block={n.block} claimsIndex={claimsIndex} dissentMode={dissentMode} dropCap={n.key === firstTextKey} />
+              <BlockItem block={n.block} claimsIndex={claimsIndex} dissentMode={dissentMode} dropCap={n.key === firstTextKey} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} />
             </div>
           )}
         </Fragment>
@@ -150,6 +156,8 @@ function FloatObject({
   dragging,
   onGripDown,
   onSize,
+  activeClaimId,
+  onClaimSelect,
 }: {
   nodeKey: string;
   block: Block;
@@ -160,6 +168,8 @@ function FloatObject({
   dragging: boolean;
   onGripDown: (e: React.PointerEvent, key: string) => void;
   onSize: () => void;
+  activeClaimId?: string | null;
+  onClaimSelect?: (id: string) => void;
 }) {
   const pull = block.type === "pullquote";
   return (
@@ -180,7 +190,7 @@ function FloatObject({
           {SIZE_LABEL[size]}
         </button>
       </div>
-      <BlockItem block={block} claimsIndex={claimsIndex} dissentMode={dissentMode} />
+      <BlockItem block={block} claimsIndex={claimsIndex} dissentMode={dissentMode} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} />
     </figure>
   );
 }

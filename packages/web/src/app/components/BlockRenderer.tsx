@@ -149,13 +149,17 @@ export function BlockItem({
   claimsIndex,
   dissentMode,
   dropCap,
+  activeClaimId,
+  onClaimSelect,
 }: {
   block: Block;
   claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
   dissentMode?: boolean;
   dropCap?: boolean;
+  activeClaimId?: string | null;
+  onClaimSelect?: (id: string) => void;
 }) {
-  return <BlockCard block={block} claimsIndex={claimsIndex} dissentMode={dissentMode} dropCap={dropCap} />;
+  return <BlockCard block={block} claimsIndex={claimsIndex} dissentMode={dissentMode} dropCap={dropCap} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} />;
 }
 
 function BlockCard({
@@ -165,6 +169,8 @@ function BlockCard({
   figureNum,
   claimsIndex,
   dissentMode,
+  activeClaimId,
+  onClaimSelect,
 }: {
   block: Block;
   compact?: boolean;
@@ -172,6 +178,8 @@ function BlockCard({
   figureNum?: number;
   claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
   dissentMode?: boolean;
+  activeClaimId?: string | null;
+  onClaimSelect?: (id: string) => void;
 }) {
   switch (block.type) {
     case "heading":
@@ -183,10 +191,12 @@ function BlockCard({
           dropCap={dropCap}
           claimsIndex={claimsIndex}
           dissentMode={dissentMode}
+          activeClaimId={activeClaimId}
+          onClaimSelect={onClaimSelect}
         />
       );
     case "section":
-      return <SectionBlock data={block.data as unknown as SectionBlockData} />;
+      return <SectionBlock data={block.data as unknown as SectionBlockData} claimsIndex={claimsIndex} dissentMode={dissentMode} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} />;
     case "timeline":
       return <TimelineBlock data={block.data as unknown as TimelineBlockData} />;
     case "map_2d":
@@ -279,11 +289,15 @@ function TextBlock({
   dropCap,
   claimsIndex,
   dissentMode,
+  activeClaimId,
+  onClaimSelect,
 }: {
   data: TextBlockData;
   dropCap?: boolean;
   claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>;
   dissentMode?: boolean;
+  activeClaimId?: string | null;
+  onClaimSelect?: (id: string) => void;
 }) {
   if (!data) return null;
   const content = (data as any).content || (data as any).text || "";
@@ -326,7 +340,7 @@ function TextBlock({
               margin: "0 1px",
             } : undefined}
           >
-            <ProvenanceChipInline claimId={part.value} status={status} />
+            <ProvenanceChipInline claimId={part.value} status={status} active={activeClaimId === part.value} onSelect={onClaimSelect} />
           </span>
         );
       })}
@@ -334,14 +348,14 @@ function TextBlock({
   );
 }
 
-function SectionBlock({ data }: { data: SectionBlockData }) {
+function SectionBlock({ data, claimsIndex, dissentMode, activeClaimId, onClaimSelect }: { data: SectionBlockData; claimsIndex?: Record<string, { status?: string; derived_confidence?: number }>; dissentMode?: boolean; activeClaimId?: string | null; onClaimSelect?: (id: string) => void }) {
   if (!data) return null;
   return (
     <details className="plate p-3 mb-4">
       <summary className="font-display text-[0.95rem] cursor-pointer" style={{ color: "var(--ink)" }}>
         {data.title}
       </summary>
-      {data.blocks && <div className="mt-3">{data.blocks.map((b, i) => <BlockCard key={b.id ?? `section-block-${i}`} block={b} compact={false} />)}</div>}
+      {data.blocks && <div className="mt-3">{data.blocks.map((b, i) => <BlockCard key={b.id ?? `section-block-${i}`} block={b} compact={false} claimsIndex={claimsIndex} dissentMode={dissentMode} activeClaimId={activeClaimId} onClaimSelect={onClaimSelect} />)}</div>}
     </details>
   );
 }
