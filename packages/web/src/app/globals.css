@@ -30,6 +30,8 @@
   --font-serif: 'Lora', Georgia, 'Times New Roman', serif;
   --font-ui: 'Geist', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  /* Typewriter voice — plate labels, folios, file rows. Loaded in layout. */
+  --font-typewriter: 'IBM Plex Mono', ui-monospace, monospace;
 
   /* Surface — aged paper */
   --surface: #f5efe0;
@@ -383,9 +385,9 @@ body::before {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  font-family: var(--font-mono);
+  font-family: var(--font-typewriter);
   font-size: 0.7rem;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink);
   margin-bottom: 1rem;
@@ -396,8 +398,8 @@ body::before {
   font-weight: 900;
   text-transform: uppercase;
   font-size: clamp(2.6rem, 1.4rem + 6vw, 5.25rem);
-  line-height: 0.95;
-  letter-spacing: -0.01em;
+  line-height: 0.85;
+  letter-spacing: -0.03em;
   color: var(--ink);
   text-wrap: balance;
   margin: 0;
@@ -436,49 +438,54 @@ body::before {
   color: var(--muted);
 }
 .plate-sep { color: var(--rule); }
-/* ── File box — taxonomy grid, ruled like the plate ── */
+/* ── File box — taxonomy grid, ruled like the plate ──
+   Solid ink label cells, bordered rows, values set medium. In dark mode
+   the cell inverts with the tokens (no separate rules). */
 .factfile {
   display: grid;
   grid-template-columns: 1fr;
   margin: 0 0 1.5rem;
-  border-top: 3px solid var(--ink);
-  border-bottom: 1px solid var(--ink);
+  border: 1px solid var(--ink);
 }
 @media (min-width: 640px) {
   .factfile { grid-template-columns: 1fr 1fr; }
-  .factfile-row:nth-child(odd) { border-right: 1px solid var(--rule); }
-  .factfile-row:nth-child(odd) > dd { padding-right: 1rem; }
-  .factfile-row:nth-child(even) > dt { padding-left: 1rem; }
 }
 .factfile-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.45rem 0;
-  border-bottom: 1px solid var(--rule);
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: stretch;
+  gap: 0;
+  border-bottom: 1px solid var(--ink);
 }
 .factfile-row:last-child { border-bottom: none; }
 @media (min-width: 640px) {
   .factfile-row:nth-last-child(2):nth-child(odd) { border-bottom: none; }
+  .factfile-row:nth-child(even) { border-left: 1px solid var(--ink); }
 }
 .factfile-row > dt {
-  font-family: var(--font-ui);
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
+  display: flex;
+  align-items: center;
+  font-family: var(--font-typewriter);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--surface);
+  background: var(--ink);
+  padding: 0.55rem 0.7rem;
+  margin: 0;
   white-space: nowrap;
 }
 .factfile-row > dd {
   margin: 0;
+  display: flex;
+  align-items: center;
   font-family: var(--font-ui);
   font-size: 0.78rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink);
-  text-align: right;
+  padding: 0.55rem 0.75rem;
   overflow-wrap: anywhere;
 }
 
@@ -511,11 +518,11 @@ body::before {
 
 /* ── Claim sidenotes — glanceable, never a second article ── */
 .claim-rail-title {
-  font-family: var(--font-ui);
-  font-variant: all-small-caps;
-  letter-spacing: 0.14em;
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-family: var(--font-typewriter);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 500;
   color: var(--subtle);
   margin: 0 0 0.6rem;
 }
@@ -537,8 +544,9 @@ body::before {
 .claim-note:hover { border-color: var(--gold); }
 .claim-note-active { border-color: var(--gold); box-shadow: var(--shadow-1); }
 .claim-note-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
-.claim-note-num { font-family: var(--font-ui); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; color: var(--subtle); }
-.claim-note-status { font-size: 0.68rem; font-weight: 600; color: var(--note-dot, var(--subtle)); }
+.claim-note-num { font-family: var(--font-typewriter); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.08em; color: var(--subtle); }
+.claim-note-status { display: inline-flex; align-items: center; gap: 0.35rem; font-family: var(--font-typewriter); font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 500; color: var(--note-dot, var(--subtle)); }
+.claim-note-status::before { content: ""; width: 5px; height: 5px; border-radius: 9999px; background: var(--note-dot, var(--subtle)); }
 .claim-note-text {
   font-family: var(--font-serif);
   font-size: 0.82rem;
@@ -620,11 +628,11 @@ body::before {
 .trail-bar > span { display: block; height: 100%; }
 .trail-section { margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--border-light); }
 .trail-label {
-  font-family: var(--font-ui);
-  font-variant: all-small-caps;
-  letter-spacing: 0.12em;
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-family: var(--font-typewriter);
+  letter-spacing: 0.18em;
+  font-size: 0.66rem;
+  font-weight: 500;
+  text-transform: uppercase;
   color: var(--subtle);
   margin: 0 0 0.55rem;
 }

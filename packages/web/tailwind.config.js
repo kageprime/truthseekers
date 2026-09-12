@@ -9,6 +9,7 @@ module.exports = {
         serif: ["var(--font-serif)", "Lora", "Georgia", "serif"],
         display: ["var(--font-display)", "'Playfair Display'", "Georgia", "serif"],
         mono: ["var(--font-mono)", "'JetBrains Mono'", "monospace"],
+        typewriter: ["var(--font-typewriter)", "'IBM Plex Mono'", "monospace"],
         pixel: ["'Press Start 2P'", "monospace"],
       },
       colors: {
