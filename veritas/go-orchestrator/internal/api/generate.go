@@ -140,6 +140,7 @@ func (s *Server) processArticle(slug string, persona string) {
 	// Unify claim identity before anything persists: model-minted IDs are
 	// unstable across runs and the writer fabricates anchors, so anchors can
 	// dangle ("unknown" chips) and regens accumulate duplicate rows.
+	logNodeShapes(slug, nodeOutputs)
 	generatedOutput = s.canonicalizeClaimIDs(nodeOutputs, generatedOutput)
 
 	art := transformGeneratedArticle(slug, generatedOutput)
@@ -514,6 +515,14 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 		}
 		b, _ := json.Marshal(raw)
 		if err := json.Unmarshal(b, &result); err == nil {
+			ndocs := 0
+			for _, docs := range result.Documents {
+				ndocs += len(docs)
+			}
+			log.Printf("[epistemic] retrieve: %d documents in %d buckets", ndocs, len(result.Documents))
+			if ndocs == 0 {
+				warnEmpty("retrieve", raw)
+			}
 			for _, docs := range result.Documents {
 				for _, d := range docs {
 					if d.ID == "" {
@@ -560,6 +569,10 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 		}
 		b, _ := json.Marshal(raw)
 		if err := json.Unmarshal(b, &result); err == nil {
+			log.Printf("[epistemic] map_evidence: %d mappings", len(result.ClaimEvidenceMap))
+			if len(result.ClaimEvidenceMap) == 0 {
+				warnEmpty("map_evidence", raw)
+			}
 			for _, m := range result.ClaimEvidenceMap {
 				if m.ClaimID == "" {
 					continue
@@ -604,6 +617,10 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 		}
 		b, _ := json.Marshal(raw)
 		if err := json.Unmarshal(b, &result); err == nil {
+			log.Printf("[epistemic] extract_claims: %d claims", len(result.Claims))
+			if len(result.Claims) == 0 {
+				warnEmpty("extract_claims", raw)
+			}
 			for _, c := range result.Claims {
 				if c.ClaimID == "" || c.Text == "" {
 					continue
@@ -653,6 +670,10 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 		}
 		b, _ := json.Marshal(raw)
 		if err := json.Unmarshal(b, &result); err == nil {
+			log.Printf("[epistemic] resolve: %d resolved claims", len(result.ResolvedClaims))
+			if len(result.ResolvedClaims) == 0 {
+				warnEmpty("resolve", raw)
+			}
 			runID := storage.EnsureGenerationRunID()
 			for _, rc := range result.ResolvedClaims {
 				if rc.ClaimID == "" {
@@ -699,6 +720,10 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 		}
 		b, _ := json.Marshal(raw)
 		if err := json.Unmarshal(b, &result); err == nil {
+			log.Printf("[epistemic] resolve relationships: %d", len(result.Relationships))
+			if len(result.Relationships) == 0 {
+				warnEmpty("claim_relationships", raw)
+			}
 			for _, rel := range result.Relationships {
 				if rel.SourceClaimID == "" || rel.TargetClaimID == "" || rel.SourceClaimID == rel.TargetClaimID {
 					continue
@@ -731,6 +756,10 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 		}
 		b, _ := json.Marshal(raw)
 		if err := json.Unmarshal(b, &result); err == nil {
+			log.Printf("[epistemic] detect_missing: %d gaps", len(result.Gaps))
+			if len(result.Gaps) == 0 {
+				warnEmpty("detect_missing", raw)
+			}
 			for _, g := range result.Gaps {
 				if g.EvidenceID == "" {
 					continue
@@ -766,6 +795,10 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 		}
 		b, _ := json.Marshal(raw)
 		if err := json.Unmarshal(b, &result); err == nil {
+			log.Printf("[epistemic] map_language: %d flags", len(result.Flags))
+			if len(result.Flags) == 0 {
+				warnEmpty("map_language", raw)
+			}
 			for _, f := range result.Flags {
 				if f.ClaimID == "" {
 					continue
@@ -805,6 +838,10 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 		}
 		b, _ := json.Marshal(raw)
 		if err := json.Unmarshal(b, &result); err == nil {
+			log.Printf("[epistemic] scrutinize: %d assessments", len(result.Assessments))
+			if len(result.Assessments) == 0 {
+				warnEmpty("scrutinize", raw)
+			}
 			for _, a := range result.Assessments {
 				if a.ClaimID == "" {
 					continue
@@ -836,7 +873,67 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 	}
 }
 
-// canonicalClaimID derives a stable content-addressed ID from claim text by
+// promoteKey moves an alternate top-level key to the canonical one when the
+// canonical key is absent. Models paraphrase key names as well as values;
+// without this, a perfectly good output unmarshals into zero values and
+// every downstream persist step silently saves nothing.
+func promoteKey(m map[string]interface{}, want string, alts ...string) bool {
+	if m == nil {
+		return false
+	}
+	if v, ok := m[want]; ok {
+		if list, ok := v.([]interface{}); ok && len(list) > 0 {
+			return false // canonical present and non-empty; nothing to do
+		}
+	}
+	for _, alt := range alts {
+		if v, ok := m[alt]; ok {
+			if list, ok := v.([]interface{}); ok && len(list) > 0 {
+				m[want] = v
+				delete(m, alt)
+				log.Printf("[generate] key promoted: %s -> %s (%d items)", alt, want, len(list))
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// logNodeShapes records each node's top-level keys on every run. Combined
+// with the per-section parsed counts in persist, this makes silent schema
+// drift visible in Heroku logs instead of discoverable from screenshots.
+func logNodeShapes(slug string, nodeOutputs map[string]interface{}) {
+	for _, name := range []string{"retrieve", "extract_claims", "map_evidence", "critique", "detect_missing", "map_language", "scrutinize", "resolve", "generate_article"} {
+		raw, ok := nodeOutputs[name]
+		if !ok {
+			log.Printf("[generate] shape %s: MISSING", name)
+			continue
+		}
+		b, _ := json.Marshal(raw)
+		if len(b) > 160 {
+			b = b[:160]
+		}
+		log.Printf("[generate] shape %s: %s", name, strings.TrimSpace(string(b)))
+	}
+}
+
+// warnEmpty logs what a section actually contained when parsing yielded
+// nothing — the difference between "model said nothing" and "model said
+// it under a different key".
+func warnEmpty(section string, raw interface{}) {
+	b, _ := json.Marshal(raw)
+	present := len(b) > 0 && string(b) != "null" && string(b) != "{}" && string(b) != "[]"
+	status := "absent"
+	if present {
+		status = "present-but-unparsed"
+		if len(b) > 240 {
+			b = b[:240]
+		}
+		log.Printf("[epistemic] WARN %s: 0 items parsed; raw: %s", section, strings.TrimSpace(string(b)))
+	} else {
+		log.Printf("[epistemic] WARN %s: 0 items parsed; raw %s", section, status)
+	}
+}
 // reformatting its signature hash into UUID shape. Same wording always maps
 // to the same ID — across nodes, regenerations, and runs — so re-running the
 // pipeline upserts rows (with version history) instead of accumulating
@@ -902,6 +999,25 @@ func (s *Server) canonicalizeClaimIDs(nodeOutputs map[string]interface{}, genera
 
 	alias := map[string]string{} // unstable model ID -> stable identity
 
+	// Normalize alternate top-level keys before anything reads them, so one
+	// paraphrased key can't hollow out every downstream consumer at once.
+	if m, ok := nodeOutputs["map_evidence"].(map[string]interface{}); ok {
+		promoteKey(m, "claim_evidence_map", "evidence_map", "mappings", "map")
+	}
+	if m, ok := nodeOutputs["detect_missing"].(map[string]interface{}); ok {
+		promoteKey(m, "gaps", "evidence_gaps", "missing_gaps")
+	}
+	if m, ok := nodeOutputs["scrutinize"].(map[string]interface{}); ok {
+		promoteKey(m, "risk_assessments", "assessments", "risks")
+	}
+	if m, ok := nodeOutputs["map_language"].(map[string]interface{}); ok {
+		promoteKey(m, "language_flags", "flags")
+	}
+	if m, ok := nodeOutputs["resolve"].(map[string]interface{}); ok {
+		promoteKey(m, "resolved_claims", "claims", "resolutions")
+		promoteKey(m, "claim_relationships", "relationships")
+	}
+
 	// Extract claims: identity flows from the wording.
 	for _, c := range claimItemList(nodeOutputs["extract_claims"], "claims") {
 		id, text := strField(c, "claim_id"), strField(c, "text")
@@ -915,9 +1031,16 @@ func (s *Server) canonicalizeClaimIDs(nodeOutputs map[string]interface{}, genera
 	}
 	// Resolved claims: alias by ID, else stabilize from their own text
 	// (post-backfill they carry it) so resolve-minted IDs heal too.
+	// ID-less items with wording are ASSIGNED their stable identity here —
+	// otherwise they save as orphans no anchor can ever reach.
 	for _, c := range claimItemList(nodeOutputs["resolve"], "resolved_claims") {
 		id := strField(c, "claim_id")
 		if id == "" {
+			if text := strField(c, "text"); text != "" {
+				stable := finalID("", text)
+				c["claim_id"] = stable
+				log.Printf("[generate] orphan resolved claim adopted as %s", stable)
+			}
 			continue
 		}
 		if stable, ok := alias[id]; ok {
