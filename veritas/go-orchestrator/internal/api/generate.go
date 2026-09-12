@@ -35,9 +35,10 @@ func init() {
 
 // buildArticleWorkflow constructs the canonical 9-node epistemic pipeline
 // using Go LLM-based executors.  Dependency graph mirrors the original Python
-// pipeline.
-func buildArticleWorkflow() *dag.Workflow {
-	execs := agent.DAGNodeExecutors(articleSystemPrompt)
+// pipeline. A non-empty contestNote arms resolve + generate_article with the
+// reader's challenge (see DAGNodeExecutorsWithContext); empty behaves flat.
+func buildArticleWorkflow(contestNote string) *dag.Workflow {
+	execs := agent.DAGNodeExecutorsWithContext(articleSystemPrompt, contestNote)
 	return &dag.Workflow{
 		Nodes: []dag.Node{
 			{ID: "retrieve", DependsOn: []string{}, Execute: execs["retrieve"]},
@@ -68,12 +69,17 @@ var humanPhase = map[string]string{
 }
 
 // processArticle executes the full generation pipeline for a slug and persists
-// the result.
-func (s *Server) processArticle(slug string, persona string) {
+// the result. A non-empty note (e.g. an upheld contestation) travels into
+// retrieval as query context and into resolve/generate as a hypothesis.
+func (s *Server) processArticle(slug string, persona string, note string) {
 	start := time.Now()
-	log.Printf("🖌️ [generate] starting pipeline slug=%s persona=%s", slug, persona)
+	log.Printf("🖌️ [generate] starting pipeline slug=%s persona=%s contest=%t", slug, persona, note != "")
 
-	queryJSON, _ := json.Marshal(map[string]string{"topic": slug})
+	query := map[string]string{"topic": slug}
+	if note != "" {
+		query["contestation"] = note
+	}
+	queryJSON, _ := json.Marshal(query)
 	// ponytail: 9 nodes, 7-deep sequential chain, each LLM call budgeted up
 	// to 120s — 5m starved generate_article (the heaviest node) with ~30s
 	// left after 8 nodes on a slow reasoning model. 15m fits the worst case
@@ -81,7 +87,7 @@ func (s *Server) processArticle(slug string, persona string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
-	workflow := buildArticleWorkflow()
+	workflow := buildArticleWorkflow(note)
 	updates, err := workflow.Execute(ctx, string(queryJSON))
 	if err != nil {
 		s.failArticle(slug, fmt.Sprintf("workflow invalid: %v", err))

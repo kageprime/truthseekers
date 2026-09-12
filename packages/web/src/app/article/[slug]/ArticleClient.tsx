@@ -9,6 +9,7 @@ import ContentCard from "../../components/ContentCard";
 import GenerationBar from "../../components/GenerationBar";
 import { articleToBlocks } from "../../components/BlockRenderer";
 import MagazineBody from "../../components/MagazineBody";
+import ContestDialog from "../../components/ContestDialog";
 import FactFile from "../../components/FactFile";
 import ClaimRail from "../../components/ClaimRail";
 import ClaimDetail from "../../components/ClaimDetail";
@@ -42,6 +43,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   const [pausedError, setPausedError] = useState<string | undefined>(undefined);
   const [showGraph, setShowGraph] = useState(false);
   const [dissentMode, setDissentMode] = useState(false);
+  const [contestOpen, setContestOpen] = useState(false);
   const { data: epistemic } = useArticleEpistemic(generating ? undefined : slug);
   const epistemicClaims = useMemo(() => {
     const list = (epistemic as any)?.claims;
@@ -470,6 +472,18 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           >
             <span aria-hidden>⚑</span> {dissentMode ? "Dissent on" : "Highlight dissent"}
           </button>
+          <button
+            onClick={() => setContestOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium transition-colors cursor-pointer"
+            style={{
+              borderColor: "var(--border-light, #e5e5e5)",
+              color: "var(--muted)",
+              background: "transparent",
+            }}
+            title="Challenge this article with a counterpoint"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg> Contest
+          </button>
         </div>
         </header>
 
@@ -540,6 +554,15 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           onSelectClaim={openTrail}
         />
       )}
+      <ContestDialog
+        slug={slug}
+        open={contestOpen}
+        onClose={() => setContestOpen(false)}
+        onQueued={() => {
+          setGenerating(true);
+          setProgress("queued");
+        }}
+      />
     </PageLayout>
   );
 }

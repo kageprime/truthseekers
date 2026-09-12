@@ -14,6 +14,7 @@ export {
   useArticleEpistemic, useGlobalClaimGraph,
   useUpvoteGap, useSubmitGapEvidence,
   useQueue, useCancelQueueJob, useResolveArticle, useCheckArticleStatus,
+  useContestArticle,
   useFetchMe,
   useHealth, useLoginEmail, useVerifyOTP, useRegisterPassword, useLoginPassword, useSignup, useActivateSignup, useOnboard,
   useStripeCheckout, useStripePortal, usePaystackInit, usePaystackVerify,

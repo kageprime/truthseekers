@@ -38,13 +38,14 @@ func IsTerminal(s Status) bool {
 
 // ── Session ─────────────────────────────────────────────────
 
-type Session struct {
+type 	Session struct {
 	ID             string    `json:"id"`
 	Slug           string    `json:"slug"`
 	Status         Status    `json:"status"`
 	UserID         string    `json:"userId"`
 	Persona        string    `json:"persona"`
 	Source         string    `json:"source"` // "ui", "cli", "trigger:cron", etc.
+	Note           string    `json:"note,omitempty"` // free-form context (e.g. contest argument)
 	IdempotencyKey string    `json:"idempotencyKey,omitempty"`
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`
@@ -59,6 +60,7 @@ type CreateCommand struct {
 	UserID         string `json:"userId"`
 	Persona        string `json:"persona"`
 	Source         string `json:"source"`         // "ui", "cli", "slack", "trigger:cron"
+	Note           string `json:"note,omitempty"` // free-form context, carried onto the session
 	IdempotencyKey string `json:"idempotencyKey"` // Prevent duplicates
 	QueuePolicy    string `json:"queuePolicy"`    // "never", "on_backpressure", "always"
 }

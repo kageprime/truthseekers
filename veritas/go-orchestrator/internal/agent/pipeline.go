@@ -83,7 +83,36 @@ type chatCompletionResp struct {
 }
 
 func doJSONRequest(route ModelRoute, payload []byte) (json.RawMessage, bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), epistemicPromptTimeout)
+	return doJSONRequestTimeout(route, payload, epistemicPromptTimeout)
+}
+
+// SendPromptJSONBudget is SendPromptJSON with a caller-chosen deadline and
+// no retries — for request-scoped judgments (e.g. contest adjudication)
+// that must fit inside the router's response window. A timeout surfaces as
+// an error so the caller can answer 503-try-again instead of hanging.
+func SendPromptJSONBudget(system, user, model string, timeout time.Duration) (json.RawMessage, error) {
+	route := resolveModel(model)
+	if route.APIKey == "" {
+		return nil, fmt.Errorf("no API key for model %s", model)
+	}
+
+	body := map[string]interface{}{
+		"model":           route.ModelID,
+		"messages":        []map[string]string{{"role": "system", "content": system}, {"role": "user", "content": user}},
+		"response_format": map[string]string{"type": "json_object"},
+		"temperature":     0,
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	result, _, err := doJSONRequestTimeout(route, payload, timeout)
+	return result, err
+}
+
+func doJSONRequestTimeout(route ModelRoute, payload []byte, timeout time.Duration) (json.RawMessage, bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "POST", route.BaseURL+"/chat/completions", bytes.NewReader(payload))
@@ -93,7 +122,7 @@ func doJSONRequest(route ModelRoute, payload []byte) (json.RawMessage, bool, err
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+route.APIKey)
 
-	client := &http.Client{Timeout: epistemicPromptTimeout + 5*time.Second}
+	client := &http.Client{Timeout: timeout + 5*time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, true, fmt.Errorf("http request: %w", err)
@@ -114,6 +143,12 @@ func doJSONRequest(route ModelRoute, payload []byte) (json.RawMessage, bool, err
 		return nil, false, fmt.Errorf("empty response from model")
 	}
 	return json.RawMessage(parsed.Choices[0].Message.Content), false, nil
+}
+
+// EpistemicModel reports the model backing the epistemic pipeline (and the
+// contest adjudicator), honoring EPISTEMIC_MODEL.
+func EpistemicModel() string {
+	return epistemicModel
 }
 
 // ────────────────────────────────────────────────────────────
@@ -691,7 +726,20 @@ func EpistemicToolExecutors(systemPrompt string) map[string]ToolExecutor {
 // Python subprocess bridge. Each executor calls the LLM directly via
 // SendPromptJSON.  The returned map is keyed by node ID (retrieve,
 // extract_claims, …, generate_article).
+// contestedPerspective frames a reader's challenge for the resolve and
+// generate nodes: a live dissenting hypothesis to test, not a verdict.
+const contestedPerspective = `CONTESTED PERSPECTIVE UNDER REVIEW — a reader challenges this topic with the argument quoted below.
+Treat it as a live dissenting hypothesis: seek evidence that confirms or refutes it during retrieval and mapping, weigh it explicitly in scrutiny and resolution, and let it change verdicts and the final article where the evidence supports the change. If the evidence does not support it, say so plainly in the article rather than ignoring it.`
+
 func DAGNodeExecutors(systemPrompt string) map[string]func(context.Context, map[string]interface{}) (interface{}, error) {
+	return DAGNodeExecutorsWithContext(systemPrompt, "")
+}
+
+// DAGNodeExecutorsWithContext is DAGNodeExecutors plus an optional reader
+// contestation. When note is non-empty, resolve and generate_article carry
+// it as a hypothesis to test; all other nodes are identical. Empty note is
+// byte-identical behavior to DAGNodeExecutors.
+func DAGNodeExecutorsWithContext(systemPrompt, contestNote string) map[string]func(context.Context, map[string]interface{}) (interface{}, error) {
 	type nodeConfig struct {
 		prompt string
 		fields map[string]string // dag input key → prompt label
@@ -706,6 +754,17 @@ func DAGNodeExecutors(systemPrompt string) map[string]func(context.Context, map[
 		"scrutinize":       {promptScrutinize, map[string]string{"map_evidence": "EVIDENCE MAP"}},
 		"resolve":          {promptResolve, map[string]string{"extract_claims": "CLAIMS", "critique": "CRITIQUE", "detect_missing": "MISSING EVIDENCE", "map_language": "LANGUAGE MAP", "scrutinize": "SCRUTINY REPORT"}},
 		"generate_article": {promptGenerateArticle, map[string]string{"resolve": "RESOLVED CLAIMS"}},
+	}
+	if contestNote != "" {
+		contest := "\n\n" + contestedPerspective + "\n\"" + contestNote + "\""
+		if cfg, ok := configs["resolve"]; ok {
+			cfg.prompt += contest
+			configs["resolve"] = cfg
+		}
+		if cfg, ok := configs["generate_article"]; ok {
+			cfg.prompt += contest
+			configs["generate_article"] = cfg
+		}
 	}
 
 		executors := make(map[string]func(context.Context, map[string]interface{}) (interface{}, error))

@@ -71,6 +71,7 @@ func (e *Engine) CreateSession(cmd CreateCommand) (*Session, error) {
 		UserID:         cmd.UserID,
 		Persona:        cmd.Persona,
 		Source:         cmd.Source,
+		Note:           cmd.Note,
 		IdempotencyKey: cmd.IdempotencyKey,
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),

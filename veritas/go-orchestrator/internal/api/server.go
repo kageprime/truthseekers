@@ -519,7 +519,7 @@ func NewServer(port string, db *storage.DB) *Server {
 
 	// Session lifecycle engine for article generation.
 	s.sessionEngine = sessionlifecycle.NewEngine(func(session sessionlifecycle.Session) error {
-		s.processArticle(session.Slug, session.Persona)
+		s.processArticle(session.Slug, session.Persona, session.Note)
 		return nil
 	})
 	s.setupRoutes()
@@ -1462,6 +1462,15 @@ func (s *Server) handleArticlesDynamicRoute(w http.ResponseWriter, r *http.Reque
 				return
 			}
 			s.handleResolveArticle(w, r, slug)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	case "contest":
+		if r.Method == "POST" {
+			if !requireCtxAuth(w, r) {
+				return
+			}
+			s.handleContestArticle(w, r, slug)
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}

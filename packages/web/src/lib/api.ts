@@ -666,6 +666,34 @@ export async function resolveArticle(slug: string, action: "approve" | "correct"
   return res.ok;
 }
 
+// ── Article Contest (reader challenge → adjudication → conditional regen) ──
+
+export interface ContestResult {
+  status: "queued" | "no_change" | "busy" | "undecided";
+  reasoning?: string;
+  error?: string;
+  contestation_id?: string;
+  slug?: string;
+}
+
+export async function contestArticle(slug: string, argument: string): Promise<ContestResult> {
+  if (MOCK) return { status: "no_change", reasoning: "Mock mode: challenge recorded, article stands." };
+  try {
+    const res = await fetch(`${BASE}/articles/${slug}/contest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() }, credentials: "include",
+      body: JSON.stringify({ argument }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) return { status: "undecided", error: "Please log in to contest this article." };
+    if (res.status === 429) return { status: "busy", error: data.error || "A generation is already running" };
+    if (!res.ok) return { status: "undecided", error: data.error || "Contest failed" };
+    return data;
+  } catch {
+    return { status: "undecided", error: "Network error" };
+  }
+}
+
 // ── Health (home page stats) ───────────────────────────────────
 
 export async function fetchHealth(): Promise<{ article_count?: number } | null> {

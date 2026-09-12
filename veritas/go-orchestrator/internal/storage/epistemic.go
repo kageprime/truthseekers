@@ -62,6 +62,38 @@ func (d *DB) UpdateClaimResolution(id, status string, vector map[string]interfac
 	return nil
 }
 
+// SaveContestation records a reader's argued challenge to an article.
+// Verdict starts pending; the adjudicator updates it. Never fails the
+// HTTP handler on error — callers decide.
+func (d *DB) SaveContestation(id, slug, userID, argument string) error {
+	if d.mockMode {
+		return nil
+	}
+	_, err := d.db.Exec(`
+		INSERT INTO contestations (id, article_slug, user_id, argument, verdict)
+		VALUES ($1, $2, $3, $4, 'pending')
+	`, id, slug, userID, argument)
+	if err != nil {
+		return fmt.Errorf("save contestation: %w", err)
+	}
+	return nil
+}
+
+// SetContestationVerdict records the adjudicator's verdict and reasoning.
+// Verdict is "warrants_regeneration" or "no_change".
+func (d *DB) SetContestationVerdict(id, verdict, reasoning string) error {
+	if d.mockMode {
+		return nil
+	}
+	_, err := d.db.Exec(`
+		UPDATE contestations SET verdict = $1, reasoning = $2 WHERE id = $3
+	`, verdict, reasoning, id)
+	if err != nil {
+		return fmt.Errorf("set contestation verdict: %w", err)
+	}
+	return nil
+}
+
 // GetClaimByID fetches a single claim by its UUID.
 func (d *DB) GetClaimByID(id string) (*Claim, error) {
 	if d.mockMode {

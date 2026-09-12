@@ -362,6 +362,12 @@ export function useFetchMe() {
   );
 }
 
+export function useContestArticle() {
+  return useApiMutation(
+    ({ slug, argument }: { slug: string; argument: string }) => api.contestArticle(slug, argument),
+  );
+}
+
 // ── Stripe (billing — legacy stubs) ──
 
 export function useStripeCheckout() {
