@@ -41,6 +41,27 @@ func (d *DB) SaveClaim(c *Claim) error {
 	return nil
 }
 
+// UpdateClaimResolution writes only the assessment fields a resolver owns
+// (status, confidence vector, derived confidence). Unlike SaveClaim it never
+// touches identity fields (text, signature, type) — a resolver that blanks
+// them trips the type CHECK and, worse, could silently rewrite wording it
+// never authored. Unmatched IDs update zero rows by design.
+func (d *DB) UpdateClaimResolution(id, status string, vector map[string]interface{}, derived float64, updatedAt time.Time) error {
+	if d.mockMode {
+		return nil
+	}
+	cvJson, _ := json.Marshal(vector)
+	_, err := d.db.Exec(`
+		UPDATE claims
+		SET status = $1, confidence_vector = $2, derived_confidence = $3, updated_at = $4
+		WHERE id = $5
+	`, status, cvJson, derived, updatedAt, id)
+	if err != nil {
+		return fmt.Errorf("update claim resolution: %w", err)
+	}
+	return nil
+}
+
 // GetClaimByID fetches a single claim by its UUID.
 func (d *DB) GetClaimByID(id string) (*Claim, error) {
 	if d.mockMode {

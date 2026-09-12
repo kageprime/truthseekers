@@ -679,14 +679,11 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 				if rc.ClaimID == "" {
 					continue
 				}
-				if err := s.db.SaveClaim(&storage.Claim{
-					ID:                rc.ClaimID,
-					Text:              rc.Text,
-					Status:            rc.Status,
-					ConfidenceVector:  rc.ConfidenceVector,
-					DerivedConfidence: rc.DerivedConfidence,
-					UpdatedAt:         now,
-				}); err != nil {
+				// Assessment-only write: the resolver owns status/vector,
+				// never identity (text/signature/type). A full-row upsert
+				// with a blank type trips the CHECK constraint and drops
+				// every verdict silently — the unknowns bug.
+				if err := s.db.UpdateClaimResolution(rc.ClaimID, rc.Status, rc.ConfidenceVector, rc.DerivedConfidence, now); err != nil {
 					log.Printf("[epistemic] resolve claim %s: %v", rc.ClaimID, err)
 					continue
 				}
