@@ -17,10 +17,10 @@ export const MOCK_ARTICLE_SUMMARIES: ArticleSummary[] = [
   { slug: "deep-sea-hydrothermal-vents", title: "Deep-Sea Hydrothermal Vents", abstract: "Fissures on the seafloor that emit geothermally heated water, supporting unique ecosystems independent of sunlight.", metadata: { status: "published", version: 2, updated: "2026-04-12T08:30:00Z" }, categories: ["geology", "marine-biology", "science"] },
   { slug: "the-printing-press", title: "The Printing Press", abstract: "Johannes Gutenberg's invention of movable-type printing in the 15th century revolutionised the spread of knowledge across Europe.", metadata: { status: "published", version: 6, updated: "2026-03-22T13:20:00Z" }, categories: ["history", "technology", "inventions"] },
   { slug: "anatomy-of-the-brain", title: "Anatomy of the Human Brain", abstract: "The human brain is the central organ of the nervous system, comprising the cerebrum, cerebellum, and brainstem.", metadata: { status: "published", version: 3, updated: "2026-05-05T10:00:00Z" }, categories: ["biology", "neuroscience", "medicine"] },
+  { slug: "the-printing-press", title: "The Printing Press", abstract: "Movable-type printing remade memory itself: within fifty years of Gutenberg's Mainz experiments, Europe held more books than a millennium of scribes had copied.", metadata: { status: "published", version: 1, updated: "2026-09-12T08:00:00Z" }, categories: ["history", "technology", "design-showcase"] },
 ];
 
-function makeBlocks(articleSlug: string): Block[] {
-  return [
+function makeBlocks(articleSlug: string): Block[] {  return [
     { id: `${articleSlug}-h1`, type: "heading", data: { level: 1, text: "Introduction" } as any },
     { id: `${articleSlug}-intro`, type: "text", data: { content: "This article examines the historical significance, causes, and lasting impact of the event. Drawing on primary sources and recent scholarship, it presents a comprehensive overview suitable for both general readers and specialists." } as any },
     { id: `${articleSlug}-h2`, type: "heading", data: { level: 2, text: "Historical Background" } as any },
@@ -31,6 +31,89 @@ function makeBlocks(articleSlug: string): Block[] {
     { id: `${articleSlug}-h4`, type: "heading", data: { level: 2, text: "Legacy and Interpretation" } as any },
     { id: `${articleSlug}-legacy`, type: "text", data: { content: "The legacy of this subject continues to evolve as new evidence emerges and interpretive frameworks shift. Modern scholarship has moved beyond earlier nationalist or teleological narratives toward more nuanced accounts that foreground complexity, contingency, and the experiences of ordinary people." } as any },
     { id: `${articleSlug}-cit`, type: "citation", data: { url: "https://example.com/source-1", title: "Primary Source Analysis, Journal of Historical Studies", relevance: "high" } as any },
+  ];
+}
+
+// Design showcase — one of every renderable block, in magazine-flow order,
+// with honest copy (no lorem). View at /article/the-printing-press in mock
+// mode. Mermaid, years, and markers are all valid by construction.
+function makeShowcaseBlocks(): Block[] {
+  return [
+    { id: "sh-lede", type: "text", data: { content: "Around 1440, a goldsmith in Mainz combined the punch, the matrix, the mould, and the press into a single system. Within fifty years, more books had been printed than scribes had copied in the previous thousand. [claim:demo-press-1]" } as any },
+    { id: "sh-press-img", type: "image", data: { src: "https://picsum.photos/seed/press/1200/800", caption: "A reconstruction of a wooden common press, the machine at the center of it all." } as any },
+    { id: "sh-h1", type: "heading", data: { level: 2, text: "Origins in Mainz" } as any },
+    { id: "sh-origins", type: "text", data: { content: "Johannes Gutenberg was trained as a metalworker, and every part of his invention reads like a goldsmith's answer to the scribe's bottleneck. Letter punches were cut in steel, struck into copper matrices, and cast in their hundreds from a hand mould — identical, interchangeable, inexhaustible." } as any },
+    { id: "sh-quote", type: "pullquote", data: { text: "What gunpowder did for war, the printing press has done for the mind.", attribution: "Wendell Phillips" } as any },
+    { id: "sh-spread", type: "text", data: { content: "The idea traveled faster than any army. By 1470 presses ran in Venice, Paris, and Seville; by 1500 some twenty million volumes had been printed across Europe, an output the scriptoria could never have approached." } as any },
+    { id: "sh-diagram", type: "diagram", data: { code: "flowchart TD\n    A[Punchcutting] --> B[Matrix fitting]\n    B --> C[Typecasting]\n    C --> D[Composition]\n    D --> E[Impression]\n    E --> F[Binding]", caption: "From punch to bound book in six stages." } as any },
+    { id: "sh-h2", type: "heading", data: { level: 2, text: "An Unfolding Century" } as any },
+    {
+      id: "sh-timeline", type: "timeline", data: {
+        events: [
+          { year: 1440, event: "Experiments in Mainz", description: "Gutenberg begins work on movable type." },
+          { year: 1455, event: "Gutenberg Bible", description: "Some 180 copies printed, the West's first major book." },
+          { year: 1462, event: "Sack of Mainz", description: "Scattered printers carry the craft across Europe." },
+          { year: 1500, event: "Twenty million volumes", description: "European presses pass a threshold no scriptorium could match." },
+        ],
+      } as any,
+    },
+    { id: "sh-cities", type: "text", data: { content: "Mainz taught, Venice scaled, Paris refined. Each city bent the press to its own market — liturgy, law, humanist classics, news-sheets — and each left its imprint on the letterforms we still read." } as any },
+    {
+      id: "sh-map", type: "map_2d", data: {
+        markers: [
+          { lat: 50.0, lng: 8.27, title: "Mainz", type: "site" },
+          { lat: 45.44, lng: 12.33, title: "Venice", type: "site" },
+          { lat: 48.85, lng: 2.35, title: "Paris", type: "site" },
+        ],
+        centerLat: 48.5, centerLng: 10, zoom: 4,
+      } as any,
+    },
+    { id: "sh-output", type: "text", data: { content: "The numbers tell the story more bluntly than any narrative. Output doubled and doubled again while prices fell far enough for students, clergy, and merchants to own books for the first time." } as any },
+    {
+      id: "sh-table", type: "table", data: {
+        caption: "Estimated European book output by decade",
+        headers: ["Decade", "Titles", "Copies"],
+        rows: [["1450s", "300", "500,000"], ["1470s", "3,000", "4,000,000"], ["1490s", "10,000", "20,000,000"]],
+        source: "Illustrative estimates",
+      } as any,
+    },
+    { id: "sh-h3", type: "heading", data: { level: 2, text: "How It Worked" } as any },
+    { id: "sh-steps", type: "list", data: { style: "ordered", items: ["Cut the punch in hardened steel.", "Strike the matrix in copper.", "Cast sorts by the hundred in the hand mould.", "Compose the forme and lock it up.", "Pull the impression, hang the sheets."] } as any },
+    {
+      id: "sh-gallery", type: "gallery", data: {
+        caption: "The crafts behind the machine",
+        images: [
+          { src: "https://picsum.photos/seed/type/800/600" },
+          { src: "https://picsum.photos/seed/paper/800/600" },
+          { src: "https://picsum.photos/seed/binding/800/600" },
+        ],
+      } as any,
+    },
+    { id: "sh-scene", type: "text", data: { content: "Walk the reconstructed workshop and the logic becomes physical: type cases within arm's reach, the press at the center, drying racks overhead. Every step minimized handling, because handling was cost." } as any },
+    {
+      id: "sh-map3d", type: "map_3d", data: {
+        id: "mainz-workshop", title: "Mainz workshop", centerLat: 50.0, centerLng: 8.27, zoom: 14,
+        terrain: { type: "flat" },
+        buildings: [{ id: "b1", lat: 50.0, lng: 8.27, width: 12, depth: 10, height: 8, color: "#a67c2f", label: "Workshop", type: "house" }],
+        annotations: [{ lat: 50.001, lng: 8.271, label: "Press room", description: "Two presses, one drying loft." }],
+      } as any,
+    },
+    { id: "sh-film", type: "video", data: { src: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4", caption: "Sample footage standing in for press-room film." } as any },
+    {
+      id: "sh-colophon", type: "section", data: {
+        title: "Colophon",
+        blocks: [
+          { id: "sh-col-t", type: "text", data: { content: "This showcase exercises every block the pipeline can emit, so the design can be judged against the richest real output." } },
+          { id: "sh-col-l", type: "list", data: { items: ["Prose, quotes, and lists", "Figures, maps, and diagrams", "Evidence and cross-references"] } },
+        ],
+      } as any,
+    },
+    { id: "sh-cit1", type: "citation", data: { url: "https://www.gutenberg.org", title: "Project Gutenberg — early printing history", relevance: "Primary texts and background" } as any },
+    { id: "sh-cit2", type: "citation", data: { url: "https://en.wikipedia.org/wiki/Printing_press", title: "Printing press — overview and references", relevance: "General reference" } as any },
+    { id: "sh-x1", type: "crossref", data: { slug: "fall-of-constantinople", title: "The Fall of Constantinople", relationship: "same century" } as any },
+    { id: "sh-x2", type: "crossref", data: { slug: "origins-of-jazz", title: "The Origins of Jazz", relationship: "craft traditions" } as any },
+    { id: "sh-div", type: "divider", data: {} as any },
+    { id: "sh-tool", type: "tool_call", data: { name: "verify_citation", result: "supported (0.91) — Gutenberg Bible, 1455" } as any },
   ];
 }
 
@@ -103,6 +186,32 @@ export const MOCK_ARTICLES: Record<string, Article> = {
     crossrefs: [{ id: "louis-armstrong", title: "Louis Armstrong", relationship: "related" }],
     citations: [{ url: "https://www.example.com/source4", title: "The Birth of Jazz", accessed: "2026-06-01" }],
     blocks: makeBlocks("origins-of-jazz"),
+  },
+  "the-printing-press": {
+    slug: "the-printing-press",
+    title: "The Printing Press",
+    abstract: "Movable-type printing remade memory itself: within fifty years of Gutenberg's Mainz experiments, Europe held more books than a millennium of scribes had copied.",
+    metadata: { version: 1, created: "2026-09-12T08:00:00Z", updated: "2026-09-12T08:00:00Z", status: "published", generatedBy: "showcase" },
+    categories: ["history", "technology", "design-showcase"],
+    sections: [
+      { id: "s1", title: "Origins in Mainz", content: "Johannes Gutenberg combined punch, matrix, mould, and press into a single system around 1440.", media: [] },
+      { id: "s2", title: "An Unfolding Century", content: "By 1500 some twenty million volumes had been printed across Europe.", media: [] },
+      { id: "s3", title: "How It Worked", content: "Punchcutting, matrix fitting, typecasting, composition, impression, binding.", media: [] },
+    ],
+    timeline: [
+      { id: "t1", year: 1440, event: "Experiments in Mainz", description: "Gutenberg begins work on movable type." },
+      { id: "t2", year: 1455, event: "Gutenberg Bible", description: "Some 180 copies printed, the West's first major book." },
+      { id: "t3", year: 1500, event: "Twenty million volumes", description: "European presses pass a threshold no scriptorium could match." },
+    ],
+    crossrefs: [
+      { id: "fall-of-constantinople", title: "The Fall of Constantinople", relationship: "same century" },
+      { id: "origins-of-jazz", title: "The Origins of Jazz", relationship: "craft traditions" },
+    ],
+    citations: [
+      { url: "https://www.gutenberg.org", title: "Project Gutenberg — early printing history", accessed: "2026-09-12" },
+      { url: "https://en.wikipedia.org/wiki/Printing_press", title: "Printing press — overview and references", accessed: "2026-09-12" },
+    ],
+    blocks: makeShowcaseBlocks(),
   },
 };
 

@@ -472,6 +472,12 @@ body::before {
 }
 .mag-zoom { cursor: pointer; }
 .mag-grip:active { cursor: grabbing; }
+.mag-grip:focus-visible,
+.mag-zoom:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+  opacity: 1;
+}
 .mag-dragging { opacity: 0.55; outline: 2px dashed var(--gold); outline-offset: 4px; }
 /* Drop anchors — invisible until a drag is in flight. */
 .mag-anchor { height: 0; }
@@ -495,6 +501,17 @@ body::before {
     shape-outside: none;
   }
   .mag-grip { display: none; }
+}
+/* Motion-sensitive readers get the content without the choreography. */
+@media (prefers-reduced-motion: reduce) {
+  .stagger-children > *,
+  .reveal-blur {
+    animation: none;
+    transition: none;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
 }
 .reading-column .block-renderer {
   font-size: 1.08rem;

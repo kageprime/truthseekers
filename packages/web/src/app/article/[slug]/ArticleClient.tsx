@@ -295,11 +295,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
   return (
     <PageLayout maxWidthClass="max-w-none">
-      <div
-        className="bezel bezel-elevated"
-        style={{ width: "100%" }}
-      >
-        <div className="bezel-inner">
+      {/* No card frame — the page itself is the surface. */}
+      <div className="w-full">
       <article className="px-3 sm:px-5 py-6 sm:py-8 w-full animate-appear-up">
         {/* Back link — gold badge with hover arrow */}
         <button
@@ -503,7 +500,6 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
         <ArticleGapsPanel slug={slug} />
       </article>
-        </div>
       </div>
     </PageLayout>
   );
