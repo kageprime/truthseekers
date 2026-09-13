@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/kageprime/veritas/go-orchestrator/internal/agent"
+	"github.com/kageprime/veritas/go-orchestrator/internal/coordinator"
 	"github.com/kageprime/veritas/go-orchestrator/internal/credstore"
 	"github.com/kageprime/veritas/go-orchestrator/internal/executor"
 	"github.com/kageprime/veritas/go-orchestrator/internal/iam"
@@ -964,6 +965,11 @@ func (s *Server) setupRoutes() {
 	s.mux.Handle("/seed/run", seedAdmin(http.HandlerFunc(s.handleSeedRun)))
 	s.mux.Handle("/seed/pause", seedAdmin(http.HandlerFunc(s.handleSeedPause)))
 
+	// Site coordinator ops (admin): status, manual run-now.
+	coordAdmin := chain(apiLimiter.middleware, s.requireRole("admin", "admin", "coordinator", "admin.settings.write"))
+	s.mux.Handle("/coordinator/status", coordAdmin(http.HandlerFunc(s.handleCoordinatorStatus)))
+	s.mux.Handle("/coordinator/run", coordAdmin(http.HandlerFunc(s.handleCoordinatorRun)))
+
 	// Webhook - HMAC verified in handler, no auth middleware
 	s.mux.Handle("/webhook/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleWebhook)))
 
@@ -980,6 +986,11 @@ func (s *Server) setupRoutes() {
 	// identically locally and on Heroku.
 	triggers.StartScheduler([]manifest.TriggerSpec{
 		{Name: "seed-trickle", Schedule: seedTrickleCron, Action: "seed_trickle"},
+	}, s.triggerAction)
+
+	// Site coordinator: daily featured picks + stalest refresh (05:00 UTC).
+	triggers.StartScheduler([]manifest.TriggerSpec{
+		{Name: "site-coordinator", Schedule: coordinator.Schedule, Action: "coordinator"},
 	}, s.triggerAction)
 
 	// Articles dynamic routes — GET reads are public (an encyclopedia must be
@@ -1180,6 +1191,9 @@ func (s *Server) triggerAction(action string, params map[string]string) {
 		s.refreshStaleArticles()
 	case "seed_trickle":
 		s.runSeedTrickle()
+	case "coordinator":
+		res := s.runCoordinatorOnce(false)
+		log.Printf("[coordinator] tick featured=%d stale=%s reason=%s", len(res.Featured), res.StaleQueued, res.Reason)
 	default:
 		log.Printf("[triggers] unknown action: %s", action)
 	}

@@ -230,6 +230,26 @@ export function useSeedPause() {
   );
 }
 
+// ── Site Coordinator (admin ops) ──
+
+export function useCoordinatorStatus(pollMs: number | false = false) {
+  return useApiQuery(["coordinator", "status"], () => api.fetchCoordinatorStatus(), { refetchInterval: pollMs });
+}
+
+export function useCoordinatorRun() {
+  const queryClient = useQueryClient();
+  return useApiMutation(
+    (force: boolean) => api.runCoordinatorNow(force),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["coordinator", "status"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "featured"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "settings"] });
+      },
+    },
+  );
+}
+
 // ── Epistemic: Contested / Gaps / Stale / Freshness / Refresh-diff ──
 
 export function useContestedClaims(limit = 50) {

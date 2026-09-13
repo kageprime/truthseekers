@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import PageLayout from "../components/PageLayout";
-import { useAuth, useAdminSettings, useArticleSearch, useModels, useConnectors, useUpdateCredential, useUsageStats, useSeedStatus, useSeedRun, useSeedPause } from "../hooks";
+import { useAuth, useAdminSettings, useArticleSearch, useModels, useConnectors, useUpdateCredential, useUsageStats, useSeedStatus, useSeedRun, useSeedPause, useCoordinatorStatus, useCoordinatorRun } from "../hooks";
 import { IconBook, IconX, IconSearch, IconCheck, IconKey, IconCpu, IconActivity, IconLightning } from "../components/Icons";
 
 function SeedPanel() {
@@ -80,6 +80,81 @@ function SeedPanel() {
           ) : (
             <div className="text-xs" style={{ color: "var(--green)" }}>Bench complete — trickle idles{seed.auto_gaps ? " (gap phase active)" : ""}.</div>
           )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function CoordinatorPanel() {
+  const { data: coord } = useCoordinatorStatus(10000);
+  const { mutate: runNow, loading: running } = useCoordinatorRun();
+  const [force, setForce] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function handleRun() {
+    setMsg("");
+    const res = await runNow(force);
+    if (!res) { setMsg("Run failed"); return; }
+    const parts = [];
+    if (res.featured?.length) parts.push(`featured: ${res.featured.join(", ")}`);
+    if (res.stale_queued) parts.push(`queued stale: ${res.stale_queued}`);
+    if (res.reason) parts.push(res.reason);
+    setMsg(parts.join(" · ") || "Done");
+  }
+
+  const last = coord?.last_run ?? null;
+  return (
+    <section className="plate p-6 space-y-4">
+      <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: "var(--ink)" }}>
+        <IconBook size={18} /> Site Coordinator
+      </h2>
+      {!coord ? (
+        <div className="text-sm" style={{ color: "var(--subtle)" }}>Loading…</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
+              <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>{coord.today.count}/{coord.today.limit}</div>
+              <div className="text-xs" style={{ color: "var(--subtle)" }}>Refreshes today ({coord.today.date})</div>
+            </div>
+            <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
+              <div className="text-lg font-bold" style={{ color: coord.paused ? "var(--oxblood)" : "var(--green)" }}>{coord.paused ? "Paused" : "Live"}</div>
+              <div className="text-xs" style={{ color: "var(--subtle)" }}>Next tick {new Date(coord.next_tick).toLocaleString()}</div>
+            </div>
+            <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
+              <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>{last?.featured?.length ?? 0}</div>
+              <div className="text-xs" style={{ color: "var(--subtle)" }}>Featured picks (last run)</div>
+            </div>
+          </div>
+          {last && (
+            <div className="text-xs space-y-1" style={{ color: "var(--subtle)" }}>
+              <div>Last run {new Date(last.at).toLocaleString()}{last.stale_queued ? ` · queued stale: ${last.stale_queued}` : ""}</div>
+              {last.featured?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {last.featured.map((slug: string) => (
+                    <span key={slug} className="text-xs px-2 py-0.5 rounded" style={{ background: "var(--surface)", border: "1px solid var(--border-light)", color: "var(--subtle)" }}>
+                      {slug}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {last.reason && <div>{last.reason}</div>}
+            </div>
+          )}
+          <div className="flex items-center gap-3 flex-wrap">
+            <button onClick={handleRun} disabled={running} className="btn btn-primary btn-sm">
+              {running ? "Coordinating…" : "Run now"}
+            </button>
+            <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--subtle)" }}>
+              <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
+              Override pause + ceiling
+            </label>
+          </div>
+          {msg && <div className="text-xs" style={{ color: "var(--subtle)" }}>{msg}</div>}
+          <p className="text-xs" style={{ color: "var(--subtle)" }}>
+            Daily at {coord.schedule} UTC: scores published articles (freshness · views · claim depth · recency), writes the top 3 to featured, and queues the stalest article for refresh. Pause is shared with Seed Trickle.
+          </p>
         </>
       )}
     </section>
@@ -181,6 +256,9 @@ export default function AdminPage() {
 
         {/* ── Seed Trickle (auto-generation ops) ── */}
         <SeedPanel />
+
+        {/* ── Site Coordinator (featured + stale refresh) ── */}
+        <CoordinatorPanel />
 
         {/* ── Featured Articles ── */}
         <section className="plate p-6 space-y-5">

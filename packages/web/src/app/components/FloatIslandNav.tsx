@@ -407,66 +407,6 @@ function TopHeader({ pathname }: { pathname: string }) {
   );
 }
 
-// ─── Bottom dock (mobile) ───────────────────────────────────────
-
-function DockLink({ href, isActive, icon: Icon, label }: {
-  href: string;
-  isActive: boolean;
-  icon: React.ComponentType<{ size: number }>;
-  label: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="relative flex items-center justify-center no-underline"
-      style={{
-        width: "2.5rem",
-        height: "2.5rem",
-        borderRadius: "0.625rem",
-        color: isActive ? "var(--surface)" : "var(--muted)",
-        background: isActive ? "var(--accent)" : "transparent",
-      }}
-      title={label}
-    >
-      <Icon size={18} />
-    </Link>
-  );
-}
-
-function BottomDock({ pathname }: { pathname: string }) {
-  const { resolved, toggle } = useTheme();
-
-  return (
-    <div className="flex flex-row items-center gap-1 px-2.5 py-1.5" style={{
-      borderRadius: "1rem",
-      background: "var(--surface-glass)",
-      backdropFilter: "blur(24px) saturate(1.4)",
-      border: "1px solid rgba(255,255,255,0.06)",
-      boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
-    }}>
-      <a href="/" className="block"><img src="/logo-icon.png" alt="Truthseekers" height={24} style={{ height: 24, width: "auto", objectFit: "contain", padding: "0.125rem" }} /></a>
-
-      <div className="w-px h-4 mx-0.5 shrink-0" style={{ background: "var(--glass-border)" }} />
-
-      <div className="flex flex-row items-center gap-0">
-        {NAV_LINKS.map((link) => (
-          <DockLink key={link.href} href={link.href} isActive={pathname.startsWith(link.href)} icon={link.icon} label={link.label} />
-        ))}
-      </div>
-
-      <div className="w-px h-4 mx-0.5 shrink-0" style={{ background: "var(--glass-border)" }} />
-
-      <button onClick={toggle} className="p-1 rounded-full text-muted hover:text-ink hover:bg-accent-bg/30 transition-all duration-200 cursor-pointer">
-        {resolved === "dark" ? (
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /></svg>
-        ) : (
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
-        )}
-      </button>
-    </div>
-  );
-}
-
 // ─── Mobile header (non-chat pages) ────────────────────────────
 
 function MobileHeader({ pathname }: { pathname: string }) {

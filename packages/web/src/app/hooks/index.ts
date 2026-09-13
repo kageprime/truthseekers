@@ -15,6 +15,7 @@ export {
   useUpvoteGap, useSubmitGapEvidence,
   useQueue, useCancelQueueJob, useResolveArticle, useCheckArticleStatus,
   useContestArticle, useSeedStatus, useSeedRun, useSeedPause,
+  useCoordinatorStatus, useCoordinatorRun,
   useFetchMe,
   useHealth, useLoginEmail, useVerifyOTP, useRegisterPassword, useLoginPassword, useSignup, useActivateSignup, useOnboard,
   useStripeCheckout, useStripePortal, usePaystackInit, usePaystackVerify,

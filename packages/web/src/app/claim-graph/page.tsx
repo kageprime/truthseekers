@@ -7,7 +7,7 @@ import { useGlobalClaimGraph } from "../hooks";
 import ClaimGraphViewer from "../components/ClaimGraphViewer";
 import ClaimGenealogyPanel from "../components/ClaimGenealogyPanel";
 import EyebrowTag from "../components/EyebrowTag";
-import RetroWindow from "../components/retro/RetroWindow";
+import RetroShell from "../components/retro/RetroShell";
 import ClaimAtlasMap from "../components/retro/ClaimAtlasMap";
 import ClaimExplorer from "../components/retro/ClaimExplorer";
 import RetroInspector from "../components/retro/RetroInspector";
@@ -65,60 +65,54 @@ export default function GlobalClaimGraphPage() {
   const retroNode = data?.nodes.find((n) => n.id === retroSel) ?? data?.nodes.find((n) => n.id === retroCentral) ?? null;
   if (IS_RETRO) {
     const scopeLabel = focusId ? "claim focus" : territory ? "territory" : "everything";
+    // ponytail: same Contents shell as articles/contested/gaps/stale — atlas controls fold into a toolbar, not a second sidebar.
     return (
-      <RetroWindow title="TruthSeekers — Claim Map" path="/claim-graph" nav status={`TruthSeekers • ${subgraph.nodes.length} nodes • ${subgraph.edges.length} edges • ${scopeLabel}`}>
-        <div className="r-side w-full lg:w-[270px] shrink-0 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68] p-2 space-y-2 overflow-auto">
-          <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1">Atlas Controls</div>
-          <div>
-            <div className="text-[10px] font-bold mb-1">View</div>
+      <RetroShell wide>
+        <div className="border-b-[3px] border-[#0a2a5e] pb-3 mb-4">
+          <div className="text-[10px] text-[#0a2a5e] font-bold tracking-widest uppercase">Claim Map • Territories by article • {scopeLabel}</div>
+          <h1 className="r-h1" style={{ fontSize: 26 }}>{view === "map" ? "Global Claim Map" : "Global Claim Graph"}</h1>
+        </div>
+        <div className="bg-[#e8e0c5] border-[2px] border-[#8a7f68] p-2 mb-4 space-y-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="text-[10px] font-bold">View</span>
             <div className="flex flex-wrap gap-1">{([["map", "Map"], ["graph", "Graph"]] as const).map(([v, label]) => <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className="px-2 py-[2px] text-[11px] border-[2px] bg-[#d4d0c8] text-black" style={{ borderStyle: view === v ? "inset" : "outset" }}>{label}</button>)}</div>
+            <span className="text-[10px] font-bold ml-2">Claims</span>
+            <div className="flex flex-wrap gap-1">{[50, 100, 150, 300].map((n) => <button key={n} onClick={() => setLimit(n)} className="px-2 py-[2px] text-[11px] border-[2px] bg-[#d4d0c8] text-black" style={{ borderStyle: limit === n ? "inset" : "outset" }}>{n}</button>)}</div>
+            <span className="text-[10px] font-bold ml-2">Min contradiction</span>
+            <div className="flex flex-wrap gap-1">{[0, 0.2, 0.4, 0.6].map((v) => <button key={v} onClick={() => setMinContradiction(v)} className="px-2 py-[2px] text-[11px] border-[2px] bg-[#d4d0c8] text-black" style={{ borderStyle: minContradiction === v ? "inset" : "outset" }}>{v.toFixed(1)}</button>)}</div>
           </div>
           {(territory || focusId) && (
-            <div className="bg-[#ffffe1] border border-black p-1.5 text-[10px] leading-[1.4]">
-              <div className="font-bold">Scoped: {focusId ? "1 claim + neighbors" : territory}</div>
-              <div className="flex gap-1 mt-1">
-                {focusId && <button onClick={() => setFocusId(null)} className="r-btn px-1.5 py-0">Widen</button>}
-                <button onClick={() => { setTerritory(null); setFocusId(null); }} className="r-btn px-1.5 py-0">Clear</button>
-              </div>
+            <div className="bg-[#ffffe1] border border-black p-1.5 text-[10px] leading-[1.4] flex flex-wrap items-center gap-2">
+              <span className="font-bold">Scoped: {focusId ? "1 claim + neighbors" : territory}</span>
+              {focusId && <button onClick={() => setFocusId(null)} className="r-btn px-1.5 py-0">Widen</button>}
+              <button onClick={() => { setTerritory(null); setFocusId(null); }} className="r-btn px-1.5 py-0">Clear</button>
             </div>
           )}
           {view === "graph" && retroSel && (
-            <div>
-              <button onClick={() => setFocusId(retroSel)} className="r-btn px-2 py-1 text-[11px] w-full" disabled={focusId === retroSel}>
-                Focus graph on selected claim
-              </button>
-            </div>
+            <button onClick={() => setFocusId(retroSel)} className="r-btn px-2 py-1 text-[11px]" disabled={focusId === retroSel}>
+              Focus graph on selected claim
+            </button>
           )}
-          <div>
-            <div className="text-[10px] font-bold mb-1">Claims</div>
-            <div className="flex flex-wrap gap-1">{[50, 100, 150, 300].map((n) => <button key={n} onClick={() => setLimit(n)} className="px-2 py-[2px] text-[11px] border-[2px] bg-[#d4d0c8] text-black" style={{ borderStyle: limit === n ? "inset" : "outset" }}>{n}</button>)}</div>
-          </div>
-          <div>
-            <div className="text-[10px] font-bold mb-1">Min contradiction</div>
-            <div className="flex flex-wrap gap-1">{[0, 0.2, 0.4, 0.6].map((v) => <button key={v} onClick={() => setMinContradiction(v)} className="px-2 py-[2px] text-[11px] border-[2px] bg-[#d4d0c8] text-black" style={{ borderStyle: minContradiction === v ? "inset" : "outset" }}>{v.toFixed(1)}</button>)}</div>
-          </div>
-          {data && <div className="text-[10px] text-[#555] tabular-nums">{data.claim_count} claims • {data.nodes.length - data.claim_count} evidence</div>}
-          <div className="text-[10px] underline"><Link href="/contested">Contested</Link> • <Link href="/gaps">Open questions</Link> • <Link href="/stale">Stale</Link></div>
-        </div>
-        <div className="flex-1 min-w-0 bg-[#efe9d5] p-2 overflow-auto">
-          <div className="bg-white p-4 max-w-[1100px] mx-auto" style={{ borderStyle: "inset", borderWidth: 3, borderColor: "#8a7f68 #fff8e0 #fff8e0 #8a7f68" }}>
-            <div className="text-[10px] tracking-widest uppercase text-[#0a2a5e] font-bold">{view === "map" ? "Claim Map • Territories by article" : `Claim Graph • ${scopeLabel}`}</div>
-            <h1 className="r-h1" style={{ fontSize: 26 }}>{view === "map" ? "Global Claim Map" : "Global Claim Graph"}</h1>
-            {loading && <div className="text-[11px] py-8 text-center">Surveying claims…</div>}
-            {!loading && data && data.nodes.length > 0 && view === "map" && <div className="mt-2"><ClaimAtlasMap nodes={data.nodes} edges={data.edges} selectedId={retroSel ?? retroCentral} onSelect={setRetroSel} onOpenGraph={(slug) => openGraph(slug)} /></div>}
-            {!loading && data && data.nodes.length > 0 && view === "graph" && (
-              subgraph.nodes.length > 0
-                ? <div className="mt-2"><ClaimExplorer nodes={subgraph.nodes} edges={subgraph.edges} selectedId={retroSel} onSelect={setRetroSel} hideInspector /></div>
-                : <div className="text-[11px] py-8 text-center border-[2px] bg-[#ffffe1] mt-2" style={{ borderStyle: "outset" }}>No edges in this scope — claims stand alone here. <button className="underline" onClick={() => { setTerritory(null); setFocusId(null); }}>Clear scope</button></div>
-            )}
-            {!loading && data && data.nodes.length === 0 && <div className="text-[11px] py-8 text-center">No claims yet — generate articles to seed the map.</div>}
+          <div className="flex flex-wrap items-center gap-2 text-[10px] text-[#555]">
+            {data && <span className="tabular-nums">{data.claim_count} claims • {data.nodes.length - data.claim_count} evidence • {subgraph.nodes.length} in scope</span>}
+            <span className="ml-auto underline"><Link href="/contested">Contested</Link> • <Link href="/gaps">Open questions</Link> • <Link href="/stale">Stale</Link></span>
           </div>
         </div>
-        <div className="r-side w-full lg:w-[340px] shrink-0 bg-[#e8e0c5] border-l-[2px] border-[#8a7f68] p-2 overflow-auto">
-          <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 mb-2">Inspector</div>
-          {data && <RetroInspector node={retroNode} nodes={data.nodes} edges={data.edges} centralId={retroCentral} />}
-        </div>
-      </RetroWindow>
+        {loading && <div className="text-[11px] py-8 text-center">Surveying claims…</div>}
+        {!loading && data && data.nodes.length > 0 && view === "map" && <div className="mt-2"><ClaimAtlasMap nodes={data.nodes} edges={data.edges} selectedId={retroSel ?? retroCentral} onSelect={setRetroSel} onOpenGraph={(slug) => openGraph(slug)} /></div>}
+        {!loading && data && data.nodes.length > 0 && view === "graph" && (
+          subgraph.nodes.length > 0
+            ? <div className="mt-2"><ClaimExplorer nodes={subgraph.nodes} edges={subgraph.edges} selectedId={retroSel} onSelect={setRetroSel} hideInspector /></div>
+            : <div className="text-[11px] py-8 text-center border-[2px] bg-[#ffffe1] mt-2" style={{ borderStyle: "outset" }}>No edges in this scope — claims stand alone here. <button className="underline" onClick={() => { setTerritory(null); setFocusId(null); }}>Clear scope</button></div>
+        )}
+        {!loading && data && data.nodes.length === 0 && <div className="text-[11px] py-8 text-center">No claims yet — generate articles to seed the map.</div>}
+        {data && (
+          <div className="mt-4 bg-[#e8e0c5] border-[2px] border-[#8a7f68] p-2">
+            <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 mb-2">Inspector</div>
+            <RetroInspector node={retroNode} nodes={data.nodes} edges={data.edges} centralId={retroCentral} />
+          </div>
+        )}
+      </RetroShell>
     );
   }
 

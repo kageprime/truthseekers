@@ -717,6 +717,36 @@ export async function setSeedPaused(paused: boolean): Promise<boolean> {
   return res.ok;
 }
 
+// ── Site Coordinator (admin ops) ───────────────────────────────
+
+export interface CoordinatorRun {
+  at: string;
+  featured: string[];
+  stale_queued: string;
+  reason: string;
+}
+
+export interface CoordinatorStatus {
+  paused: boolean;
+  schedule: string;
+  next_tick: string;
+  today: { date: string; count: number; limit: number };
+  last_run: CoordinatorRun | null;
+}
+
+export async function fetchCoordinatorStatus(): Promise<CoordinatorStatus | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/coordinator/status`, { cache: "no-store", headers: { ...authHeaders() }, credentials: "include" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function runCoordinatorNow(force = false): Promise<CoordinatorRun | null> {
+  if (MOCK) return null;
+  const res = await authed(`/coordinator/run${force ? "?force=1" : ""}`, { method: "POST" });
+  return res.json().catch(() => null);
+}
+
 // ── Article Resolve (paused review flow) ───────────────────────
 
 export async function resolveArticle(slug: string, action: "approve" | "correct"): Promise<boolean> {
