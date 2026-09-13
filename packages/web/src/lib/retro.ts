@@ -30,6 +30,30 @@ export function contradictionOf(n: { contradiction_level?: number; confidence_ve
   return typeof v === "number" ? v : 0;
 }
 
+// ponytail: map → graph derivation — same payload, three scopes. Pure, no fetch.
+export function toSubgraph(
+  nodes: Array<{ id: string; type?: string; article_slug?: string }>,
+  edges: Array<{ source: string; target: string }>,
+  scope: { territory?: string | null; focusId?: string | null }
+): { nodes: typeof nodes; edges: typeof edges } {
+  const { territory = null, focusId = null } = scope;
+  let claims = nodes.filter((n) => n.type !== "evidence");
+  if (territory) claims = claims.filter((c) => (c.article_slug ?? "unfiled") === territory);
+  let keep = new Set(claims.map((c) => c.id));
+  if (focusId && keep.has(focusId)) {
+    const hop = new Set<string>([focusId]);
+    for (const e of edges) {
+      if (e.source === focusId && keep.has(e.target)) hop.add(e.target);
+      if (e.target === focusId) hop.add(e.source);
+    }
+    keep = hop;
+  }
+  for (const e of edges) if (keep.has(e.target) && !keep.has(e.source)) keep.add(e.source);
+  const out = nodes.filter((n) => keep.has(n.id));
+  const ids = new Set(out.map((n) => n.id));
+  return { nodes: out, edges: edges.filter((e) => ids.has(e.source) && ids.has(e.target)) };
+}
+
 // Generalized: live ClaimGraphNode/Edge + optional claim text map -> Spinosaurus-shaped nodes.
 export function toAtlas(
   nodes: Array<{ id: string; label?: string; status?: string; confidence?: number; type?: string }>,

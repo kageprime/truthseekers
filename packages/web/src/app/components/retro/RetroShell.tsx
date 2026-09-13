@@ -1,41 +1,54 @@
 "use client";
 import Link from "next/link";
+import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import RetroWindow from "./RetroWindow";
-import { IconBack, IconBook, IconChat, IconClock, IconGear, IconGraph, IconMap, IconPencil, IconQuestion, IconScale, IconTag, IconWrench } from "./icons";
+import { NAV_GROUPS, RETRO_ROUTES } from "@/lib/routes";
+import { IconBack, IconBook, IconChat, IconClock, IconGear, IconGraph, IconHome, IconList, IconMap, IconPencil, IconQuestion, IconScale, IconTag, IconWrench } from "./icons";
 
-// ponytail: global retro shell — one nav tree for every non-article page. No per-page rewrites.
-const NAV = [
-  { href: "/articles", label: "Articles", Icon: IconBook },
-  { href: "/claim-graph", label: "Claim Graph", Icon: IconGraph },
-  { href: "/contested", label: "Contested", Icon: IconScale },
-  { href: "/gaps", label: "Open Questions", Icon: IconQuestion },
-  { href: "/stale", label: "Stale Watch", Icon: IconClock },
-  { href: "/maps", label: "Maps", Icon: IconMap },
-  { href: "/chat/new", label: "Chat", Icon: IconChat },
-  { href: "/pricing", label: "Pricing", Icon: IconTag },
-  { href: "/admin", label: "Admin", Icon: IconWrench },
-  { href: "/settings", label: "Settings", Icon: IconGear },
-];
+// ponytail: global retro shell — grouped registry nav for every non-article page. No per-page rewrites.
+const ICONS: Record<string, (p: { size?: number }) => React.ReactNode> = {
+  home: IconHome, book: IconBook, graph: IconGraph, scale: IconScale, question: IconQuestion,
+  clock: IconClock, map: IconMap, chat: IconChat, tag: IconTag, wrench: IconWrench,
+  gear: IconGear, pencil: IconPencil, list: IconList,
+};
 
 export default function RetroShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  // ponytail: collapsed on small screens — the tree no longer shoves content down.
+  const [treeOpen, setTreeOpen] = useState(false);
   return (
-    <RetroWindow title={`TruthSeekers — ${pathname}`} status="TruthSeekers • Ready">
+    <RetroWindow title={`TruthSeekers — ${pathname}`} path={pathname} status="TruthSeekers • Ready">
       <div className="r-side w-full lg:w-[270px] shrink-0 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68] flex flex-col">
-        <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 flex items-center justify-between"><span>Contents</span><span className="bg-[#c9a227] text-black px-1 text-[9px] border border-black">TREE</span></div>
-        <nav className="p-2 space-y-0.5 overflow-auto" aria-label="Site contents">
-          {NAV.map(({ href, label, Icon }) => {
-            const active = pathname === href || pathname.startsWith(href + "/");
-            return (
-              <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`w-full text-left px-1.5 py-1 text-[12px] flex items-center gap-1.5 border no-underline ${active ? "bg-[#0a2a5e] text-white border-[#0a2a5e]" : "bg-transparent border-transparent hover:bg-[#d6cfae] text-black"}`}>
-                <span className="inline-flex shrink-0" aria-hidden><Icon size={14} /></span><span className="flex-1 leading-[1.25]">{label}</span>
-              </Link>
-            );
-          })}
+        <button
+          className="lg:hidden bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 flex items-center justify-between w-full"
+          onClick={() => setTreeOpen((o) => !o)}
+          aria-expanded={treeOpen}
+          aria-controls="retro-contents"
+        >
+          <span>Contents</span><span aria-hidden>{treeOpen ? "▾" : "▸"}</span>
+        </button>
+        <div className="hidden lg:flex bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 items-center justify-between"><span>Contents</span><span className="bg-[#c9a227] text-black px-1 text-[9px] border border-black">TREE</span></div>
+        <nav id="retro-contents" className={`${treeOpen ? "block" : "hidden"} lg:block p-2 space-y-2 overflow-auto`} aria-label="Site contents">
+          {NAV_GROUPS.map((g) => (
+            <div key={g}>
+              <div className="text-[9px] font-bold tracking-widest uppercase px-1.5 pb-0.5" style={{ color: "#8a7f68" }}>{g}</div>
+              <div className="space-y-0.5">
+                {RETRO_ROUTES.filter((r) => r.group === g && !r.hideInNav).map(({ href, label, icon }) => {
+                  const active = pathname === href || pathname.startsWith(href + "/");
+                  const Icon = ICONS[icon] ?? IconBook;
+                  return (
+                    <Link key={href} href={href} aria-current={active ? "page" : undefined} onClick={() => setTreeOpen(false)} className={`w-full text-left px-1.5 py-1 text-[12px] flex items-center gap-1.5 border no-underline ${active ? "bg-[#0a2a5e] text-white border-[#0a2a5e]" : "bg-transparent border-transparent hover:bg-[#d6cfae] text-black"}`} style={active ? { color: "#fff" } : undefined}>
+                      <span className="inline-flex shrink-0" aria-hidden><Icon size={14} /></span><span className="flex-1 leading-[1.25]">{label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
-        <div className="mt-2 mx-2 border-[2px] bg-[#ffffe1] p-2" style={{ borderStyle: "outset", borderWidth: 2 }}>
+        <div className="mt-2 mx-2 border-[2px] bg-[#ffffe1] p-2 hidden lg:block" style={{ borderStyle: "outset", borderWidth: 2 }}>
           <div className="text-[10px] font-bold bg-[#c9a227] text-black px-1 inline-block border border-black mb-1">WORD OF THE DAY</div>
           <div className="text-[12px] font-bold" style={{ fontFamily: "Georgia" }}>pis·ci·vore</div>
           <div className="text-[10px] leading-[1.3] mt-0.5"><i>n.</i> Fish-eater.</div>

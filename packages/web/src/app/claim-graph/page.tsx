@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useGlobalClaimGraph } from "../hooks";
@@ -9,9 +9,10 @@ import ClaimGenealogyPanel from "../components/ClaimGenealogyPanel";
 import EyebrowTag from "../components/EyebrowTag";
 import RetroWindow from "../components/retro/RetroWindow";
 import ClaimAtlasMap from "../components/retro/ClaimAtlasMap";
+import ClaimExplorer from "../components/retro/ClaimExplorer";
 import RetroInspector from "../components/retro/RetroInspector";
 import { IS_RETRO } from "@/lib/retro";
-import { contradictionOf } from "@/lib/retro";
+import { contradictionOf, toSubgraph } from "@/lib/retro";
 import type { ClaimGraphNode } from "@/lib/api";
 
 export default function GlobalClaimGraphPage() {
@@ -48,15 +49,46 @@ export default function GlobalClaimGraphPage() {
     [router]
   );
 
-  // ponytail: retro Atlas — 3-col chrome, shared selection, live filters.
+  // ponytail: retro Atlas — 3-col chrome, shared selection, live filters. Graph derives from the same payload.
   const [retroSel, setRetroSel] = useState<string | null>(null);
+  const [view, setView] = useState<"map" | "graph">("map");
+  const [territory, setTerritory] = useState<string | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const subgraph = useMemo(
+    () => (data ? toSubgraph(data.nodes as any[], data.edges as any[], { territory, focusId }) : { nodes: [], edges: [] }),
+    [data, territory, focusId]
+  );
+  const openGraph = useCallback((slug: string | null, focus: string | null = null) => {
+    setTerritory(slug); setFocusId(focus); setView("graph");
+  }, []);
   const retroCentral = data ? (() => { let b = -Infinity, id: string | null = data.nodes[0]?.id ?? null; for (const n of data.nodes) { if ((n as any).type !== "claim") continue; const s = contradictionOf(n as any) * 10 + data.edges.filter((e) => e.target === n.id).length; if (s > b) { b = s; id = n.id; } } return id; })() : null;
   const retroNode = data?.nodes.find((n) => n.id === retroSel) ?? data?.nodes.find((n) => n.id === retroCentral) ?? null;
   if (IS_RETRO) {
+    const scopeLabel = focusId ? "claim focus" : territory ? "territory" : "everything";
     return (
-      <RetroWindow title="TruthSeekers — Claim Map" status={`TruthSeekers • ${data?.nodes.length ?? 0} nodes • ${data?.edges.length ?? 0} edges`}>
+      <RetroWindow title="TruthSeekers — Claim Map" path="/claim-graph" status={`TruthSeekers • ${subgraph.nodes.length} nodes • ${subgraph.edges.length} edges • ${scopeLabel}`}>
         <div className="r-side w-full lg:w-[270px] shrink-0 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68] p-2 space-y-2 overflow-auto">
           <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1">Atlas Controls</div>
+          <div>
+            <div className="text-[10px] font-bold mb-1">View</div>
+            <div className="flex flex-wrap gap-1">{([["map", "Map"], ["graph", "Graph"]] as const).map(([v, label]) => <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className="px-2 py-[2px] text-[11px] border-[2px] bg-[#d4d0c8] text-black" style={{ borderStyle: view === v ? "inset" : "outset" }}>{label}</button>)}</div>
+          </div>
+          {(territory || focusId) && (
+            <div className="bg-[#ffffe1] border border-black p-1.5 text-[10px] leading-[1.4]">
+              <div className="font-bold">Scoped: {focusId ? "1 claim + neighbors" : territory}</div>
+              <div className="flex gap-1 mt-1">
+                {focusId && <button onClick={() => setFocusId(null)} className="r-btn px-1.5 py-0">Widen</button>}
+                <button onClick={() => { setTerritory(null); setFocusId(null); }} className="r-btn px-1.5 py-0">Clear</button>
+              </div>
+            </div>
+          )}
+          {view === "graph" && retroSel && (
+            <div>
+              <button onClick={() => setFocusId(retroSel)} className="r-btn px-2 py-1 text-[11px] w-full" disabled={focusId === retroSel}>
+                Focus graph on selected claim
+              </button>
+            </div>
+          )}
           <div>
             <div className="text-[10px] font-bold mb-1">Claims</div>
             <div className="flex flex-wrap gap-1">{[50, 100, 150, 300].map((n) => <button key={n} onClick={() => setLimit(n)} className="px-2 py-[2px] text-[11px] border-[2px] bg-[#d4d0c8] text-black" style={{ borderStyle: limit === n ? "inset" : "outset" }}>{n}</button>)}</div>
@@ -70,10 +102,15 @@ export default function GlobalClaimGraphPage() {
         </div>
         <div className="flex-1 min-w-0 bg-[#efe9d5] p-2 overflow-auto">
           <div className="bg-white p-4 max-w-[1100px] mx-auto" style={{ borderStyle: "inset", borderWidth: 3, borderColor: "#8a7f68 #fff8e0 #fff8e0 #8a7f68" }}>
-            <div className="text-[10px] tracking-widest uppercase text-[#0a2a5e] font-bold">Claim Map • Territories by article</div>
-            <h1 className="r-h1" style={{ fontSize: 26 }}>Global Claim Map</h1>
+            <div className="text-[10px] tracking-widest uppercase text-[#0a2a5e] font-bold">{view === "map" ? "Claim Map • Territories by article" : `Claim Graph • ${scopeLabel}`}</div>
+            <h1 className="r-h1" style={{ fontSize: 26 }}>{view === "map" ? "Global Claim Map" : "Global Claim Graph"}</h1>
             {loading && <div className="text-[11px] py-8 text-center">Surveying claims…</div>}
-            {!loading && data && data.nodes.length > 0 && <div className="mt-2"><ClaimAtlasMap nodes={data.nodes} edges={data.edges} selectedId={retroSel ?? retroCentral} onSelect={setRetroSel} /></div>}
+            {!loading && data && data.nodes.length > 0 && view === "map" && <div className="mt-2"><ClaimAtlasMap nodes={data.nodes} edges={data.edges} selectedId={retroSel ?? retroCentral} onSelect={setRetroSel} onOpenGraph={(slug) => openGraph(slug)} /></div>}
+            {!loading && data && data.nodes.length > 0 && view === "graph" && (
+              subgraph.nodes.length > 0
+                ? <div className="mt-2"><ClaimExplorer nodes={subgraph.nodes} edges={subgraph.edges} selectedId={retroSel} onSelect={setRetroSel} hideInspector /></div>
+                : <div className="text-[11px] py-8 text-center border-[2px] bg-[#ffffe1] mt-2" style={{ borderStyle: "outset" }}>No edges in this scope — claims stand alone here. <button className="underline" onClick={() => { setTerritory(null); setFocusId(null); }}>Clear scope</button></div>
+            )}
             {!loading && data && data.nodes.length === 0 && <div className="text-[11px] py-8 text-center">No claims yet — generate articles to seed the map.</div>}
           </div>
         </div>

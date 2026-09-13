@@ -10,6 +10,7 @@ import ViewSwitcher from "./components/ViewSwitcher";
 import FloatIslandNav from "./components/FloatIslandNav";
 import LiveNowTicker from "./components/LiveNowTicker";
 import RetroShell from "./components/retro/RetroShell";
+import RetroPalette from "./components/retro/RetroPalette";
 import "./components/retro/retro98.css";
 import { useFloatingChat } from "./FloatingChatContext";
 import { useArticleView } from "./ArticleViewContext";
@@ -18,8 +19,8 @@ import { useAuth } from "./hooks/useAuth";
 const IS_MOCK = process.env.NEXT_PUBLIC_MOCK === "true";
 // ponytail: retro is the platform default — escape with NEXT_PUBLIC_RETRO=false.
 const IS_RETRO = process.env.NEXT_PUBLIC_RETRO !== "false";
-// Article slugs + claim-graph draw their own 3-col RetroWindow; /article/new + /articles use the generic shell.
-const isSelfWrapped = (p: string) => p === "/claim-graph" || (/^\/article\/[^/]+$/.test(p) && p !== "/article/new");
+// Article slugs + claim-graph + chat draw their own RetroWindow; everything else uses the generic shell.
+const isSelfWrapped = (p: string) => p === "/claim-graph" || p.startsWith("/chat/") || p === "/chat" || (/^\/article\/[^/]+$/.test(p) && p !== "/article/new");
 
 
 const HIDDEN_ROUTES = ["/login", "/onboarding"];
@@ -81,6 +82,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return (
       <div className="retro98">
         <RetroShell>{children}</RetroShell>
+        <RetroPalette />
         {showChat && (
           <div className="fixed inset-0 z-50 flex flex-col justify-end pointer-events-none">
             <div className="absolute inset-0 bg-black/30 pointer-events-auto" onClick={close} />
@@ -159,6 +161,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       {/* Explore overlay */}
       <ExploreView />
+
+      {/* ponytail: palette everywhere in retro — including self-wrapped article/graph/chat. */}
+      {IS_RETRO && <RetroPalette />}
 
       {/* Press overlay */}
       <PressView />

@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { contradictionOf, retroStatusColor, smartShort } from "@/lib/retro";
 
 // ponytail: the global claim MAP — territories per article, hottest disputes first. No geo needed.
-export default function ClaimAtlasMap({ nodes, edges, selectedId, onSelect }: { nodes: any[]; edges: any[]; selectedId: string | null; onSelect: (id: string | null) => void }) {
+export default function ClaimAtlasMap({ nodes, edges, selectedId, onSelect, onOpenGraph }: { nodes: any[]; edges: any[]; selectedId: string | null; onSelect: (id: string | null) => void; onOpenGraph?: (slug: string) => void }) {
   const evCount = useMemo(() => {
     const m: Record<string, number> = {};
     for (const e of edges) if (e.type === "evidence") m[e.target] = (m[e.target] ?? 0) + 1;
@@ -35,6 +35,11 @@ export default function ClaimAtlasMap({ nodes, edges, selectedId, onSelect }: { 
           <header className="bg-[#0a2a5e] text-white px-2 py-1 flex items-center gap-2">
             <span className="text-[11px] font-bold truncate flex-1">{t.title}</span>
             <span className="text-[9px] bg-[#c9a227] text-black px-1 border border-black shrink-0">{t.claims.length} claims</span>
+            {onOpenGraph && (
+              <button onClick={() => onOpenGraph(t.slug)} aria-label={`Open claim graph for ${t.title}`} className="text-[9px] font-bold bg-[#d4d0c8] text-black px-1.5 py-0 border shrink-0" style={{ borderStyle: "outset", borderWidth: 1, borderColor: "#fff #404040 #404040 #fff" }}>
+                Graph →
+              </button>
+            )}
           </header>
           <div className="p-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
             {t.claims.map((c: any) => {

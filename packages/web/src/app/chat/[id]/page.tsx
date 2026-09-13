@@ -10,7 +10,7 @@ import type { AgentEvent } from "../../components/ProcessViewer";
 import ChatMessage from "../../components/ChatMessage";
 import EmptyChatState from "../../components/EmptyChatState";
 import TruthConsole from "../../components/TruthConsole";
-import TruthConsoleDeck from "../../components/truth-console/TruthConsoleDeck";
+import RetroWindow from "../../components/retro/RetroWindow";
 import { useTraceSegments } from "../../components/truth-console/useTraceSegments";
 import { useChatContext } from "../ChatContext";
 import { useTheme } from "../../components/ThemeProvider";
@@ -216,7 +216,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   ];
 
   return (
-    <div className="flex-1 flex min-h-0 bg-[#efe9d5]">
+    <RetroWindow
+      title={`TruthSeekers — ${conv?.title ?? (isNew ? "New chat" : "Chat")}`}
+      path={convId ? `/chat/${convId}` : "/chat/new"}
+      crumb={conv?.title ?? (isNew ? "New chat" : "Chat")}
+      status={`TruthSeekers • ${messages.length} message${messages.length === 1 ? "" : "s"}${sending ? " • streaming" : ""}`}
+    >
+    <div className="flex-1 flex min-h-0 bg-[#efe9d5] w-full">
       {/* ── Mobile header bar ── */}
       <div className="md:hidden fixed top-0 left-0 right-0 flex items-center justify-between px-3 h-11 bg-surface/95 backdrop-blur-md border-b border-border/30" style={{ zIndex: 40 }}>
         <button
@@ -353,7 +359,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         {/* ── Messages area ── */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 pt-12 md:pt-0">
           {loading || convLoading ? (
-            <div className="p-4 sm:p-6 space-y-5 max-w-3xl mx-auto">
+            <div className="p-4 sm:p-6 space-y-5 max-w-[880px] mx-auto">
               <div className="flex justify-end">
                 <div className="rounded-2xl rounded-br-md p-3 sm:p-4 max-w-[70%]" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>
                   <div className="h-3 skeleton rounded w-40" />
@@ -387,7 +393,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           ) : showEmpty ? (
             <EmptyChatState onSetInput={doSend} />
           ) : (
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-[880px] mx-auto">
               {messages.map((msg: any, i: number) => (
                 <ChatMessage
                   key={msg.id}
@@ -436,25 +442,30 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           )}
         </div>
 
-        {/* ── Footer: console deck + input ── */}
+        {/* ── Footer: trace toggle + docked composer ── */}
         {!showEmpty && (
-          <div className="shrink-0 border-t border-border/30">
-            <div className="max-w-3xl mx-auto px-4">
-              <div className="flex items-center justify-end py-1">
-                <TruthConsoleDeck
-                  variant="footer"
-                  segments={seg.segments}
-                  liveSegmentId={seg.liveSegmentId}
-                  unreadTotal={seg.unreadCount}
+          <div className="shrink-0 bg-[#e8e0c5] border-t-[2px] border-[#8a7f68]">
+            <div className="max-w-[880px] mx-auto px-2 sm:px-4">
+              <div className="flex items-center justify-between py-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#8a7f68" }}>
+                  {sending ? "Agent working…" : conv?.title ?? "Conversation"}
+                </span>
+                <button
                   onClick={() => setConsoleOpen((o) => !o)}
-                />
+                  aria-pressed={consoleOpen}
+                  aria-label="Toggle agent trace panel"
+                  className="r-btn inline-flex items-center gap-1 px-2 py-0.5"
+                  style={consoleOpen ? { borderStyle: "inset" } : undefined}
+                >
+                  Trace{seg.unreadCount > 0 && !consoleOpen && <span className="bg-[#a33] text-white text-[9px] px-1 border border-black">{seg.unreadCount}</span>}
+                </button>
               </div>
             </div>
           </div>
         )}
         {!showEmpty && (
-          <div className="shrink-0 px-2 sm:px-4 pb-3 sm:pb-4 pt-0">
-            <div className="max-w-3xl mx-auto">
+          <div className="shrink-0 px-2 sm:px-4 pb-3 sm:pb-4 pt-2 bg-[#efe9d5]">
+            <div className="max-w-[880px] mx-auto">
               <div className="bezel">
                 <div
                   className="bezel-inner flex items-end gap-1.5 sm:gap-2 p-1.5 sm:p-2"
@@ -518,9 +529,14 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
       </div>
 
-      {/* ── Truth Console panel ── */}
+      {/* ── Agent trace rail (desktop) + bottom sheet (mobile) ── */}
       {consoleOpen && (
-        <div className="hidden md:flex shrink-0 w-[400px] flex-col bg-[#e8e0c5] border-l-[2px] border-[#8a7f68]">
+        <div className="hidden md:flex r-side shrink-0 w-[340px] flex-col bg-[#e8e0c5] border-l-[2px] border-[#8a7f68]">
+          <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 flex items-center justify-between shrink-0">
+            <span>Agent Trace</span>
+            <button onClick={() => setConsoleOpen(false)} aria-label="Close trace panel" className="text-white hover:bg-white/20 px-1 cursor-pointer" style={{ background: "none", border: "none" }}>X</button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-auto">
           <TruthConsole
             segments={seg.segments}
             activeSegmentId={seg.activeSegmentId}
@@ -532,8 +548,34 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             onClose={() => setConsoleOpen(false)}
             loading={sending && seg.activeEvents.length === 0}
           />
+          </div>
+        </div>
+      )}
+      {consoleOpen && (
+        <div className="md:hidden fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Agent trace">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setConsoleOpen(false)} />
+          <div className="absolute inset-x-0 bottom-0 top-[10vh] bg-[#e8e0c5] border-t-[3px] flex flex-col" style={{ borderStyle: "outset", borderColor: "#fff8e0 #8a7f68 #8a7f68 #fff8e0" }}>
+            <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 flex items-center justify-between shrink-0">
+              <span>Agent Trace</span>
+              <button onClick={() => setConsoleOpen(false)} aria-label="Close trace panel" className="text-white px-1 cursor-pointer" style={{ background: "none", border: "none" }}>X</button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-auto">
+              <TruthConsole
+                segments={seg.segments}
+                activeSegmentId={seg.activeSegmentId}
+                liveSegmentId={seg.liveSegmentId}
+                unreadCount={seg.unreadCount}
+                activeEvents={seg.activeEvents}
+                onSelectSegment={seg.selectSegment}
+                onJumpToLive={seg.jumpToLive}
+                onClose={() => setConsoleOpen(false)}
+                loading={sending && seg.activeEvents.length === 0}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
+    </RetroWindow>
   );
 }
