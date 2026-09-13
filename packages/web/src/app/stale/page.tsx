@@ -22,8 +22,9 @@ export default function StalePage() {
     <div className="max-w-4xl mx-auto px-4 py-12">
       <h1 className="text-2xl font-serif mb-2 text-ink">Stale Articles</h1>
       <p className="text-xs text-subtle mb-8">
-        Articles ranked by evidence freshness. The further down the list, the more likely the
-        evidence needs re-verification. Click any article to read or refresh it.
+        Articles ranked by evidence freshness — the average age-decay of linked evidence across
+        every claim (100% = verified today, decaying over ~6 months; claims with no evidence
+        count as 50%). Stalest first. Click any article to read or refresh it.
       </p>
 
       {loading && <div className="text-xs text-subtle">Loading...</div>}
@@ -62,12 +63,13 @@ export default function StalePage() {
                 <div className="shrink-0 flex items-center gap-2">
                   <div
                     className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                    title={`Evidence freshness: ${(a.freshness_score * 100).toFixed(0)}% across ${a.claim_count} claims`}
                     style={{
                       color: freshColor(a.freshness_score),
                       background: freshColor(a.freshness_score) + "14",
                     }}
                   >
-                    {(a.freshness_score * 100).toFixed(0)}%
+                    {(a.freshness_score * 100).toFixed(0)}% fresh
                   </div>
                 </div>
               </div>

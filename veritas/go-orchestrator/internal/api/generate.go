@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -510,6 +511,12 @@ func transformGeneratedArticle(slug string, raw interface{}) *storage.Article {
 func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{}) {
 	now := time.Now().UTC()
 
+	// Retrieval doc registry: step 1 re-attaches URL + source when a
+	// mapping references a retrieved doc. Without this the step-1 upsert
+	// (full-row overwrite) would clobber the step-0 URL with "".
+	docURL := map[string]string{}
+	docSource := map[string]string{}
+
 	// 0. retrieve → save evidence items
 	if raw, ok := outputs["retrieve"]; ok {
 		var result struct {
@@ -535,16 +542,23 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 					if d.ID == "" {
 						continue
 					}
+					// IDs are hashed into UUID shape: sources.id and
+					// evidence.id/source_id are UUID columns (22P02
+					// otherwise), and the deterministic mapping lets
+					// step-1 claim links upsert-merge onto these rows.
+					sourceID := stableUUID("source:" + d.ID)
+					docURL[d.ID] = d.URL
+					docSource[d.ID] = sourceID
 					// Save as source
 					if err := s.db.SaveSource(&storage.Source{
-						ID:   d.ID,
+						ID:   sourceID,
 						Name: d.Title,
 						Type: "institutional",
 					}); err != nil {
 						log.Printf("[epistemic] save source %s: %v", d.ID, err)
 					}
 					// Save as evidence
-					evID := d.ID + "-ev"
+					evID := stableUUID(d.ID + "-ev")
 					if err := s.db.SaveEvidence(&storage.Evidence{
 						ID:             evID,
 						Type:           "primary_document",
@@ -553,7 +567,7 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 						AcquisitionMethod: "retrieval",
 						Accessibility:  "public",
 						SupportsClaim:  true,
-						SourceID:       &d.ID,
+						SourceID:       &sourceID,
 						CreatedAt:      now,
 					}); err != nil {
 						log.Printf("[epistemic] save evidence %s: %v", evID, err)
@@ -584,29 +598,46 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 				if m.ClaimID == "" {
 					continue
 				}
-				for _, eid := range m.Supporting {
-					evID := eid + "-ev"
-					if err := s.db.SaveEvidence(&storage.Evidence{
-						ID:       evID,
-						ClaimID:  m.ClaimID,
-						Type:     "primary_document",
-						SupportsClaim: true,
-						CreatedAt: now,
-					}); err != nil {
+				// Unhealable claim refs (model fabrications the alias pass
+				// couldn't stabilize — no wording to work from) would die
+				// as 22P02 or FK violations; drop them loudly instead.
+				if !isUUID(m.ClaimID) {
+					log.Printf("[epistemic] map_evidence: dropping mapping for non-UUID claim ref %q", m.ClaimID)
+					continue
+				}
+				// Same hash as step 0 (eid+"-ev") so claim links merge onto
+				// the retrieval rows carrying URL + source instead of
+				// forking bare duplicates.
+				linkEvidence := func(eid string, supports bool) {
+					evID := stableUUID(eid + "-ev")
+					ev := &storage.Evidence{
+						ID:          evID,
+						ClaimID:     m.ClaimID,
+						Type:        "primary_document",
+						SupportsClaim: supports,
+						CreatedAt:   now,
+					}
+					// Re-attach provenance: the upsert overwrites the whole
+					// row, so a bare link would wipe the step-0 URL.
+					if u, ok := docURL[eid]; ok {
+						ev.URL = u
+						ev.ChainOfCustody = "unverified"
+						ev.AcquisitionMethod = "retrieval"
+						ev.Accessibility = "public"
+					}
+					if src, ok := docSource[eid]; ok {
+						s := src
+						ev.SourceID = &s
+					}
+					if err := s.db.SaveEvidence(ev); err != nil {
 						log.Printf("[epistemic] save evidence %s: %v", evID, err)
 					}
 				}
+				for _, eid := range m.Supporting {
+					linkEvidence(eid, true)
+				}
 				for _, eid := range m.Contradicting {
-					evID := eid + "-ev"
-					if err := s.db.SaveEvidence(&storage.Evidence{
-						ID:       evID,
-						ClaimID:  m.ClaimID,
-						Type:     "primary_document",
-						SupportsClaim: false,
-						CreatedAt: now,
-					}); err != nil {
-						log.Printf("[epistemic] save evidence %s: %v", evID, err)
-					}
+					linkEvidence(eid, false)
 				}
 			}
 		} else {
@@ -750,6 +781,7 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 	if raw, ok := outputs["detect_missing"]; ok {
 		var result struct {
 			Gaps []struct {
+				ClaimID            string  `json:"claim_id"`
 				EvidenceID         string  `json:"evidence_id"`
 				GapType            string  `json:"gap_type"`
 				ExpectedArtifact   string  `json:"expected_artifact"`
@@ -765,11 +797,16 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 				warnEmpty("detect_missing", raw)
 			}
 			for _, g := range result.Gaps {
-				if g.EvidenceID == "" {
+				// Gaps join to articles via claim_id — unlinked rows are
+				// invisible everywhere, and non-UUID refs die as 22P02.
+				if !isUUID(g.ClaimID) {
+					log.Printf("[epistemic] detect_missing: dropping gap with unresolvable claim ref %q", g.ClaimID)
 					continue
 				}
+				id := stableUUID(g.ClaimID + "|" + g.GapType + "|" + g.ExpectedArtifact + "|" + g.VerificationStatus)
 				if err := s.db.SaveEvidenceGap(&storage.EvidenceGap{
-					ID:                 g.EvidenceID,
+					ID:                 id,
+					ClaimID:            g.ClaimID,
 					GapType:            g.GapType,
 					ExpectedArtifact:   g.ExpectedArtifact,
 					VerificationStatus: g.VerificationStatus,
@@ -777,7 +814,7 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 					CauseConfidence:    g.CauseConfidence,
 					DetectedAt:         now,
 				}); err != nil {
-					log.Printf("[epistemic] save gap %s: %v", g.EvidenceID, err)
+					log.Printf("[epistemic] save gap %s: %v", id, err)
 				}
 			}
 		} else {
@@ -807,7 +844,13 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 				if f.ClaimID == "" {
 					continue
 				}
-				id := f.ClaimID + "-lang-" + storage.EnsureGenerationRunID()
+				if !isUUID(f.ClaimID) {
+					log.Printf("[epistemic] map_language: dropping flag with non-UUID claim ref %q", f.ClaimID)
+					continue
+				}
+				// Deterministic per (claim, phrase): regens upsert instead
+				// of accumulating, and the ID satisfies the UUID column.
+				id := stableUUID(f.ClaimID + "-lang-" + f.SourcePhrase)
 				if err := s.db.SaveLanguageFlag(&storage.LanguageFlag{
 					ID:               id,
 					ClaimID:          f.ClaimID,
@@ -850,7 +893,11 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 				if a.ClaimID == "" {
 					continue
 				}
-				id := a.ClaimID + "-scr-" + storage.EnsureGenerationRunID()
+				if !isUUID(a.ClaimID) {
+					log.Printf("[epistemic] scrutinize: dropping assessment with non-UUID claim ref %q", a.ClaimID)
+					continue
+				}
+				id := stableUUID(a.ClaimID + "-scr")
 				rf := make(map[string]interface{})
 				for i, f := range a.RiskFactors {
 					rf[fmt.Sprintf("factor_%d", i)] = f
@@ -1059,6 +1106,7 @@ func (s *Server) canonicalizeClaimIDs(nodeOutputs map[string]interface{}, genera
 	// Every other claim_id reference in the epistemic outputs follows the alias.
 	rewriteClaimRefs(nodeOutputs["resolve"], alias)
 	rewriteClaimRefs(nodeOutputs["map_evidence"], alias)
+	rewriteClaimRefs(nodeOutputs["detect_missing"], alias)
 	rewriteClaimRefs(nodeOutputs["scrutinize"], alias)
 	rewriteClaimRefs(nodeOutputs["map_language"], alias)
 
@@ -1137,6 +1185,7 @@ func rewriteClaimRefs(raw interface{}, alias map[string]string) {
 		}
 	}
 	remapList("claim_evidence_map", "claim_id")
+	remapList("gaps", "claim_id")
 	remapList("risk_assessments", "claim_id")
 	remapList("language_flags", "claim_id")
 	remapList("claim_relationships", "source_claim_id", "target_claim_id")
@@ -1159,6 +1208,29 @@ var metaTalkPatterns = []*regexp.Regexp{
 var sentenceSplitRe = regexp.MustCompile(`[.!?]+\s+`)
 var anchorStripRe = regexp.MustCompile(`\[claim:[0-9a-fA-F-]+\]`)
 var normSpaceRe = regexp.MustCompile(`[^a-z0-9 ]+`)
+
+// stableUUID deterministically maps an arbitrary seed string into UUID
+// shape (sha256 → v4 bits). Model-minted and synthetic IDs ("doc-…-ev",
+// "{claim}-lang-{run}") can never satisfy UUID columns and died with 22P02,
+// silently dropping every evidence row, language flag and scrutiny
+// assessment. Hashing preserves the upsert-merge design (same seed → same
+// row across regens, so step-0 retrieval rows merge with step-1 claim links)
+// while satisfying the type.
+func stableUUID(seed string) string {
+	sum := sha256.Sum256([]byte(seed))
+	b := sum[:16]
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+var uuidLikeRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// isUUID reports whether s is safe to send to UUID columns and FK joins.
+// Model-fabricated claim IDs that canonicalization couldn't heal (no wording
+// to stabilize from) are dropped with a log line instead of dying as 22P02
+// mid-persist — the same class as stripped anchors.
+func isUUID(s string) bool { return uuidLikeRe.MatchString(s) }
 
 // lintArticleProse scans generated prose for process narration and verbatim
 // restatement. Findings are logged loudly for prompt tuning; the article is

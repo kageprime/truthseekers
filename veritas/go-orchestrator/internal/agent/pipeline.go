@@ -330,6 +330,7 @@ OUTPUT FORMAT:
 {
   "gaps": [
     {
+      "claim_id": "uuid — the claim this gap belongs to (copy exactly from the claim list you were given)",
       "evidence_id": "uuid",
       "gap_type": "expected | unexpected | unknown_expectedness",
       "expected_artifact": "patent | primary_source | dataset | eyewitness",
@@ -379,6 +380,9 @@ SUPPLEMENTAL INSTRUCTIONS:
 - Exclude evidence obtained under duress, torture, or without chain-of-custody from primary weighting.
 - Recommend higher corroboration thresholds for flagged claims.
 - All outputs must be marked as "is_interpretive": true.
+- Assess EVERY claim you were given: emit one entry per claim_id, no
+  exceptions. Low-risk claims get "risk_factors": [] with risk_score 0 —
+  an empty risk_assessments array is a failure, not a clean bill of health.
 
 OUTPUT FORMAT:
 {

@@ -1205,13 +1205,17 @@ func (d *DB) GetStaleArticles(limit int) ([]*StaleArticle, error) {
 	}
 	rows, err := d.db.Query(`
 		SELECT a.slug, a.title,
-		       COALESCE(AVG(c.derived_confidence), 0.5),
+		       COALESCE(AVG(cf.score), 0.5),
 		       COUNT(DISTINCT c.id), a.metadata->>'updated'
 		FROM articles a
 		LEFT JOIN article_claims ac ON a.id = ac.article_id
 		LEFT JOIN claims c ON ac.claim_id = c.id
+		LEFT JOIN LATERAL (
+			SELECT COALESCE(AVG(1.0/(1.0+EXTRACT(EPOCH FROM (NOW()-e.created_at))/86400.0/180.0)), 0.5) AS score
+			FROM evidence e WHERE e.claim_id = c.id
+		) cf ON true
 		GROUP BY a.slug, a.title, a.metadata->>'updated'
-		ORDER BY COALESCE(AVG(c.derived_confidence), 0.5) ASC
+		ORDER BY COALESCE(AVG(cf.score), 0.5) ASC
 		LIMIT $1
 	`, limit)
 	if err != nil {
