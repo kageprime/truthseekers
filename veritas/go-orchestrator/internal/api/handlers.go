@@ -530,6 +530,32 @@ func (s *Server) handleGetArticleGraph(w http.ResponseWriter, r *http.Request, s
 	json.NewEncoder(w).Encode(response)
 }
 
+// shortLabel truncates long claim text on a word boundary for graph nodes.
+// ponytail: derived at encode time — no schema migration for a display field.
+func shortLabel(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if len(s) <= 60 {
+		return s
+	}
+	cut := s[:59]
+	if sp := strings.LastIndex(cut, " "); sp > 12 {
+		cut = cut[:sp]
+	}
+	return cut + "…"
+}
+
+// contradictionLevel pulls the resolve-node score out of the confidence vector
+// so clients can pick the central claim without parsing vectors themselves.
+func contradictionLevel(cv map[string]interface{}) float64 {
+	if cv == nil {
+		return 0
+	}
+	if v, ok := cv["contradiction_level"].(float64); ok {
+		return v
+	}
+	return 0
+}
+
 // handleArticleClaimGraph returns a claim-level graph for an article: claim,
 // evidence, and source nodes joined by typed edges (evidence→claim supports /
 // contradicts, plus claim→claim relationships from the resolve node).
@@ -550,12 +576,19 @@ func (s *Server) handleArticleClaimGraph(w http.ResponseWriter, r *http.Request,
 	edges := []map[string]interface{}{}
 	seen := make(map[string]bool)
 
+	artTitle := ""
+	if art, _ := s.db.GetArticle(slug); art != nil {
+		artTitle = art.Title
+	}
 	for _, c := range claims {
 		if !seen["claim|"+c.ID] {
 			nodes = append(nodes, map[string]interface{}{
 				"id": c.ID, "type": "claim", "label": c.Text,
+				"short_label": shortLabel(c.Text),
 				"status": c.Status, "confidence": c.DerivedConfidence,
 				"confidence_vector": c.ConfidenceVector,
+				"contradiction_level": contradictionLevel(c.ConfidenceVector),
+				"article_slug": slug, "article_title": artTitle,
 			})
 			seen["claim|"+c.ID] = true
 		}
@@ -651,12 +684,19 @@ func (s *Server) handleArticleEpistemic(w http.ResponseWriter, r *http.Request, 
 	var nodes []map[string]interface{}
 	edges := []map[string]interface{}{}
 	seen := map[string]bool{}
+	epArtTitle := ""
+	if art, _ := s.db.GetArticle(slug); art != nil {
+		epArtTitle = art.Title
+	}
 	for _, c := range claims {
 		if !seen["claim|"+c.ID] {
 			nodes = append(nodes, map[string]interface{}{
 				"id": c.ID, "type": "claim", "label": c.Text,
+				"short_label": shortLabel(c.Text),
 				"status": c.Status, "confidence": c.DerivedConfidence,
-				"confidence_vector": c.ConfidenceVector, "article_slug": slug,
+				"confidence_vector": c.ConfidenceVector,
+				"contradiction_level": contradictionLevel(c.ConfidenceVector),
+				"article_slug": slug, "article_title": epArtTitle,
 			})
 			seen["claim|"+c.ID] = true
 		}
@@ -773,13 +813,26 @@ func (s *Server) handleGetGlobalClaimGraph(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	titles := map[string]string{}
+	for _, c := range claims {
+		if _, ok := titles[c.ArticleSlug]; !ok {
+			if art, _ := s.db.GetArticle(c.ArticleSlug); art != nil {
+				titles[c.ArticleSlug] = art.Title
+			} else {
+				titles[c.ArticleSlug] = ""
+			}
+		}
+	}
 	nodes := []map[string]interface{}{}
 	seen := map[string]bool{}
 	for _, c := range claims {
 		nodes = append(nodes, map[string]interface{}{
 			"id": c.ID, "type": "claim", "label": c.Text,
+			"short_label": shortLabel(c.Text),
 			"status": c.Status, "confidence": c.DerivedConfidence,
-			"confidence_vector": c.ConfidenceVector, "article_slug": c.ArticleSlug,
+			"confidence_vector": c.ConfidenceVector,
+			"contradiction_level": contradictionLevel(c.ConfidenceVector),
+			"article_slug": c.ArticleSlug, "article_title": titles[c.ArticleSlug],
 		})
 		seen["claim|"+c.ID] = true
 		for _, e := range evidenceByClaim[c.ID] {

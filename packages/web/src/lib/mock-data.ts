@@ -289,6 +289,48 @@ export const MOCK_USAGE = {
   recent: [],
 };
 
+// ponytail: retro Atlas mock — Spinosaurus reference shaped as live claim-graph API.
+export const MOCK_SPINO_NODES = [
+  { id: "central", type: "claim" as const, label: "Spinosaurus was a specialized aquatic predator", status: "disputed", confidence: 0.58 },
+  { id: "tail", type: "claim" as const, label: "Paddle-like tail fin (2020)", status: "verified", confidence: 0.89 },
+  { id: "dense", type: "claim" as const, label: "Dense bones for buoyancy control", status: "supported", confidence: 0.74 },
+  { id: "nostril", type: "claim" as const, label: "Retracted nares for diving", status: "disputed", confidence: 0.42 },
+  { id: "isotope", type: "claim" as const, label: "Isotopic evidence: aquatic diet", status: "supported", confidence: 0.68 },
+  { id: "snout", type: "claim" as const, label: "Crocodile-like snout for fishing", status: "verified", confidence: 0.92 },
+  { id: "legs", type: "claim" as const, label: "Hind limbs too powerful for fully aquatic life", status: "contradicted", confidence: 0.71 },
+  { id: "saildrag", type: "claim" as const, label: "Dorsal sail would create enormous drag", status: "contradicted", confidence: 0.55 },
+  { id: "swim", type: "claim" as const, label: "Insufficient swimming biomechanics", status: "contradicted", confidence: 0.66 },
+  { id: "floodplain", type: "claim" as const, label: "Fossils in floodplain, not marine deposits", status: "supported", confidence: 0.77 },
+];
+export const MOCK_SPINO_EDGES = [
+  { source: "tail", target: "central", type: "evidence" as const, relationship: "supports" },
+  { source: "dense", target: "central", type: "evidence" as const, relationship: "supports" },
+  { source: "nostril", target: "central", type: "evidence" as const, relationship: "supports" },
+  { source: "isotope", target: "central", type: "evidence" as const, relationship: "supports" },
+  { source: "snout", target: "central", type: "evidence" as const, relationship: "supports" },
+  { source: "legs", target: "central", type: "evidence" as const, relationship: "contradicts" },
+  { source: "saildrag", target: "central", type: "evidence" as const, relationship: "contradicts" },
+  { source: "swim", target: "central", type: "evidence" as const, relationship: "contradicts" },
+  { source: "floodplain", target: "central", type: "evidence" as const, relationship: "contradicts" },
+];
+export const MOCK_GLOBAL_CLAIM_GRAPH = { nodes: MOCK_SPINO_NODES, edges: MOCK_SPINO_EDGES, claim_count: 10, min_contradiction: 0 };
+// ponytail: synthetic 150-node global — Spino cluster tiled with article_slugs for perf tests.
+export function buildMockGlobal(limit = 150) {
+  const arts = ["spinosaurus", "tyrannosaurus", "carcharodontosaurus", "baryonyx", "suchomimus"];
+  const nodes: any[] = []; const edges: any[] = [];
+  const per = Math.max(1, Math.ceil(limit / arts.length));
+  arts.forEach((a, ai) => {
+    MOCK_SPINO_NODES.forEach((n: any, ni: number) => {
+      if (nodes.length >= limit) return;
+      nodes.push({ ...n, id: `${a}-${n.id}`, label: n.id === "central" ? `${a}: apex aquatic predator debate` : `${n.label} [${a}]`, article_slug: a, confidence_vector: { contradiction_level: n.status === "disputed" || n.status === "contradicted" ? 0.6 : 0.15 } });
+    });
+    MOCK_SPINO_EDGES.forEach((e: any) => { edges.push({ ...e, source: `${a}-${e.source}`, target: `${a}-${e.target}` }); });
+    if (ai > 0) edges.push({ source: `${a}-central`, target: `${arts[ai - 1]}-central`, type: "claim", relationship: "related", strength: 0.3 });
+  });
+  void per;
+  return { nodes: nodes.slice(0, limit), edges, claim_count: nodes.slice(0, limit).filter((n) => n.type === "claim").length, min_contradiction: 0 };
+}
+
 // Epistemic composite for the showcase article — claims, one gap, freshness
 // and a small claim graph with a supports edge, a contradicts edge, and a
 // claim-to-claim dispute, so the margin rail and trail drawer review fully.

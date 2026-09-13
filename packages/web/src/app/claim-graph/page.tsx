@@ -7,6 +7,11 @@ import { useGlobalClaimGraph } from "../hooks";
 import ClaimGraphViewer from "../components/ClaimGraphViewer";
 import ClaimGenealogyPanel from "../components/ClaimGenealogyPanel";
 import EyebrowTag from "../components/EyebrowTag";
+import RetroWindow from "../components/retro/RetroWindow";
+import ClaimExplorer from "../components/retro/ClaimExplorer";
+import RetroInspector from "../components/retro/RetroInspector";
+import { IS_RETRO } from "@/lib/retro";
+import { contradictionOf } from "@/lib/retro";
 import type { ClaimGraphNode } from "@/lib/api";
 
 export default function GlobalClaimGraphPage() {
@@ -42,6 +47,43 @@ export default function GlobalClaimGraphPage() {
     },
     [router]
   );
+
+  // ponytail: retro Atlas — 3-col chrome, shared selection, live filters.
+  const [retroSel, setRetroSel] = useState<string | null>(null);
+  const retroCentral = data ? (() => { let b = -Infinity, id: string | null = data.nodes[0]?.id ?? null; for (const n of data.nodes) { if ((n as any).type !== "claim") continue; const s = contradictionOf(n as any) * 10 + data.edges.filter((e) => e.target === n.id).length; if (s > b) { b = s; id = n.id; } } return id; })() : null;
+  const retroNode = data?.nodes.find((n) => n.id === retroSel) ?? data?.nodes.find((n) => n.id === retroCentral) ?? null;
+  if (IS_RETRO) {
+    return (
+      <RetroWindow title="Microsoft Encarta Encyclopedia 98 - Claimgraph Atlas" address="encarta.msn.com/Atlas/ClaimGraph" status={`MS Encarta • ${data?.nodes.length ?? 0} nodes • ${data?.edges.length ?? 0} edges`}>
+        <div className="w-full lg:w-[270px] shrink-0 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68] p-2 space-y-2 overflow-auto">
+          <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1">Atlas Controls</div>
+          <div>
+            <div className="text-[10px] font-bold mb-1">Claims</div>
+            <div className="flex flex-wrap gap-1">{[50, 100, 150, 300].map((n) => <button key={n} onClick={() => setLimit(n)} className="px-2 py-[2px] text-[11px] border-[2px] bg-[#d4d0c8] text-black" style={{ borderStyle: limit === n ? "inset" : "outset" }}>{n}</button>)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] font-bold mb-1">Min contradiction</div>
+            <div className="flex flex-wrap gap-1">{[0, 0.2, 0.4, 0.6].map((v) => <button key={v} onClick={() => setMinContradiction(v)} className="px-2 py-[2px] text-[11px] border-[2px] bg-[#d4d0c8] text-black" style={{ borderStyle: minContradiction === v ? "inset" : "outset" }}>{v.toFixed(1)}</button>)}</div>
+          </div>
+          {data && <div className="text-[10px] text-[#555] tabular-nums">{data.claim_count} claims • {data.nodes.length - data.claim_count} evidence</div>}
+          <div className="text-[10px] underline"><Link href="/contested">Contested</Link> • <Link href="/gaps">Open questions</Link> • <Link href="/stale">Stale</Link></div>
+        </div>
+        <div className="flex-1 min-w-0 bg-[#efe9d5] p-2 overflow-auto">
+          <div className="bg-white p-2 max-w-[900px] mx-auto" style={{ borderStyle: "inset", borderWidth: 3, borderColor: "#8a7f68 #fff8e0 #fff8e0 #8a7f68" }}>
+            <div className="text-[10px] tracking-widest uppercase text-[#0a2a5e] font-bold">Claimgraph Atlas • Interactive</div>
+            <h1 className="r-h1" style={{ fontSize: 26 }}>Global Claim Graph</h1>
+            {loading && <div className="text-[11px] py-8 text-center">Loading claim graph…</div>}
+            {!loading && data && data.nodes.length > 0 && <ClaimExplorer nodes={data.nodes} edges={data.edges} selectedId={retroSel ?? retroCentral} onSelect={setRetroSel} hideInspector />}
+            {!loading && data && data.nodes.length === 0 && <div className="text-[11px] py-8 text-center">No claims yet — generate articles to seed the graph.</div>}
+          </div>
+        </div>
+        <div className="w-full lg:w-[340px] shrink-0 bg-[#e8e0c5] border-l-[2px] border-[#8a7f68] p-2 overflow-auto">
+          <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 mb-2">Inspector</div>
+          {data && <RetroInspector node={retroNode} nodes={data.nodes} edges={data.edges} centralId={retroCentral} />}
+        </div>
+      </RetroWindow>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 md:py-20">

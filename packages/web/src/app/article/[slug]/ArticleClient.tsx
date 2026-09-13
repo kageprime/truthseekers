@@ -24,6 +24,9 @@ import LiveBadge from "../../components/LiveBadge";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import type { Article } from "@encarta/core";
 import { IconXCircle, IconBook, IconLightning, IconFile, IconFileText, IconUser, IconRefresh, IconAlert } from "../../components/Icons";
+import RetroWindow from "../../components/retro/RetroWindow";
+import RetroArticle from "../../components/retro/RetroArticle";
+import { IS_RETRO } from "@/lib/retro";
 
 interface ArticleClientProps {
   slug: string;
@@ -354,6 +357,15 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   }
 
   if (!article) return null;
+
+  // ponytail: retro branch — same data, Spinosaurus chrome. Old theme untouched.
+  if (IS_RETRO) {
+    return (
+      <RetroWindow title={`Microsoft Encarta Encyclopedia 98 - ${article.title}`} address={`encarta.msn.com/${slug}`} status={`MS Encarta • ${slug}`}>
+        <RetroArticle article={article} epistemic={epistemic} graph={(epistemic as any)?.claim_graph ?? null} />
+      </RetroWindow>
+    );
+  }
 
   const hasFullContent = (article.blocks && article.blocks.length > 0) ||
     (article.sections && article.sections.length > 0);

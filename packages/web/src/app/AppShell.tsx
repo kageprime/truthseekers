@@ -9,11 +9,17 @@ import GraphView from "./components/GraphView";
 import ViewSwitcher from "./components/ViewSwitcher";
 import FloatIslandNav from "./components/FloatIslandNav";
 import LiveNowTicker from "./components/LiveNowTicker";
+import RetroShell from "./components/retro/RetroShell";
+import "./components/retro/retro98.css";
 import { useFloatingChat } from "./FloatingChatContext";
 import { useArticleView } from "./ArticleViewContext";
 import { useAuth } from "./hooks/useAuth";
 
 const IS_MOCK = process.env.NEXT_PUBLIC_MOCK === "true";
+// ponytail: retro is the platform default — escape with NEXT_PUBLIC_RETRO=false.
+const IS_RETRO = process.env.NEXT_PUBLIC_RETRO !== "false";
+// Article slugs + claim-graph draw their own 3-col RetroWindow; /article/new + /articles use the generic shell.
+const isSelfWrapped = (p: string) => p === "/claim-graph" || (/^\/article\/[^/]+$/.test(p) && p !== "/article/new");
 
 
 const HIDDEN_ROUTES = ["/login", "/onboarding"];
@@ -70,6 +76,26 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", handler);
   }, [toggle]);
 
+  // ponytail: global retro — every route gets Encarta chrome; article/claim-graph draw their own.
+  if (IS_RETRO && !isSelfWrapped(pathname)) {
+    return (
+      <div className="retro98">
+        <RetroShell>{children}</RetroShell>
+        {showChat && (
+          <div className="fixed inset-0 z-50 flex flex-col justify-end pointer-events-none">
+            <div className="absolute inset-0 bg-black/30 pointer-events-auto" onClick={close} />
+            <div className="relative pointer-events-auto bg-[#efe9d5] border-[3px] max-h-[85vh] overflow-hidden" style={{ borderStyle: "outset", borderColor: "#fff8e0 #8a7f68 #8a7f68 #fff8e0" }}>
+              <FloatingChatWidget />
+            </div>
+          </div>
+        )}
+        <ExploreView />
+        <PressView />
+        <GraphView />
+      </div>
+    );
+  }
+
   return (
     <div className="h-dvh overflow-hidden flex flex-col">
       {/* B1: third-party-cookie warning — session lives on this tab only */}
@@ -85,8 +111,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
       )}
-      {!isOverlayRoute && !isHidden && <FloatIslandNav />}
-      {!isOverlayRoute && !isHidden && <LiveNowTicker />}
+      {!IS_RETRO && !isOverlayRoute && !isHidden && <FloatIslandNav />}
+      {!IS_RETRO && !isOverlayRoute && !isHidden && <LiveNowTicker />}
       <div className="flex-1 flex min-h-0 min-w-0 relative overflow-hidden">
         <main
           className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col"

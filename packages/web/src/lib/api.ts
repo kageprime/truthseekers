@@ -418,7 +418,7 @@ export interface FreshnessInfo {
 }
 
 export async function fetchAllGaps(): Promise<{ gaps: any[] } | null> {
-  if (MOCK) return null;
+  if (MOCK) return { gaps: (mock.MOCK_EPISTEMIC as any).gaps ?? [] };
   const res = await fetch(`${BASE}/gaps`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
@@ -439,7 +439,7 @@ export async function fetchRefreshDiff(slug: string): Promise<any | null> {
 }
 
 export async function fetchStaleArticles(limit = 50): Promise<{ articles: any[] } | null> {
-  if (MOCK) return null;
+  if (MOCK) return { articles: [] };
   const res = await fetch(`${BASE}/stale?limit=${limit}`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
@@ -484,12 +484,16 @@ export interface ClaimGraphNode {
   id: string;
   type: "claim" | "evidence" | "source";
   label: string;
+  short_label?: string;
   status?: string;
   confidence?: number;
   supports?: boolean;
   chain_of_custody?: string;
   accessibility?: string;
   confidence_vector?: Record<string, number>;
+  contradiction_level?: number;
+  article_slug?: string;
+  article_title?: string;
 }
 
 export interface ClaimGraphEdge {
@@ -501,7 +505,7 @@ export interface ClaimGraphEdge {
 }
 
 export async function fetchArticleClaimGraph(slug: string): Promise<{ nodes: ClaimGraphNode[]; edges: ClaimGraphEdge[] } | null> {
-  if (MOCK) return null;
+  if (MOCK) return { nodes: (mock.MOCK_SPINO_NODES as any), edges: (mock.MOCK_SPINO_EDGES as any) };
   const res = await fetch(`${BASE}/articles/${slug}/claim-graph`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
@@ -527,14 +531,14 @@ export async function fetchGlobalClaimGraph(limit = 150, minContradiction = 0): 
   claim_count: number;
   min_contradiction: number;
 } | null> {
-  if (MOCK) return null;
+  if (MOCK) return (mock as any).buildMockGlobal ? (mock as any).buildMockGlobal(limit) : mock.MOCK_GLOBAL_CLAIM_GRAPH as any;
   const res = await fetch(`${BASE}/claim-graph?limit=${limit}&min_contradiction=${minContradiction}`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function fetchContestedClaims(limit = 50): Promise<{ claims: any[] } | null> {
-  if (MOCK) return null;
+  if (MOCK) return { claims: (mock.MOCK_EPISTEMIC as any).claims ?? [] };
   const res = await fetch(`${BASE}/contested?limit=${limit}`, { cache: "no-store", credentials: "include" });
   if (!res.ok) return null;
   return res.json();
