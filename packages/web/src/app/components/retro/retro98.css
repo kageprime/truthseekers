@@ -26,3 +26,7 @@
 .retro98 .input, .retro98 input, .retro98 textarea, .retro98 select { border:2px inset !important; border-color:#808080 #fff #fff #808080 !important; border-radius:0 !important; background:#fff !important; font-family:Verdana,sans-serif !important; }
 .retro98 a { color:#0a2a5e; }
 .retro98 h1, .retro98 h2 { font-family:Georgia,serif; color:#0a2a5e; }
+/* ponytail: sticky rails — page scrolls, sidebars park. lg+ only; stacked mobile scrolls normally. */
+@media (min-width:1024px){
+  .retro98 .r-side { position:sticky; top:12px; align-self:flex-start; max-height:calc(100vh - 24px); overflow:auto; }
+}

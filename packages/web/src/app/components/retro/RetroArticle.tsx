@@ -51,7 +51,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-      <div className="w-full lg:w-[270px] shrink-0 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68] flex flex-col">
+      <div className="r-side w-full lg:w-[270px] shrink-0 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68] flex flex-col">
         <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 flex items-center justify-between"><span>Contents</span><span className="bg-[#c9a227] text-black px-1 text-[9px] border border-black">TREE</span></div>
         <div className="p-2 space-y-0.5 overflow-auto max-h-[300px] lg:max-h-none">
           {sections.map((s)=><button key={s.id} onClick={()=>{setActive(s.id); refs.current[s.id]?.scrollIntoView({behavior:"smooth",block:"start"});}} className={`w-full text-left px-1.5 py-1 text-[12px] flex items-start gap-1.5 border ${active===s.id?"bg-[#0a2a5e] text-white border-[#0a2a5e]":"bg-transparent border-transparent hover:bg-[#d6cfae]"}`}><span className="mt-0.5">{s.icon}</span><span className="flex-1 leading-[1.25]">{s.label}</span>{(s as any).badge&&<span className="text-[8px] bg-red-700 text-white px-1 border border-black font-bold">{(s as any).badge}</span>}</button>)}
@@ -143,7 +143,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
         </div>
       </div>
 
-      <div className="w-full lg:w-[340px] shrink-0 bg-[#e8e0c5] border-l-[2px] border-t-[2px] lg:border-t-0 border-[#8a7f68] flex flex-col gap-2 p-2 overflow-auto">
+      <div className="r-side w-full lg:w-[340px] shrink-0 bg-[#e8e0c5] border-l-[2px] border-t-[2px] lg:border-t-0 border-[#8a7f68] flex flex-col gap-2 p-2 overflow-auto">
         <div className="border-[2px] bg-[#efe9d5]" style={{ borderStyle:"outset",borderWidth:2 }}>
           <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-0.5 flex justify-between items-center"><span>Image Viewer</span><span className="bg-[#c9a227] text-black text-[8px] px-1 border border-black">1 OF 1</span></div>
           <div className="relative group cursor-zoom-in" onClick={()=>setZoom(true)}>

@@ -13,7 +13,8 @@ class RetroSim {
   private hover: PNode | null = null; private fitted = false; private frame = 0;
   private dragNode: PNode | null = null; private panning = false; private panStartX = 0; private panStartY = 0;
   private nodeIndex = new Map<string, PNode>();
-  private settled = false; private static readonly SETTLE_KE = 0.5; private static readonly SETTLE_MIN = 80;
+  private settled = false; private static readonly SETTLE_KE_PER_NODE = 0.02; private static readonly SETTLE_MIN = 80;
+  private frozen = false;
   private selChanged = false; private selectedId: string | null; private centralId: string | null;
   constructor(private canvas: HTMLCanvasElement, nodes: ClaimGraphNode[], edges: ClaimGraphEdge[], private onSelect: (n: ClaimGraphNode | null) => void, selectedId: string | null, centralId: string | null) {
     this.ctx = canvas.getContext("2d")!;
@@ -32,9 +33,16 @@ class RetroSim {
     window.addEventListener("resize", this.resize);
     this.loop();
   }
-  setSelected(id: string | null) { this.selectedId = id; this.selChanged = true; this.wake(); }
+  setSelected(id: string | null) { this.selectedId = id; this.selChanged = true; this.paint(); }
+  setFrozen(f: boolean) {
+    this.frozen = f;
+    if (f) { if (this.raf) cancelAnimationFrame(this.raf); this.raf = 0; this.settled = true; this.draw(); }
+    else { this.wake(); }
+  }
+  // ponytail: single-frame repaint for hover/selection — never restarts the loop.
+  paint() { if (!this.raf) this.draw(); else this.selChanged = true; }
   destroy() { cancelAnimationFrame(this.raf); this.raf = 0; this.canvas.removeEventListener("pointerdown", this.down); this.canvas.removeEventListener("pointermove", this.move); this.canvas.removeEventListener("pointerup", this.up); this.canvas.removeEventListener("pointerleave", this.up); this.canvas.removeEventListener("wheel", this.wheel); window.removeEventListener("resize", this.resize); }
-  wake() { if (this.raf) return; this.settled = false; this.loop(); }
+  wake() { if (this.raf || this.frozen) return; this.settled = false; this.loop(); }
   private size() { const rect = (this.canvas.parentElement as HTMLElement).getBoundingClientRect(); this.dpr = Math.max(1, window.devicePixelRatio || 1); this.W = rect.width; this.H = rect.height; this.canvas.width = this.W * this.dpr; this.canvas.height = this.H * this.dpr; this.canvas.style.width = this.W + "px"; this.canvas.style.height = this.H + "px"; }
   private resize = () => { this.size(); this.wake(); };
   private toWorld(e: PointerEvent) { const r = this.canvas.getBoundingClientRect(); return { x: (e.clientX - r.left - this.offsetX) / this.zoom, y: (e.clientY - r.top - this.offsetY) / this.zoom }; }
@@ -43,8 +51,9 @@ class RetroSim {
   private move = (e: PointerEvent) => {
     const p = this.toWorld(e);
     if (this.dragNode) { this.dragNode.x = p.x; this.dragNode.y = p.y; this.dragNode.vx = 0; this.dragNode.vy = 0; this.wake(); return; }
-    if (this.panning) { this.offsetX = e.clientX - this.panStartX; this.offsetY = e.clientY - this.panStartY; this.wake(); return; }
-    const h = this.pick(p); if ((h?.id ?? null) !== (this.hover?.id ?? null)) { this.hover = h; this.wake(); }
+    if (this.panning) { this.offsetX = e.clientX - this.panStartX; this.offsetY = e.clientY - this.panStartY; if (!this.settled) this.wake(); else this.draw(); return; }
+    // ponytail: hover only repaints — restarting the loop on every flyover kept 150 nodes in perpetual motion.
+    const h = this.pick(p); if ((h?.id ?? null) !== (this.hover?.id ?? null)) { this.hover = h; this.paint(); }
   };
   private up = (e: PointerEvent) => {
     if (this.dragNode) { const n = this.dragNode; n.fixed = false; this.dragNode = null; this.onSelect(n.data); this.wake(); return; }
@@ -55,7 +64,8 @@ class RetroSim {
   private loop = () => {
     const ke = this.step(); this.draw(); this.frame++;
     if (!this.fitted && this.frame > RetroSim.SETTLE_MIN) { this.fit(); this.fitted = true; }
-    if (this.frame > RetroSim.SETTLE_MIN && ke < RetroSim.SETTLE_KE) {
+    // ponytail: KE scales with N — settle on per-node energy or 150 nodes never rest.
+    if (this.frame > RetroSim.SETTLE_MIN && ke / Math.max(1, this.nodes.length) < RetroSim.SETTLE_KE_PER_NODE) {
       if (this.selChanged) { this.selChanged = false; this.raf = requestAnimationFrame(this.loop); return; }
       this.settled = true; this.raf = 0; return;
     }
@@ -88,8 +98,11 @@ class RetroSim {
     const cx = this.W / 2, cy = this.H / 2; let ke = 0;
     for (const n of nodes) {
       if (n.fixed) continue;
-      n.vx += (cx - n.x) * 0.02; n.vy += (cy - n.y) * 0.02;
-      n.vx *= 0.82; n.vy *= 0.82; n.x += n.vx; n.y += n.vy;
+      n.vx += (cx - n.x) * 0.01; n.vy += (cy - n.y) * 0.01;
+      n.vx *= 0.85; n.vy *= 0.85;
+      // ponytail: sleep sub-pixel drift — kills the endless shimmer that made clicks miss.
+      if (n.vx * n.vx + n.vy * n.vy < 1e-4) { n.vx = 0; n.vy = 0; }
+      else { n.x += n.vx; n.y += n.vy; }
       n.x = Math.max(20, Math.min(this.W - 20, n.x)); n.y = Math.max(20, Math.min(this.H - 20, n.y));
       ke += n.vx * n.vx + n.vy * n.vy;
     }
@@ -152,7 +165,7 @@ class RetroSim {
   }
 }
 
-export default function ClaimExplorerCanvas({ nodes, edges, selectedId, centralId, height = 460, onSelect }: { nodes: ClaimGraphNode[]; edges: ClaimGraphEdge[]; selectedId: string | null; centralId: string | null; height?: number; onSelect: (n: ClaimGraphNode | null) => void }) {
+export default function ClaimExplorerCanvas({ nodes, edges, selectedId, centralId, frozen = false, height = 460, onSelect }: { nodes: ClaimGraphNode[]; edges: ClaimGraphEdge[]; selectedId: string | null; centralId: string | null; frozen?: boolean; height?: number; onSelect: (n: ClaimGraphNode | null) => void }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const sim = useRef<RetroSim | null>(null);
   const cb = useRef(onSelect); cb.current = onSelect;
@@ -164,6 +177,7 @@ export default function ClaimExplorerCanvas({ nodes, edges, selectedId, centralI
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges, centralId]);
   useEffect(() => { sim.current?.setSelected(selectedId); }, [selectedId]);
+  useEffect(() => { sim.current?.setFrozen(frozen); }, [frozen]);
   return (
     <div className="relative w-full overflow-hidden select-none" style={{ height, background: "#fdf8e8", borderStyle: "inset", borderWidth: 3, borderColor: "#a09060 #fff9e5 #fff9e5 #a09060", boxShadow: "inset 1px 1px 3px rgba(0,0,0,0.2)" }}>
       <canvas ref={ref} className="absolute inset-0 w-full h-full block touch-none cursor-grab" />

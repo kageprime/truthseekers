@@ -55,7 +55,7 @@ export default function GlobalClaimGraphPage() {
   if (IS_RETRO) {
     return (
       <RetroWindow title="Microsoft Encarta Encyclopedia 98 - Claimgraph Atlas" address="encarta.msn.com/Atlas/ClaimGraph" status={`MS Encarta • ${data?.nodes.length ?? 0} nodes • ${data?.edges.length ?? 0} edges`}>
-        <div className="w-full lg:w-[270px] shrink-0 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68] p-2 space-y-2 overflow-auto">
+        <div className="r-side w-full lg:w-[270px] shrink-0 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68] p-2 space-y-2 overflow-auto">
           <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1">Atlas Controls</div>
           <div>
             <div className="text-[10px] font-bold mb-1">Claims</div>
@@ -77,7 +77,7 @@ export default function GlobalClaimGraphPage() {
             {!loading && data && data.nodes.length === 0 && <div className="text-[11px] py-8 text-center">No claims yet — generate articles to seed the graph.</div>}
           </div>
         </div>
-        <div className="w-full lg:w-[340px] shrink-0 bg-[#e8e0c5] border-l-[2px] border-[#8a7f68] p-2 overflow-auto">
+        <div className="r-side w-full lg:w-[340px] shrink-0 bg-[#e8e0c5] border-l-[2px] border-[#8a7f68] p-2 overflow-auto">
           <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 mb-2">Inspector</div>
           {data && <RetroInspector node={retroNode} nodes={data.nodes} edges={data.edges} centralId={retroCentral} />}
         </div>
