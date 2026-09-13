@@ -18,7 +18,7 @@ export default function HomePage() {
   const { data: latest, loading: latestLoading } = useArticles(0, 6);
 
   const feat = (featured ?? [])[0] ?? null;
-  const latestList = (latest as any)?.articles ?? latest ?? [];
+  const latestList = (latest as any)?.data ?? [];
   const articles = Array.isArray(latestList) ? latestList.slice(0, 6) : [];
 
   const submitSearch = (e: React.FormEvent) => {
