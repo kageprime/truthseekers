@@ -8,6 +8,12 @@ export interface RetroRoute {
   group: "Encyclopedia" | "Create" | "Account";
   keywords: string;
   hideInNav?: boolean;
+  adminOnly?: boolean;
+}
+
+// ponytail: account roles owner/admin see admin surfaces; everyone else doesn't.
+export function canSeeAdmin(role?: string | null): boolean {
+  return role === "owner" || role === "admin";
 }
 
 export const RETRO_ROUTES: RetroRoute[] = [
@@ -22,7 +28,7 @@ export const RETRO_ROUTES: RetroRoute[] = [
   { href: "/chat/new", label: "New Chat", icon: "chat", group: "Create", keywords: "chat ask agent research conversation" },
   { href: "/queue", label: "Queue", icon: "list", group: "Create", keywords: "queue jobs pending generation status" },
   { href: "/pricing", label: "Pricing", icon: "tag", group: "Account", keywords: "pricing plans billing pay pro enterprise" },
-  { href: "/admin", label: "Admin", icon: "wrench", group: "Account", keywords: "admin settings seed ops" },
+  { href: "/admin", label: "Admin", icon: "wrench", group: "Account", keywords: "admin settings seed ops", adminOnly: true },
   { href: "/settings", label: "Settings", icon: "gear", group: "Account", keywords: "settings preferences profile theme" },
   { href: "/style-guide", label: "Style Guide", icon: "book", group: "Account", keywords: "style guide design system" },
   { href: "/login", label: "Sign in", icon: "chat", group: "Account", keywords: "login signin sign in auth", hideInNav: true },

@@ -220,6 +220,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       title={`TruthSeekers — ${conv?.title ?? (isNew ? "New chat" : "Chat")}`}
       path={convId ? `/chat/${convId}` : "/chat/new"}
       crumb={conv?.title ?? (isNew ? "New chat" : "Chat")}
+      nav
       status={`TruthSeekers • ${messages.length} message${messages.length === 1 ? "" : "s"}${sending ? " • streaming" : ""}`}
     >
     <div className="flex-1 flex min-h-0 bg-[#efe9d5] w-full">

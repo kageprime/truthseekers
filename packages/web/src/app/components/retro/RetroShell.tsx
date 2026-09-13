@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import RetroWindow from "./RetroWindow";
-import { NAV_GROUPS, RETRO_ROUTES } from "@/lib/routes";
+import { NAV_GROUPS, RETRO_ROUTES, canSeeAdmin } from "@/lib/routes";
+import { useAuth } from "../../hooks/useAuth";
 import { IconBack, IconBook, IconChat, IconClock, IconGear, IconGraph, IconHome, IconList, IconMap, IconPencil, IconQuestion, IconScale, IconTag, IconWrench } from "./icons";
 
 // ponytail: global retro shell — grouped registry nav for every non-article page. No per-page rewrites.
@@ -16,6 +17,8 @@ const ICONS: Record<string, (p: { size?: number }) => React.ReactNode> = {
 export default function RetroShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useAuth();
+  const showAdmin = canSeeAdmin(user?.role);
   // ponytail: collapsed on small screens — the tree no longer shoves content down.
   const [treeOpen, setTreeOpen] = useState(false);
   return (
@@ -35,7 +38,7 @@ export default function RetroShell({ children }: { children: React.ReactNode }) 
             <div key={g}>
               <div className="text-[9px] font-bold tracking-widest uppercase px-1.5 pb-0.5" style={{ color: "#8a7f68" }}>{g}</div>
               <div className="space-y-0.5">
-                {RETRO_ROUTES.filter((r) => r.group === g && !r.hideInNav).map(({ href, label, icon }) => {
+                {RETRO_ROUTES.filter((r) => r.group === g && !r.hideInNav && (!r.adminOnly || showAdmin)).map(({ href, label, icon }) => {
                   const active = pathname === href || pathname.startsWith(href + "/");
                   const Icon = ICONS[icon] ?? IconBook;
                   return (

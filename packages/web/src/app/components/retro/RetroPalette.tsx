@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { RETRO_ROUTES, crumbLabel } from "@/lib/routes";
+import { RETRO_ROUTES, canSeeAdmin, crumbLabel } from "@/lib/routes";
+import { useAuth } from "../../hooks/useAuth";
 
 // ponytail: one palette for everywhere — static registry + actions + local recents. No backend, works offline.
 interface Entry { kind: "page" | "action" | "recent"; label: string; hint: string; run: () => void; keys: string; }
@@ -15,6 +16,7 @@ function readRecents(): string[] {
 export default function RetroPalette() {
   const router = useRouter();
   const pathname = usePathname();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
@@ -55,7 +57,8 @@ export default function RetroPalette() {
 
   const entries: Entry[] = useMemo(() => {
     const go = (href: string) => () => { close(); router.push(href); };
-    const pages: Entry[] = RETRO_ROUTES.map((r) => ({ kind: "page", label: r.label, hint: r.href, run: go(r.href), keys: `${r.label} ${r.href} ${r.keywords}`.toLowerCase() }));
+    const admin = canSeeAdmin(user?.role);
+    const pages: Entry[] = RETRO_ROUTES.filter((r) => !r.adminOnly || admin).map((r) => ({ kind: "page", label: r.label, hint: r.href, run: go(r.href), keys: `${r.label} ${r.href} ${r.keywords}`.toLowerCase() }));
     const actions: Entry[] = [
       { kind: "action", label: "New article", hint: "action", run: go("/article/new"), keys: "new article write create generate" },
       { kind: "action", label: "New chat", hint: "action", run: go("/chat/new"), keys: "new chat ask agent conversation" },
@@ -66,7 +69,7 @@ export default function RetroPalette() {
     const recent: Entry[] = recents.filter((p) => p !== pathname && !seen.has(p) && (seen.add(p), true)).slice(0, 4)
       .map((p) => ({ kind: "recent", label: crumbLabel(p.split("/").filter(Boolean).pop() ?? "") + `  (${p})`, hint: p, run: go(p), keys: p.toLowerCase() }));
     return [...recent, ...pages, ...actions];
-  }, [recents, pathname, router, close]);
+  }, [recents, pathname, router, close, user?.role]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();

@@ -143,6 +143,15 @@ export default function ArticlesPage() {
 
   useEffect(() => { setMounted(true); }, []);
 
+  // ponytail: deep-link search (?q= from home) — no Suspense needed, read once on mount.
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get("q");
+      if (q) { setQuery(q); setDebouncedQuery(q); }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   usePageSearch(useMemo(() => query || debouncedQuery ? {
     value: query, onChange: setQuery, onSubmit: (e: FormEvent) => { e.preventDefault(); setDebouncedQuery(query); },
     onClear: () => { setQuery(""); setDebouncedQuery(""); }, placeholder: "Search articles...",

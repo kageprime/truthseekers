@@ -66,7 +66,7 @@ export default function GlobalClaimGraphPage() {
   if (IS_RETRO) {
     const scopeLabel = focusId ? "claim focus" : territory ? "territory" : "everything";
     return (
-      <RetroWindow title="TruthSeekers — Claim Map" path="/claim-graph" status={`TruthSeekers • ${subgraph.nodes.length} nodes • ${subgraph.edges.length} edges • ${scopeLabel}`}>
+      <RetroWindow title="TruthSeekers — Claim Map" path="/claim-graph" nav status={`TruthSeekers • ${subgraph.nodes.length} nodes • ${subgraph.edges.length} edges • ${scopeLabel}`}>
         <div className="r-side w-full lg:w-[270px] shrink-0 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68] p-2 space-y-2 overflow-auto">
           <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1">Atlas Controls</div>
           <div>

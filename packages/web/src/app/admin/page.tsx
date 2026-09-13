@@ -104,6 +104,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
+    else if (!authLoading && user && user.role !== "owner" && user.role !== "admin") router.replace("/");
   }, [user, authLoading, router]);
 
   useEffect(() => {
@@ -136,6 +137,16 @@ export default function AdminPage() {
 
   if (authLoading) return null;
   if (!user) return null;
+  // ponytail: admin surfaces are owner/admin only — members bounce home.
+  if (user.role !== "owner" && user.role !== "admin") {
+    return (
+      <div className="py-12 text-center">
+        <div className="text-[11px] py-8 border-[2px] bg-[#ffffe1] inline-block px-8" style={{ borderStyle: "outset", borderWidth: 2 }}>
+          Restricted — administrators only.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <PageLayout>

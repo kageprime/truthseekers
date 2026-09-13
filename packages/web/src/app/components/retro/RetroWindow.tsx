@@ -2,10 +2,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import "./retro98.css";
+import RetroNavStrip from "./RetroNavStrip";
 import { crumbLabel } from "@/lib/routes";
 
-// ponytail: chrome is titlebar (home badge + breadcrumb trail) + content + statusbar. Nav lives in the sidebar.
-export default function RetroWindow({ title, children, status, path, crumb }: { title: string; children: React.ReactNode; status: string; path?: string; crumb?: string }) {
+// ponytail: chrome is titlebar (home badge + breadcrumb trail) + optional nav strip + content + statusbar.
+export default function RetroWindow({ title, children, status, path, crumb, nav }: { title: string; children: React.ReactNode; status: string; path?: string; crumb?: string; nav?: boolean }) {
   const pathname = usePathname();
   const p = path ?? pathname ?? "/";
   const segs = p.split("/").filter(Boolean);
@@ -37,6 +38,7 @@ export default function RetroWindow({ title, children, status, path, crumb }: { 
           </div>
           <div className="flex gap-0.5" aria-hidden>{["_","□","X"].map((c) => <div key={c} className="w-[16px] h-[14px] bg-[#d4d0c8] text-[10px] leading-[12px] text-black flex items-center justify-center font-bold" style={{ borderStyle:"outset",borderWidth:1,borderColor:"white #404040 #404040 white" }}>{c}</div>)}</div>
         </div>
+        {nav && <RetroNavStrip />}
         <div className="flex-1 flex flex-col lg:flex-row min-h-0 gap-2 p-2">{children}</div>
         <div className="h-[18px] bg-[#d4d0c8] border-t-[2px] border-[#808080] flex items-center px-2 text-[10px] gap-3 shrink-0">
           <span className="border px-2 py-0 bg-[#efe9d5]" style={{ borderStyle:"inset",borderWidth:1 }}>Ready</span>
