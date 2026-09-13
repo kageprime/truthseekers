@@ -62,28 +62,43 @@ func apiPublicBase() string {
 	return "http://localhost:4097"
 }
 
-// imageAPIKey resolves the server-side image credential: hot-swapped
-// credstore first (admin UI, no redeploy), env fallback.
-func (s *Server) imageAPIKey() string {
+// imageProvider resolves the image backend: Muse Image via the Meta Model
+// API key first (already configured in prod — same key as the text
+// pipeline), DigitalOcean Inference as fallback. Returns base URL, model,
+// and key.
+func (s *Server) imageProvider() (baseURL, model, apiKey string, ok bool) {
 	if s.credStore != nil {
+		if k := s.credStore.Get("meta"); k != "" {
+			return "https://api.meta.ai/v1", "muse-image-1.0", k, true
+		}
 		if k := s.credStore.Get("do"); k != "" {
-			return k
+			return "https://inference.do-ai.run/v1", "stable-diffusion-3.5-large", k, true
 		}
 	}
-	return os.Getenv("MODEL_ACCESS_KEY")
+	if k := strings.TrimSpace(os.Getenv("MODEL_API_KEY")); k != "" {
+		return "https://api.meta.ai/v1", "muse-image-1.0", k, true
+	}
+	if k := strings.TrimSpace(os.Getenv("MODEL_ACCESS_KEY")); k != "" {
+		return "https://inference.do-ai.run/v1", "stable-diffusion-3.5-large", k, true
+	}
+	return "", "", "", false
 }
 
-// callImageAPI runs one DO Inference image generation and returns raw PNG
-// bytes. Shared by the chat gateway executor and the article pipeline.
-func callImageAPI(baseURL, apiKey, prompt string) ([]byte, error) {
+// callImageAPI runs one text-to-image generation and returns raw PNG bytes.
+// Both backends speak the OpenAI images shape; Muse returns a URL or b64,
+// DO returns b64. Shared by the chat gateway executor and the pipeline.
+func callImageAPI(baseURL, model, apiKey, prompt string) ([]byte, error) {
 	body := map[string]interface{}{
-		"model":           "stable-diffusion-3.5-large",
-		"prompt":          prompt,
-		"n":               1,
-		"size":            "1024x1024",
-		"quality":         "auto",
-		"response_format": "b64_json",
-		"output_format":   "png",
+		"model":  model,
+		"prompt": prompt,
+		"n":      1,
+	}
+	// ponytail: DO-only extras — Muse takes the minimal OpenAI shape.
+	if !strings.Contains(baseURL, "api.meta.ai") {
+		body["size"] = "1024x1024"
+		body["quality"] = "auto"
+		body["response_format"] = "b64_json"
+		body["output_format"] = "png"
 	}
 	payload, _ := json.Marshal(body)
 	req, err := http.NewRequest("POST", strings.TrimSuffix(baseURL, "/")+"/images/generations", bytes.NewReader(payload))
@@ -105,17 +120,47 @@ func callImageAPI(baseURL, apiKey, prompt string) ([]byte, error) {
 	var doResp struct {
 		Data []struct {
 			B64JSON string `json:"b64_json"`
+			URL     string `json:"url"`
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&doResp); err != nil {
 		return nil, err
 	}
-	if len(doResp.Data) == 0 || doResp.Data[0].B64JSON == "" {
+	if len(doResp.Data) == 0 {
 		return nil, fmt.Errorf("empty image result")
 	}
-	raw, err := base64.StdEncoding.DecodeString(doResp.Data[0].B64JSON)
+	return fetchImageBytes(doResp.Data[0].B64JSON, doResp.Data[0].URL)
+}
+
+// fetchImageBytes resolves one OpenAI image object to raw bytes: inline
+// b64 preferred, otherwise a server-side download of the (signed) URL.
+func fetchImageBytes(b64, url string) ([]byte, error) {
+	if b64 != "" {
+		raw, err := base64.StdEncoding.DecodeString(b64)
+		if err != nil || len(raw) == 0 || len(raw) > 10<<20 {
+			return nil, fmt.Errorf("invalid image payload")
+		}
+		return raw, nil
+	}
+	if url == "" {
+		return nil, fmt.Errorf("empty image result")
+	}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		return nil, fmt.Errorf("image download %d", resp.StatusCode)
+	}
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20+1))
 	if err != nil || len(raw) == 0 || len(raw) > 10<<20 {
-		return nil, fmt.Errorf("invalid image payload")
+		return nil, fmt.Errorf("invalid image download")
 	}
 	return raw, nil
 }
@@ -125,11 +170,12 @@ func callImageAPI(baseURL, apiKey, prompt string) ([]byte, error) {
 // Non-fatal: a missing key or failed call logs loudly and the article ships
 // text-only — never fail a 3-minute generation over images.
 func (s *Server) generateArticleImages(slug string, art *storage.Article) {
-	key := s.imageAPIKey()
-	if key == "" {
-		log.Printf("[images] slug=%s: MODEL_ACCESS_KEY/credstore(do) unset — skipping visuals (set via admin credentials page)", slug)
+	baseURL, model, key, ok := s.imageProvider()
+	if !ok {
+		log.Printf("[images] slug=%s: no image key (MODEL_API_KEY/MODEL_ACCESS_KEY or credstore meta/do) — skipping visuals", slug)
 		return
 	}
+	log.Printf("[images] slug=%s: generating via %s (%s)", slug, model, baseURL)
 	_ = s.db.SaveJob(slug, "media", "media", map[string]interface{}{"title": art.Title})
 	BroadcastProgress(slug, "progress", map[string]interface{}{
 		"slug": slug, "phase": "media", "node": "generate_media",
@@ -175,7 +221,7 @@ func (s *Server) generateArticleImages(slug string, art *storage.Article) {
 	base := apiPublicBase()
 	made := 0
 	for _, t := range targets {
-		raw, err := callImageAPI("https://inference.do-ai.run/v1", key, t.prompt)
+		raw, err := callImageAPI(baseURL, model, key, t.prompt)
 		if err != nil {
 			log.Printf("[images] slug=%s %s: %v", slug, t.name, err)
 			continue

@@ -700,7 +700,7 @@ func (s *Server) generateImageExecutorCustom(input executor.CallInput, conn *exe
 	if apiKey == "" {
 		return executor.CallResult{Status: "error", Reason: "image generation not configured"}
 	}
-	raw, err := callImageAPI(conn.BaseURL, apiKey, prompt)
+	raw, err := callImageAPI(conn.BaseURL, "stable-diffusion-3.5-large", apiKey, prompt)
 	if err != nil {
 		return executor.CallResult{Status: "error", Reason: fmt.Sprintf("image generation failed: %v", err)}
 	}
