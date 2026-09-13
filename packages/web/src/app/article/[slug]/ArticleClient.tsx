@@ -12,6 +12,7 @@ import { collectAnchorNumbers, stripClaimAnchors } from "@/lib/claim-parser";
 import MagazineBody from "../../components/MagazineBody";
 import ContestDialog from "../../components/ContestDialog";
 import FactFile from "../../components/FactFile";
+import KeyFactsBox from "../../components/KeyFactsBox";
 import ClaimRail from "../../components/ClaimRail";
 import ClaimDetail from "../../components/ClaimDetail";
 import ClaimGraphViewer from "../../components/ClaimGraphViewer";
@@ -505,6 +506,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         </header>
 
         <RefreshDiffBanner slug={slug} />
+
+        <KeyFactsBox facts={(epistemic as any)?.key_facts ?? []} />
 
         <div className="mb-6" />
         {showGraph && (

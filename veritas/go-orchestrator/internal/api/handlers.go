@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	sessionlifecycle "github.com/kageprime/veritas/go-orchestrator/internal/session-lifecycle"
+	"github.com/kageprime/veritas/go-orchestrator/internal/storage"
 )
 
 // Active SSE channel registries for real-time progress updates
@@ -690,10 +692,47 @@ func (s *Server) handleArticleEpistemic(w http.ResponseWriter, r *http.Request, 
 		"slug":           slug,
 		"claims":         claims,
 		"gaps":           gaps,
+		"key_facts":      keyFacts(claims),
 		"freshness":      map[string]interface{}{"overall_score": overall, "claim_freshness": claimFresh},
 		"refresh_diff":   diff,
 		"claim_graph":    map[string]interface{}{"nodes": nodes, "edges": edges},
 	})
+}
+
+// keyFacts derives the article's file-box rows from its resolved claims —
+// the closest generic stand-in for Wikipedia's infobox. Supported claims
+// first (they're the established facts), then unknown, disputed, weak;
+// highest confidence wins within a tier. Cap 8. Pure ranking, no invention.
+func keyFacts(claims []*storage.Claim) []map[string]interface{} {
+	tier := map[string]int{"supported": 0, "unknown": 1, "disputed": 2, "weak": 3}
+	sorted := append([]*storage.Claim(nil), claims...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		ti, tj := tier[sorted[i].Status], tier[sorted[j].Status]
+		if _, ok := tier[sorted[i].Status]; !ok {
+			ti = 1
+		}
+		if _, ok := tier[sorted[j].Status]; !ok {
+			tj = 1
+		}
+		if ti != tj {
+			return ti < tj
+		}
+		return sorted[i].DerivedConfidence > sorted[j].DerivedConfidence
+	})
+	out := []map[string]interface{}{}
+	for _, c := range sorted {
+		if len(out) >= 8 || c.Text == "" {
+			continue
+		}
+		out = append(out, map[string]interface{}{
+			"id": c.ID, "text": c.Text, "status": c.Status,
+			"derived_confidence": c.DerivedConfidence,
+		})
+	}
+	if out == nil {
+		out = []map[string]interface{}{}
+	}
+	return out
 }
 
 // handleGetGlobalClaimGraph returns a cross-encyclopedia claim graph for the
