@@ -11,7 +11,7 @@ export default function RetroNavStrip() {
   const { user } = useAuth();
   const admin = user?.role === "owner" || user?.role === "admin";
   return (
-    <nav aria-label="Site" className="flex items-center gap-x-1 gap-y-0.5 flex-wrap px-2 py-1 bg-[#e8e0c5] border-b-[2px] border-[#8a7f68] text-[11px] shrink-0">
+    <nav aria-label="Site" className="r-navstrip flex items-center gap-x-1 gap-y-0.5 flex-wrap px-2 py-1 bg-[#e8e0c5] border-b-[2px] border-[#8a7f68] text-[11px] shrink-0">
       {NAV_GROUPS.map((g, gi) => (
         <Fragment key={g}>
           {gi > 0 && <span aria-hidden className="select-none" style={{ color: "#8a7f68" }}>|</span>}

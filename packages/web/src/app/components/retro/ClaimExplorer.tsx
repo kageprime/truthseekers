@@ -58,9 +58,9 @@ export default function ClaimExplorer({ nodes, edges, selectedId: extSel, onSele
     <div className="w-full">
       <div className="flex gap-[6px] mb-2 flex-wrap items-center">
         {[["all", "Show All"], ["support", "Show Supporting Only"], ["weakest", "Highlight Weakest Link"]].map(([k, l]) => (
-          <button key={k} onClick={() => setMode(k as any)} className="px-3 py-[3px] text-[11px] border-[2px] bg-[#d4d0c8] text-black" style={{ borderStyle: mode === k ? "inset" : "outset" }}>{l}</button>
+          <button key={k} onClick={() => setMode(k as any)} className="px-3 py-[3px] min-h-[40px] sm:min-h-0 text-[11px] border-[2px] bg-[#d4d0c8] text-black" style={{ borderStyle: mode === k ? "inset" : "outset" }}>{l}</button>
         ))}
-        <button onClick={() => setFrozen((f) => !f)} className="ml-auto px-3 py-[3px] text-[11px] border-[2px] bg-[#0a2a5e] text-white" style={{ borderStyle: frozen ? "inset" : "outset" }}>{frozen ? "▶ Resume motion" : "⏸ Freeze"}</button>
+        <button onClick={() => setFrozen((f) => !f)} className="ml-auto px-3 py-[3px] min-h-[40px] sm:min-h-0 text-[11px] border-[2px] bg-[#0a2a5e] text-white" style={{ borderStyle: frozen ? "inset" : "outset" }}>{frozen ? "▶ Resume motion" : "⏸ Freeze"}</button>
       </div>
       <ClaimExplorerCanvas nodes={nodes} edges={fed} selectedId={mode === "weakest" ? weakestId : selectedId} centralId={centralId} frozen={frozen} onSelect={handleCanvasSelect} />
       {!hideInspector && <div className="mt-2"><RetroInspector node={mode === "weakest" ? nodes.find((n: any) => n.id === weakestId) ?? node : node} nodes={nodes} edges={edges} centralId={centralId} /></div>}

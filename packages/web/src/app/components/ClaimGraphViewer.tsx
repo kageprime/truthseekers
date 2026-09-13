@@ -71,8 +71,8 @@ export default function ClaimGraphViewer({
 
   return (
     <div className="relative my-4 overflow-hidden rounded-[1.2rem]" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-      <div className="relative" style={{ height }}>
-        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
+      <div className="relative max-h-[340px] sm:max-h-none" style={{ height }}>
+        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block touch-pan-y" />
         <div className="absolute top-2 left-2 flex flex-wrap gap-1.5 text-[10px] pointer-events-none max-w-[calc(100%-8px)]" style={{ color: "var(--muted)" }}>
           {Object.entries(STATUS_COLOR).map(([k, c]) => (
             <span key={k} className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 backdrop-blur" style={{ background: "color-mix(in srgb, var(--surface-elevated) 72%, transparent)", border: "1px solid var(--border)" }}>
@@ -94,7 +94,7 @@ export default function ClaimGraphViewer({
       {selectedFull && !onNodeClick && (
         <div className="relative border-t p-4" style={{ borderColor: "var(--rule)" }}>
           <div aria-hidden className="absolute inset-x-0 top-0 h-px" style={{ background: "linear-gradient(90deg, transparent, var(--gold), transparent)" }} />
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 flex-col sm:flex-row">
             <ConfidenceRadar vector={selectedFull.confidence_vector} size={132} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-1.5">

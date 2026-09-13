@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { NAV_GROUPS, RETRO_ROUTES } from "@/lib/routes";
-import { IconBack, IconBook, IconChat, IconClock, IconGear, IconGraph, IconHome, IconList, IconMap, IconPencil, IconQuestion, IconScale, IconTag, IconWrench } from "./icons";
+import { IconBack, IconFwd, IconBook, IconChat, IconClock, IconGear, IconGraph, IconHome, IconList, IconMap, IconPencil, IconQuestion, IconScale, IconTag, IconWrench } from "./icons";
 
 // ponytail: single contents nav — sidebar tree on desktop, collapsed toggle on mobile. Every list page renders this.
 const ICONS: Record<string, (p: { size?: number }) => React.ReactNode> = {
@@ -27,7 +27,7 @@ export default function RetroContentsNav({ pathname, showAdmin }: { pathname: st
         <span>Contents</span><span aria-hidden>{treeOpen ? "▾" : "▸"}</span>
       </button>
       <div className="hidden lg:flex bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 items-center justify-between"><span>Contents</span><span className="bg-[#c9a227] text-black px-1 text-[9px] border border-black">TREE</span></div>
-      <nav id="retro-contents" className={`${treeOpen ? "block" : "hidden"} lg:block p-2 space-y-2 overflow-auto`} aria-label="Site contents">
+      <nav id="retro-contents" className={`${treeOpen ? "block max-h-[50dvh]" : "hidden"} lg:block lg:max-h-none p-2 space-y-2 overflow-auto`} aria-label="Site contents">
         {NAV_GROUPS.map((g) => (
           <div key={g}>
             <div className="text-[9px] font-bold tracking-widest uppercase px-1.5 pb-0.5" style={{ color: "#8a7f68" }}>{g}</div>
@@ -50,8 +50,9 @@ export default function RetroContentsNav({ pathname, showAdmin }: { pathname: st
         <div className="text-[12px] font-bold" style={{ fontFamily: "Georgia" }}>pis·ci·vore</div>
         <div className="text-[10px] leading-[1.3] mt-0.5"><i>n.</i> Fish-eater.</div>
       </div>
-      <div className="mt-auto p-2 flex gap-1">
+      <div className="mt-auto p-2 flex gap-1" style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
         <button className="r-btn flex-1 inline-flex items-center justify-center gap-1" onClick={() => router.back()} aria-label="Go back"><IconBack size={12} /> Back</button>
+        <button className="r-btn flex-1 inline-flex items-center justify-center gap-1" onClick={() => router.forward()} aria-label="Go forward">Fwd <IconFwd size={12} /></button>
         <button className="r-btn flex-1 inline-flex items-center justify-center gap-1" onClick={() => router.push("/article/new")} aria-label="Write a new article"><IconPencil size={12} /> New</button>
       </div>
     </div>

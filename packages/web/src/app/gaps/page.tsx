@@ -87,7 +87,7 @@ export default function GapsPage() {
               )}
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <Link href={`/article/${g.article_slug}`} className="text-[10px] underline" style={{ color: "#0a2a5e" }}>{g.article_slug}</Link>
+                  <Link href={`/article/${g.article_slug}`} className="text-[10px] underline break-all" style={{ color: "#0a2a5e" }}>{g.article_slug}</Link>
                   <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
                     <span className="text-[9px] font-bold px-1.5 py-0.5 border border-black text-white" style={{ background: g.gap_type === "expected" ? "#b7791f" : "#6b7a8f" }}>{g.gap_type}</span>
                     <span className="text-[9px] font-bold px-1.5 py-0.5 border border-black text-white" style={{ background: g.verification_status === "verified_gap" ? "#a33a3a" : "#6b7a8f" }}>{g.verification_status.replace(/_/g, " ")}</span>
@@ -96,7 +96,7 @@ export default function GapsPage() {
                   </div>
                 </div>
                 <button onClick={() => handleUpvote(g.id)} aria-label={`Upvote gap, ${g.upvotes} votes`}
-                  className="r-btn shrink-0 flex flex-col items-center px-2 py-1"
+                  className="r-btn shrink-0 flex flex-col items-center justify-center px-2 py-1 min-h-[40px] min-w-[44px]"
                 >
                   <span className="text-sm leading-none" aria-hidden>▲</span>
                   <span className="text-[10px] tabular-nums mt-0.5">{g.upvotes}</span>
@@ -108,7 +108,7 @@ export default function GapsPage() {
                     value={submitting === g.id ? submitUrl : ""}
                     onChange={(e) => { setSubmitting(g.id); setSubmitUrl(e.target.value); }}
                     onFocus={() => setSubmitting(g.id)}
-                    className="flex-1 min-w-[180px] text-[11px] px-2 py-1 bg-white text-black"
+                    className="flex-1 min-w-0 basis-full sm:basis-auto sm:min-w-[180px] text-[11px] px-2 py-1 bg-white text-black"
                     style={{ borderStyle: "inset", borderWidth: 2, borderColor: "#808080 #fff #fff #808080" }} />
                   <input type="text" placeholder="Note (optional)" aria-label="Evidence note"
                     value={submitting === g.id ? submitNote : ""}

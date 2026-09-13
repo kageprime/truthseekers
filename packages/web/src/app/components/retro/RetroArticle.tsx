@@ -181,7 +181,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
 
       <div className="flex-1 min-w-0 bg-[#efe9d5] flex flex-col">
         <div className="bg-white m-1.5 sm:m-2 flex-1 overflow-auto r-scroll" style={{ borderStyle:"inset",borderWidth:3,borderColor:"#8a7f68 #fff8e0 #fff8e0 #8a7f68" }}>
-          <div className="max-w-[800px] mx-auto p-5 sm:p-8">
+          <div className="max-w-[800px] mx-auto p-3 sm:p-8">
             <div className="border-b-[3px] border-[#0a2a5e] pb-3 mb-4">
               <div className="text-[10px] text-[#0a2a5e] font-bold tracking-widest uppercase">{(article?.categories ?? []).join(" • ") || "Encyclopedia • Evidence"}</div>
               <h1 className="r-h1 mt-1">{article?.title ?? "Untitled"}</h1>
@@ -199,13 +199,13 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
             </section>
             <section ref={(el)=>{refs.current.anatomy=el;}} id="anatomy" className="mb-8 scroll-mt-4">
               <h2 className="r-h2"><span>3</span> Claims ({claims.length})</h2>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]" style={{ fontFamily:"Verdana" }}>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]" style={{ fontFamily:"Verdana" }}>
                 {claims.slice(0,4).map((c:any)=><div key={c.id} className="border bg-[#efe9d5] p-2"><b>{c.status}</b> {(c.derived_confidence*100|0)}%<br/>{String(c.text).slice(0,90)}…</div>)}
-                {claims.length===0&&<div className="border bg-[#efe9d5] p-2 col-span-2">No claims yet — epistemic pipeline pending.</div>}
+                {claims.length===0&&<div className="border bg-[#efe9d5] p-2 col-span-1 sm:col-span-2">No claims yet — epistemic pipeline pending.</div>}
               </div>
             </section>
             <section ref={(el)=>{refs.current.debate=el;}} id="debate" className="mb-8 scroll-mt-4 border-[3px] border-[#c9a227] bg-[#fffef6] p-2" style={{ borderStyle:"ridge",borderWidth:3 }}>
-              <div className="flex items-center gap-2 mb-2"><h2 className="text-[15px] font-bold bg-[#a33] text-white px-2 py-1 inline-flex items-center gap-2"><span>4</span> The Debate</h2><span className="text-[9px] bg-[#a33] text-white px-1.5 py-0.5 font-bold border border-black animate-pulse">CONTROVERSY • ACTIVE</span></div>
+              <div className="flex flex-wrap items-center gap-2 mb-2"><h2 className="text-[15px] font-bold bg-[#a33] text-white px-2 py-1 inline-flex items-center gap-2"><span>4</span> The Debate</h2><span className="text-[9px] bg-[#a33] text-white px-1.5 py-0.5 font-bold border border-black animate-pulse">CONTROVERSY • ACTIVE</span></div>
               <div className="border-[3px] bg-[#d4d0c8] p-2" style={{ borderStyle:"ridge" }}>
                 <div className="flex items-center justify-between bg-[#0a2a5e] text-white px-2 py-1 mb-2"><div className="text-[11px] font-bold inline-flex items-center gap-1.5"><IconFlask size={13} /> TruthSeekers Researcher: Claim Explorer</div><div className="text-[9px] bg-[#c9a227] text-black px-1 border border-black">INTERACTIVE • DRAG &amp; CLICK</div></div>
                 {g.nodes.length>0?<ClaimExplorer nodes={g.nodes} edges={g.edges} selectedId={explorerSel} onSelect={setExplorerSel}/>:<div className="text-[11px] bg-white border p-3">No claim graph yet — generate the article to seed it.</div>}
@@ -269,7 +269,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
         </div>
         <div className="text-[9px] text-center text-[#8a7f68] py-1">TruthSeekers • Living Encyclopedia</div>
       </div>
-      {zoom&&<div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4" onClick={()=>setZoom(false)}><div className="bg-[#efe9d5] border-[3px] max-w-[900px] w-full" style={{ borderStyle:"outset",borderColor:"#fff8e0 #8a7f68 #8a7f68 #fff8e0" }} onClick={(e)=>e.stopPropagation()}><div className="h-[20px] bg-[#0a2a5e] text-white text-[11px] font-bold flex items-center justify-between px-2"><span>{article?.title}</span><button onClick={()=>setZoom(false)} aria-label="Close viewer" className="w-[14px] h-[12px] bg-[#d4d0c8] text-black border text-[9px] flex items-center justify-center" style={{ borderStyle:"outset",borderWidth:1 }}>X</button></div><div className="p-6 text-[13px] bg-black text-white">{body}</div></div></div>}
+      {zoom&&<div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 overflow-y-auto" onClick={()=>setZoom(false)}><div className="bg-[#efe9d5] border-[3px] max-w-[900px] w-full max-h-[85dvh] overflow-auto" style={{ borderStyle:"outset",borderColor:"#fff8e0 #8a7f68 #8a7f68 #fff8e0" }} onClick={(e)=>e.stopPropagation()}><div className="h-[20px] bg-[#0a2a5e] text-white text-[11px] font-bold flex items-center justify-between px-2"><span>{article?.title}</span><button onClick={()=>setZoom(false)} aria-label="Close viewer" className="w-[14px] h-[12px] bg-[#d4d0c8] text-black border text-[9px] flex items-center justify-center" style={{ borderStyle:"outset",borderWidth:1 }}>X</button></div><div className="p-6 text-[13px] bg-black text-white">{body}</div></div></div>}
       {inspectId&&<div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4" onClick={closeInspect} role="dialog" aria-modal="true" aria-label={`Claim ${anchorNums[inspectId] ?? ""} inspection`}>
         <div className="bg-[#efe9d5] border-[3px] max-w-[560px] w-full" style={{ borderStyle:"outset",borderColor:"#fff8e0 #8a7f68 #8a7f68 #fff8e0" }} onClick={(e)=>e.stopPropagation()}>
           <div className="h-[20px] bg-[#0a2a5e] text-white text-[11px] font-bold flex items-center justify-between px-2">

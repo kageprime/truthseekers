@@ -47,8 +47,15 @@ export default function RetroPalette() {
         setOpen((o) => !o); setQ(""); setIdx(0);
       } else if (e.key === "Escape" && open) { e.preventDefault(); close(); }
     };
+    // ponytail: touch entry — the titlebar Go to… button fires this (no keyboard on a PWA phone).
+    const onBridge = () => {
+      invoker.current = document.activeElement as HTMLElement | null;
+      setRecents(readRecents());
+      setOpen(true); setQ(""); setIdx(0);
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("retro-palette-open", onBridge);
+    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("retro-palette-open", onBridge); };
   }, [open, close]);
 
   useEffect(() => {
@@ -63,6 +70,7 @@ export default function RetroPalette() {
       { kind: "action", label: "New article", hint: "action", run: go("/article/new"), keys: "new article write create generate" },
       { kind: "action", label: "New chat", hint: "action", run: go("/chat/new"), keys: "new chat ask agent conversation" },
       { kind: "action", label: "Go back", hint: "action", run: () => { close(); router.back(); }, keys: "back previous go back" },
+      { kind: "action", label: "Go forward", hint: "action", run: () => { close(); router.forward(); }, keys: "forward next go forward" },
       { kind: "action", label: "Copy page address", hint: "action", run: () => { try { navigator.clipboard.writeText(window.location.href); } catch {} close(); }, keys: "copy address url link share" },
     ];
     const seen = new Set<string>();
@@ -81,9 +89,9 @@ export default function RetroPalette() {
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[200] bg-black/50 flex items-start justify-center p-4 pt-[12vh]" onClick={close} role="presentation">
+    <div className="fixed inset-0 z-[200] bg-black/50 flex items-start justify-center p-4 pt-[12vh] overflow-y-auto" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }} onClick={close} role="presentation">
       <div
-        className="bg-[#efe9d5] w-full max-w-[520px]"
+        className="bg-[#efe9d5] w-full max-w-[520px] max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col my-auto"
         style={{ borderStyle: "outset", borderWidth: 3, borderColor: "#fff8e0 #8a7f68 #8a7f68 #fff8e0", boxShadow: "6px 6px 0 rgba(0,0,0,.4)" }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -110,7 +118,7 @@ export default function RetroPalette() {
             role="combobox"
             aria-controls="retro-palette-list"
             aria-activedescendant={filtered[idx] ? `rp-${idx}` : undefined}
-            className="w-full px-2 py-1.5 text-[12px] bg-white text-black"
+            className="w-full px-2 py-1.5 text-[16px] bg-white text-black"
             style={{ borderStyle: "inset", borderWidth: 2, borderColor: "#808080 #fff #fff #808080" }}
           />
           <ul id="retro-palette-list" role="listbox" aria-label="Matches" className="mt-1.5 max-h-[300px] overflow-auto bg-white border-[2px]" style={{ borderStyle: "inset", borderColor: "#8a7f68 #fff8e0 #fff8e0 #8a7f68" }}>

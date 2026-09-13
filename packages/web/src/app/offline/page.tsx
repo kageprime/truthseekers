@@ -11,27 +11,20 @@ export const metadata = {
 // Must stay dependency-free (no data fetching) so it precaches reliably.
 export default function OfflinePage() {
   return (
-    <main className="min-h-dvh flex flex-col items-center justify-center px-6 text-center">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-3xl" style={{ background: "color-mix(in srgb, var(--gold) 14%, transparent)", border: "1px solid color-mix(in srgb, var(--gold) 30%, transparent)" }}>
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-        </svg>
+    <main>
+      <div className="border-b-[3px] border-[#0a2a5e] pb-3 mb-4">
+        <div className="text-[10px] text-[#0a2a5e] font-bold tracking-widest uppercase">TruthSeekers • No connection</div>
+        <h1 className="r-h1 mt-1" style={{ fontSize: 28 }}>You are offline</h1>
+        <p className="text-[11px] mt-1" style={{ color: "#555" }}>
+          Articles and pages you have already opened are kept on this device and stay readable. Chat and generation need a connection.
+        </p>
       </div>
-      <p className="eyebrow mb-3">No connection</p>
-      <h1 className="font-display font-bold mb-3" style={{ fontSize: "clamp(1.75rem, 1.2rem + 2vw, 2.5rem)", color: "var(--ink)", letterSpacing: "-0.02em" }}>
-        You are offline
-      </h1>
-      <p className="text-sm sm:text-base max-w-md leading-relaxed mb-8" style={{ color: "var(--muted)" }}>
-        Articles and pages you have already opened are kept on this device and stay readable. Chat and generation need a connection.
-      </p>
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <Link href="/" className="cta-bevel">
-          Back to safety
-        </Link>
-        <Link href="/articles" className="text-sm font-medium underline underline-offset-4" style={{ color: "var(--accent-dark)" }}>
-          Browse cached articles
-        </Link>
+      <div className="bg-[#ffffe1] border-[2px] p-3 text-[12px] leading-[1.5] text-black" style={{ borderStyle: "outset", borderWidth: 2 }}>
+        While you wait: open the <span className="font-bold">Contents</span> tree to revisit cached articles, or press the <span className="font-bold">Go to…</span> button in the title bar to jump from recent pages.
+      </div>
+      <div className="flex flex-wrap items-center gap-2 mt-4">
+        <Link href="/" className="r-btn inline-block px-4 py-1.5 no-underline text-black">Back to safety</Link>
+        <Link href="/articles" className="text-[11px] font-bold text-[#0a2a5e] underline">Browse cached articles</Link>
       </div>
     </main>
   );

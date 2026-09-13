@@ -1156,9 +1156,12 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
 
 /* Press View - newspaper columns */
 .newspaper-columns {
-  column-count: 2;
+  column-count: 1;
   column-gap: 1.5rem;
   column-rule: 1px solid rgba(138, 122, 98, 0.25);
+}
+@media (min-width: 640px) {
+  .newspaper-columns { column-count: 2; }
 }
 .newspaper-columns.front-page .block-renderer > *:first-child {
   margin-top: 0;

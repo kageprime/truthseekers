@@ -136,7 +136,7 @@ export default function GlobalClaimGraphPage() {
 
       <div className="bezel mb-6">
         <div className="bezel-inner flex flex-wrap items-center gap-3 md:gap-5 px-4 md:px-5 py-3.5 text-[10px]">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className="eyebrow !text-[9px] !py-0.5">Claims</span>
             {[50, 100, 150, 300].map((n) => (
               <button
@@ -155,7 +155,7 @@ export default function GlobalClaimGraphPage() {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className="eyebrow !text-[9px] !py-0.5">Min contradiction</span>
             {[0, 0.2, 0.4, 0.6].map((v) => (
               <button

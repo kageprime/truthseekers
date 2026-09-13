@@ -154,7 +154,7 @@ export default function SettingsPage() {
     { id: "preferences", icon: IconPalette, title: "Preferences", content: (
       <div className="space-y-4">
         <label className="block text-xs font-medium" style={{ color: "var(--muted)" }}>Theme</label>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {([
             { id: "light" as const, label: "Light", desc: "Warm paper", style: { background: "#f5efe0", color: "#1a1612" } },
             { id: "dark" as const, label: "Dark", desc: "Night mode", style: { background: "#1a1714", color: "#ece3d2" } },

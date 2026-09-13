@@ -6,9 +6,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
   "background_color": "#f5efe0",
-  "theme_color": "#f5efe0",
+  "theme_color": "#0a2a5e",
   "categories": ["education", "books", "reference"],
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
@@ -18,11 +17,6 @@
   ],
   "shortcuts": [
     {
-      "name": "Chat",
-      "url": "/chat/new",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
-    },
-    {
       "name": "Articles",
       "url": "/articles",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
@@ -30,6 +24,11 @@
     {
       "name": "Claim Graph",
       "url": "/claim-graph",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Chat",
+      "url": "/chat/new",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ]

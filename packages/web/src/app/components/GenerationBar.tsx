@@ -220,7 +220,7 @@ export default function GenerationBar({
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <button
                   disabled={resolving}
                   onClick={() => handleResolve("approve")}

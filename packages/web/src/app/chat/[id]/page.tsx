@@ -224,8 +224,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       status={`TruthSeekers • ${messages.length} message${messages.length === 1 ? "" : "s"}${sending ? " • streaming" : ""}`}
     >
     <div className="flex-1 flex min-h-0 bg-[#efe9d5] w-full">
-      {/* ── Mobile header bar ── */}
-      <div className="md:hidden fixed top-0 left-0 right-0 flex items-center justify-between px-3 h-11 bg-surface/95 backdrop-blur-md border-b border-border/30" style={{ zIndex: 40 }}>
+      {/* ── Mobile header bar (in-flow: RetroWindow already owns the top chrome) ── */}
+      <div className="md:hidden shrink-0 flex items-center justify-between px-3 h-11 bg-surface/95 backdrop-blur-md border-b border-border/30">
         <button
           onClick={() => setMobileSidebarOpen(true)}
           className="flex items-center justify-center w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-accent-bg/20 transition-all"
@@ -358,7 +358,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       {/* ── Main chat area ── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* ── Messages area ── */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 pt-12 md:pt-0">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
           {loading || convLoading ? (
             <div className="p-4 sm:p-6 space-y-5 max-w-[880px] mx-auto">
               <div className="flex justify-end">
@@ -447,15 +447,15 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         {!showEmpty && (
           <div className="shrink-0 bg-[#e8e0c5] border-t-[2px] border-[#8a7f68]">
             <div className="max-w-[880px] mx-auto px-2 sm:px-4">
-              <div className="flex items-center justify-between py-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#8a7f68" }}>
+              <div className="flex items-center justify-between gap-2 py-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest truncate min-w-0 flex-1" style={{ color: "#8a7f68" }}>
                   {sending ? "Agent working…" : conv?.title ?? "Conversation"}
                 </span>
                 <button
                   onClick={() => setConsoleOpen((o) => !o)}
                   aria-pressed={consoleOpen}
                   aria-label="Toggle agent trace panel"
-                  className="r-btn inline-flex items-center gap-1 px-2 py-0.5"
+                  className="r-btn inline-flex items-center gap-1 px-2 py-0.5 min-h-[40px] sm:min-h-0 shrink-0"
                   style={consoleOpen ? { borderStyle: "inset" } : undefined}
                 >
                   Trace{seg.unreadCount > 0 && !consoleOpen && <span className="bg-[#a33] text-white text-[9px] px-1 border border-black">{seg.unreadCount}</span>}
@@ -494,7 +494,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                       style={{ background: "var(--oxblood)" }}
                     >
                       <span
-                        className="cta-bevel-icon !w-7 !h-7"
+                        className="cta-bevel-icon !w-7 !h-7 max-sm:!w-10 max-sm:!h-10"
                         style={{ background: "color-mix(in srgb, var(--surface) 25%, transparent)", color: "var(--surface)" }}
                         aria-hidden
                       >
@@ -511,7 +511,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                       className="cta-bevel shrink-0 !p-1 !gap-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
                     >
                       <span
-                        className="cta-bevel-icon !w-7 !h-7"
+                        className="cta-bevel-icon !w-7 !h-7 max-sm:!w-10 max-sm:!h-10"
                         style={{ background: input.trim() ? "var(--gold)" : "color-mix(in srgb, var(--border) 60%, transparent)" }}
                         aria-hidden
                       >

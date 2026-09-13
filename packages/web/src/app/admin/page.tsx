@@ -36,7 +36,7 @@ function SeedPanel() {
         <div className="text-sm" style={{ color: "var(--subtle)" }}>Loading…</div>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
               <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>{seed.today.count}/{seed.today.limit}</div>
               <div className="text-xs" style={{ color: "var(--subtle)" }}>Today ({seed.today.date})</div>
@@ -51,7 +51,7 @@ function SeedPanel() {
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <button onClick={handleRun} disabled={running} className="btn btn-primary btn-sm">
+            <button onClick={handleRun} disabled={running} className="btn btn-primary btn-sm min-h-[40px]">
               {running ? "Queueing…" : "Run now"}
             </button>
             <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--subtle)" }}>
@@ -113,7 +113,7 @@ function CoordinatorPanel() {
         <div className="text-sm" style={{ color: "var(--subtle)" }}>Loading…</div>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
               <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>{coord.today.count}/{coord.today.limit}</div>
               <div className="text-xs" style={{ color: "var(--subtle)" }}>Refreshes today ({coord.today.date})</div>
@@ -143,7 +143,7 @@ function CoordinatorPanel() {
             </div>
           )}
           <div className="flex items-center gap-3 flex-wrap">
-            <button onClick={handleRun} disabled={running} className="btn btn-primary btn-sm">
+            <button onClick={handleRun} disabled={running} className="btn btn-primary btn-sm min-h-[40px]">
               {running ? "Coordinating…" : "Run now"}
             </button>
             <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--subtle)" }}>
@@ -234,8 +234,8 @@ export default function AdminPage() {
             <IconKey size={18} /> Credential Management
           </h2>
           <p className="text-xs" style={{ color: "var(--subtle)" }}>Hot-swap API tokens without restarting the server.</p>
-          <div className="flex gap-2 items-end">
-            <div className="flex-1 space-y-1">
+          <div className="flex gap-2 items-end flex-col sm:flex-row">
+            <div className="flex-1 min-w-0 w-full space-y-1">
               <label className="text-xs font-medium" style={{ color: "var(--subtle)" }}>Service</label>
               <select value={credService} onChange={(e) => setCredService(e.target.value)} className="input text-sm w-full">
                 {["groq", "do", "openai", "tavily", "firecrawl"].map((s) => (
@@ -243,11 +243,11 @@ export default function AdminPage() {
                 ))}
               </select>
             </div>
-            <div className="flex-[2] space-y-1">
+            <div className="flex-[2] min-w-0 w-full space-y-1">
               <label className="text-xs font-medium" style={{ color: "var(--subtle)" }}>Token</label>
               <input type="password" value={credToken} onChange={(e) => setCredToken(e.target.value)} placeholder="sk-..." className="input text-sm w-full" />
             </div>
-            <button onClick={handleCredSave} disabled={credSaving || !credToken.trim()} className="btn btn-primary btn-sm" style={{ marginBottom: 0 }}>
+            <button onClick={handleCredSave} disabled={credSaving || !credToken.trim()} className="btn btn-primary btn-sm min-h-[40px] w-full sm:w-auto" style={{ marginBottom: 0 }}>
               {credSaving ? "Saving…" : "Update"}
             </button>
           </div>
@@ -310,7 +310,7 @@ export default function AdminPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button onClick={handleSave} disabled={updating || settingsLoading} className="btn btn-primary btn-sm">
+            <button onClick={handleSave} disabled={updating || settingsLoading} className="btn btn-primary btn-sm min-h-[40px]">
               {updating ? "Saving…" : "Save"}
             </button>
             {saved && <span className="flex items-center gap-1 text-sm" style={{ color: "var(--green)" }}><IconCheck size={14} /> Saved</span>}
@@ -377,7 +377,7 @@ export default function AdminPage() {
             <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: "var(--ink)" }}>
               <IconActivity size={18} /> LLM Usage
             </h2>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
                 <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>{usage.totals?.callCount ?? 0}</div>
                 <div className="text-xs" style={{ color: "var(--subtle)" }}>Calls</div>

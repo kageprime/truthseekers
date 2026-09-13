@@ -86,7 +86,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         {showChat && (
           <div className="fixed inset-0 z-50 flex flex-col justify-end pointer-events-none">
             <div className="absolute inset-0 bg-black/30 pointer-events-auto" onClick={close} />
-            <div className="relative pointer-events-auto bg-[#efe9d5] border-[3px] max-h-[85vh] overflow-hidden" style={{ borderStyle: "outset", borderColor: "#fff8e0 #8a7f68 #8a7f68 #fff8e0" }}>
+            <div className="relative pointer-events-auto bg-[#efe9d5] border-[3px] max-h-[85dvh] overflow-hidden" style={{ borderStyle: "outset", borderColor: "#fff8e0 #8a7f68 #8a7f68 #fff8e0", paddingBottom: "max(0px, env(safe-area-inset-bottom))" }}>
               <FloatingChatWidget />
             </div>
           </div>

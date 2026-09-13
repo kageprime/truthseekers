@@ -95,7 +95,7 @@ function ArticleRow({ article, index }: { article: ArticleSummary; index: number
           <span className="block text-[11px] leading-[1.4] mt-0.5 line-clamp-2" style={{ color: "#444" }}>
             {article.abstract || "No description"}
           </span>
-          <span className="flex items-center gap-2 mt-1.5 text-[10px]" style={{ color: "#8a7f68" }}>
+          <span className="flex items-center gap-2 mt-1.5 text-[10px] flex-wrap" style={{ color: "#8a7f68" }}>
             {(article.categories ?? []).slice(0, 3).map((cat) => (
               <span key={cat}>{cat.replace(/-/g, " ")}</span>
             ))}
@@ -246,7 +246,7 @@ export default function ArticlesPage() {
               }
             }}
             disabled={!query.trim()}
-            className="r-btn shrink-0 inline-flex items-center gap-1 disabled:opacity-40"
+            className="r-btn shrink-0 inline-flex items-center gap-1 disabled:opacity-40 min-h-[40px]"
           >
             <IconLightning size={13} /> Generate
           </button>
@@ -287,10 +287,10 @@ export default function ArticlesPage() {
               ))}
             </select>
             <div className="ml-auto flex gap-1">
-              <button onClick={() => setViewMode("grid")} className="r-btn px-2 py-1 inline-flex items-center" title="Grid view" aria-label="Grid view" aria-pressed={viewMode === "grid"} style={viewMode === "grid" ? { borderStyle: "inset" } : undefined}>
+              <button onClick={() => setViewMode("grid")} className="r-btn px-2 py-1 inline-flex items-center min-h-[40px] min-w-[40px] justify-center" title="Grid view" aria-label="Grid view" aria-pressed={viewMode === "grid"} style={viewMode === "grid" ? { borderStyle: "inset" } : undefined}>
                 <IconGrid size={12} />
               </button>
-              <button onClick={() => setViewMode("list")} className="r-btn px-2 py-1 inline-flex items-center" title="List view" aria-label="List view" aria-pressed={viewMode === "list"} style={viewMode === "list" ? { borderStyle: "inset" } : undefined}>
+              <button onClick={() => setViewMode("list")} className="r-btn px-2 py-1 inline-flex items-center min-h-[40px] min-w-[40px] justify-center" title="List view" aria-label="List view" aria-pressed={viewMode === "list"} style={viewMode === "list" ? { borderStyle: "inset" } : undefined}>
                 <IconList size={12} />
               </button>
             </div>
@@ -337,7 +337,7 @@ export default function ArticlesPage() {
                 <button
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="r-btn px-3 py-1 disabled:opacity-40"
+                  className="r-btn px-3 py-1 disabled:opacity-40 min-h-[40px]"
                   aria-label="Previous page"
                 >
                   ◀ Prev
@@ -348,7 +348,7 @@ export default function ArticlesPage() {
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={page >= totalPages - 1}
-                  className="r-btn px-3 py-1 disabled:opacity-40"
+                  className="r-btn px-3 py-1 disabled:opacity-40 min-h-[40px]"
                   aria-label="Next page"
                 >
                   Next ▶

@@ -491,7 +491,7 @@ function GalleryBlock({ data, figureNum }: { data: GalleryBlockData; figureNum?:
   const num = figureNum;
   return (
     <figure className="figure-plate mb-4">
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 p-2">
         {data.images.filter(Boolean).map((img, i) => (
           <div key={i} className="overflow-hidden" style={{ border: "1px solid var(--rule)", borderRadius: "var(--radius-sharp)", aspectRatio: "4/3" }}>
             <MediaImage src={img.src} caption={undefined} prompt={img.prompt} />

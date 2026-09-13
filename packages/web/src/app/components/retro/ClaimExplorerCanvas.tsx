@@ -179,8 +179,8 @@ export default function ClaimExplorerCanvas({ nodes, edges, selectedId, centralI
   useEffect(() => { sim.current?.setSelected(selectedId); }, [selectedId]);
   useEffect(() => { sim.current?.setFrozen(frozen); }, [frozen]);
   return (
-    <div className="relative w-full overflow-hidden select-none" style={{ height, background: "#fdf8e8", borderStyle: "inset", borderWidth: 3, borderColor: "#a09060 #fff9e5 #fff9e5 #a09060", boxShadow: "inset 1px 1px 3px rgba(0,0,0,0.2)" }}>
-      <canvas ref={ref} className="absolute inset-0 w-full h-full block touch-none cursor-grab" />
+    <div className="relative w-full overflow-hidden select-none max-h-[320px] sm:max-h-none" style={{ height, background: "#fdf8e8", borderStyle: "inset", borderWidth: 3, borderColor: "#a09060 #fff9e5 #fff9e5 #a09060", boxShadow: "inset 1px 1px 3px rgba(0,0,0,0.2)" }}>
+      <canvas ref={ref} className="absolute inset-0 w-full h-full block touch-pan-y cursor-grab" />
       <div className="absolute left-2 top-2 px-2 py-1 bg-[#0a2a5e] text-white text-[10px] border border-black pointer-events-none">DRAG CANVAS • DRAG NODE • SCROLL ZOOM • CLICK CLAIM</div>
       <div className="absolute right-2 top-2 flex gap-2 text-[9px] pointer-events-none">
         {[["#2e7d32","Verified"],["#5a9a3a","Supported"],["#b7791f","Disputed"],["#a33a3a","Contradicted"]].map(([c,l])=><span key={l} className="flex items-center gap-1 bg-[#fdf8e8]/85 px-1"><span className="w-2.5 h-2.5 rounded-full inline-block border border-black" style={{ background:c }}/>{l}</span>)}

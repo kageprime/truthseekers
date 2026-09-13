@@ -69,7 +69,7 @@ export function ProvenanceChipInline({ claimId, status, active, onSelect, n, tit
       </button>
       {open && (
         <div className="absolute z-50 w-72 p-3 rounded-lg shadow-elev-2 border" style={{
-          top: "calc(100% + 4px)", left: 0,
+          top: "calc(100% + 4px)", left: 0, maxWidth: "calc(100vw - 32px)",
           background: "var(--surface-elevated, #fff)",
           borderColor: "var(--border-light, #e5e5e5)",
         }}>

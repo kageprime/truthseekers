@@ -43,18 +43,18 @@ export default function HomePage() {
 
       {/* Search */}
       <form onSubmit={submitSearch} className="mb-5" role="search" aria-label="Search the encyclopedia">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <input
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search articles, claims, topics…"
             aria-label="Search articles"
-            className="flex-1 bg-white text-black text-[13px] px-3 py-2"
+            className="flex-1 min-w-0 basis-full sm:basis-auto bg-white text-black text-[13px] px-3 py-2"
             style={{ borderStyle: "inset", borderWidth: 2, borderColor: "#808080 #fff #fff #808080" }}
           />
-          <button type="submit" disabled={!q.trim()} className="r-btn px-4 py-2 font-bold disabled:opacity-40">Search</button>
-          <button type="button" onClick={() => router.push("/chat/new")} className="r-btn px-4 py-2 font-bold">Research →</button>
+          <button type="submit" disabled={!q.trim()} className="r-btn px-4 py-2 font-bold disabled:opacity-40 min-h-[40px]">Search</button>
+          <button type="button" onClick={() => router.push("/chat/new")} className="r-btn px-4 py-2 font-bold min-h-[40px]">Research →</button>
         </div>
       </form>
 
@@ -97,9 +97,9 @@ export default function HomePage() {
           )}
           {articles.map((a: any, i: number) => (
             <Link key={a.slug ?? i} href={`/article/${a.slug}`} className="block bg-white border-[2px] p-2 no-underline hover:bg-[#fff8dc]" style={{ borderStyle: "outset" }}>
-              <span className="flex items-baseline gap-2">
+              <span className="flex items-baseline gap-2 flex-wrap">
                 <span className="text-[10px] font-bold tabular-nums shrink-0" style={{ color: "#8a7f68" }}>{String(i + 1).padStart(2, "0")}</span>
-                <span className="text-[13px] font-bold text-[#0a2a5e] leading-snug" style={{ fontFamily: "Georgia,serif" }}>{a.title}</span>
+                <span className="text-[13px] font-bold text-[#0a2a5e] leading-snug min-w-0 flex-1" style={{ fontFamily: "Georgia,serif" }}>{a.title}</span>
                 {a.metadata?.updated && (
                   <span className="ml-auto text-[10px] tabular-nums shrink-0" style={{ color: "#8a7f68" }}>
                     {new Date(a.metadata.updated).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}

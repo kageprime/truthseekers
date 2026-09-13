@@ -15,7 +15,7 @@ export default function RetroShell({ children, wide }: { children: React.ReactNo
       <RetroContentsNav pathname={pathname} showAdmin={showAdmin} />
       <div className="flex-1 min-w-0 bg-[#efe9d5] flex flex-col min-h-0">
         <div className="bg-white border-[3px] m-1.5 sm:m-2 flex-1 overflow-auto r-scroll min-h-0" style={{ borderStyle: "inset", borderWidth: 3, borderColor: "#8a7f68 #fff8e0 #fff8e0 #8a7f68" }}>
-          <div className={`${wide ? "" : "max-w-[960px] "}mx-auto p-5 sm:p-8`}>{children}</div>
+          <div className={`${wide ? "" : "max-w-[960px] "}mx-auto p-3 sm:p-8`}>{children}</div>
         </div>
       </div>
     </RetroWindow>
