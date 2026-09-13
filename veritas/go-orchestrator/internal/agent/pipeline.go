@@ -762,7 +762,7 @@ func DAGNodeExecutorsWithContext(systemPrompt, contestNote string) map[string]fu
 		"critique":         {promptCritique, map[string]string{"map_evidence": "CLAIM-EVIDENCE MAP"}},
 		"detect_missing":   {promptDetectMissing, map[string]string{"map_evidence": "EVIDENCE MAP"}},
 		"map_language":     {promptMapLanguage, map[string]string{"extract_claims": "CLAIMS"}},
-		"scrutinize":       {promptScrutinize, map[string]string{"map_evidence": "EVIDENCE MAP"}},
+		"scrutinize":       {promptScrutinize, map[string]string{"extract_claims": "CLAIMS", "map_evidence": "EVIDENCE MAP"}},
 		"resolve":          {promptResolve, map[string]string{"extract_claims": "CLAIMS", "critique": "CRITIQUE", "detect_missing": "MISSING EVIDENCE", "map_language": "LANGUAGE MAP", "scrutinize": "SCRUTINY REPORT"}},
 		"generate_article": {promptGenerateArticle, map[string]string{"resolve": "RESOLVED CLAIMS"}},
 	}

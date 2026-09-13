@@ -517,7 +517,60 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 	docURL := map[string]string{}
 	docSource := map[string]string{}
 
-	// 0. retrieve → save evidence items
+	// Claims first: evidence links, gaps, flags, and scrutiny all carry a
+	// claim_id FK. Persisting claims before anything that references them
+	// turns a total FK wipeout (23503 on every link) into linked rows.
+	// 0. extract_claims → save claims + link to article (with signature dedup)
+	if raw, ok := outputs["extract_claims"]; ok {
+		var result struct {
+			Claims []struct {
+				ClaimID string `json:"claim_id"`
+				Text    string `json:"text"`
+			} `json:"claims"`
+		}
+		b, _ := json.Marshal(raw)
+		if err := json.Unmarshal(b, &result); err == nil {
+			log.Printf("[epistemic] extract_claims: %d claims", len(result.Claims))
+			if len(result.Claims) == 0 {
+				warnEmpty("extract_claims", raw)
+			}
+			for _, c := range result.Claims {
+				if c.ClaimID == "" || c.Text == "" {
+					continue
+				}
+				sig := storage.ClaimSignature(c.Text)
+				existing, err := s.db.GetClaimBySignature(sig)
+				if err != nil {
+					log.Printf("[epistemic] dedup check %s: %v", c.ClaimID, err)
+				}
+				if existing != nil {
+					if err := s.db.LinkArticleClaim(slug, existing.ID); err != nil {
+						log.Printf("[epistemic] link dedup %s: %v", existing.ID, err)
+					}
+					continue
+				}
+				if err := s.db.SaveClaim(&storage.Claim{
+					ID:        c.ClaimID,
+					Text:      c.Text,
+					Signature: sig,
+					Type:      "factual",
+					Status:    "unknown",
+					CreatedAt: now,
+					UpdatedAt: now,
+				}); err != nil {
+					log.Printf("[epistemic] save claim %s: %v", c.ClaimID, err)
+					continue
+				}
+				if err := s.db.LinkArticleClaim(slug, c.ClaimID); err != nil {
+					log.Printf("[epistemic] link claim %s: %v", c.ClaimID, err)
+				}
+			}
+		} else {
+			log.Printf("[epistemic] parse extract_claims: %v", err)
+		}
+	}
+
+	// 1. retrieve → save evidence items
 	if raw, ok := outputs["retrieve"]; ok {
 		var result struct {
 			Documents map[string][]struct {
@@ -579,7 +632,7 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 		}
 	}
 
-	// 1. map_evidence → link evidence to claims
+	// 2. map_evidence → link evidence to claims (parents exist per step 0)
 	if raw, ok := outputs["map_evidence"]; ok {
 		var result struct {
 			ClaimEvidenceMap []struct {
@@ -645,55 +698,7 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 		}
 	}
 
-	// 2. extract_claims → save claims + link to article (with signature dedup)
-	if raw, ok := outputs["extract_claims"]; ok {
-		var result struct {
-			Claims []struct {
-				ClaimID string `json:"claim_id"`
-				Text    string `json:"text"`
-			} `json:"claims"`
-		}
-		b, _ := json.Marshal(raw)
-		if err := json.Unmarshal(b, &result); err == nil {
-			log.Printf("[epistemic] extract_claims: %d claims", len(result.Claims))
-			if len(result.Claims) == 0 {
-				warnEmpty("extract_claims", raw)
-			}
-			for _, c := range result.Claims {
-				if c.ClaimID == "" || c.Text == "" {
-					continue
-				}
-				sig := storage.ClaimSignature(c.Text)
-				existing, err := s.db.GetClaimBySignature(sig)
-				if err != nil {
-					log.Printf("[epistemic] dedup check %s: %v", c.ClaimID, err)
-				}
-				if existing != nil {
-					if err := s.db.LinkArticleClaim(slug, existing.ID); err != nil {
-						log.Printf("[epistemic] link dedup %s: %v", existing.ID, err)
-					}
-					continue
-				}
-				if err := s.db.SaveClaim(&storage.Claim{
-					ID:        c.ClaimID,
-					Text:      c.Text,
-					Signature: sig,
-					Type:      "factual",
-					Status:    "unknown",
-					CreatedAt: now,
-					UpdatedAt: now,
-				}); err != nil {
-					log.Printf("[epistemic] save claim %s: %v", c.ClaimID, err)
-					continue
-				}
-				if err := s.db.LinkArticleClaim(slug, c.ClaimID); err != nil {
-					log.Printf("[epistemic] link claim %s: %v", c.ClaimID, err)
-				}
-			}
-		} else {
-			log.Printf("[epistemic] parse extract_claims: %v", err)
-		}
-	}
+	// (extract_claims persisted as step 0 — FK parents first; see above)
 
 	// 3. resolve → update claim status, confidence_vector, derived_confidence
 	if raw, ok := outputs["resolve"]; ok {
