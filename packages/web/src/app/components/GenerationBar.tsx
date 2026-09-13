@@ -254,7 +254,7 @@ export default function GenerationBar({
           {/* Done celebration */}
           {isDone && (
             <div className="done-banner-inline">
-              <div className="done-icon">🎉</div>
+              <div className="done-icon" aria-hidden>✓</div>
               <h2>Article Complete</h2>
               <p>The encyclopedia has a new entry on <strong>{entry.title}</strong>.</p>
               <div className="done-actions">

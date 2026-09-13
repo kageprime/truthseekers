@@ -54,7 +54,7 @@ export default function GlobalClaimGraphPage() {
   const retroNode = data?.nodes.find((n) => n.id === retroSel) ?? data?.nodes.find((n) => n.id === retroCentral) ?? null;
   if (IS_RETRO) {
     return (
-      <RetroWindow title="Microsoft Encarta Encyclopedia 98 - Claimgraph Atlas" address="encarta.msn.com/Atlas/ClaimGraph" status={`MS Encarta • ${data?.nodes.length ?? 0} nodes • ${data?.edges.length ?? 0} edges`}>
+      <RetroWindow title="TruthSeekers — Claimgraph Atlas" path="/claim-graph" status={`TruthSeekers • ${data?.nodes.length ?? 0} nodes • ${data?.edges.length ?? 0} edges`}>
         <div className="r-side w-full lg:w-[270px] shrink-0 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68] p-2 space-y-2 overflow-auto">
           <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1">Atlas Controls</div>
           <div>
@@ -69,7 +69,7 @@ export default function GlobalClaimGraphPage() {
           <div className="text-[10px] underline"><Link href="/contested">Contested</Link> • <Link href="/gaps">Open questions</Link> • <Link href="/stale">Stale</Link></div>
         </div>
         <div className="flex-1 min-w-0 bg-[#efe9d5] p-2 overflow-auto">
-          <div className="bg-white p-2 max-w-[900px] mx-auto" style={{ borderStyle: "inset", borderWidth: 3, borderColor: "#8a7f68 #fff8e0 #fff8e0 #8a7f68" }}>
+          <div className="bg-white p-4 max-w-[1100px] mx-auto" style={{ borderStyle: "inset", borderWidth: 3, borderColor: "#8a7f68 #fff8e0 #fff8e0 #8a7f68" }}>
             <div className="text-[10px] tracking-widest uppercase text-[#0a2a5e] font-bold">Claimgraph Atlas • Interactive</div>
             <h1 className="r-h1" style={{ fontSize: 26 }}>Global Claim Graph</h1>
             {loading && <div className="text-[11px] py-8 text-center">Loading claim graph…</div>}

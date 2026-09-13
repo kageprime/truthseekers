@@ -16,6 +16,7 @@ import { useChatContext } from "../ChatContext";
 import { useTheme } from "../../components/ThemeProvider";
 import Spinner from "../../components/Spinner";
 import { IconPlus } from "../../components/Icons";
+import { IconBook, IconGear, IconMap, IconMoon, IconSun } from "../../components/retro/icons";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -209,9 +210,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const showEmpty = messages.length === 0 && !sending && isNew;
 
   const NAV_LINKS = [
-    { href: "/articles", label: "Articles", icon: "📚" },
-    { href: "/maps", label: "Maps", icon: "🗺️" },
-    { href: "/settings", label: "Settings", icon: "⚙️" },
+    { href: "/articles", label: "Articles", Icon: IconBook },
+    { href: "/maps", label: "Maps", Icon: IconMap },
+    { href: "/settings", label: "Settings", Icon: IconGear },
   ];
 
   return (
@@ -270,7 +271,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                   className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg no-underline transition-colors hover:bg-accent-bg/15"
                   style={{ color: "var(--muted)" }}
                 >
-                  <span className="text-base">{link.icon}</span>
+                  <span className="inline-flex" aria-hidden><link.Icon size={16} /></span>
                   <span>{link.label}</span>
                 </Link>
               ))}
@@ -279,7 +280,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                 className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg w-full text-left transition-colors hover:bg-accent-bg/15"
                 style={{ color: "var(--muted)", background: "none", border: "none" }}
               >
-                <span className="text-base">{theme === "dark" ? "☀️" : "🌙"}</span>
+                <span className="inline-flex" aria-hidden>{theme === "dark" ? <IconSun size={16} /> : <IconMoon size={16} />}</span>
                 <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
               </button>
             </div>

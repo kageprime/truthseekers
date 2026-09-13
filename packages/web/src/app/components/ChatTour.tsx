@@ -2,37 +2,40 @@
 
 import { useState, useEffect } from "react";
 
+import type { ComponentType } from "react";
+import { IconChat, IconClock, IconFlask, IconMap, IconWrench } from "./retro/icons";
+
 interface TourStep {
   title: string;
   body: string;
-  icon: string;
+  Icon: ComponentType<{ size?: number }>;
 }
 
 const STEPS: TourStep[] = [
   {
     title: "Ask Anything",
     body: "Type any question here. I'll research the web, look up articles, and build rich responses with maps, timelines, and diagrams.",
-    icon: "💬",
+    Icon: IconChat,
   },
   {
     title: "Choose Your Model",
     body: "Pick which AI model powers your research. DeepSeek Flash for speed, Pro for depth, Gemma for a balanced approach.",
-    icon: "🧠",
+    Icon: IconFlask,
   },
   {
     title: "Open the Truth Console",
     body: "Toggle the Console panel to watch the agent work in real-time — every web search, tool call, and result as it happens.",
-    icon: "🎛️",
+    Icon: IconWrench,
   },
   {
     title: "Explore Rich Responses",
     body: "Responses aren't just text — they include interactive maps, timelines, Mermaid diagrams, image galleries, and more.",
-    icon: "✨",
+    Icon: IconMap,
   },
   {
     title: "Chat History",
     body: "All your conversations are saved in the sidebar. Revisit past chats, pick up where you left off, or start fresh.",
-    icon: "📋",
+    Icon: IconClock,
   },
 ];
 
@@ -90,7 +93,7 @@ export default function ChatTour({ onComplete }: { onComplete: () => void }) {
         </div>
 
         {/* Icon */}
-        <div className="text-4xl text-center mb-4">{s.icon}</div>
+        <div className="text-center mb-4" style={{ color: "var(--accent)" }}><s.Icon size={36} /></div>
 
         {/* Title */}
         <h3 className="text-base font-semibold text-center mb-2" style={{ color: "var(--ink)" }}>

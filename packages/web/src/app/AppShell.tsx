@@ -76,7 +76,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", handler);
   }, [toggle]);
 
-  // ponytail: global retro — every route gets Encarta chrome; article/claim-graph draw their own.
+  // ponytail: global retro — every route gets TruthSeekers chrome; article/claim-graph draw their own.
   if (IS_RETRO && !isSelfWrapped(pathname)) {
     return (
       <div className="retro98">
