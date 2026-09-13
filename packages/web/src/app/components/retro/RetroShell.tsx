@@ -22,7 +22,7 @@ export default function RetroShell({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router = useRouter();
   return (
-    <RetroWindow title={`TruthSeekers — ${pathname}`} path={pathname} status="TruthSeekers • Ready">
+    <RetroWindow title={`TruthSeekers — ${pathname}`} status="TruthSeekers • Ready">
       <div className="r-side w-full lg:w-[270px] shrink-0 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68] flex flex-col">
         <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 flex items-center justify-between"><span>Contents</span><span className="bg-[#c9a227] text-black px-1 text-[9px] border border-black">TREE</span></div>
         <nav className="p-2 space-y-0.5 overflow-auto" aria-label="Site contents">

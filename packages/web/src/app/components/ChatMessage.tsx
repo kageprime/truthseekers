@@ -2,7 +2,7 @@
 
 import { memo, useState } from "react";
 import BlockRenderer from "./BlockRenderer";
-import MarkdownRenderer from "./MarkdownRenderer";
+import RetroMarkdown from "./retro/RetroMarkdown";
 import type { Block } from "@encarta/core";
 import { sanitizeMessage } from "@/lib/dsml";
 import { IconThumbsUp, IconThumbsDown, IconRefresh, IconCopy, IconCheck } from "./Icons";
@@ -108,8 +108,8 @@ function ThinkingBox({ events, streaming }: { events: any[]; streaming?: boolean
         <span className={`inline-block transition-transform duration-200 text-[8px] ${isOpen ? "rotate-90" : ""}`}>
           ▶
         </span>
-        <span className="flex items-center gap-1.5">
-          <span>🧠 Thought process</span>
+          <span className="flex items-center gap-1.5">
+            <span>Thought process</span>
           {toolCallCount > 0 && (
             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-border/20 font-mono">
               {toolCallCount} step{toolCallCount !== 1 ? "s" : ""}
@@ -142,10 +142,10 @@ function ThinkingBox({ events, streaming }: { events: any[]; streaming?: boolean
               label = `Returned: ${toolLabel(name).replace(/^[^\s]+\s+/, "")}`;
               summary = toolResultSummaryText(event.data);
             } else if (isStatus) {
-              label = `⚡ Status`;
+              label = `Status`;
               summary = String(event.data || "");
             } else if (isError) {
-              label = `🛑 Error`;
+              label = `Error`;
               summary = String(event.data || "");
             }
 
@@ -204,7 +204,8 @@ const ChatMessage = memo(function ChatMessage({
             <span className="text-[9px] font-semibold uppercase tracking-wider text-subtle">You</span>
             {createdAt && <span className="text-[9px] text-subtle">{timeAgo(createdAt)}</span>}
           </div>
-          <div className="px-3.5 py-2.5 rounded-xl text-sm bg-accent-bg border border-accent/15 text-ink leading-relaxed">
+          {/* ponytail: user card — navy-tinted paper, outset bevel. */}
+          <div className="px-3 py-2 text-[13px] text-black leading-relaxed border-[2px] bg-[#e4ecf7]" style={{ borderStyle: "outset", borderColor: "#fff8e0 #8a7f68 #8a7f68 #fff8e0" }}>
             {content}
           </div>
         </div>
@@ -230,8 +231,8 @@ const ChatMessage = memo(function ChatMessage({
 
           {/* Content */}
           {cleanContent ? (
-            <div className={`text-[15px] leading-relaxed text-ink-secondary font-serif-body ${streaming ? "streaming-cursor" : ""}`}>
-              <MarkdownRenderer content={cleanContent} />
+            <div className={`text-[13.5px] leading-[1.65] text-black bg-white border-[2px] p-3 ${streaming ? "streaming-cursor" : ""}`} style={{ borderStyle: "inset", borderColor: "#8a7f68 #fff8e0 #fff8e0 #8a7f68", fontFamily: "Georgia,serif" }}>
+              <RetroMarkdown content={cleanContent} />
             </div>
           ) : streaming ? (
             <div className="flex items-center gap-1.5 py-2">

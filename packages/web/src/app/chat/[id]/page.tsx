@@ -216,7 +216,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   ];
 
   return (
-    <div className="flex-1 flex min-h-0 bg-surface">
+    <div className="flex-1 flex min-h-0 bg-[#efe9d5]">
       {/* ── Mobile header bar ── */}
       <div className="md:hidden fixed top-0 left-0 right-0 flex items-center justify-between px-3 h-11 bg-surface/95 backdrop-blur-md border-b border-border/30" style={{ zIndex: 40 }}>
         <button
@@ -241,16 +241,16 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       {mobileSidebarOpen && (
         <div className="md:hidden fixed inset-0" style={{ zIndex: 50 }}>
           <div className="absolute inset-0 bg-black/40 animate-appear-blur" onClick={() => setMobileSidebarOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 flex flex-col bg-surface border-r border-border/30 shadow-elev-3 animate-slide-in-left">
+          <aside className="absolute left-0 top-0 bottom-0 w-72 flex flex-col bg-[#e8e0c5] border-r-[2px] border-[#8a7f68]">
             {/* Sidebar header */}
-            <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-border/30">
+            <div className="shrink-0 flex items-center justify-between px-2 h-8 bg-[#0a2a5e] text-white">
               <div className="flex items-center gap-2">
                 <img src="/logo-icon.png" alt="" height={18} style={{ height: 18, width: "auto" }} />
-                <span className="text-xs font-semibold" style={{ color: "var(--ink)" }}>Truthseekers</span>
+                <span className="text-[11px] font-bold text-white">TruthSeekers</span>
               </div>
               <button
                 onClick={() => setMobileSidebarOpen(false)}
-                className="flex items-center justify-center w-7 h-7 rounded-md text-subtle hover:text-ink hover:bg-accent-bg/20 transition-all"
+                className="flex items-center justify-center w-7 h-7 text-white cursor-pointer"
                 aria-label="Close menu"
                 style={{ background: "none", border: "none" }}
               >
@@ -296,25 +296,21 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             </div>
 
             {/* Session list */}
-            <div className="flex-1 overflow-y-auto min-h-0 px-2 pb-3">
+            <div className="flex-1 overflow-y-auto min-h-0 p-1.5 pb-3">
               {chatsLoading ? (
                 <div className="flex items-center justify-center py-6">
                   <Spinner size={14} />
                 </div>
               ) : conversations.length === 0 ? (
-                <div className="px-3 py-6 text-xs text-center" style={{ color: "var(--subtle)" }}>No conversations yet</div>
+                <div className="px-2 py-6 text-[11px] text-center" style={{ color: "#8a7f68" }}>No conversations yet</div>
               ) : (
                 conversations.map((c: any) => (
                   <button
                     key={c.id}
                     onClick={() => { router.push(`/chat/${c.id}`); setMobileSidebarOpen(false); }}
-                    className="w-full text-left px-3 py-2 text-xs rounded-md transition-colors hover:bg-accent-bg/15 mb-0.5"
-                    style={{
-                      color: c.id === convId ? "var(--accent)" : "var(--muted)",
-                      background: c.id === convId ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",
-                    }}
+                    className={`w-full text-left px-1.5 py-1 text-[12px] border ${c.id === convId ? "bg-[#0a2a5e] text-white border-[#0a2a5e]" : "bg-transparent border-transparent text-black"}`}
                   >
-                    <div className="truncate font-medium">{c.title}</div>
+                    <div className="truncate leading-[1.25]">{c.title}</div>
                   </button>
                 ))
               )}
@@ -324,32 +320,28 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       )}
 
       {/* ── Sidebar: session list (desktop) ── */}
-      <aside className="hidden md:flex flex-col shrink-0 w-60 border-r border-border/30 bg-surface-elevated/40">
-        <div className="shrink-0 flex items-center justify-between px-3 h-11 border-b border-border/30">
-          <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--subtle)" }}>Sessions</span>
-          <button onClick={handleNewChat} className="flex items-center justify-center w-6 h-6 rounded-md text-subtle hover:text-accent hover:bg-accent-bg/30 transition-all cursor-pointer" aria-label="New chat" style={{ background: "none", border: "none" }}>
+      <aside className="hidden md:flex flex-col shrink-0 w-60 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68]">
+        <div className="shrink-0 flex items-center justify-between px-2 h-8 bg-[#0a2a5e] text-white">
+          <span className="text-[11px] font-bold">Sessions</span>
+          <button onClick={handleNewChat} className="flex items-center justify-center w-6 h-6 text-white hover:bg-white/20 cursor-pointer" aria-label="New chat" style={{ background: "none", border: "none" }}>
             <IconPlus size={14} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto min-h-0 py-1">
+        <div className="flex-1 overflow-y-auto min-h-0 p-1.5">
           {chatsLoading ? (
             <div className="flex items-center justify-center py-6">
               <Spinner size={14} />
             </div>
           ) : conversations.length === 0 ? (
-            <div className="px-4 py-6 text-xs text-center" style={{ color: "var(--subtle)" }}>No conversations yet</div>
+            <div className="px-2 py-6 text-[11px] text-center" style={{ color: "#8a7f68" }}>No conversations yet</div>
           ) : (
             conversations.map((c: any) => (
               <button
                 key={c.id}
                 onClick={() => router.push(`/chat/${c.id}`)}
-                className="w-full text-left px-3 py-2 text-xs transition-colors hover:bg-accent-bg/15"
-                style={{
-                  color: c.id === convId ? "var(--accent)" : "var(--muted)",
-                  background: c.id === convId ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "transparent",
-                }}
+                className={`w-full text-left px-1.5 py-1 text-[12px] border ${c.id === convId ? "bg-[#0a2a5e] text-white border-[#0a2a5e]" : "bg-transparent border-transparent hover:bg-[#d6cfae] text-black"}`}
               >
-                <div className="truncate font-medium">{c.title}</div>
+                <div className="truncate leading-[1.25]">{c.title}</div>
               </button>
             ))
           )}
@@ -528,7 +520,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
       {/* ── Truth Console panel ── */}
       {consoleOpen && (
-        <div className="hidden md:flex shrink-0 w-[400px] flex-col bg-surface border-l border-border/30">
+        <div className="hidden md:flex shrink-0 w-[400px] flex-col bg-[#e8e0c5] border-l-[2px] border-[#8a7f68]">
           <TruthConsole
             segments={seg.segments}
             activeSegmentId={seg.activeSegmentId}

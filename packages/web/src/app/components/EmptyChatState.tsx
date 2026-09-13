@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import EyebrowTag from "./EyebrowTag";
-import { IconChat } from "./Icons";
+import { IconChat } from "./retro/icons";
 
 const topicCategories: { label: string; topics: string[] }[] = [
   {
@@ -49,42 +48,33 @@ export default function EmptyChatState({ onSetInput }: EmptyChatStateProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-full px-5 sm:px-6 py-16 sm:py-24 text-center">
       {/* Eyebrow */}
-      <div className="reveal-blur mb-7 sm:mb-9">
-        <EyebrowTag label="Research · Live agent" />
+      <div className="mb-7 sm:mb-9">
+        <span className="text-[9px] font-bold px-1.5 py-0.5 bg-[#0a2a5e] text-white border border-[#0a2a5e] tracking-widest uppercase">Research • Live agent</span>
       </div>
 
       {/* Brand mark + headline */}
-      <div className="reveal-blur mb-7 sm:mb-9 flex flex-col items-center gap-5">
+      <div className="mb-7 sm:mb-9 flex flex-col items-center gap-5">
         <div
-          className="w-16 h-16 sm:w-20 sm:h-20 rounded-[1.5rem] flex items-center justify-center"
-          style={{
-            background: "color-mix(in srgb, var(--gold) 14%, transparent)",
-            border: "1px solid color-mix(in srgb, var(--gold) 30%, transparent)",
-            boxShadow: "0 12px 40px -12px color-mix(in srgb, var(--gold) 40%, transparent)",
-          }}
+          className="w-16 h-16 flex items-center justify-center bg-[#d4d0c8] text-[#0a2a5e]"
+          style={{ borderStyle: "outset", borderWidth: 3, borderColor: "#fff8e0 #8a7f68 #8a7f68 #fff8e0", boxShadow: "4px 4px 0 rgba(0,0,0,.35)" }}
         >
-          <IconChat size={32} style={{ color: "var(--gold)" }} />
+          <IconChat size={30} />
         </div>
         <div>
           <h1
-            className="font-display font-bold mb-2"
-            style={{
-              fontSize: "clamp(1.85rem, 1.2rem + 2.5vw, 2.75rem)",
-              letterSpacing: "-0.025em",
-              lineHeight: 1.05,
-              color: "var(--ink)",
-            }}
+            className="font-bold mb-2 text-[#0a2a5e]"
+            style={{ fontFamily: "Georgia,'Times New Roman',serif", fontSize: "clamp(1.85rem, 1.2rem + 2.5vw, 2.75rem)", lineHeight: 1.05 }}
           >
             What should we research?
           </h1>
-          <p className="text-sm sm:text-base max-w-md mx-auto leading-relaxed" style={{ color: "var(--muted)" }}>
+          <p className="text-[13px] max-w-md mx-auto leading-relaxed" style={{ color: "#555" }}>
             Ask anything — the agent builds a nine-stage epistemic pipeline, then returns a structured answer with maps, timelines, diagrams, and every claim sourced.
           </p>
         </div>
       </div>
 
       {/* Double-Bezel composer */}
-      <div className="w-full max-w-2xl mb-10 sm:mb-14 reveal-blur">
+      <div className="w-full max-w-2xl mb-10 sm:mb-14">
         <div className="bezel">
           <div
             className="bezel-inner flex items-end gap-2 p-2 sm:p-2.5"
@@ -118,22 +108,19 @@ export default function EmptyChatState({ onSetInput }: EmptyChatStateProps) {
             </button>
           </div>
         </div>
-        <p className="mt-3 text-[10px] tracking-wider uppercase" style={{ color: "var(--subtle)" }}>
-          <kbd className="px-1.5 py-0.5 rounded border font-mono normal-case tracking-normal" style={{ borderColor: "var(--rule)", background: "var(--surface-elevated)" }}>⏎</kbd>{" "}
+        <p className="mt-3 text-[10px] tracking-wider uppercase" style={{ color: "#8a7f68" }}>
+          <kbd className="px-1.5 py-0.5 border font-mono normal-case tracking-normal bg-white text-black" style={{ borderStyle: "outset", borderWidth: 2 }}>⏎</kbd>{" "}
           to send · shift+⏎ for new line
         </p>
       </div>
 
-      {/* Topic suggestions as Doppelrand cards */}
-      <div className="w-full max-w-2xl space-y-5 sm:space-y-6 reveal-blur">
+      {/* Topic suggestions */}
+      <div className="w-full max-w-2xl space-y-5 sm:space-y-6">
         {topicCategories.map((cat) => (
           <div key={cat.label}>
             <div className="flex items-center justify-center gap-2.5 mb-3">
-              <span className="eyebrow !text-[9px] !py-0.5">{cat.label}</span>
-              <div
-                className="h-px flex-1 max-w-[60px]"
-                style={{ background: "color-mix(in srgb, var(--rule) 70%, transparent)" }}
-              />
+              <span className="text-[9px] font-bold px-1.5 py-0.5 bg-[#0a2a5e] text-white tracking-widest uppercase">{cat.label}</span>
+              <div className="h-[2px] flex-1 max-w-[60px] bg-[#0a2a5e]" />
             </div>
             <div className="flex flex-wrap items-center gap-2 justify-center">
               {cat.topics.map((topic) => (

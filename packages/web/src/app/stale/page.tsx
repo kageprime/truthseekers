@@ -19,18 +19,19 @@ export default function StalePage() {
     score > 0.66 ? "#4a8f5a" : score > 0.33 ? "#b87a2e" : "#b33c3c";
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12">
-      <h1 className="text-2xl font-serif mb-2 text-ink">Stale Articles</h1>
-      <p className="text-xs text-subtle mb-8">
-        Articles ranked by evidence freshness — the average age-decay of linked evidence across
-        every claim (100% = verified today, decaying over ~6 months; claims with no evidence
-        count as 50%). Stalest first. Click any article to read or refresh it.
-      </p>
+    <>
+      <div className="border-b-[3px] border-[#0a2a5e] pb-3 mb-4">
+        <div className="text-[10px] text-[#0a2a5e] font-bold tracking-widest uppercase">Living Encyclopedia • Maintenance</div>
+        <h1 className="r-h1 mt-1" style={{ fontSize: 28 }}>Stale Watch</h1>
+        <p className="text-[11px] mt-1" style={{ color: "#555" }}>
+          Stalest first. 100% means verified today; evidence decays over ~6 months. Click any article to read or refresh it.
+        </p>
+      </div>
 
-      {loading && <div className="text-xs text-subtle">Loading...</div>}
+      {loading && <div className="text-[11px] py-8 text-center" style={{ color: "#8a7f68" }}>Checking dates…</div>}
 
       {!loading && articles.length === 0 && (
-        <div className="text-xs text-subtle py-8 text-center">No articles tracked.</div>
+        <div className="text-[11px] py-8 text-center border-[2px] bg-[#ffffe1]" style={{ borderStyle: "outset", borderWidth: 2 }}>No articles tracked.</div>
       )}
 
       {articles.length > 0 && (
@@ -39,18 +40,17 @@ export default function StalePage() {
             <Link
               key={a.slug}
               href={`/article/${a.slug}`}
-              className="block p-3 rounded border hover:border-opacity-100 transition-colors"
-              style={{ borderColor: "var(--border, #e5e5e5)" }}
+              className="block bg-white border-[2px] p-2 no-underline hover:bg-[#fff8dc]"
+              style={{ borderStyle: "outset", borderWidth: 2 }}
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-ink truncate">{a.title}</div>
-                  <div className="text-[10px] mt-0.5" style={{ color: "var(--muted, #777)" }}>
+                  <div className="text-[13px] font-bold text-[#0a2a5e] truncate" style={{ fontFamily: "Georgia,serif" }}>{a.title}</div>
+                  <div className="text-[10px] mt-0.5 tabular-nums" style={{ color: "#8a7f68" }}>
                     {a.claim_count} claims
                     {a.updated && (
                       <span>
-                        {" "}
-                        · updated{" "}
+                        {" "}· updated{" "}
                         {new Date(a.updated).toLocaleDateString("en-US", {
                           year: "numeric",
                           month: "short",
@@ -59,24 +59,22 @@ export default function StalePage() {
                       </span>
                     )}
                   </div>
-                </div>
-                <div className="shrink-0 flex items-center gap-2">
-                  <div
-                    className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                    title={`Evidence freshness: ${(a.freshness_score * 100).toFixed(0)}% across ${a.claim_count} claims`}
-                    style={{
-                      color: freshColor(a.freshness_score),
-                      background: freshColor(a.freshness_score) + "14",
-                    }}
-                  >
-                    {(a.freshness_score * 100).toFixed(0)}% fresh
+                  <div className="mt-1.5 h-[8px] bg-[#efe9d5] border border-[#8a7f68] max-w-[280px]">
+                    <span className="block h-full" style={{ width: `${Math.max(0, Math.min(1, a.freshness_score)) * 100}%`, background: freshColor(a.freshness_score) }} />
                   </div>
+                </div>
+                <div
+                  className="shrink-0 text-[10px] font-bold px-2 py-0.5 border border-black text-white tabular-nums"
+                  title={`Evidence freshness: ${(a.freshness_score * 100).toFixed(0)}% across ${a.claim_count} claims`}
+                  style={{ background: freshColor(a.freshness_score) }}
+                >
+                  {(a.freshness_score * 100).toFixed(0)}%
                 </div>
               </div>
             </Link>
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }

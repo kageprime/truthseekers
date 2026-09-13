@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ClaimExplorer from "./ClaimExplorer";
 import RetroInspector from "./RetroInspector";
+import RetroMarkdown from "./RetroMarkdown";
 import { IconBone, IconBook, IconClose, IconFlask, IconLock, IconMountain, IconQuestion, IconScale, IconSearch } from "./icons";
 import { retroStatusColor } from "@/lib/retro";
 
@@ -98,6 +99,29 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inspectId]);
 
+  // ponytail: markdown-ish sections go through the shared skin; anchors survive as a cited row.
+  const MD_RE = /```|\$\$|\\\(|\\\[|^\s*\|.*\|\s*$|^\s*#{1,6}\s/m;
+  const sectionBlock = (s: any) => {
+    const cited = splitAnchors(s.content ?? "").filter((p) => p.t === "claim").map((p) => (p as { t: "claim"; v: string }).v);
+    const stripped = (s.content ?? "").replace(ANCHOR_RE, "").replace(/\s{2,}/g, " ").trim();
+    return (
+      <div key={s.id} className="mb-4">
+        <b>{s.title}</b>
+        <div className="mt-1">{MD_RE.test(s.content ?? "") ? <RetroMarkdown content={stripped} /> : renderRich(s.content)}</div>
+        {cited.length > 0 && (
+          <div className="mt-1 text-[11px] flex flex-wrap gap-1 items-center">
+            <span className="text-[#555]">Cited claims:</span>
+            {cited.map((id) => (
+              <button key={id} className="r-claim" aria-label={`Inspect cited claim ${anchorNums[id] ?? ""}`} onClick={(e) => openInspect(id, e.currentTarget)}>
+                <sup>[{anchorNums[id] ?? "?"}]</sup>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Claims read as citations: superscript [n] chips; hover reveals the claim card, click inspects.
   const renderRich = (text: string) => {
     const parts = splitAnchors(text || "");
@@ -171,7 +195,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
             </section>
             <section ref={(el)=>{refs.current.discovery=el;}} id="discovery" className="mb-8 scroll-mt-4">
               <h2 className="r-h2"><span>2</span> Sections</h2>
-              <div className="mt-3 r-body">{secs.length===0?"Sections appear after generation. Mock shows abstract only.":secs.map((s:any)=><div key={s.id} className="mb-4"><b>{s.title}</b><br/>{renderRich(s.content)}</div>)}</div>
+              <div className="mt-3 r-body">{secs.length===0?"Sections appear after generation. Mock shows abstract only.":secs.map(sectionBlock)}</div>
             </section>
             <section ref={(el)=>{refs.current.anatomy=el;}} id="anatomy" className="mb-8 scroll-mt-4">
               <h2 className="r-h2"><span>3</span> Claims ({claims.length})</h2>

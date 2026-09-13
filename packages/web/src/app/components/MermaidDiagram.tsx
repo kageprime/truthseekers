@@ -8,7 +8,23 @@ let mermaidInit = false;
 function ensureMermaid() {
   if (!mermaidInit) {
     // ponytail: strict blocks click/link interactions in diagrams (S23).
-    mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "strict" });
+    // Retro paper theme — the platform default is retro; escape-hatch theme inherits it.
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: "base",
+      securityLevel: "strict",
+      themeVariables: {
+        primaryColor: "#efe9d5",
+        primaryTextColor: "#0a2a5e",
+        primaryBorderColor: "#0a2a5e",
+        lineColor: "#0a2a5e",
+        secondaryColor: "#c9a227",
+        tertiaryColor: "#fdf8e8",
+        background: "#fdf8e8",
+        mainBkg: "#efe9d5",
+        nodeBorder: "#0a2a5e",
+      },
+    });
     mermaidInit = true;
   }
 }

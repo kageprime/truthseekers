@@ -361,7 +361,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   // ponytail: retro branch — same data, Spinosaurus chrome. Old theme untouched.
   if (IS_RETRO) {
     return (
-      <RetroWindow title={`TruthSeekers — ${article.title}`} path={`/article/${slug}`} status={`TruthSeekers • ${slug}`}>
+      <RetroWindow title={`TruthSeekers — ${article.title}`} status={`TruthSeekers • ${slug}`}>
         <RetroArticle article={article} epistemic={epistemic} graph={(epistemic as any)?.claim_graph ?? null} />
       </RetroWindow>
     );
