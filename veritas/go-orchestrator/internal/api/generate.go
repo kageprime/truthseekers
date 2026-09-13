@@ -152,6 +152,7 @@ func (s *Server) processArticle(slug string, persona string, note string) {
 	lintArticleProse(slug, generatedOutput)
 
 	art := transformGeneratedArticle(slug, generatedOutput)
+	s.backfillCitationURLs(slug, nodeOutputs, art)
 	if err := s.db.SaveArticle(art); err != nil {
 		s.failArticle(slug, fmt.Sprintf("save article: %v", err))
 		return
@@ -187,6 +188,71 @@ func (s *Server) processArticle(slug string, persona string, note string) {
 	// reflect the fresh content without waiting for the 60s ISR window. The
 	// frontend handles this via POST /api/revalidate with a shared secret.
 	s.notifyFrontendRevalidate(slug)
+}
+
+// backfillCitationURLs fills empty citation URLs from the retrieve node's
+// documents. The writer cites sources as bare doc IDs ("doc-4302a327") with
+// empty urls, which render as dead links; the real URLs sit one node away.
+// Mechanical title/id match — no LLM round-trip. Non-fatal by design.
+func (s *Server) backfillCitationURLs(slug string, nodeOutputs map[string]interface{}, art *storage.Article) {
+	if len(art.Citations) == 0 {
+		return
+	}
+	raw, ok := nodeOutputs["retrieve"]
+	if !ok {
+		return
+	}
+	var result struct {
+		Documents map[string][]struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+			URL   string `json:"url"`
+		} `json:"documents"`
+	}
+	b, _ := json.Marshal(raw)
+	if err := json.Unmarshal(b, &result); err != nil {
+		return
+	}
+	byID := map[string]string{}
+	byTitle := map[string]string{}
+	for _, docs := range result.Documents {
+		for _, d := range docs {
+			if d.URL == "" {
+				continue
+			}
+			if d.ID != "" {
+				byID[strings.ToLower(d.ID)] = d.URL
+			}
+			if d.Title != "" {
+				byTitle[strings.ToLower(d.Title)] = d.URL
+			}
+		}
+	}
+	if len(byID) == 0 && len(byTitle) == 0 {
+		return
+	}
+	fixed := 0
+	for i := range art.Citations {
+		if strings.TrimSpace(art.Citations[i].URL) != "" {
+			continue
+		}
+		t := strings.ToLower(strings.TrimSpace(art.Citations[i].Title))
+		if u, ok := byID[t]; ok {
+			art.Citations[i].URL = u
+			fixed++
+			continue
+		}
+		for title, u := range byTitle {
+			if title != "" && (strings.Contains(t, title) || strings.Contains(title, t)) {
+				art.Citations[i].URL = u
+				fixed++
+				break
+			}
+		}
+	}
+	if fixed > 0 {
+		log.Printf("[generate] slug=%s: backfilled %d/%d citation URLs", slug, fixed, len(art.Citations))
+	}
 }
 
 // notifyFrontendRevalidate POSTs to the Next.js revalidation endpoint in a

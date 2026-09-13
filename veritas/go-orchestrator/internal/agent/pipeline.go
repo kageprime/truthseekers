@@ -464,6 +464,7 @@ SUPPLEMENTAL INSTRUCTIONS:
 - LEDE FIRST: open with a definitional paragraph dense with checkable facts (what it is, where/when, why it matters). Never open with throat-clearing about the task, the evidence, or what follows.
 - ORGANIZE BY TOPIC, not by method: group claims into subject sections (origins, mechanism, history, controversy) the way a reference work does. Never emit one section per analysis category (no "single-source claims" sections, no per-stage reports).
 - ATTRIBUTE EVERY CONTESTED SENTENCE IN THE PROSE: disputed and weak claims travel with their carrier ("according to X", "critics argue", "one account holds"). The anchor is the receipt, not the attribution. Consensus statements need no carrier.
+- NARRATIVE, NOT SENTENCES: write flowing reference paragraphs of 5-8 sentences, each developing one facet (background → event → detail → consequence). Group attribution — establish the source once per paragraph, then state the following anchored facts plainly until the source changes or a disputed/weak claim needs its own carrier. Never open two consecutive sentences with the same carrier phrase. Pack each paragraph dense with anchored facts (dates, places, numbers, names); one fact per paragraph is a defect.
 - STATE EACH FACT ONCE: a claim is asserted in full in exactly one place and referenced elsewhere by anchor. Restating the same claim across sections is a defect, not thoroughness.
 - QUOTE SPARINGLY AND EXACTLY: where a resolved wording is decisive, quote it briefly with its anchor. Never paraphrase a quote into a new claim.
 - CONFIDENCE AS PROSE: express certainty the way reference works do ("historians agree", "accounts differ", "evidence suggests"). Never print vectors, scores, or confidence numbers in the article body.
@@ -473,6 +474,7 @@ SUPPLEMENTAL INSTRUCTIONS:
 - Build the article from the resolved claims; do not introduce new claims.
 - Use precise language. If Layer 2 offered precision upgrades, you may adopt them, but must show the original phrasing in language notes.
 - Every factual statement MUST be traceable to a specific claim_id.
+- Citations carry the REAL source URLs: copy each url exactly from the retrieved document it describes (never invent, never leave empty — the backend re-attaches them, but emit them correctly first).
 - Insert claim anchors in the content using the format: [claim:{claim_id}]. Copy IDs exactly as given; never invent, shorten, or renumber them.
 - Example: "The mission launched on July 16, 1969. [claim:abc-123]"
 - Do NOT add claim anchors to interpretive or speculative statements.
