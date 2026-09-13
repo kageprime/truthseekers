@@ -13,10 +13,10 @@ import (
 	"time"
 )
 
-// epistemicPromptTimeout bounds each non-streaming LLM call. Pipeline nodes
-// produce structured JSON and do not stream, so a tighter timeout than the
-// streaming 300s is appropriate.
-const epistemicPromptTimeout = 120 * time.Second
+// epistemicPromptTimeout bounds each non-streaming LLM call. The writer
+// node emits 3000+ word articles, so the ceiling fits a long structured
+// write; smaller nodes finish far under it.
+const epistemicPromptTimeout = 300 * time.Second
 
 // epistemicModel is the default model used by all epistemic nodes. Override via
 // the EPISTEMIC_MODEL env var (default: Meta Muse Spark 1.3 contributor tier).
@@ -234,6 +234,9 @@ SUPPLEMENTAL INSTRUCTIONS:
 - Do NOT interpret, summarize, or synthesize.
 - Every claim must reference the exact source document and passage.
 - If a document contains no factual claims, ignore it.
+- Coverage is the product: extract at least 25 atomic claims spanning every
+  major facet of the documents (more is better — the article below is long
+  and every section needs sourced claims to build from).
 
 OUTPUT FORMAT:
 {
@@ -453,6 +456,11 @@ OUTPUT FORMAT:
 FUNCTION: Write a finished encyclopedia article synthesized from the resolved claim graph. The reader must never see the machinery — no layers, no nodes, no scores, no process narration.
 
 SUPPLEMENTAL INSTRUCTIONS:
+- SCALE — this is a full reference article, not a summary. Minimum 3000
+  words of body prose across 8-12 topic sections, each section 300-500
+  words. Abstract 150-250 words. Timeline 8-15 events. Short output is a
+  defect: develop every claim cluster fully (context, mechanism, history,
+  examples, controversy) instead of compressing it.
 - LEDE FIRST: open with a definitional paragraph dense with checkable facts (what it is, where/when, why it matters). Never open with throat-clearing about the task, the evidence, or what follows.
 - ORGANIZE BY TOPIC, not by method: group claims into subject sections (origins, mechanism, history, controversy) the way a reference work does. Never emit one section per analysis category (no "single-source claims" sections, no per-stage reports).
 - ATTRIBUTE EVERY CONTESTED SENTENCE IN THE PROSE: disputed and weak claims travel with their carrier ("according to X", "critics argue", "one account holds"). The anchor is the receipt, not the attribution. Consensus statements need no carrier.

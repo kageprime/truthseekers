@@ -168,6 +168,10 @@ func (s *Server) processArticle(slug string, persona string, note string) {
 	// Non-fatal: article is already saved; log errors and continue.
 	s.persistNodeOutputs(slug, nodeOutputs)
 
+	// Visuals — hero + section illustrations, DB-backed. Non-fatal:
+	// the article ships text-only when the key is unset or calls fail.
+	s.generateArticleImages(slug, art)
+
 	_ = s.db.SaveJob(slug, "done", "store", map[string]interface{}{"title": art.Title})
 
 	BroadcastProgress(slug, "article_complete", map[string]interface{}{

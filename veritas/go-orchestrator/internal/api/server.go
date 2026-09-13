@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -701,36 +700,9 @@ func (s *Server) generateImageExecutorCustom(input executor.CallInput, conn *exe
 	if apiKey == "" {
 		return executor.CallResult{Status: "error", Reason: "image generation not configured"}
 	}
-	body := map[string]interface{}{
-		"model":           "stable-diffusion-3.5-large",
-		"prompt":          prompt,
-		"n":               1,
-		"size":            "1024x1024",
-		"quality":         "auto",
-		"response_format": "b64_json",
-		"output_format":   "png",
-	}
-	payload, _ := json.Marshal(body)
-	req, _ := http.NewRequest("POST", conn.BaseURL+"/images/generations", bytes.NewReader(payload))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Do(req)
+	raw, err := callImageAPI(conn.BaseURL, apiKey, prompt)
 	if err != nil {
-		return executor.CallResult{Status: "error", Reason: fmt.Sprintf("API call failed: %v", err)}
-	}
-	defer resp.Body.Close()
-	var doResp struct {
-		Created int `json:"created"`
-		Data    []struct {
-			B64JSON string `json:"b64_json"`
-		} `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&doResp); err != nil {
-		return executor.CallResult{Status: "error", Reason: fmt.Sprintf("decode failed: %v", err)}
-	}
-	if len(doResp.Data) == 0 || doResp.Data[0].B64JSON == "" {
-		return executor.CallResult{Status: "error", Reason: "empty result"}
+		return executor.CallResult{Status: "error", Reason: fmt.Sprintf("image generation failed: %v", err)}
 	}
 	imageDir := os.Getenv("ENCARTA_IMAGE_DIR")
 	if imageDir == "" {
@@ -738,15 +710,7 @@ func (s *Server) generateImageExecutorCustom(input executor.CallInput, conn *exe
 		imageDir = wd + "/public/images"
 	}
 	os.MkdirAll(imageDir, 0755)
-	// ponytail: decode the payload (S18) — the old code wrote base64 TEXT to
-	// a .png. Random name so outputs aren't enumerable.
-	raw, err := base64.StdEncoding.DecodeString(doResp.Data[0].B64JSON)
-	if err != nil {
-		return executor.CallResult{Status: "error", Reason: "invalid image payload"}
-	}
-	if len(raw) == 0 || len(raw) > 10<<20 {
-		return executor.CallResult{Status: "error", Reason: "invalid image size"}
-	}
+	// ponytail: random name so outputs aren't enumerable.
 	filename := fmt.Sprintf("chat-%s.png", randFilename())
 	path := imageDir + "/" + filename
 	if err := os.WriteFile(path, raw, 0644); err != nil {
@@ -962,6 +926,9 @@ func (s *Server) setupRoutes() {
 
 	// Chat router needs special handling for sub-paths
 	s.mux.Handle("/chat/", chatAuth(http.HandlerFunc(s.chatRouter)))
+
+	// Article images (DB-backed generated visuals) - public read
+	s.mux.Handle("/images/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleArticleImage)))
 
 	// Maps - public read
 	s.mux.Handle("/maps", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleMapsRoot)))
