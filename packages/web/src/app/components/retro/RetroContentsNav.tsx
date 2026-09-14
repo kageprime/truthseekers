@@ -11,7 +11,18 @@ const ICONS: Record<string, (p: { size?: number }) => React.ReactNode> = {
   gear: IconGear, pencil: IconPencil, list: IconList,
 };
 
-export default function RetroContentsNav({ pathname, showAdmin }: { pathname: string; showAdmin: boolean }) {
+export interface OutlineItem {
+  id: string;
+  label: string;
+}
+
+export default function RetroContentsNav({ pathname, showAdmin, outline, activeOutline, onOutlineSelect }: {
+  pathname: string;
+  showAdmin: boolean;
+  outline?: OutlineItem[];
+  activeOutline?: string;
+  onOutlineSelect?: (id: string) => void;
+}) {
   const router = useRouter();
   const [treeOpen, setTreeOpen] = useState(false);
 
@@ -70,6 +81,36 @@ export default function RetroContentsNav({ pathname, showAdmin }: { pathname: st
             </div>
           </div>
         ))}
+        {/* ponytail: article pages inject their outline here so every page
+            shares one nav component instead of a bespoke sidebar. */}
+        {outline && outline.length > 0 && (
+          <div className="space-y-1 pt-2 mt-1 border-t border-[var(--r-border)]">
+            <div className="text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 text-[var(--r-muted)]">
+              On this page
+            </div>
+            <div className="space-y-0.5">
+              {outline.map((s) => {
+                const isActive = activeOutline === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => onOutlineSelect?.(s.id)}
+                    aria-current={isActive ? "true" : undefined}
+                    className={`w-full text-left px-2.5 py-1.5 text-[12px] flex items-center gap-2 border rounded-[var(--r-radius)] transition-colors cursor-pointer ${
+                      isActive
+                        ? "bg-[var(--r-accent)] border-[var(--r-accent)] font-semibold shadow-sm"
+                        : "bg-transparent border-transparent hover:bg-black/5 text-[var(--r-ink)]"
+                    }`}
+                    style={isActive ? { color: "#ffffff" } : undefined}
+                  >
+                    <span aria-hidden className="shrink-0 opacity-70">▪</span>
+                    <span className="flex-1 leading-snug">{s.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Word of the Day Box */}
@@ -85,16 +126,16 @@ export default function RetroContentsNav({ pathname, showAdmin }: { pathname: st
         </div>
       </div>
 
-      {/* Action Footer */}
-      <div className="mt-auto p-2.5 flex gap-1.5 border-t border-[var(--r-border)]" style={{ paddingBottom: "max(0.6rem, env(safe-area-inset-bottom))" }}>
-        <button className="r-btn flex-1 inline-flex items-center justify-center gap-1" onClick={() => router.back()} aria-label="Go back">
-          <IconBack size={12} /> Back
+      {/* Action Footer — ponytail: compact icon-only row, same on mobile. */}
+      <div className="mt-auto p-1.5 flex gap-1 border-t border-[var(--r-border)]" style={{ paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))" }}>
+        <button className="r-btn flex-1 inline-flex items-center justify-center px-1 py-1" onClick={() => router.back()} aria-label="Go back" title="Back">
+          <IconBack size={12} />
         </button>
-        <button className="r-btn flex-1 inline-flex items-center justify-center gap-1" onClick={() => router.forward()} aria-label="Go forward">
-          Fwd <IconFwd size={12} />
+        <button className="r-btn flex-1 inline-flex items-center justify-center px-1 py-1" onClick={() => router.forward()} aria-label="Go forward" title="Forward">
+          <IconFwd size={12} />
         </button>
-        <button className="r-btn flex-1 inline-flex items-center justify-center gap-1" onClick={() => router.push("/article/new")} aria-label="Write a new article">
-          <IconPencil size={12} /> New
+        <button className="r-btn flex-1 inline-flex items-center justify-center px-1 py-1" onClick={() => router.push("/article/new")} aria-label="Write a new article" title="New article">
+          <IconPencil size={12} />
         </button>
       </div>
     </div>

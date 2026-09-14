@@ -314,13 +314,21 @@ func validateBody(model interface{}) func(http.Handler) http.Handler {
 				http.Error(w, `{"error":"body too large"}`, http.StatusRequestEntityTooLarge)
 				return
 			}
-			var target interface{}
-			switch v := model.(type) {
-			case func() interface{}:
-				target = v()
-			default:
+		var target interface{}
+		switch v := model.(type) {
+		case func() interface{}:
+			target = v()
+		default:
+			// ponytail: fresh target per request — Unmarshal merges into
+			// non-nil maps, so reusing one pointer leaks state across
+			// requests. A by-value model can't unmarshal at all (register
+			// pointers; S13 re-wrap still applies per request).
+			if rv := reflect.ValueOf(model); rv.Kind() == reflect.Ptr {
+				target = reflect.New(rv.Type().Elem()).Interface()
+			} else {
 				target = model
 			}
+		}
 			if err := json.Unmarshal(raw, target); err != nil {
 				http.Error(w, `{"error":"Invalid JSON body"}`, http.StatusBadRequest)
 				return
@@ -408,6 +416,8 @@ func validatedBody(r *http.Request) interface{} {
 
 // getValidatedBody retrieves the validated body into a typed destination.
 // Returns true if successful, false if not present or type mismatch.
+// ponytail: models are registered as pointers, so deref a pointer source
+// into a struct destination — without this every validated PUT 500d.
 func getValidatedBody(r *http.Request, dst interface{}) bool {
 	v := r.Context().Value("validatedBody")
 	if v == nil {
@@ -418,11 +428,15 @@ func getValidatedBody(r *http.Request, dst interface{}) bool {
 		return false
 	}
 	srcVal := reflect.ValueOf(v)
-	if !srcVal.Type().AssignableTo(dstVal.Type().Elem()) {
-		return false
+	if srcVal.Kind() == reflect.Ptr && srcVal.Type().Elem().AssignableTo(dstVal.Type().Elem()) {
+		dstVal.Elem().Set(srcVal.Elem())
+		return true
 	}
-	dstVal.Elem().Set(srcVal.Elem())
-	return true
+	if srcVal.Type().AssignableTo(dstVal.Type().Elem()) {
+		dstVal.Elem().Set(srcVal)
+		return true
+	}
+	return false
 }
 
 // Validation request types
@@ -904,7 +918,7 @@ func (s *Server) setupRoutes() {
 
 	// Credential hot-swap — admin only (S6): any-member rotation let phished
 	// members swap server-side LLM/search keys. Rate limited + body validation.
-	s.mux.Handle("/v1/credentials", chain(apiLimiter.middleware, s.requireRole("admin", "admin", "credentials", "token.*"), validateBody(credentialsReq{}))(http.HandlerFunc(s.handleCredentials)))
+	s.mux.Handle("/v1/credentials", chain(apiLimiter.middleware, s.requireRole("admin", "admin", "credentials", "token.*"), validateBody(&credentialsReq{}))(http.HandlerFunc(s.handleCredentials)))
 
 	// Stripe - auth required (legacy stubs; billing is Paystack — see F3)
 	s.mux.Handle("/stripe", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleStripeRouter)))
@@ -920,7 +934,7 @@ func (s *Server) setupRoutes() {
 	s.mux.Handle("/quota", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleGetQuota)))
 	s.mux.Handle("/queue", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleGetQueue)))
 	s.mux.Handle("/queue/", chain(apiLimiter.middleware, s.authMiddleware)(http.HandlerFunc(s.handleQueueRouter)))
-	s.mux.Handle("/track", chain(apiLimiter.middleware, s.authMiddleware, validateBody(trackReq{}))(http.HandlerFunc(s.handleTrack)))
+	s.mux.Handle("/track", chain(apiLimiter.middleware, s.authMiddleware, validateBody(&trackReq{}))(http.HandlerFunc(s.handleTrack)))
 
 	// Articles - top/search public read, generate/refresh/write auth + rate limited + validation
 	s.mux.Handle("/articles/top", chain(apiLimiter.middleware, s.optionalAuthMiddleware)(http.HandlerFunc(s.handleGetTopArticles)))
@@ -967,7 +981,7 @@ func (s *Server) setupRoutes() {
 	// Admin - auth + admin role required + validation on PUT
 	// ponytail: action must be the full "admin.settings.write" — bare "write"
 	// never matched a perm so even admins got 403.
-	s.mux.Handle("/admin/settings", chain(apiLimiter.middleware, s.requireRole("admin", "admin", "settings", "admin.settings.write"), validateBody(adminSettingsReq{}))(http.HandlerFunc(s.handleAdminSettings)))
+	s.mux.Handle("/admin/settings", chain(apiLimiter.middleware, s.requireRole("admin", "admin", "settings", "admin.settings.write"), validateBody(&adminSettingsReq{}))(http.HandlerFunc(s.handleAdminSettings)))
 
 	// Seed trickle ops (admin): status, manual run-now, pause/resume.
 	seedAdmin := chain(apiLimiter.middleware, s.requireRole("admin", "admin", "seed", "admin.settings.write"))

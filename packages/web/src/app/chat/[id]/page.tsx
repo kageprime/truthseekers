@@ -177,8 +177,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   ];
 
   return (
-    <RetroWindow title={`TruthSeekers — Chat`} status={sending ? "Agent thinking…" : "Ready"}>
-      <div className="flex-1 flex flex-col md:flex-row min-h-0 min-w-0 bg-[var(--r-surface)] rounded-[var(--r-radius)] overflow-hidden transition-colors duration-200 border border-[var(--r-border)]">
+    <RetroWindow title={`TruthSeekers — Chat`} status={sending ? "Agent thinking…" : "Ready"} fixed>
+      {/* ponytail: fixed shell → this fills the viewport; messages scroll, sessions + composer stay pinned. */}
+      <div className="flex-1 flex flex-col md:flex-row h-full min-h-0 min-w-0 bg-[var(--r-surface)] rounded-[var(--r-radius)] overflow-hidden transition-colors duration-200 border border-[var(--r-border)]">
         {/* Mobile Header Bar */}
         <div className="md:hidden shrink-0 flex items-center justify-between px-3 h-10 bg-[var(--r-nav-bg)] border-b border-[var(--r-border)]">
           <button

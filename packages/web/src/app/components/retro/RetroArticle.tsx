@@ -1,10 +1,13 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import RetroContentsNav from "./RetroContentsNav";
 import ClaimExplorer from "./ClaimExplorer";
 import RetroInspector from "./RetroInspector";
 import RetroMarkdown from "./RetroMarkdown";
 import { IconBone, IconBook, IconClose, IconFlask, IconLock, IconMountain, IconQuestion, IconScale, IconSearch } from "./icons";
 import { retroStatusColor } from "@/lib/retro";
+import { canSeeAdmin } from "@/lib/routes";
 import { useQueryClient } from "@tanstack/react-query";
 import { useArticleProgress, useAuth, useRefreshArticle, useRefreshDiff } from "../../hooks";
 import ContestDialog from "../ContestDialog";
@@ -44,6 +47,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
   const [contestOpen, setContestOpen] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
   const [regen, setRegen] = useState<string | null>(null);
+  const [regenMsg, setRegenMsg] = useState<string | null>(null);
   const { mutate: refreshMutate, loading: refreshLoading } = useRefreshArticle();
   const { data: diff } = useRefreshDiff(article?.slug);
   const diffCount = (diff?.upgraded ?? 0) + (diff?.downgraded ?? 0) + (diff?.status_changed ?? 0);
@@ -51,13 +55,25 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
     onPhase: (p) => setRegen(p === "done" ? null : p),
     onDone: () => {
       setRegen(null);
+      setRegenMsg("Regeneration complete — article updated.");
       queryClient.invalidateQueries({ queryKey: ["article", article?.slug] });
     },
-    onError: () => setRegen(null),
+    onError: (e) => {
+      setRegen(null);
+      setRegenMsg(`Regeneration failed: ${e}`);
+    },
   });
   const handleRegen = () => {
     if (!article?.slug || regen !== null) return;
-    refreshMutate(article.slug).then((r) => { if (r) setRegen("queued"); });
+    setRegenMsg(null);
+    // ponytail: refreshArticle resolves undefined on transport failure and
+    // {status:"error"|"busy"} on refusal — every path gets visible feedback.
+    refreshMutate(article.slug).then((r) => {
+      if (!r) setRegenMsg("Regeneration failed to start — is the API reachable?");
+      else if ((r as any).status === "busy") setRegenMsg(`Backend busy: ${(r as any).error || "a generation is already running"}`);
+      else if ((r as any).status === "error") setRegenMsg("Regeneration refused — check quota and try again.");
+      else setRegen("queued");
+    });
   };
   const chipReturn = useRef<HTMLElement | null>(null);
   const refs = useRef<Record<string, HTMLElement|null>>({});
@@ -81,21 +97,6 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
 
   const siblings = useMemo(() => claims.filter((c) => weakest && c.id !== weakest.id).slice(0, 2), [claims, weakest]);
 
-  const dots = useMemo(() => {
-    if (!g.nodes.length) return [];
-    const hasXY = g.nodes.some((n: any) => typeof n.x === "number" && typeof n.y === "number");
-    if (hasXY) {
-      const xs = g.nodes.map((n: any) => n.x ?? 0), ys = g.nodes.map((n: any) => n.y ?? 0);
-      const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-      return g.nodes.slice(0, 60).map((n: any) => ({ x: 10 + ((Number(n.x) || 0) - minX) / Math.max(1, maxX - minX) * 180, y: 10 + ((Number(n.y) || 0) - minY) / Math.max(1, maxY - minY) * 100, s: n.status }));
-    }
-    return g.nodes.slice(0, 60).map((n: any, i: number) => {
-      const a = i * 2.39996, r = 8 + Math.sqrt(i) * 9;
-      return { x: 100 + r * Math.cos(a) * 1.6, y: 60 + r * Math.sin(a), s: n.status };
-    });
-  }, [g]);
-
-  const dotColor = (s: string) => (s === "verified" ? "#2e7d32" : s === "supported" ? "#5a9a3a" : s === "disputed" ? "#b7791f" : "#a33a3a");
   const body: string = article?.abstract ?? "";
   const secs: any[] = article?.sections ?? [];
 
@@ -204,51 +205,15 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row min-h-0 gap-3">
-      {/* Article Contents Sidebar */}
-      <div className="r-side w-full lg:w-[260px] shrink-0 bg-[var(--r-nav-bg)] border border-[var(--r-border)] rounded-[var(--r-radius)] flex flex-col transition-colors duration-200">
-        <div className="bg-[var(--r-accent)] text-white text-[11px] font-bold px-3 py-1.5 flex items-center justify-between">
-          <span>Article Outline</span>
-          <span className="bg-[var(--r-header-accent)] text-black px-1.5 py-0.5 text-[9px] font-bold rounded-sm border border-black/30">TOC</span>
-        </div>
-        <div className="p-2 space-y-0.5">
-          {sections.map((s)=>(
-            <button
-              key={s.id}
-              onClick={()=>{setActive(s.id); refs.current[s.id]?.scrollIntoView({behavior:"smooth",block:"start"});}}
-              aria-current={active===s.id?"true":undefined}
-              className={`w-full text-left px-2.5 py-1.5 text-[12px] flex items-center gap-2 border rounded-[var(--r-radius)] transition-colors ${
-                active===s.id
-                  ? "bg-[var(--r-accent)] text-white border-[var(--r-accent)] font-semibold shadow-sm"
-                  : "bg-transparent border-transparent hover:bg-black/5 text-[var(--r-ink)]"
-              }`}
-              style={active===s.id ? { color: "#ffffff" } : undefined}
-            >
-              <span className="inline-flex shrink-0 opacity-85" aria-hidden><s.Icon size={14} /></span>
-              <span className="flex-1 leading-snug">{s.label}</span>
-              {(s as any).badge && <span className="text-[8px] bg-red-700 text-white px-1.5 py-0.5 rounded-sm font-bold">{(s as any).badge}</span>}
-            </button>
-          ))}
-        </div>
-
-        {/* Mini Atlas Map */}
-        <div className="mt-2 mx-2.5 border bg-[var(--r-surface-elevated)] p-2.5 rounded-[var(--r-radius)]" style={{ borderColor: "var(--r-border)" }}>
-          <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--r-accent)" }}>Mini Claim Graph</div>
-          <svg viewBox="0 0 200 120" className="w-full h-[90px] bg-[var(--r-surface)] border rounded-sm" style={{ borderColor: "var(--r-border)" }}>
-            <path d="M60 10 Q80 5 110 15 T140 40 Q145 70 120 95 T70 100 Q45 80 40 50 T60 10" fill="var(--r-nav-bg)" stroke="var(--r-border)" strokeWidth={1.2}/>
-            {dots.map((d: { x: number; y: number; s: string }, i: number) => <circle key={i} cx={d.x} cy={d.y} r={2.8} fill={dotColor(d.s)} stroke="#000" strokeWidth={0.5} />)}
-            <text x={10} y={110} fontSize={7} fontFamily="sans-serif" fill="var(--r-ink-secondary)">{g.nodes.length} claims • {g.edges.length} evidence nodes</text>
-          </svg>
-        </div>
-
-        {/* Word of the Day */}
-        <div className="mt-2 mx-2.5 border bg-[var(--r-surface-elevated)] p-2.5 rounded-[var(--r-radius)]" style={{ borderColor: "var(--r-border)" }}>
-          <div className="text-[9px] font-bold bg-[var(--r-header-accent)] text-black px-1.5 py-0.5 inline-block border border-black/30 mb-1 rounded-sm">FACT CARD</div>
-          <div className="text-[13px] font-bold" style={{ fontFamily:"Georgia, serif", color: "var(--r-ink)" }}>pis·ci·vore</div>
-          <div className="text-[11px] leading-snug mt-0.5" style={{ color: "var(--r-ink-secondary)" }}><i>n.</i> A fish-eating organism. Key adaptation in semiaquatic predators.</div>
-        </div>
-
-        <div className="mt-auto p-2.5 text-[10px] border-t border-[var(--r-border)] text-[var(--r-muted)]">Article: {article?.slug ?? "—"} • {claims.length} claims</div>
-      </div>
+      {/* ponytail: same Contents nav as every other page, with this
+          article's outline injected — no bespoke sidebar. */}
+      <RetroContentsNav
+        pathname={`/article/${article?.slug ?? ""}`}
+        showAdmin={canSeeAdmin(user?.role)}
+        outline={sections.map((s) => ({ id: s.id, label: s.label }))}
+        activeOutline={active}
+        onOutlineSelect={(id) => { setActive(id); refs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+      />
 
       {/* Main Document Reading View (Vintage Book + CD-ROM Mashup) */}
       <div className="flex-1 min-w-0 bg-[var(--r-surface)] flex flex-col rounded-[var(--r-radius)] border border-[var(--r-border)] transition-colors duration-200">
@@ -264,14 +229,15 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
             </div>
 
             {/* Action bar — contest, regenerate, what-changed */}
-            <div className="flex flex-wrap items-center gap-2 mb-6">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
               <button
                 className="r-btn"
-                onClick={() => setContestOpen(true)}
+                onClick={() => setContestOpen((v) => !v)}
                 disabled={!user}
+                aria-expanded={contestOpen}
                 title={user ? "Challenge this article with a counterpoint" : "Log in to contest this article"}
               >
-                ⚑ Contest
+                {contestOpen ? "▾" : "▸"} Contest
               </button>
               <button
                 className="r-btn"
@@ -287,6 +253,26 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
                 </button>
               )}
             </div>
+            {!user && (
+              <div className="text-[11px] mb-4" style={{ color: "var(--r-muted)" }}>
+                <Link href={`/login?redirect=${encodeURIComponent(`/article/${article?.slug ?? ""}`)}`} className="underline font-bold" style={{ color: "var(--r-accent)" }}>Log in</Link>
+                {" "}to contest or regenerate this article.
+              </div>
+            )}
+            {regenMsg && (
+              <div className="text-[11px] mb-4" style={{ color: "var(--r-muted)" }}>{regenMsg}</div>
+            )}
+            {contestOpen && (
+              <div className="mb-6">
+                <ContestDialog
+                  slug={article.slug}
+                  open={contestOpen}
+                  onClose={() => setContestOpen(false)}
+                  onQueued={() => { setContestOpen(false); setRegen("queued"); }}
+                  inline
+                />
+              </div>
+            )}
 
             {showDiff && diffCount > 0 && (
               <div className="mb-6 border bg-[var(--r-surface-elevated)] rounded-[var(--r-radius)] p-3 text-[11px]" style={{ borderColor: "var(--r-border)" }}>
@@ -459,12 +445,6 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
           </ul>
         </div>
       </div>
-      <ContestDialog
-        slug={article.slug}
-        open={contestOpen}
-        onClose={() => setContestOpen(false)}
-        onQueued={() => setRegen("queued")}
-      />
     </div>
   );
 }

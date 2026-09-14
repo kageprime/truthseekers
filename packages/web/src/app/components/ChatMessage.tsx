@@ -102,8 +102,7 @@ function ThinkingBox({ events, streaming }: { events: any[]; streaming?: boolean
     <div className="my-2 text-xs">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 font-medium py-1 px-2.5 rounded-[var(--r-radius)] transition-colors border bg-[var(--r-surface-elevated)] text-[var(--r-muted)]"
-        style={{ borderColor: "var(--r-border)" }}
+        className="flex items-center gap-1.5 py-0.5 px-0 rounded-[var(--r-radius)] transition-colors bg-transparent border-0 cursor-pointer text-[var(--r-muted)] hover:text-[var(--r-ink)]"
       >
         <span className={`inline-block transition-transform duration-200 text-[8px] ${isOpen ? "rotate-90" : ""}`}>
           ▶
@@ -181,6 +180,7 @@ const ChatMessage = memo(function ChatMessage({
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const { content: cleanContent, blocks: mergedBlocks } = sanitizeMessage(content ?? "", blocks);
 
@@ -247,24 +247,36 @@ const ChatMessage = memo(function ChatMessage({
           </div>
         )}
 
-        {/* Action bar */}
+        {/* Action bar — collapsed behind ⋯, content-first */}
         {!streaming && (
-          <div className={`flex items-center gap-2 pt-1 transition-opacity ${
-            isLastAssistant ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          <div className={`flex items-center gap-1 pt-1 transition-opacity ${
+            menuOpen || isLastAssistant ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           }`}>
-            <button onClick={handleCopy} className="p-1 text-[11px] text-[var(--r-muted)] hover:text-[var(--r-ink)] transition-colors" title="Copy">
-              {copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-expanded={menuOpen}
+              aria-label="Message actions"
+              className="px-1.5 py-0.5 text-[13px] font-bold tracking-widest text-[var(--r-muted)] hover:text-[var(--r-ink)] transition-colors bg-transparent border-0 cursor-pointer"
+            >
+              ⋯
             </button>
-            <button onClick={() => setFeedback(feedback === "up" ? null : "up")} className={`p-1 text-[11px] transition-colors ${feedback === "up" ? "text-emerald-700 font-bold" : "text-[var(--r-muted)] hover:text-[var(--r-ink)]"}`} title="Helpful">
-              <IconThumbsUp size={13} />
-            </button>
-            <button onClick={() => setFeedback(feedback === "down" ? null : "down")} className={`p-1 text-[11px] transition-colors ${feedback === "down" ? "text-red-700 font-bold" : "text-[var(--r-muted)] hover:text-[var(--r-ink)]"}`} title="Not helpful">
-              <IconThumbsDown size={13} />
-            </button>
-            {isLastAssistant && onRegenerate && (
-              <button onClick={onRegenerate} className="p-1 text-[11px] text-[var(--r-muted)] hover:text-[var(--r-ink)] transition-colors" title="Regenerate">
-                <IconRefresh size={13} />
-              </button>
+            {menuOpen && (
+              <>
+                <button onClick={handleCopy} className="p-1 text-[11px] text-[var(--r-muted)] hover:text-[var(--r-ink)] transition-colors bg-transparent border-0 cursor-pointer" title="Copy">
+                  {copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
+                </button>
+                <button onClick={() => setFeedback(feedback === "up" ? null : "up")} className={`p-1 text-[11px] transition-colors bg-transparent border-0 cursor-pointer ${feedback === "up" ? "text-emerald-700 font-bold" : "text-[var(--r-muted)] hover:text-[var(--r-ink)]"}`} title="Helpful">
+                  <IconThumbsUp size={13} />
+                </button>
+                <button onClick={() => setFeedback(feedback === "down" ? null : "down")} className={`p-1 text-[11px] transition-colors bg-transparent border-0 cursor-pointer ${feedback === "down" ? "text-red-700 font-bold" : "text-[var(--r-muted)] hover:text-[var(--r-ink)]"}`} title="Not helpful">
+                  <IconThumbsDown size={13} />
+                </button>
+                {isLastAssistant && onRegenerate && (
+                  <button onClick={onRegenerate} className="p-1 text-[11px] text-[var(--r-muted)] hover:text-[var(--r-ink)] transition-colors bg-transparent border-0 cursor-pointer" title="Regenerate">
+                    <IconRefresh size={13} />
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}

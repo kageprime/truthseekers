@@ -18,7 +18,9 @@
   --r-ink: #1c1917;
   --r-ink-secondary: #57534e;
   --r-muted: #78716c;
-  --r-accent: #a67c2f;
+  /* ponytail: primary accent is win98 navy like the homepage — gold
+     survives only as --r-header-accent for badges/highlights. */
+  --r-accent: #0a2a5e;
   --r-nav-bg: #e8e1d0;
   --r-card-border: 1px solid #d6cebc;
   --r-btn-bg: #e8e1d0;

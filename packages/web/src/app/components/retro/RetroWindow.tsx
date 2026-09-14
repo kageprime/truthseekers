@@ -21,7 +21,7 @@ function useOnline(): boolean {
   return online;
 }
 
-export default function RetroWindow({ title, children, status, path, crumb, nav }: { title: string; children: React.ReactNode; status: string; path?: string; crumb?: string; nav?: boolean }) {
+export default function RetroWindow({ title, children, status, path, crumb, nav, fixed }: { title: string; children: React.ReactNode; status: string; path?: string; crumb?: string; nav?: boolean; fixed?: boolean }) {
   const pathname = usePathname();
   const online = useOnline();
   const [theme, setTheme] = useRetroTheme();
@@ -39,7 +39,9 @@ export default function RetroWindow({ title, children, status, path, crumb, nav 
 
   return (
     <div className={`retro98 ${themeClass} min-h-dvh p-1 sm:p-2.5 transition-colors duration-200`} style={{ background: "var(--r-bg)" }}>
-      <div className="r-window w-full flex flex-col min-h-[calc(100dvh-20px)]">
+      {/* ponytail: fixed pins the shell to the viewport so an inner column
+          (e.g. chat messages) becomes the only scroller. */}
+      <div className={`r-window w-full flex flex-col ${fixed ? "h-[calc(100dvh-20px)]" : "min-h-[calc(100dvh-20px)]"}`}>
         {/* Titlebar */}
         <div className="r-title flex items-center justify-between px-2 select-none shrink-0 gap-2" style={{ paddingTop: "env(safe-area-inset-top)" }}>
           <div className="flex items-center gap-2 text-white text-[12px] font-bold min-w-0">
