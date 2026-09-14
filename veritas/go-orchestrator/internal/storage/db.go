@@ -239,6 +239,7 @@ type DB struct {
 	mockMessages      map[string][]*StoredMessage
 	mockUsers         map[string]*User
 	mockConversations map[string]*Conversation
+	mockSettings      map[string]string
 	otpMu             sync.Mutex
 	mockOTP           map[string]otpEntry
 }
@@ -305,6 +306,7 @@ func newMockDB(dataDir string) *DB {
 		mockMessages:      make(map[string][]*StoredMessage),
 		mockUsers:         make(map[string]*User),
 		mockConversations: make(map[string]*Conversation),
+		mockSettings:      make(map[string]string),
 	}
 }
 
@@ -493,9 +495,15 @@ func (d *DB) GetUser(id string) (*User, error) {
 
 func (d *DB) SetUserOnboarded(id string, onboarded bool) error {
 	if d.mockMode {
-		if u, ok := d.mockUsers[id]; ok {
-			u.Onboarded = onboarded
-			u.UpdatedAt = time.Now().UTC()
+		// ponytail: mockUsers is keyed by email — match on ID like the
+		// GetUser mock path instead of a direct key lookup that always
+		// missed and made onboarding loop forever in file mode.
+		for _, u := range d.mockUsers {
+			if u.ID == id {
+				u.Onboarded = onboarded
+				u.UpdatedAt = time.Now().UTC()
+				break
+			}
 		}
 		return nil
 	}
@@ -695,12 +703,18 @@ func (d *DB) MemDeleteExpired() (int64, error) {
 func DefaultSettings() map[string]string {
 	return map[string]string{
 		"featured_articles": "[]",
+		"featured_pinned":   "[]",
 	}
 }
 
 func (d *DB) GetSettings() (map[string]string, error) {
 	out := DefaultSettings()
 	if d.mockMode {
+		// ponytail: file mode persists settings in memory like every other
+		// mock map — same interface as postgres, no silent discards.
+		for k, v := range d.mockSettings {
+			out[k] = v
+		}
 		return out, nil
 	}
 
@@ -722,6 +736,12 @@ func (d *DB) GetSettings() (map[string]string, error) {
 
 func (d *DB) SaveSettings(settings map[string]string) error {
 	if d.mockMode {
+		if d.mockSettings == nil {
+			d.mockSettings = make(map[string]string)
+		}
+		for k, v := range settings {
+			d.mockSettings[k] = v
+		}
 		return nil
 	}
 	now := time.Now().UTC()
