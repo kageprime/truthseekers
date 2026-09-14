@@ -23,6 +23,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
+  const [error, setError] = useState("");
   const { user, loading: authLoading, completeOnboarding } = useAuth();
   const router = useRouter();
 
@@ -30,9 +31,20 @@ export default function OnboardingPage() {
     if (step === 0 && name.trim()) {
       setStep(1);
     } else if (step === 1 && goal) {
+      setError("");
+      // ponytail: a failed submit used to stall silently, so users hit
+      // "Skip for now" and looped back to onboarding on every login.
       const ok = await completeOnboarding(name);
       if (ok) router.push("/chat/new?tour=true");
+      else setError("Couldn't save — check your connection and try again.");
     }
+  };
+
+  // Skipping is still a decision: record it so login stops bouncing here.
+  const handleSkip = async () => {
+    setError("");
+    await completeOnboarding(name);
+    router.push("/chat/new");
   };
 
   if (authLoading) {
@@ -171,12 +183,15 @@ export default function OnboardingPage() {
 
             <div className="text-center mt-4">
               <button
-                onClick={() => router.push("/chat/new")}
+                onClick={handleSkip}
                 className="text-xs hover:underline cursor-pointer"
                 style={{ color: "var(--subtle)", background: "none", border: "none" }}
               >
                 Skip for now
               </button>
+              {error && (
+                <p className="text-xs mt-2" style={{ color: "var(--oxblood)" }}>{error}</p>
+              )}
             </div>
           </div>
         </div>
