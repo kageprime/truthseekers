@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { canSeeAdmin } from "@/lib/routes";
-import { useAuth, useAdminSettings, useArticleSearch, useModels, useConnectors, useUpdateCredential, useUsageStats, useSeedStatus, useSeedRun, useSeedPause, useCoordinatorStatus, useCoordinatorRun } from "../hooks";
+import { useAuth, useAdminSettings, useArticleSearch, useModels, useConnectors, useUpdateCredential, useUsageStats, useSeedStatus, useSeedRun, useSeedPause, useCoordinatorStatus, useCoordinatorRun, useHealth } from "../hooks";
 import { IconBook, IconX, IconSearch, IconCheck, IconKey, IconCpu, IconActivity, IconLightning } from "../components/Icons";
 
 function Stat({ value, label, tone }: { value: string; label: string; tone?: string }) {
@@ -175,6 +175,7 @@ export default function AdminPage() {
   const { data: models } = useModels();
   const { data: connectors } = useConnectors();
   const { data: usage } = useUsageStats();
+  const { data: health } = useHealth();
   const { mutate: updateCred, loading: credSaving } = useUpdateCredential();
   const [featured, setFeatured] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -314,6 +315,30 @@ export default function AdminPage() {
 
       {/* ── System ── */}
       <div className="text-[10px] font-bold tracking-widest uppercase pt-1" style={{ color: "var(--r-muted)" }}>System</div>
+      <section className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-3.5 space-y-2">
+        <h2 className="text-[13px] font-bold flex items-center gap-2" style={{ color: "var(--r-ink)" }}>
+          <IconCpu size={15} /> Storage
+        </h2>
+        {!health ? (
+          <div className="text-[12px]" style={{ color: "var(--r-muted)" }}>Health unavailable.</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Stat
+                value={health.storage_mode ?? "unknown"}
+                label="Storage mode"
+                tone={health.storage_mode === "postgres" ? "#2e7d32" : "#a33a3a"}
+              />
+              <Stat value={String(health.article_count ?? 0)} label="Articles" />
+            </div>
+            {health.storage_mode !== "postgres" && (
+              <div className="text-[11px] font-bold" style={{ color: "#a33a3a" }}>
+                FILE MODE — users and content vanish on restart. Set DATABASE_URL on the backend.
+              </div>
+            )}
+          </>
+        )}
+      </section>
       <section className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-3.5 space-y-3">
         <h2 className="text-[13px] font-bold flex items-center gap-2" style={{ color: "var(--r-ink)" }}>
           <IconKey size={15} /> Credential Management

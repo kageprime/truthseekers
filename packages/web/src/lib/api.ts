@@ -779,7 +779,7 @@ export async function contestArticle(slug: string, argument: string): Promise<Co
 
 // ── Health (home page stats) ───────────────────────────────────
 
-export async function fetchHealth(): Promise<{ article_count?: number } | null> {
+export async function fetchHealth(): Promise<{ article_count?: number; storage_mode?: string; mockMode?: boolean } | null> {
   if (MOCK) return { article_count: 0 };
   try {
     const res = await fetch(`${BASE}/health`, { cache: "no-store", credentials: "include" });

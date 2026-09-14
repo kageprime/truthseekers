@@ -285,6 +285,14 @@ func (d *DB) ArticleCount() int {
 // local development. It loads real article JSON from the data directory so
 // the product is fully populated even with no database.
 func newMockDB(dataDir string) *DB {
+	// ponytail: single choke point for all three file-mode fallbacks
+	// (empty/unreachable DATABASE_URL) — impossible to miss in logs.
+	fmt.Printf("\n" +
+		"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n" +
+		"!! FILE-BACKED MODE: no Postgres reachable.                !!\n" +
+		"!! Users, articles, and settings live in RAM and VANISH   !!\n" +
+		"!! on restart. Set DATABASE_URL for real persistence.     !!\n" +
+		"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n")
 	fs, err := loadFileStore(dataDir)
 	if err != nil {
 		fmt.Printf("WARNING: failed to load file store (%v). Falling back to empty store.\n", err)
