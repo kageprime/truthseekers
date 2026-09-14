@@ -1,6 +1,9 @@
 package agent
 
-import "encoding/json"
+import (
+	"context"
+	"encoding/json"
+)
 
 type Role string
 
@@ -76,14 +79,17 @@ type AgentEvent struct {
 }
 
 type AgentConfig struct {
-	Model            string
-	SystemPrompt     string
-	Messages         []Message
-	Tools            []AgentTool
-	MaxIterations    int
-	Temperature      float64
-	ReasoningEffort  string
-	OnEvent          func(AgentEvent)
+	Model           string
+	SystemPrompt    string
+	Messages        []Message
+	Tools           []AgentTool
+	MaxIterations   int
+	Temperature     float64
+	ReasoningEffort string
+	OnEvent         func(AgentEvent)
+	// Ctx parents the run: disconnect cancels in-flight LLM calls, and Run
+	// adds an overall deadline on top. Nil = context.Background().
+	Ctx context.Context
 }
 
 type AgentTool struct {

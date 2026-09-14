@@ -4,10 +4,13 @@ import { useRefreshDiff } from "../hooks";
 
 interface Props {
   slug: string;
+  // ponytail: pass the composite slice and the per-widget fetch is skipped.
+  diff?: { upgraded: number; downgraded: number; status_changed: number } | null;
 }
 
-export default function RefreshDiffBanner({ slug }: Props) {
-  const { data: diff } = useRefreshDiff(slug);
+export default function RefreshDiffBanner({ slug, diff: externalDiff }: Props) {
+  const { data: fetched } = useRefreshDiff(externalDiff !== undefined ? undefined : slug);
+  const diff = externalDiff !== undefined ? externalDiff : fetched;
 
   if (!diff) return null;
   if (diff.upgraded === 0 && diff.downgraded === 0 && diff.status_changed === 0) return null;

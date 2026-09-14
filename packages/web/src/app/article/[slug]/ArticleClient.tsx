@@ -476,7 +476,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
             {article.metadata?.generatedBy && (
               <span className="plate-byline"><IconUser size={11} /> {article.metadata.generatedBy.slice(0, 12)}</span>
             )}
-            {article.slug && <FreshnessBadge slug={article.slug} />}
+            {article.slug && (generating || epistemic !== undefined) && <FreshnessBadge slug={article.slug} freshness={(epistemic as any)?.freshness ?? undefined} />}
             <LiveBadge slug={slug} />
             <span className="plate-sep" aria-hidden="true">·</span>
             <button
@@ -517,14 +517,14 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         </div>
         </header>
 
-        <RefreshDiffBanner slug={slug} />
+        {(generating || epistemic !== undefined) && <RefreshDiffBanner slug={slug} diff={(epistemic as any)?.refresh_diff ?? undefined} />}
 
         <KeyFactsBox facts={(epistemic as any)?.key_facts ?? []} />
 
         <div className="mb-6" />
-        {showGraph && (
+        {showGraph && (generating || epistemic !== undefined) && (
           <div className="mb-6">
-            <ClaimGraphViewer slug={slug} />
+            <ClaimGraphViewer slug={slug} data={(epistemic as any)?.claim_graph ?? undefined} />
           </div>
         )}
 
@@ -560,7 +560,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
         </aside>
         </div>
 
-        <ArticleGapsPanel slug={slug} />
+        {(generating || epistemic !== undefined) && <ArticleGapsPanel slug={slug} gaps={(epistemic as any)?.gaps ?? undefined} />}
       </article>
       </div>
       {trailClaim && (

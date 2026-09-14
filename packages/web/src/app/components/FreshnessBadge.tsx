@@ -4,10 +4,14 @@ import { useArticleFreshness } from "../hooks";
 
 interface Props {
   slug: string;
+  // ponytail: pass the composite slice and the per-widget fetch is skipped —
+  // the article page already loads /epistemic, no second round-trip.
+  freshness?: { overall_score: number; claim_freshness: { claim_id: string }[] } | null;
 }
 
-export default function FreshnessBadge({ slug }: Props) {
-  const { data: res } = useArticleFreshness(slug);
+export default function FreshnessBadge({ slug, freshness }: Props) {
+  const { data: fetched } = useArticleFreshness(freshness !== undefined ? undefined : slug);
+  const res = freshness !== undefined ? freshness : fetched;
   if (!res) return null;
   const { overall_score: score, claim_freshness: claimFreshness } = res;
   const claimCount = claimFreshness?.length || 0;

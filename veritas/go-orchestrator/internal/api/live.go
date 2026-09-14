@@ -29,15 +29,9 @@ type liveEntry struct {
 	phase       string
 	lastEvent   string
 	lastEventAt time.Time
+	createdAt   time.Time
 	slug        string
 }
-
-var (
-	liveMu      sync.RWMutex
-	liveStates  = make(map[string]*liveEntry)
-	liveSubs    = make(map[string][]chan string)
-	liveSubsMu  sync.RWMutex
-)
 
 type livePayload struct {
 	Slug        string `json:"slug"`
@@ -50,95 +44,6 @@ type livePayload struct {
 
 const liveRecentWindow = 90 * time.Second
 
-// getOrCreateLive returns (or creates) the live state entry for a slug.
-func getOrCreateLive(slug string) *liveEntry {
-	liveMu.Lock()
-	defer liveMu.Unlock()
-	if e, ok := liveStates[slug]; ok {
-		return e
-	}
-	e := &liveEntry{slug: slug}
-	liveStates[slug] = e
-	return e
-}
-
-// markActivity is the single producer hook — called from BroadcastProgress so
-// every phase/event tick from the pipeline also flips the live state.
-func markActivity(slug, phase, lastEvent string) {
-	e := getOrCreateLive(slug)
-	e.mu.Lock()
-	if phase != "" {
-		e.phase = phase
-	}
-	if lastEvent != "" {
-		e.lastEvent = lastEvent
-		e.lastEventAt = time.Now()
-	} else if phase != "" {
-		// Phase ticks are themselves activity; bump the timestamp so a long
-		// pipeline (no discrete events) still shows the article as live.
-		e.lastEventAt = time.Now()
-	}
-	e.mu.Unlock()
-	fanoutLive(slug)
-}
-
-// bumpViewers adjusts the per-slug viewer count. delta is +1 on connect,
-// -1 on disconnect.
-func bumpViewers(slug string, delta int) {
-	e := getOrCreateLive(slug)
-	e.mu.Lock()
-	e.viewers += delta
-	if e.viewers < 0 {
-		e.viewers = 0
-	}
-	e.mu.Unlock()
-	fanoutLive(slug)
-}
-
-// snapshotLive returns the current live payload for a slug.
-func snapshotLive(slug string) livePayload {
-	e := getOrCreateLive(slug)
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-	live := false
-	if e.viewers > 0 {
-		live = true
-	} else if !e.lastEventAt.IsZero() && time.Since(e.lastEventAt) < liveRecentWindow {
-		live = true
-	}
-	ts := ""
-	if !e.lastEventAt.IsZero() {
-		ts = e.lastEventAt.UTC().Format(time.RFC3339)
-	}
-	return livePayload{
-		Slug:        slug,
-		Viewers:     e.viewers,
-		Phase:       e.phase,
-		LastEvent:   e.lastEvent,
-		LastEventAt: ts,
-		Live:        live,
-	}
-}
-
-// fanoutLive pushes the current snapshot to all SSE subscribers of a slug.
-func fanoutLive(slug string) {
-	snap := snapshotLive(slug)
-	raw, err := json.Marshal(snap)
-	if err != nil {
-		return
-	}
-	payload := "event: live\ndata: " + string(raw) + "\n\n"
-	liveSubsMu.RLock()
-	chans := liveSubs[slug]
-	liveSubsMu.RUnlock()
-	for _, ch := range chans {
-		select {
-		case ch <- payload:
-		default:
-		}
-	}
-}
-
 // ── Global activity ring (drives the /live/now ticker) ──────────────────
 
 type activityItem struct {
@@ -150,57 +55,6 @@ type activityItem struct {
 }
 
 const maxGlobalActivity = 30
-
-var (
-	globalActivityMu sync.RWMutex
-	globalActivity   = make([]activityItem, 0, maxGlobalActivity)
-)
-
-func pushActivity(slug, kind, phase, text string) {
-	item := activityItem{
-		Slug:  slug,
-		Kind:  kind,
-		Phase: phase,
-		Text:  text,
-		At:    time.Now().UTC().Format(time.RFC3339),
-	}
-	globalActivityMu.Lock()
-	globalActivity = append(globalActivity, item)
-	if len(globalActivity) > maxGlobalActivity {
-		globalActivity = globalActivity[len(globalActivity)-maxGlobalActivity:]
-	}
-	globalActivityMu.Unlock()
-	fanoutGlobal()
-}
-
-func snapshotGlobal() []activityItem {
-	globalActivityMu.RLock()
-	defer globalActivityMu.RUnlock()
-	out := make([]activityItem, len(globalActivity))
-	copy(out, globalActivity)
-	return out
-}
-
-// ── Global subscribers ──────────────────────────────────────────────────
-
-var (
-	globalSubsMu sync.RWMutex
-	globalSubs   []chan string
-)
-
-func fanoutGlobal() {
-	items := snapshotGlobal()
-	raw, _ := json.Marshal(items)
-	payload := "event: activity\ndata: " + string(raw) + "\n\n"
-	globalSubsMu.RLock()
-	defer globalSubsMu.RUnlock()
-	for _, ch := range globalSubs {
-		select {
-		case ch <- payload:
-		default:
-		}
-	}
-}
 
 // ── SSE handlers ────────────────────────────────────────────────────────
 
@@ -227,19 +81,19 @@ func (s *Server) handleArticleLive(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 
 	ch := make(chan string, 16)
-	liveSubsMu.Lock()
 	// S17: cap watchers per slug — unbounded fanout is a memory/CPU DoS.
-	if len(liveSubs[slug]) >= 100 {
-		liveSubsMu.Unlock()
+	s.sse.liveSubsMu.Lock()
+	if len(s.sse.liveSubs[slug]) >= maxLiveSubsPerSlug {
+		s.sse.liveSubsMu.Unlock()
 		http.Error(w, `{"error":"too many watchers"}`, http.StatusTooManyRequests)
 		return
 	}
-	liveSubs[slug] = append(liveSubs[slug], ch)
-	liveSubsMu.Unlock()
-	bumpViewers(slug, 1)
+	s.sse.liveSubs[slug] = append(s.sse.liveSubs[slug], ch)
+	s.sse.liveSubsMu.Unlock()
+	s.sse.bumpViewers(slug, 1)
 
 	// Initial snapshot.
-	raw, _ := json.Marshal(snapshotLive(slug))
+	raw, _ := json.Marshal(s.sse.snapshotLive(slug))
 	fmt.Fprintf(w, "event: live\ndata: %s\n\n", string(raw))
 	flusher.Flush()
 
@@ -254,19 +108,19 @@ func (s *Server) handleArticleLive(w http.ResponseWriter, r *http.Request) {
 			// liveSubsMu.RLock. RWMutex isn't reentrant: Lock→RLock on one
 			// goroutine deadlocks, wedging every future /articles/:slug/live
 			// at registration (zero bytes, browser reports it as a CORS error).
-			liveSubsMu.Lock()
-			chans := liveSubs[slug]
+			s.sse.liveSubsMu.Lock()
+			chans := s.sse.liveSubs[slug]
 			for i, c := range chans {
 				if c == ch {
-					liveSubs[slug] = append(chans[:i], chans[i+1:]...)
+					s.sse.liveSubs[slug] = append(chans[:i], chans[i+1:]...)
 					break
 				}
 			}
-			if len(liveSubs[slug]) == 0 {
-				delete(liveSubs, slug)
+			if len(s.sse.liveSubs[slug]) == 0 {
+				delete(s.sse.liveSubs, slug)
 			}
-			liveSubsMu.Unlock()
-			bumpViewers(slug, -1)
+			s.sse.liveSubsMu.Unlock()
+			s.sse.bumpViewers(slug, -1)
 			return
 		case payload := <-ch:
 			fmt.Fprint(w, payload)
@@ -276,7 +130,7 @@ func (s *Server) handleArticleLive(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 			// Also re-broadcast a snapshot so the recent-window `live` flag
 			// flips back to false after the activity window expires.
-			fanoutLive(slug)
+			s.sse.fanoutLive(slug)
 		}
 	}
 }
@@ -294,17 +148,17 @@ func (s *Server) handleGlobalLive(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 
 	ch := make(chan string, 8)
-	globalSubsMu.Lock()
+	s.sse.globMu.Lock()
 	// S17: cap global ticker subscribers.
-	if len(globalSubs) >= 1000 {
-		globalSubsMu.Unlock()
+	if len(s.sse.globalSubs) >= maxGlobalSubs {
+		s.sse.globMu.Unlock()
 		http.Error(w, `{"error":"too many watchers"}`, http.StatusTooManyRequests)
 		return
 	}
-	globalSubs = append(globalSubs, ch)
-	globalSubsMu.Unlock()
+	s.sse.globalSubs = append(s.sse.globalSubs, ch)
+	s.sse.globMu.Unlock()
 
-	raw, _ := json.Marshal(snapshotGlobal())
+	raw, _ := json.Marshal(s.sse.snapshotGlobal())
 	fmt.Fprintf(w, "event: activity\ndata: %s\n\n", string(raw))
 	flusher.Flush()
 
@@ -315,12 +169,12 @@ func (s *Server) handleGlobalLive(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-ctx.Done():
-			globalSubsMu.Lock()
-			defer globalSubsMu.Unlock()
-			chans := globalSubs
+			s.sse.globMu.Lock()
+			defer s.sse.globMu.Unlock()
+			chans := s.sse.globalSubs
 			for i, c := range chans {
 				if c == ch {
-					globalSubs = append(chans[:i], chans[i+1:]...)
+					s.sse.globalSubs = append(chans[:i], chans[i+1:]...)
 					break
 				}
 			}

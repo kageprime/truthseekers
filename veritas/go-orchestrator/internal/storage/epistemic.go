@@ -445,33 +445,31 @@ func (d *DB) DeleteEpistemicDataForArticle(slug string) error {
 		return fmt.Errorf("delete epistemic data: resolve slug: %w", err)
 	}
 
+	// ponytail: single tx — 6 bare Execs with swallowed errors left
+	// partial deletes.
+	tx, err := d.db.Begin()
+	if err != nil {
+		return fmt.Errorf("delete epistemic data: begin: %w", err)
+	}
+	defer tx.Rollback()
 	// Delete in dependency order to avoid FK violations
-	_, _ = d.db.Exec(`
-		DELETE FROM scrutiny_assessments WHERE claim_id IN (
-			SELECT claim_id FROM article_claims WHERE article_id = $1
-		)
-	`, articleID)
-	_, _ = d.db.Exec(`
-		DELETE FROM language_flags WHERE claim_id IN (
-			SELECT claim_id FROM article_claims WHERE article_id = $1
-		)
-	`, articleID)
-	_, _ = d.db.Exec(`
-		DELETE FROM evidence_gaps WHERE claim_id IN (
-			SELECT claim_id FROM article_claims WHERE article_id = $1
-		)
-	`, articleID)
-	_, _ = d.db.Exec(`
-		DELETE FROM evidence WHERE claim_id IN (
-			SELECT claim_id FROM article_claims WHERE article_id = $1
-		)
-	`, articleID)
-	_, _ = d.db.Exec(`
-		DELETE FROM article_claims WHERE article_id = $1
-	`, articleID)
-	_, _ = d.db.Exec(`
-		DELETE FROM claims WHERE id NOT IN (SELECT claim_id FROM article_claims)
-	`)
+	for _, q := range []string{
+		`DELETE FROM scrutiny_assessments WHERE claim_id IN (SELECT claim_id FROM article_claims WHERE article_id = $1)`,
+		`DELETE FROM language_flags WHERE claim_id IN (SELECT claim_id FROM article_claims WHERE article_id = $1)`,
+		`DELETE FROM evidence_gaps WHERE claim_id IN (SELECT claim_id FROM article_claims WHERE article_id = $1)`,
+		`DELETE FROM evidence WHERE claim_id IN (SELECT claim_id FROM article_claims WHERE article_id = $1)`,
+		`DELETE FROM article_claims WHERE article_id = $1`,
+	} {
+		if _, err := tx.Exec(q, articleID); err != nil {
+			return fmt.Errorf("delete epistemic data: %w", err)
+		}
+	}
+	if _, err := tx.Exec(`DELETE FROM claims WHERE id NOT IN (SELECT claim_id FROM article_claims)`); err != nil {
+		return fmt.Errorf("delete epistemic data: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("delete epistemic data: commit: %w", err)
+	}
 	return nil
 }
 

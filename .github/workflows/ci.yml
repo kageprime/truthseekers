@@ -39,6 +39,35 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4097
 
+  go:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: veritas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d veritas_test"
+          --health-interval 5s --health-timeout 5s --health-retries 5
+    defaults:
+      run:
+        working-directory: veritas/go-orchestrator
+    env:
+      ALLOW_DEV_AUTH: "1"
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/veritas_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: veritas/go-orchestrator/go.sum
+      - run: go vet ./...
+      - run: go test ./... -count=1
+
   deploy-web:
     runs-on: ubuntu-latest
     needs: lint-and-test

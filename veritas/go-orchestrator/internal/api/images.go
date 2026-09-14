@@ -177,7 +177,7 @@ func (s *Server) generateArticleImages(slug string, art *storage.Article) {
 		log.Printf("[images] slug=%s: generating via %s (%s)", slug, model, baseURL)
 	}
 	_ = s.db.SaveJob(slug, "media", "media", map[string]interface{}{"title": art.Title})
-	BroadcastProgress(slug, "progress", map[string]interface{}{
+	s.sse.broadcast(slug, "progress", map[string]interface{}{
 		"slug": slug, "phase": "media", "node": "generate_media",
 		"status": "running", "timestamp": time.Now().Unix(),
 	})
@@ -289,3 +289,4 @@ func xmlEscape(s string) string {
 	s = strings.ReplaceAll(s, `"`, "&quot;")
 	return s
 }
+

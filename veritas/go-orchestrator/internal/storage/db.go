@@ -351,6 +351,11 @@ func NewDB(connStr, dataDir string) (*DB, error) {
 		}
 	}
 
+	// ponytail: bound pool or chat/agent fan-out exhausts max_connections.
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -466,8 +471,8 @@ func (d *DB) FindOrCreateUserByEmail(email string) (*User, error) {
 			UpdatedAt:        now,
 			Activated:        true,
 		}
-		_, err = d.db.Exec("INSERT INTO users (id, email, name, avatar, role, subscription_tier, onboarded, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-			u.ID, u.Email, u.Name, u.Avatar, u.Role, u.SubscriptionTier, u.Onboarded, u.CreatedAt, u.UpdatedAt)
+		_, err = d.db.Exec("INSERT INTO users (id, email, name, avatar, role, subscription_tier, onboarded, created_at, updated_at, username, activated) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+			u.ID, u.Email, u.Name, u.Avatar, u.Role, u.SubscriptionTier, u.Onboarded, u.CreatedAt, u.UpdatedAt, u.Username, true)
 		if err != nil {
 			return nil, fmt.Errorf("create user: %w", err)
 		}
@@ -490,8 +495,8 @@ func (d *DB) GetUser(id string) (*User, error) {
 	}
 
 	var u User
-	err := d.db.QueryRow("SELECT id, email, name, avatar, role, subscription_tier, onboarded, created_at, updated_at FROM users WHERE id = $1", id).
-		Scan(&u.ID, &u.Email, &u.Name, &u.Avatar, &u.Role, &u.SubscriptionTier, &u.Onboarded, &u.CreatedAt, &u.UpdatedAt)
+	err := d.db.QueryRow("SELECT id, email, name, avatar, role, subscription_tier, onboarded, created_at, updated_at, COALESCE(username,''), activated FROM users WHERE id = $1", id).
+		Scan(&u.ID, &u.Email, &u.Name, &u.Avatar, &u.Role, &u.SubscriptionTier, &u.Onboarded, &u.CreatedAt, &u.UpdatedAt, &u.Username, &u.Activated)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -842,8 +847,16 @@ func (d *DB) SaveArticle(art *Article) error {
 
 	id := randID()
 
+	// ponytail: single tx for article + edges — partial failure left
+	// articles without edges.
+	tx, err := d.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
 	// Using UPSERT style via ON CONFLICT (slug)
-	_, err := d.db.Exec(`
+	_, err = tx.Exec(`
 		INSERT INTO articles (id, slug, title, abstract, blocks, confidence_vector, derived_confidence, 
 		                      sections, timeline, categories, crossrefs, citations, metadata, created_at, updated_at) 
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
@@ -860,26 +873,19 @@ func (d *DB) SaveArticle(art *Article) error {
 	}
 
 	// Populate graph_edges from crossrefs for graph traversal
-	if len(art.Crossrefs) > 0 {
-		tx, err := d.db.Begin()
-		if err != nil {
-			return fmt.Errorf("begin tx for graph_edges: %w", err)
+	if _, err := tx.Exec("DELETE FROM graph_edges WHERE source = $1", art.Slug); err != nil {
+		return fmt.Errorf("clear graph_edges: %w", err)
+	}
+	for _, cr := range art.Crossrefs {
+		if _, err = tx.Exec(
+			"INSERT INTO graph_edges (source, target, relationship) VALUES ($1, $2, $3) ON CONFLICT (source, target) DO UPDATE SET relationship = EXCLUDED.relationship",
+			art.Slug, cr.Title, cr.Relationship,
+		); err != nil {
+			return fmt.Errorf("insert graph_edge: %w", err)
 		}
-		// Clear existing edges for this source
-		_, _ = tx.Exec("DELETE FROM graph_edges WHERE source = $1", art.Slug)
-		for _, cr := range art.Crossrefs {
-			_, err = tx.Exec(
-				"INSERT INTO graph_edges (source, target, relationship) VALUES ($1, $2, $3) ON CONFLICT (source, target) DO UPDATE SET relationship = EXCLUDED.relationship",
-				art.Slug, cr.Title, cr.Relationship,
-			)
-			if err != nil {
-				tx.Rollback()
-				return fmt.Errorf("insert graph_edge: %w", err)
-			}
-		}
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit graph_edges: %w", err)
-		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit article: %w", err)
 	}
 
 	return nil
@@ -1237,7 +1243,7 @@ func (d *DB) GetTopArticles(limit int) ([]*Article, error) {
 	}
 	rows, err := d.db.Query(`
 		SELECT a.slug, a.title, a.abstract, a.blocks, a.confidence_vector, a.derived_confidence,
-		       a.sections, a.timeline, a.categories, a.crossrefs, a.citations, a.threed_scenes, a.metadata, a.created_at, a.updated_at
+		       a.sections, a.timeline, a.categories, a.crossrefs, a.citations, a.metadata, a.created_at, a.updated_at
 		FROM articles a
 		JOIN (
 			SELECT slug, COUNT(*) as view_count
@@ -1414,12 +1420,12 @@ func (d *DB) SearchMaps(searchQuery string, limit int) ([]*MapEntry, error) {
 		return nil, nil
 	}
 
-	q := "%" + searchQuery + "%"
+	q := "%" + escapeLIKE(searchQuery) + "%"
 	rows, err := d.db.Query(`
 		SELECT slug, title, subtitle, description, content, image, region, era, type, external_url, 
 		       center_lat, center_lng, zoom, geo_json, markers, created_at, updated_at 
 		FROM maps 
-		WHERE title ILIKE $1 OR subtitle ILIKE $1 OR description ILIKE $1 OR region ILIKE $1 OR era ILIKE $1 
+		WHERE title ILIKE $1 ESCAPE '\' OR subtitle ILIKE $1 ESCAPE '\' OR description ILIKE $1 ESCAPE '\' OR region ILIKE $1 ESCAPE '\' OR era ILIKE $1 ESCAPE '\'
 		ORDER BY created_at DESC LIMIT $2`, q, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search maps failed: %w", err)

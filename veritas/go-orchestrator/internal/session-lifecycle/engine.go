@@ -3,6 +3,7 @@ package sessionlifecycle
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -13,11 +14,16 @@ import (
 const (
 	maxRetries = 5
 	maxActive  = 3
+	// ponytail: unbounded queue piled memory on refresh bursts; 429 past this.
+	maxQueue = 100
 )
 
+// ErrQueueFull signals backpressure overflow; handlers map it to 429.
+var ErrQueueFull = errors.New("session queue full, retry later")
+
 // Engine manages session lifecycle with state machine, backpressure, and retry.
-// ponytail: in-memory only, single-process. Add DB backing and multi-instance
-// coordination (Redis) when horizontal scaling is needed.
+// Sessions write through to Store (DB) on every transition; boot reloads
+// non-terminal rows via Restore. Nil store = memory-only (tests, file mode).
 type Engine struct {
 	mu         sync.RWMutex
 	sessions   map[string]*Session        // sessionID → session
@@ -26,32 +32,83 @@ type Engine struct {
 	queue      []*Session                 // FIFO queue for backpressured sessions
 	active     int                        // Current running count
 	processor  Processor
+	store      Store
 	done       chan struct{}
+	stopOnce   sync.Once
+	wg         sync.WaitGroup
 }
 
-// NewEngine creates a session lifecycle engine.
+// NewEngine creates a memory-only session lifecycle engine.
 func NewEngine(processor Processor) *Engine {
+	return NewEngineWithStore(processor, nullStore{})
+}
+
+// NewEngineWithStore creates an engine that persists every transition.
+func NewEngineWithStore(processor Processor, store Store) *Engine {
+	if store == nil {
+		store = nullStore{}
+	}
 	e := &Engine{
 		sessions:  make(map[string]*Session),
 		bySlug:    make(map[string]string),
 		byKey:     make(map[string]string),
 		processor: processor,
+		store:     store,
 		done:      make(chan struct{}),
 	}
 	go e.drainLoop()
 	return e
 }
 
+// Restore re-queues non-terminal sessions after a restart. Anything that was
+// provisioning/running is safely re-queued — the pipeline upserts, so a
+// duplicate run converges instead of corrupting.
+func (e *Engine) Restore(sessions []Session) {
+	e.mu.Lock()
+	var restored []Session
+	for i := range sessions {
+		s := sessions[i]
+		if IsTerminal(s.Status) {
+			continue
+		}
+		cp := s
+		cp.Status = StatusQueued
+		cp.UpdatedAt = time.Now()
+		e.sessions[cp.ID] = &cp
+		e.bySlug[cp.Slug] = cp.ID
+		if cp.IdempotencyKey != "" {
+			e.byKey[cp.IdempotencyKey] = cp.ID
+		}
+		e.queue = append(e.queue, &cp)
+		restored = append(restored, cp)
+		log.Printf("[session] restored %s (slug=%s, was=%s)", cp.ID, cp.Slug, s.Status)
+	}
+	e.mu.Unlock()
+	for i := range restored {
+		e.persist(&restored[i])
+	}
+	go e.drain()
+}
+
+// persist writes one session through to the store. Call WITHOUT holding e.mu
+// (it does blocking I/O); pass a copy taken under lock.
+func (e *Engine) persist(s *Session) {
+	if err := e.store.Upsert(*s); err != nil {
+		log.Printf("[session] persist %s: %v", s.ID, err)
+	}
+}
+
 // CreateSession creates a new session with idempotency and backpressure.
 func (e *Engine) CreateSession(cmd CreateCommand) (*Session, error) {
 	e.mu.Lock()
-	defer e.mu.Unlock()
 
 	// Idempotency check.
 	if cmd.IdempotencyKey != "" {
 		if existingID, ok := e.byKey[cmd.IdempotencyKey]; ok {
 			if s, ok := e.sessions[existingID]; ok {
-				return s, nil
+				cp := *s
+				e.mu.Unlock()
+				return &cp, nil
 			}
 		}
 	}
@@ -60,6 +117,7 @@ func (e *Engine) CreateSession(cmd CreateCommand) (*Session, error) {
 	if existingID, ok := e.bySlug[cmd.Slug]; ok {
 		if s, ok := e.sessions[existingID]; ok {
 			if s.Status == StatusQueued || s.Status == StatusProvisioning || s.Status == StatusRunning {
+				e.mu.Unlock()
 				return nil, fmt.Errorf("session already active for slug %q (status=%s)", cmd.Slug, s.Status)
 			}
 		}
@@ -78,12 +136,6 @@ func (e *Engine) CreateSession(cmd CreateCommand) (*Session, error) {
 		UpdatedAt:      time.Now(),
 	}
 
-	e.sessions[session.ID] = session
-	e.bySlug[cmd.Slug] = session.ID
-	if cmd.IdempotencyKey != "" {
-		e.byKey[cmd.IdempotencyKey] = session.ID
-	}
-
 	// Apply queue policy.
 	backpressure := e.backpressureLocked()
 	shouldQueue := backpressure.ShouldQueue
@@ -93,6 +145,18 @@ func (e *Engine) CreateSession(cmd CreateCommand) (*Session, error) {
 		shouldQueue = false
 	}
 
+	if shouldQueue && len(e.queue) >= maxQueue {
+		e.mu.Unlock()
+		return nil, ErrQueueFull
+	}
+
+	e.sessions[session.ID] = session
+	e.bySlug[cmd.Slug] = session.ID
+	if cmd.IdempotencyKey != "" {
+		e.byKey[cmd.IdempotencyKey] = session.ID
+	}
+
+	startNow := false
 	if shouldQueue {
 		session.Status = StatusQueued
 		e.queue = append(e.queue, session)
@@ -100,10 +164,17 @@ func (e *Engine) CreateSession(cmd CreateCommand) (*Session, error) {
 	} else {
 		session.Status = StatusProvisioning
 		e.active++
+		e.wg.Add(1)
+		startNow = true
+	}
+	cp := *session
+	e.mu.Unlock()
+
+	e.persist(&cp)
+	if startNow {
 		go e.runSession(session)
 	}
-
-	return session, nil
+	return &cp, nil
 }
 
 // GetSession returns a session by ID.
@@ -138,10 +209,10 @@ func (e *Engine) ListSessions() []Session {
 // Transition moves a session to a new status, validating the transition.
 func (e *Engine) Transition(cmd TransitionCommand) error {
 	e.mu.Lock()
-	defer e.mu.Unlock()
 
 	s, ok := e.sessions[cmd.SessionID]
 	if !ok {
+		e.mu.Unlock()
 		return fmt.Errorf("session %q not found", cmd.SessionID)
 	}
 
@@ -154,9 +225,11 @@ func (e *Engine) Transition(cmd TransitionCommand) error {
 		}
 	}
 	if !valid {
+		e.mu.Unlock()
 		return fmt.Errorf("invalid transition %s → %s", s.Status, cmd.ToStatus)
 	}
 
+	prev := s.Status
 	s.Status = cmd.ToStatus
 	s.UpdatedAt = time.Now()
 	if cmd.Error != "" {
@@ -165,18 +238,31 @@ func (e *Engine) Transition(cmd TransitionCommand) error {
 
 	log.Printf("[session] %s → %s (slug=%s)", s.ID, cmd.ToStatus, s.Slug)
 
-	// If completing or failed, reduce active count and drain next.
+	// Slot accounting: only provisioning/running hold a slot. Completing and
+	// terminal states release it — exactly once (Running→Completing→Completed
+	// must not double-decrement; Queued→Stopped must not decrement at all).
+	// ponytail: the old code decremented on every completing/terminal arrival,
+	// leaking the count negative on cancels and double on two-step completion.
+	shouldDrain := false
 	if cmd.ToStatus == StatusCompleting || IsTerminal(cmd.ToStatus) {
-		e.active--
+		if prev == StatusProvisioning || prev == StatusRunning {
+			e.active--
+		}
 		if cmd.ToStatus == StatusFailed && s.RetryCount < maxRetries {
 			s.RetryCount++
 			s.Status = StatusQueued
 			e.queue = append(e.queue, s)
 			log.Printf("[session] queued %s for retry %d/%d", s.ID, s.RetryCount, maxRetries)
 		}
+		shouldDrain = true
+	}
+	cp := *s
+	e.mu.Unlock()
+
+	e.persist(&cp)
+	if shouldDrain {
 		go e.drain()
 	}
-
 	return nil
 }
 
@@ -197,6 +283,23 @@ func (e *Engine) Stats() (active int, queued int) {
 // Limits exposes the backpressure ceiling for ops surfaces.
 func (e *Engine) Limits() (maxActiveSessions int) { return maxActive }
 
+// QueueLimit exposes the real queue bound (not a duplicate of maxActive).
+func (e *Engine) QueueLimit() int { return maxQueue }
+
+// ListSessionsPaged returns newest-first sessions with limit/offset.
+// limit <= 0 means all (callers should cap; /queue caps at 200).
+func (e *Engine) ListSessionsPaged(limit, offset int) []Session {
+	all := e.ListSessions()
+	if offset >= len(all) {
+		return []Session{}
+	}
+	all = all[offset:]
+	if limit > 0 && limit < len(all) {
+		all = all[:limit]
+	}
+	return all
+}
+
 // ── Internal ────────────────────────────────────────────────
 
 func (e *Engine) backpressureLocked() BackpressureState {
@@ -216,6 +319,7 @@ func (e *Engine) backpressureLocked() BackpressureState {
 }
 
 func (e *Engine) runSession(session *Session) {
+	defer e.wg.Done()
 	e.Transition(TransitionCommand{
 		SessionID: session.ID,
 		ToStatus:  StatusRunning,
@@ -223,16 +327,25 @@ func (e *Engine) runSession(session *Session) {
 
 	err := e.processor(*session)
 
-	toStatus := StatusCompleted
-	errMsg := ""
+	// ponytail: two-step completion — Running→Completed is not a valid
+	// transition (and never was, so sessions silently stuck at running).
 	if err != nil {
-		toStatus = StatusFailed
-		errMsg = err.Error()
+		e.Transition(TransitionCommand{
+			SessionID: session.ID,
+			ToStatus:  StatusFailed,
+			Error:     err.Error(),
+		})
+		return
+	}
+	if err := e.Transition(TransitionCommand{
+		SessionID: session.ID,
+		ToStatus:  StatusCompleting,
+	}); err != nil {
+		return
 	}
 	e.Transition(TransitionCommand{
 		SessionID: session.ID,
-		ToStatus:  toStatus,
-		Error:     errMsg,
+		ToStatus:  StatusCompleted,
 	})
 }
 
@@ -248,6 +361,7 @@ func (e *Engine) drainLocked() {
 		e.queue = e.queue[1:]
 		session.Status = StatusProvisioning
 		e.active++
+		e.wg.Add(1)
 		go e.runSession(session)
 	}
 }
@@ -265,9 +379,11 @@ func (e *Engine) drainLoop() {
 	}
 }
 
-// Stop shuts down the drain loop.
+// Stop shuts down the drain loop and waits for in-flight sessions.
+// Callers should bound this (main wraps shutdown in a timeout ctx).
 func (e *Engine) Stop() {
-	close(e.done)
+	e.stopOnce.Do(func() { close(e.done) })
+	e.wg.Wait()
 }
 
 func randID() string {

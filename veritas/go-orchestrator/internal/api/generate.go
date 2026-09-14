@@ -38,19 +38,27 @@ func init() {
 // using Go LLM-based executors.  Dependency graph mirrors the original Python
 // pipeline. A non-empty contestNote arms resolve + generate_article with the
 // reader's challenge (see DAGNodeExecutorsWithContext); empty behaves flat.
+// nodeRetry is the shared resilience budget: transient LLM flakes (429/5xx,
+// mid-stream drops) retry with backoff instead of killing the 15m job.
+// ponytail: one policy for all nodes — per-node tuning when data says so.
+var nodeRetry = dag.RetryPolicy{MaxAttempts: 3, BackoffBase: time.Second, BackoffMax: 8 * time.Second}
+
 func buildArticleWorkflow(contestNote string) *dag.Workflow {
 	execs := agent.DAGNodeExecutorsWithContext(articleSystemPrompt, contestNote)
+	n := func(id string, timeout time.Duration, deps ...string) dag.Node {
+		return dag.Node{ID: id, DependsOn: deps, Execute: execs[id], Retry: nodeRetry, Timeout: timeout}
+	}
 	return &dag.Workflow{
 		Nodes: []dag.Node{
-			{ID: "retrieve", DependsOn: []string{}, Execute: execs["retrieve"]},
-			{ID: "extract_claims", DependsOn: []string{"retrieve"}, Execute: execs["extract_claims"]},
-			{ID: "map_evidence", DependsOn: []string{"retrieve", "extract_claims"}, Execute: execs["map_evidence"]},
-			{ID: "critique", DependsOn: []string{"retrieve", "extract_claims", "map_evidence"}, Execute: execs["critique"]},
-			{ID: "detect_missing", DependsOn: []string{"extract_claims", "map_evidence"}, Execute: execs["detect_missing"]},
-			{ID: "map_language", DependsOn: []string{"extract_claims"}, Execute: execs["map_language"]},
-			{ID: "scrutinize", DependsOn: []string{"extract_claims", "critique", "detect_missing", "map_language"}, Execute: execs["scrutinize"]},
-			{ID: "resolve", DependsOn: []string{"extract_claims", "map_evidence", "critique", "scrutinize"}, Execute: execs["resolve"]},
-			{ID: "generate_article", DependsOn: []string{"resolve", "retrieve", "extract_claims"}, Execute: execs["generate_article"]},
+			n("retrieve", 2*time.Minute),
+			n("extract_claims", 2*time.Minute, "retrieve"),
+			n("map_evidence", 90*time.Second, "retrieve", "extract_claims"),
+			n("critique", 90*time.Second, "retrieve", "extract_claims", "map_evidence"),
+			n("detect_missing", 90*time.Second, "extract_claims", "map_evidence"),
+			n("map_language", 90*time.Second, "extract_claims"),
+			n("scrutinize", 2*time.Minute, "extract_claims", "critique", "detect_missing", "map_language"),
+			n("resolve", 2*time.Minute, "extract_claims", "map_evidence", "critique", "scrutinize"),
+			n("generate_article", 5*time.Minute, "resolve", "retrieve", "extract_claims"),
 		},
 	}
 }
@@ -72,7 +80,9 @@ var humanPhase = map[string]string{
 // processArticle executes the full generation pipeline for a slug and persists
 // the result. A non-empty note (e.g. an upheld contestation) travels into
 // retrieval as query context and into resolve/generate as a hypothesis.
-func (s *Server) processArticle(slug string, persona string, note string) {
+// The returned error drives session retry: failArticle records the job/SSE
+// state, the error moves the session to failed (→ requeue until maxRetries).
+func (s *Server) processArticle(slug string, persona string, note string) error {
 	start := time.Now()
 	log.Printf("🖌️ [generate] starting pipeline slug=%s persona=%s contest=%t", slug, persona, note != "")
 
@@ -85,14 +95,20 @@ func (s *Server) processArticle(slug string, persona string, note string) {
 	// to 120s — 5m starved generate_article (the heaviest node) with ~30s
 	// left after 8 nodes on a slow reasoning model. 15m fits the worst case
 	// with headroom; the client SSE survives via progress heartbeats.
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	// Parent is the server run ctx so Shutdown cancels LLM spend on SIGTERM.
+	ctx, cancel := context.WithTimeout(s.runCtx, 15*time.Minute)
 	defer cancel()
 
-	workflow := buildArticleWorkflow(note)
+	builder := s.workflowBuilder
+	if builder == nil {
+		builder = buildArticleWorkflow
+	}
+	workflow := builder(note)
 	updates, err := workflow.Execute(ctx, string(queryJSON))
 	if err != nil {
-		s.failArticle(slug, fmt.Sprintf("workflow invalid: %v", err))
-		return
+		reason := fmt.Sprintf("workflow invalid: %v", err)
+		s.failArticle(slug, reason)
+		return fmt.Errorf("%s", reason)
 	}
 
 	// Collect node outputs for epistemic persistence.
@@ -107,20 +123,18 @@ func (s *Server) processArticle(slug string, persona string, note string) {
 			if phase == "" {
 				phase = update.NodeID
 			}
-			_ = s.db.SaveJob(slug, "writing", phase, map[string]interface{}{"title": slug, "persona": persona, "node": update.NodeID})
-			BroadcastProgress(slug, "progress", map[string]interface{}{
+			_ = s.db.SaveJob(slug, "writing", phase, map[string]interface{}{"title": slug, "persona": persona})
+			s.sse.broadcast(slug, "progress", map[string]interface{}{
 				"slug":      slug,
 				"phase":     phase,
-				"node":      update.NodeID,
 				"status":    "running",
 				"timestamp": time.Now().Unix(),
 			})
 		case "failed":
 			pipelineFailed = true
 			log.Printf("💥 [generate] node %s failed: %s", update.NodeID, update.Error)
-			BroadcastProgress(slug, "progress", map[string]interface{}{
+			s.sse.broadcast(slug, "progress", map[string]interface{}{
 				"slug":      slug,
-				"node":      update.NodeID,
 				"status":    "failed",
 				"error":     update.Error,
 				"timestamp": time.Now().Unix(),
@@ -141,7 +155,7 @@ func (s *Server) processArticle(slug string, persona string, note string) {
 			reason = "generation timed out"
 		}
 		s.failArticle(slug, reason)
-		return
+		return fmt.Errorf("%s", reason)
 	}
 
 	// Unify claim identity before anything persists: model-minted IDs are
@@ -149,13 +163,21 @@ func (s *Server) processArticle(slug string, persona string, note string) {
 	// dangle ("unknown" chips) and regens accumulate duplicate rows.
 	logNodeShapes(slug, nodeOutputs)
 	generatedOutput = s.canonicalizeClaimIDs(nodeOutputs, generatedOutput)
-	lintArticleProse(slug, generatedOutput)
+	// ponytail: one writer retry on lint signal (same arming pattern as
+	// contestNote) + citation verification sampling on weak claims.
+	generatedOutput = s.retryWriterOnLint(slug, note, nodeOutputs, generatedOutput)
+	s.verifySampleWeakClaims(slug, nodeOutputs)
 
-	art := transformGeneratedArticle(slug, generatedOutput)
+	art, ok := transformGeneratedArticle(slug, generatedOutput)
+	if !ok {
+		s.failArticle(slug, "generate_article produced no usable output")
+		return fmt.Errorf("generate_article produced no usable output")
+	}
 	s.backfillCitationURLs(slug, nodeOutputs, art)
 	if err := s.db.SaveArticle(art); err != nil {
-		s.failArticle(slug, fmt.Sprintf("save article: %v", err))
-		return
+		reason := fmt.Sprintf("save article: %v", err)
+		s.failArticle(slug, reason)
+		return fmt.Errorf("%s", reason)
 	}
 
 	// Fresh link set per generation (rows + versions are preserved — only
@@ -175,7 +197,7 @@ func (s *Server) processArticle(slug string, persona string, note string) {
 
 	_ = s.db.SaveJob(slug, "done", "store", map[string]interface{}{"title": art.Title})
 
-	BroadcastProgress(slug, "article_complete", map[string]interface{}{
+	s.sse.broadcast(slug, "article_complete", map[string]interface{}{
 		"slug":               slug,
 		"article_id":         slug,
 		"title":              art.Title,
@@ -188,6 +210,7 @@ func (s *Server) processArticle(slug string, persona string, note string) {
 	// reflect the fresh content without waiting for the 60s ISR window. The
 	// frontend handles this via POST /api/revalidate with a shared secret.
 	s.notifyFrontendRevalidate(slug)
+	return nil
 }
 
 // backfillCitationURLs fills empty citation URLs from the retrieve node's
@@ -259,7 +282,13 @@ func (s *Server) backfillCitationURLs(slug string, nodeOutputs map[string]interf
 // background goroutine. Failures are logged and ignored — the ISR window is
 // the safety net.
 func (s *Server) notifyFrontendRevalidate(slug string) {
-	apiURL := os.Getenv("NEXT_PUBLIC_API_URL")
+	// ponytail: REVALIDATE_URL is the server-side frontend base
+	// (in compose: http://frontend:3000). NEXT_PUBLIC_API_URL is the
+	// browser-facing API base and points at the backend itself.
+	apiURL := os.Getenv("REVALIDATE_URL")
+	if apiURL == "" {
+		apiURL = os.Getenv("NEXT_PUBLIC_API_URL")
+	}
 	secret := os.Getenv("REVALIDATE_SECRET")
 	if apiURL == "" || secret == "" {
 		return
@@ -291,7 +320,7 @@ func (s *Server) notifyFrontendRevalidate(slug string) {
 // failArticle marks the job as errored and notifies subscribers.
 func (s *Server) failArticle(slug string, reason string) {
 	_ = s.db.SaveJob(slug, "error", "error", map[string]interface{}{"title": slug, "error": reason})
-	BroadcastProgress(slug, "progress", map[string]interface{}{
+	s.sse.broadcast(slug, "progress", map[string]interface{}{
 		"slug":      slug,
 		"phase":     "error",
 		"status":    "failed",
@@ -315,7 +344,7 @@ func (s *Server) streamNodeOutputs(slug string, nodeID string, raw interface{}) 
 	}
 	go func() {
 		for _, ev := range events {
-			BroadcastProgress(slug, "agent_event", ev)
+			s.sse.broadcast(slug, "agent_event", ev)
 			time.Sleep(70 * time.Millisecond)
 		}
 	}()
@@ -351,8 +380,16 @@ func extractLiveEvents(nodeID string, raw interface{}) []map[string]interface{} 
 				Title string `json:"title"`
 				URL   string `json:"url"`
 			} `json:"documents"`
+			Plan    []string `json:"research_plan"`
+			Queries []string `json:"research_queries"`
 		}
 		if json.Unmarshal(b, &r) == nil {
+			if len(r.Plan) > 0 {
+				out = append(out, mkEvent("research_plan", "plan", map[string]interface{}{
+					"steps":   r.Plan,
+					"queries": r.Queries,
+				}, now))
+			}
 			for _, docs := range r.Documents {
 				for _, d := range docs {
 					if d.ID == "" {
@@ -517,22 +554,22 @@ type articlePayload struct {
 }
 
 // transformGeneratedArticle converts the raw generate_article node output
-// (interface{} from the DAG channel) into a storage.Article ready to persist.
-// Falls back to a stub-shaped article when the output is missing or malformed
-// so the frontend always gets a renderable article.
-func transformGeneratedArticle(slug string, raw interface{}) *storage.Article {
+// into a storage.Article. Returns false when the output is missing or
+// malformed — callers must fail loudly instead of publishing a stub as
+// "published" (that masqueraded failure as success).
+func transformGeneratedArticle(slug string, raw interface{}) (*storage.Article, bool) {
 	// Re-marshal through JSON so map[string]interface{} and typed structs both
 	// decode cleanly into articlePayload regardless of which path produced it.
 	rawBytes, err := json.Marshal(raw)
 	if err != nil || len(rawBytes) == 0 {
-		log.Printf("⚠️ [generate] empty/malformed article output for slug=%s, using stub", slug)
-		return stubArticle(slug)
+		log.Printf("💥 [generate] empty/malformed article output for slug=%s", slug)
+		return nil, false
 	}
 
 	var payload articlePayload
 	if err := json.Unmarshal(rawBytes, &payload); err != nil || payload.Article.Title == "" {
-		log.Printf("⚠️ [generate] could not parse article output for slug=%s (err=%v), using stub", slug, err)
-		return stubArticle(slug)
+		log.Printf("💥 [generate] could not parse article output for slug=%s (err=%v)", slug, err)
+		return nil, false
 	}
 
 	abstract := payload.Article.Abstract
@@ -572,7 +609,7 @@ func transformGeneratedArticle(slug string, raw interface{}) *storage.Article {
 			Updated:     time.Now().UTC().Format(time.RFC3339),
 			GeneratedBy: "veritas-pipeline",
 		},
-	}
+	}, true
 }
 
 // persistNodeOutputs saves intermediate DAG node outputs (claims, evidence gaps,
@@ -1309,15 +1346,16 @@ func isUUID(s string) bool { return uuidLikeRe.MatchString(s) }
 
 // lintArticleProse scans generated prose for process narration and verbatim
 // restatement. Findings are logged loudly for prompt tuning; the article is
-// never mutated here (anchor safety).
-func lintArticleProse(slug string, generated interface{}) {
+// never mutated here (anchor safety). Returns meta-talk hits, restated-sentence
+// count, and short finding lines so the caller can retry the writer once.
+func lintArticleProse(slug string, generated interface{}) (metaHits, dupes int, findings []string) {
 	b, err := json.Marshal(generated)
 	if err != nil {
-		return
+		return 0, 0, nil
 	}
 	var payload articlePayload
 	if err := json.Unmarshal(b, &payload); err != nil {
-		return
+		return 0, 0, nil
 	}
 	texts := []string{payload.Article.Abstract}
 	for _, s := range payload.Article.Sections {
@@ -1334,7 +1372,12 @@ func lintArticleProse(slug string, generated interface{}) {
 				if end > len(t) {
 					end = len(t)
 				}
-				log.Printf("[generate] lint slug=%s meta-talk %q near: …%s…", slug, re.String(), strings.TrimSpace(t[start:end]))
+				excerpt := strings.TrimSpace(t[start:end])
+				log.Printf("[generate] lint slug=%s meta-talk %q near: …%s…", slug, re.String(), excerpt)
+				metaHits++
+				if len(findings) < 6 {
+					findings = append(findings, "meta-talk "+re.String()+" near: "+excerpt)
+				}
 			}
 		}
 	}
@@ -1350,7 +1393,6 @@ func lintArticleProse(slug string, generated interface{}) {
 			seen[norm]++
 		}
 	}
-	dupes := 0
 	for sent, n := range seen {
 		if n >= 2 {
 			dupes++
@@ -1366,24 +1408,45 @@ func lintArticleProse(slug string, generated interface{}) {
 	if dupes > 3 {
 		log.Printf("[generate] lint slug=%s …and %d more restated sentences", slug, dupes-3)
 	}
+	return metaHits, dupes, findings
 }
 
-// stubArticle returns a minimal renderable article, used only when the
-// generate_article node produced no usable output.
-func stubArticle(slug string) *storage.Article {
-	return &storage.Article{
-		Slug:     slug,
-		Title:    slug,
-		Abstract: fmt.Sprintf("An article on %s could not be fully generated.", slug),
-		Blocks: []interface{}{
-			map[string]interface{}{"id": "h1", "type": "heading", "data": map[string]interface{}{"level": 1, "text": slug}},
-			map[string]interface{}{"id": "p1", "type": "text", "data": map[string]interface{}{"text": fmt.Sprintf("Generation of this article (%s) did not produce content.", slug)}},
-		},
-		DerivedConfidence: 0.0,
-		Metadata: storage.ArticleMetadata{
-			Version:     1,
-			Status:      "published",
-			GeneratedBy: "veritas-stub-fallback",
-		},
+// retryWriterOnLint runs lintArticleProse and, on signal (meta-talk or heavy
+// restatement), re-invokes the writer once with findings appended. Anchor-safe:
+// the retry is a fresh writer pass, never a regex edit. Returns the article
+// output to persist (original when clean or when the retry fails).
+func (s *Server) retryWriterOnLint(slug, note string, nodeOutputs map[string]interface{}, generated interface{}) interface{} {
+	metaHits, dupes, findings := lintArticleProse(slug, generated)
+	if metaHits == 0 && dupes <= 3 {
+		return generated
+	}
+	log.Printf("[generate] lint slug=%s: retrying writer once (meta=%d restated=%d)", slug, metaHits, dupes)
+	retry, err := agent.RewriteArticleWithFindings(articleSystemPrompt, note, nodeOutputs["resolve"], nodeOutputs["retrieve"], nodeOutputs["extract_claims"], findings)
+	if err != nil {
+		log.Printf("[generate] lint slug=%s: writer retry failed (%v), keeping original", slug, err)
+		return generated
+	}
+	retry = s.canonicalizeClaimIDs(nodeOutputs, retry)
+	if m2, d2, _ := lintArticleProse(slug, retry); m2 < metaHits || d2 < dupes {
+		log.Printf("[generate] lint slug=%s: retry improved (meta %d→%d restated %d→%d)", slug, metaHits, m2, dupes, d2)
+		return retry
+	}
+	log.Printf("[generate] lint slug=%s: retry no better, keeping original", slug)
+	return generated
+}
+
+// verifySampleWeakClaims runs citation verification sampling over weak claims
+// (log-first, no persistence). Downgrades nothing today; the log tunes the
+// resolver and writer prompts over time.
+func (s *Server) verifySampleWeakClaims(slug string, nodeOutputs map[string]interface{}) {
+	res, ok := nodeOutputs["resolve"]
+	if !ok {
+		return
+	}
+	for _, r := range agent.SampleVerifyWeakClaims(res, nodeOutputs["retrieve"]) {
+		log.Printf("[verify-sample] slug=%s claim=%s supported=%t conf=%.2f %s", slug, r.ClaimID, r.Supported, r.Conf, r.Note)
 	}
 }
+
+
+

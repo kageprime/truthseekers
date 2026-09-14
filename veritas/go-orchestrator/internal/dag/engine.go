@@ -3,6 +3,7 @@ package dag
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -152,6 +153,9 @@ func (w *Workflow) Execute(ctx context.Context, query string) (<-chan ProgressUp
 							if backoff > n.Retry.BackoffMax {
 								backoff = n.Retry.BackoffMax
 							}
+							// ponytail: ±20% jitter so 9 nodes retrying at once
+							// don't thunder the provider.
+							backoff = backoff - backoff/5 + time.Duration(rand.Int63n(int64(backoff)/5*2+1))
 
 							select {
 							case <-ctx.Done():

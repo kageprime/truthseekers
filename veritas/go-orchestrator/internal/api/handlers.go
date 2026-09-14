@@ -7,64 +7,32 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	sessionlifecycle "github.com/kageprime/veritas/go-orchestrator/internal/session-lifecycle"
 	"github.com/kageprime/veritas/go-orchestrator/internal/storage"
 )
 
-// Active SSE channel registries for real-time progress updates
-var (
-	progressChannels   = make(map[string][]chan string)
-	progressChannelsMu sync.RWMutex
-	progressRing       = make(map[string][]string) // ring buffer per slug, replayed to late joiners
-	progressRingMu     sync.RWMutex
-)
-
-const maxRingEvents = 50
-
-// BroadcastProgress sends an SSE payload to all listening clients for a slug.
-func BroadcastProgress(slug string, event string, data interface{}) {
-	progressChannelsMu.RLock()
-	chans, ok := progressChannels[slug]
-	progressChannelsMu.RUnlock()
-
-	rawJSON, err := json.Marshal(data)
-	if err != nil {
-		return
+// serveETag sets ETag and serves 304 on match. Returns true when the response
+// is complete (caller must return). Same pattern as handleGetMap, shared so
+// hot reads (article, epistemic) get conditional requests for free.
+func serveETag(w http.ResponseWriter, r *http.Request, tag string) bool {
+	if tag == "" {
+		return false
 	}
-	payload := fmt.Sprintf("event: %s\ndata: %s\n\n", event, string(rawJSON))
-
-	// Live-feed hooks: every progress tick is also live activity. These
-	// are no-ops when nobody is subscribed, so the hot path stays cheap.
-	phase, text := extractLiveSignal(event, data)
-	if phase != "" || text != "" {
-		markActivity(slug, phase, text)
-		pushActivity(slug, event, phase, text)
+	etag := `"` + tag + `"`
+	w.Header().Set("ETag", etag)
+	if match := r.Header.Get("If-None-Match"); match != "" && strings.Contains(match, etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return true
 	}
+	return false
+}
 
-	if !ok || len(chans) == 0 {
-		return
-	}
-
-	// Store in ring buffer for late-joining subscribers
-	progressRingMu.Lock()
-	ring := progressRing[slug]
-	ring = append(ring, payload)
-	if len(ring) > maxRingEvents {
-		ring = ring[len(ring)-maxRingEvents:]
-	}
-	progressRing[slug] = ring
-	progressRingMu.Unlock()
-
-	// Send to all subscribers non-blockingly
-	for _, ch := range chans {
-		select {
-		case ch <- payload:
-		default:
-		}
-	}
+// cache60 marks slowly-changing reads cacheable for the ISR window so
+// browsers and edge caches stop refetching every poll.
+func cache60(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "public, max-age=60")
 }
 
 // extractLiveSignal pulls a human-readable phase + text from a progress event
@@ -95,38 +63,6 @@ func extractLiveSignal(event string, data interface{}) (phase, text string) {
 		text = t
 	}
 	return phase, text
-}
-
-// maxProgressSubsPerSlug caps SSE watchers per article (S17) — unbounded
-// subscribers let one slug pin memory + fanout CPU.
-const maxProgressSubsPerSlug = 100
-
-func registerProgressChannel(slug string, ch chan string) bool {
-	progressChannelsMu.Lock()
-	defer progressChannelsMu.Unlock()
-	if len(progressChannels[slug]) >= maxProgressSubsPerSlug {
-		return false
-	}
-	progressChannels[slug] = append(progressChannels[slug], ch)
-	return true
-}
-
-func unregisterProgressChannel(slug string, ch chan string) {
-	progressChannelsMu.Lock()
-	defer progressChannelsMu.Unlock()
-	chans := progressChannels[slug]
-	for i, c := range chans {
-		if c == ch {
-			progressChannels[slug] = append(chans[:i], chans[i+1:]...)
-			break
-		}
-	}
-	if len(progressChannels[slug]) == 0 {
-		delete(progressChannels, slug)
-		progressRingMu.Lock()
-		delete(progressRing, slug)
-		progressRingMu.Unlock()
-	}
 }
 
 func (s *Server) handleListArticles(w http.ResponseWriter, r *http.Request) {
@@ -173,6 +109,7 @@ func (s *Server) handleListArticles(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	cache60(w)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -224,6 +161,16 @@ func (s *Server) handleGetArticle(w http.ResponseWriter, r *http.Request, slug s
 		return
 	}
 
+	// ponytail: UpdatedAt is the row version — regeneration bumps it, so the
+	// ETag is exact with zero extra queries.
+	tag := article.Metadata.Updated
+	if !article.UpdatedAt.IsZero() {
+		tag = article.UpdatedAt.UTC().Format(time.RFC3339)
+	}
+	cache60(w)
+	if serveETag(w, r, tag) {
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(article)
 }
@@ -251,6 +198,9 @@ type GenerateRequest struct {
 
 func (s *Server) handleGenerateArticle(w http.ResponseWriter, r *http.Request, slug string) {
 	reqLog(r, "generate article slug=%s", slug)
+	if !s.checkWriteBudget(w, r) {
+		return
+	}
 	var req GenerateRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	_ = json.NewDecoder(r.Body).Decode(&req)
@@ -294,6 +244,9 @@ func (s *Server) handleGenerateArticle(w http.ResponseWriter, r *http.Request, s
 
 func (s *Server) handleRefreshArticle(w http.ResponseWriter, r *http.Request, slug string) {
 	reqLog(r, "refresh article slug=%s", slug)
+	if !s.checkWriteBudget(w, r) {
+		return
+	}
 	userID := userIDFromRequest(r)
 	_, err := s.sessionEngine.CreateSession(sessionlifecycle.CreateCommand{
 		Slug:    slug,
@@ -727,6 +680,9 @@ func (s *Server) handleArticleEpistemic(w http.ResponseWriter, r *http.Request, 
 		})
 	}
 
+	// ponytail: freshness scores decay with wall-clock time, so no ETag here —
+	// a 60s Cache-Control is the honest contract (matches the ISR window).
+	cache60(w)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"slug":           slug,
@@ -877,6 +833,7 @@ func (s *Server) handleGetGlobalClaimGraph(w http.ResponseWriter, r *http.Reques
 		})
 	}
 
+	cache60(w)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"nodes":             nodes,
@@ -893,7 +850,8 @@ func (s *Server) handleGetContestedClaims(w http.ResponseWriter, r *http.Request
 	reqLog(r, "contested claims")
 	limitStr := r.URL.Query().Get("limit")
 	limit := 50
-	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+	// ponytail: uncapped limit was a full-table scan on demand.
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
 		limit = l
 	}
 	claims, err := s.db.GetMostContestedClaims(limit)
@@ -901,6 +859,7 @@ func (s *Server) handleGetContestedClaims(w http.ResponseWriter, r *http.Request
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	cache60(w)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"claims": claims})
 }
@@ -936,15 +895,18 @@ func (s *Server) handleGetQueue(w http.ResponseWriter, r *http.Request) {
 	// Live session listing — the /queue page polls this every 2s. Shape
 	// matches the frontend QueueData contract ({jobs, stats}).
 	type jobJSON struct {
-		Slug      string `json:"slug"`
-		Status    string `json:"status"`
-		Phase     string `json:"phase"`
-		CreatedAt string `json:"createdAt"`
-		Source    string `json:"source,omitempty"`
-		Error     string `json:"error,omitempty"`
+		Slug       string `json:"slug"`
+		Status     string `json:"status"`
+		Phase      string `json:"phase"`
+		CreatedAt  string `json:"createdAt"`
+		UpdatedAt  string `json:"updatedAt"`
+		Source     string `json:"source,omitempty"`
+		Error      string `json:"error,omitempty"`
+		RetryCount int    `json:"retryCount"`
 	}
 	jobs := make([]jobJSON, 0)
-	for _, sess := range s.sessionEngine.ListSessions() {
+	// ponytail: cap the poll payload; full history is unbounded.
+	for _, sess := range s.sessionEngine.ListSessionsPaged(200, 0) {
 		status := string(sess.Status)
 		switch sess.Status {
 		case sessionlifecycle.StatusCompleted:
@@ -953,19 +915,21 @@ func (s *Server) handleGetQueue(w http.ResponseWriter, r *http.Request) {
 			status = "error"
 		}
 		jobs = append(jobs, jobJSON{
-			Slug:      sess.Slug,
-			Status:    status,
-			Phase:     status,
-			CreatedAt: sess.CreatedAt.UTC().Format(time.RFC3339),
-			Source:    sess.Source,
-			Error:     sess.Error,
+			Slug:       sess.Slug,
+			Status:     status,
+			Phase:      status,
+			CreatedAt:  sess.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:  sess.UpdatedAt.UTC().Format(time.RFC3339),
+			Source:     sess.Source,
+			Error:      sess.Error,
+			RetryCount: sess.RetryCount,
 		})
 	}
 	active, queued := s.sessionEngine.Stats()
 	jobsJSON, _ := json.Marshal(jobs)
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, `{"jobs":%s,"stats":{"active":%d,"queued":%d,"maxConcurrent":%d,"maxQueue":%d}}`,
-		string(jobsJSON), active, queued, s.sessionEngine.Limits(), s.sessionEngine.Limits())
+		string(jobsJSON), active, queued, s.sessionEngine.Limits(), s.sessionEngine.QueueLimit())
 }
 
 // handleQueueRouter dispatches DELETE /queue/:slug (cancel a session).
@@ -984,6 +948,18 @@ func (s *Server) handleQueueRouter(w http.ResponseWriter, r *http.Request) {
 	if sess == nil {
 		http.Error(w, `{"error":"no session for slug"}`, http.StatusNotFound)
 		return
+	}
+	// ponytail: any authed user could cancel anyone's generation. Owner
+	// (or owner/admin role, or trigger-owned sessions with empty UserID) only.
+	caller := userIDFromContext(r.Context())
+	if sess.UserID != "" && sess.UserID != caller {
+		role, _ := r.Context().Value("userRole").(string)
+		if role != "owner" && role != "admin" {
+			if u, err := s.db.GetUser(caller); err != nil || u == nil || (u.Role != "owner" && u.Role != "admin") {
+				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+				return
+			}
+		}
 	}
 	if sessionlifecycle.IsTerminal(sess.Status) {
 		http.Error(w, fmt.Sprintf(`{"error":"session already %s"}`, sess.Status), http.StatusConflict)
@@ -1018,10 +994,7 @@ func (s *Server) handleTrack(w http.ResponseWriter, r *http.Request) {
 	if event == "" {
 		event = "view"
 	}
-	ip := r.Header.Get("X-Forwarded-For")
-	if ip == "" {
-		ip = r.RemoteAddr
-	}
+	ip := clientIP(r)
 
 	_ = s.db.TrackArticleView(slug, ip, event)
 
@@ -1042,14 +1015,14 @@ func (s *Server) handleGetAllGaps(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleUpvoteGap(w http.ResponseWriter, r *http.Request) {
 	// Path: /gaps/{id}/upvote
+	if !requireCtxAuth(w, r) {
+		return
+	}
 	path := strings.TrimPrefix(r.URL.Path, "/gaps/")
 	gapID := strings.TrimSuffix(path, "/upvote")
 	gapID = strings.TrimSuffix(gapID, "/")
 	reqLog(r, "upvote gap id=%s", gapID)
-	userID := userIDFromRequest(r)
-	if userID == "" {
-		userID = "anonymous"
-	}
+	userID := userIDFromContext(r.Context())
 	if err := s.db.UpvoteGap(gapID, userID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1061,6 +1034,9 @@ func (s *Server) handleUpvoteGap(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSubmitGapEvidence(w http.ResponseWriter, r *http.Request) {
 	// Path: /gaps/{id}/submit
+	if !requireCtxAuth(w, r) {
+		return
+	}
 	path := strings.TrimPrefix(r.URL.Path, "/gaps/")
 	gapID := strings.TrimSuffix(path, "/submit")
 	gapID = strings.TrimSuffix(gapID, "/")
@@ -1074,10 +1050,11 @@ func (s *Server) handleSubmitGapEvidence(w http.ResponseWriter, r *http.Request)
 		http.Error(w, `{"error":"url is required"}`, http.StatusBadRequest)
 		return
 	}
-	userID := userIDFromRequest(r)
-	if userID == "" {
-		userID = "anonymous"
+	if !(strings.HasPrefix(body.URL, "https://") || strings.HasPrefix(body.URL, "http://")) {
+		http.Error(w, `{"error":"url must be http(s)"}`, http.StatusBadRequest)
+		return
 	}
+	userID := userIDFromContext(r.Context())
 	sub, err := s.db.SubmitGapEvidence(gapID, body.URL, body.Note, userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1108,7 +1085,8 @@ func (s *Server) handleGetStaleArticles(w http.ResponseWriter, r *http.Request) 
 	reqLog(r, "stale articles")
 	limitStr := r.URL.Query().Get("limit")
 	limit := 50
-	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+	// ponytail: uncapped limit was a full-table scan on demand.
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
 		limit = l
 	}
 	articles, err := s.db.GetStaleArticles(limit)
@@ -1116,6 +1094,7 @@ func (s *Server) handleGetStaleArticles(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	cache60(w)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"articles": articles})
 }
@@ -1160,7 +1139,7 @@ func (s *Server) handleGetTopArticles(w http.ResponseWriter, r *http.Request) {
 	reqLog(r, "top articles")
 	limitStr := r.URL.Query().Get("limit")
 	limit := 10
-	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
 		limit = l
 	}
 
@@ -1174,6 +1153,7 @@ func (s *Server) handleGetTopArticles(w http.ResponseWriter, r *http.Request) {
 		"data": articles,
 	}
 
+	cache60(w)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -1198,22 +1178,18 @@ func (s *Server) handleGetArticleProgress(w http.ResponseWriter, r *http.Request
 	authed := userIDFromRequest(r) != ""
 
 	ch := make(chan string, 64)
-	if !registerProgressChannel(slug, ch) {
+	if !s.sse.registerProgress(slug, ch) {
 		http.Error(w, `{"error":"too many watchers"}`, http.StatusTooManyRequests)
 		return
 	}
-	defer unregisterProgressChannel(slug, ch)
+	defer s.sse.unregisterProgress(slug, ch)
 
-	// Replay ring buffer for late-joining AUTHENTICATED subscribers only —
-	// the ring holds in-progress claim text.
-	if authed {
-		progressRingMu.RLock()
-		ring := progressRing[slug]
-		progressRingMu.RUnlock()
-		for _, msg := range ring {
-			w.Write([]byte(msg))
-			flusher.Flush()
-		}
+	// Resume from the ring: EventSource auto-sends Last-Event-ID on
+	// reconnect (frames carry id:), so refresh mid-generation replays the
+	// middle instead of heartbeat-only. Anonymous replays see completion only.
+	for _, msg := range s.sse.replaySince(slug, lastEventID(r.Header.Get("Last-Event-ID")), authed) {
+		w.Write([]byte(msg))
+		flusher.Flush()
 	}
 
 	// Stream initial heartbeat or status
@@ -1228,7 +1204,7 @@ func (s *Server) handleGetArticleProgress(w http.ResponseWriter, r *http.Request
 		case msg := <-ch:
 			// ponytail: fail-closed — anonymous sees only completion.
 			// progress + agent_event carry claim text / retrieved sources.
-			if !authed && !strings.HasPrefix(msg, "event: article_complete") {
+			if !authed && sseEventName(msg) != "article_complete" {
 				continue
 			}
 			w.Write([]byte(msg))

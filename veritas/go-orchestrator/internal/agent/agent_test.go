@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"sync"
@@ -18,7 +19,7 @@ type scriptedLLM struct {
 	toolDefs [][]ToolDefinition // toolDefs seen per call
 }
 
-func (s *scriptedLLM) call(_ []Message, _, _ string, _ float64, defs []ToolDefinition, _ func(AgentEvent)) (LLMResponse, error) {
+func (s *scriptedLLM) call(_ context.Context, _ []Message, _, _ string, _ float64, defs []ToolDefinition, _ func(AgentEvent)) (LLMResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.calls >= len(s.scripts) {
@@ -250,6 +251,26 @@ func TestManageContext_NeverOrphansToolMessages(t *testing.T) {
 	// Seed must survive.
 	if len(a.messages) == 0 || a.messages[0].Content != "seed" {
 		t.Fatalf("seed message was dropped")
+	}
+}
+
+// 7. A dead parent ctx fails the run before any LLM call burns tokens —
+// the disconnect-cancels-inflight fix. The 10m runTimeout needs no test:
+// it only fires on wedged providers, and waiting it out is not a test.
+func TestRun_DeadContextFailsFast(t *testing.T) {
+	sl := &scriptedLLM{scripts: []LLMResponse{{Text: "never"}}}
+	a := NewAgent(AgentConfig{})
+	a.llmCall = sl.call
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	a.config.Ctx = ctx
+	if _, err := a.Run("hi"); err == nil {
+		t.Fatal("expected deadline error, got nil")
+	}
+	sl.mu.Lock()
+	defer sl.mu.Unlock()
+	if sl.calls != 0 {
+		t.Fatalf("dead ctx still burned %d LLM calls", sl.calls)
 	}
 }
 

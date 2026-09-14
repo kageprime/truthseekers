@@ -114,6 +114,42 @@ func TestDedupBySlug(t *testing.T) {
 	}
 }
 
+func TestProcessorErrorRetries(t *testing.T) {
+	// ponytail: the Phase-1 fix — processor errors must reach failed →
+	// requeue instead of silently completing.
+	calls := 0
+	e := NewEngine(func(s Session) error {
+		calls++
+		if calls == 1 {
+			return fmt.Errorf("boom")
+		}
+		return nil
+	})
+	defer e.Stop()
+
+	s, err := e.CreateSession(CreateCommand{Slug: "retry-slug", UserID: "u1", Source: "ui"})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		got := e.GetSession(s.ID)
+		if got != nil && got.Status == StatusCompleted {
+			if got.RetryCount != 1 {
+				t.Fatalf("expected 1 retry, got %d", got.RetryCount)
+			}
+			break
+		}
+		if got != nil && got.Status == StatusFailed && got.RetryCount == 0 {
+			t.Fatalf("failed without retry: %+v", got)
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for retry, calls=%d sess=%+v", calls, got)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
 func TestBackpressure(t *testing.T) {
 	e := NewEngine(func(s Session) error {
 		time.Sleep(500 * time.Millisecond)

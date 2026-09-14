@@ -16,6 +16,7 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -23,6 +24,7 @@ import (
 	"github.com/kageprime/veritas/go-orchestrator/internal/agent"
 	"github.com/kageprime/veritas/go-orchestrator/internal/coordinator"
 	"github.com/kageprime/veritas/go-orchestrator/internal/credstore"
+	"github.com/kageprime/veritas/go-orchestrator/internal/dag"
 	"github.com/kageprime/veritas/go-orchestrator/internal/executor"
 	"github.com/kageprime/veritas/go-orchestrator/internal/iam"
 	llmgateway "github.com/kageprime/veritas/go-orchestrator/internal/llm-gateway"
@@ -86,6 +88,34 @@ type Server struct {
 	// so POST /chat/:id/stop (or a client disconnect) can Abort() the loop.
 	agentsMu sync.Mutex
 	agents   map[string]agentRun
+
+	// runCtx is the parent for all generation pipelines. Cancelled on
+	// Shutdown so SIGTERM stops LLM spend instead of orphaning it.
+	runCtx    context.Context
+	runCancel context.CancelFunc
+
+	// workflowBuilder constructs the article DAG. Overridable in tests
+	// with instant fake nodes so the generation path runs without LLM keys.
+	workflowBuilder func(note string) *dag.Workflow
+
+	// sse owns all streaming registries (progress, live, global). Per-Server
+	// so tests never share watchers; stopped on Shutdown.
+	sse *sseHub
+
+	// writeLimiter budgets expensive writes (generate/refresh/contest) per
+	// user at 10/min. The shared 60/min IP bucket never bound these, so one
+	// account could queue unbounded 15-minute pipelines.
+	writeLimiter *rateLimiter
+}
+
+// checkWriteBudget enforces the expensive-write budget. Returns false + 429
+// when exhausted. Call after requireCtxAuth so the user bucket applies.
+func (s *Server) checkWriteBudget(w http.ResponseWriter, r *http.Request) bool {
+	if s.writeLimiter.allow(userKey(r)) {
+		return true
+	}
+	s.writeLimiter.reject(w)
+	return false
 }
 
 // agentRun is a registered in-flight agent run, owned by a single user.
@@ -158,28 +188,39 @@ func (rl *rateLimiter) allow(ip string) bool {
 	return true
 }
 
+func (rl *rateLimiter) reject(w http.ResponseWriter) {
+	// ponytail: tell clients when to retry — blind 429s cause reconnect storms.
+	w.Header().Set("Retry-After", strconv.Itoa(int(rl.window.Seconds())))
+	http.Error(w, `{"error":"rate limit exceeded"}`, http.StatusTooManyRequests)
+}
+
 func (rl *rateLimiter) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := clientIP(r)
 		if !rl.allow("ip:"+ip) {
-			http.Error(w, `{"error":"rate limit exceeded"}`, http.StatusTooManyRequests)
+			rl.reject(w)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
+// userKey resolves the per-user bucket, falling back to IP when no user is
+// in ctx (shouldn't happen behind auth, but safe for tests).
+func userKey(r *http.Request) string {
+	key := "user:" + userIDFromContext(r.Context())
+	if key == "user:" {
+		key = "ip:" + clientIP(r)
+	}
+	return key
+}
+
 // userMiddleware limits by authenticated userID. Chain AFTER authMiddleware:
-// chain(limiter, auth, userLimiter)(h). Falls back to IP when no user in ctx
-// (shouldn't happen behind auth, but safe for tests).
+// chain(limiter, auth, userLimiter)(h).
 func (rl *rateLimiter) userMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := "user:" + userIDFromContext(r.Context())
-		if key == "user:" {
-			key = "ip:" + clientIP(r)
-		}
-		if !rl.allow(key) {
-			http.Error(w, `{"error":"rate limit exceeded"}`, http.StatusTooManyRequests)
+		if !rl.allow(userKey(r)) {
+			rl.reject(w)
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -474,11 +515,17 @@ type (
 )
 
 func NewServer(port string, db *storage.DB) *Server {
+	runCtx, runCancel := context.WithCancel(context.Background())
 	s := &Server{
-		db:     db,
-		port:   port,
-		mux:    http.NewServeMux(),
-		agents: make(map[string]agentRun),
+		db:              db,
+		port:            port,
+		mux:             http.NewServeMux(),
+		agents:          make(map[string]agentRun),
+		runCtx:          runCtx,
+		runCancel:       runCancel,
+		workflowBuilder: buildArticleWorkflow,
+		sse:             newSSEHub(),
+		writeLimiter:    newRateLimiter(context.Background(), 10, time.Minute),
 	}
 
 	_ = jwtSecret() // fail fast at boot when JWT_SECRET is unset (S2)
@@ -536,13 +583,60 @@ func NewServer(port string, db *storage.DB) *Server {
 		s.skillRegistry = reg
 	}
 
-	// Session lifecycle engine for article generation.
-	s.sessionEngine = sessionlifecycle.NewEngine(func(session sessionlifecycle.Session) error {
-		s.processArticle(session.Slug, session.Persona, session.Note)
-		return nil
-	})
+	// Session lifecycle engine for article generation. Write-through to
+	// Postgres so a restart re-queues non-terminal sessions; the processor
+	// error drives failed → retry (up to 5) → dead-letter.
+	s.sessionEngine = sessionlifecycle.NewEngineWithStore(func(session sessionlifecycle.Session) error {
+		return s.processArticle(session.Slug, session.Persona, session.Note)
+	}, dbSessionStore{db: db})
+	if db.StorageMode() == "postgres" {
+		if rows, err := db.ListNonTerminalSessions(); err != nil {
+			log.Printf("[session] restore: %v", err)
+		} else if len(rows) > 0 {
+			restored := make([]sessionlifecycle.Session, 0, len(rows))
+			for _, r := range rows {
+				restored = append(restored, sessionlifecycle.Session{
+					ID:             r.ID,
+					Slug:           r.Slug,
+					Status:         sessionlifecycle.Status(r.Status),
+					UserID:         r.UserID,
+					Persona:        r.Persona,
+					Source:         r.Source,
+					Note:           r.Note,
+					IdempotencyKey: r.IdempotencyKey,
+					CreatedAt:      r.CreatedAt,
+					UpdatedAt:      r.UpdatedAt,
+					Error:          r.Error,
+					RetryCount:     r.RetryCount,
+				})
+			}
+			s.sessionEngine.Restore(restored)
+		}
+	}
 	s.setupRoutes()
 	return s
+}
+
+// dbSessionStore adapts storage to the session engine's Store seam.
+type dbSessionStore struct {
+	db *storage.DB
+}
+
+func (d dbSessionStore) Upsert(s sessionlifecycle.Session) error {
+	return d.db.UpsertSession(storage.SessionRecord{
+		ID:             s.ID,
+		Slug:           s.Slug,
+		Status:         string(s.Status),
+		UserID:         s.UserID,
+		Persona:        s.Persona,
+		Source:         s.Source,
+		Note:           s.Note,
+		IdempotencyKey: s.IdempotencyKey,
+		RetryCount:     s.RetryCount,
+		Error:          s.Error,
+		CreatedAt:      s.CreatedAt,
+		UpdatedAt:      s.UpdatedAt,
+	})
 }
 
 // registerAgent records an active agent run so it can be aborted by convID.
@@ -1048,6 +1142,14 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
+	// ponytail: cancel pipelines first so in-flight LLM calls see ctx.Done
+	// instead of burning tokens into a dying process.
+	if s.runCancel != nil {
+		s.runCancel()
+	}
+	if s.sse != nil {
+		s.sse.Stop()
+	}
 	if s.server != nil {
 		return s.server.Shutdown(ctx)
 	}

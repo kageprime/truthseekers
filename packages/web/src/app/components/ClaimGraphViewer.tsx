@@ -33,7 +33,8 @@ export default function ClaimGraphViewer({
   onNodeClick?: (n: ClaimGraphNode) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const fetched = useArticleClaimGraph(slug);
+  // ponytail: externalData skips the fetch entirely (useApi guards on slug).
+  const fetched = useArticleClaimGraph(externalData !== undefined ? undefined : slug);
   const data = externalData !== undefined ? externalData : fetched.data;
   const loading = externalLoading !== undefined ? externalLoading : fetched.loading;
   const [selected, setSelected] = useState<ClaimGraphNode | null>(null);

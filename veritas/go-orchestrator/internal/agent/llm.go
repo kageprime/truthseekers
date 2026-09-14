@@ -159,6 +159,7 @@ const (
 )
 
 func SendPromptStream(
+	ctx context.Context,
 	messages []Message,
 	systemPrompt string,
 	model string,
@@ -193,7 +194,14 @@ func SendPromptStream(
 	var lastErr error
 	backoff := llmBackoffInitial
 	for attempt := 1; attempt <= llmMaxAttempts; attempt++ {
-		resp, retryable, err := doLLMRequest(route, payload, onEvent)
+		// ponytail: fail fast when the client is gone — the old time.Sleep
+		// burned the full backoff into a dead connection.
+		select {
+		case <-ctx.Done():
+			return LLMResponse{}, ctx.Err()
+		default:
+		}
+		resp, retryable, err := doLLMRequest(ctx, route, payload, onEvent)
 		if err == nil {
 			return resp, nil
 		}
@@ -202,7 +210,11 @@ func SendPromptStream(
 			break
 		}
 		log.Printf("[llm] attempt %d/%d failed (%v); retrying in %s", attempt, llmMaxAttempts, err, backoff)
-		time.Sleep(backoff)
+		select {
+		case <-ctx.Done():
+			return LLMResponse{}, ctx.Err()
+		case <-time.After(backoff):
+		}
 		if backoff < llmBackoffMax {
 			backoff *= 2
 		}
@@ -215,8 +227,11 @@ func SendPromptStream(
 // successful 200 that then errors mid-stream is NOT retryable, because we have
 // already begun emitting partial text to the client via onEvent — retrying
 // would duplicate that output.
-func doLLMRequest(route ModelRoute, payload []byte, onEvent func(AgentEvent)) (LLMResponse, bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), llmPerAttemptTo)
+func doLLMRequest(parent context.Context, route ModelRoute, payload []byte, onEvent func(AgentEvent)) (LLMResponse, bool, error) {
+	// ponytail: per-attempt timeout derives from the caller ctx (run deadline
+	// or request cancel), not Background — disconnect now kills in-flight
+	// tokens instead of burning up to 300s into a dead client.
+	ctx, cancel := context.WithTimeout(parent, llmPerAttemptTo)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "POST", route.BaseURL+"/chat/completions", bytes.NewReader(payload))

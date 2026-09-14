@@ -31,11 +31,12 @@ const STATUS_TEXT: Record<string, string> = {
   false_positive_risk: "#888",
 };
 
-export default function ArticleGapsPanel({ slug }: { slug: string }) {
-  const { data: res } = useArticleGaps(slug);
+export default function ArticleGapsPanel({ slug, gaps: externalGaps }: { slug: string; gaps?: Gap[] | null }) {
+  // ponytail: pass the composite slice and the per-widget fetch is skipped.
+  const { data: res } = useArticleGaps(externalGaps !== undefined ? undefined : slug);
   const { mutate: upvoteGap } = useUpvoteGap();
   const { mutate: submitGapEvidence } = useSubmitGapEvidence();
-  const gaps = (res?.gaps as Gap[] | undefined) ?? [];
+  const gaps = externalGaps !== undefined ? externalGaps ?? [] : (res?.gaps as Gap[] | undefined) ?? [];
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [url, setUrl] = useState("");

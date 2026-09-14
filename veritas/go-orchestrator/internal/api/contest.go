@@ -72,6 +72,9 @@ type contestClaim struct {
 
 func (s *Server) handleContestArticle(w http.ResponseWriter, r *http.Request, slug string) {
 	reqLog(r, "contest article slug=%s", slug)
+	if !s.checkWriteBudget(w, r) {
+		return
+	}
 	userID := userIDFromRequest(r)
 
 	var body struct {

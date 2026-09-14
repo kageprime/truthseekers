@@ -154,15 +154,11 @@ func (s *Server) handleGetMap(w http.ResponseWriter, r *http.Request, slug strin
 	}
 
 	// ETag/304 support — cheap pointer-based hash from updatedAt for cache hits.
-	if m.UpdatedAt != "" {
-		etag := `"` + m.UpdatedAt + `"`
-		w.Header().Set("ETag", etag)
-		if match := r.Header.Get("If-None-Match"); match != "" && strings.Contains(match, etag) {
-			w.WriteHeader(http.StatusNotModified)
-			return
-		}
+	if serveETag(w, r, m.UpdatedAt) {
+		return
 	}
 
+	cache60(w)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(m)
 }

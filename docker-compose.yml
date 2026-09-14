@@ -32,9 +32,21 @@ services:
       - API_PUBLIC_URL=http://localhost:4097
       - DATABASE_URL=postgres://postgres:postgrespassword@db:5432/veritas?sslmode=disable
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-}
+      - REVALIDATE_SECRET=${REVALIDATE_SECRET:-}
+      - REVALIDATE_URL=http://frontend:3000
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - MODEL_ACCESS_KEY=${MODEL_ACCESS_KEY:-}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4097/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
   frontend:
     build:
@@ -47,6 +59,11 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:4097
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   pgdata:

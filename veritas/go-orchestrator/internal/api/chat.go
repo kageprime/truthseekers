@@ -382,6 +382,9 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		SystemPrompt: chatSystemPrompt,
 		Messages:     history,
 		Temperature:  0.7,
+		// ponytail: request ctx parents the run — tab close aborts in-flight
+		// LLM tokens via ctx.Done, not just the abort flag after the fact.
+		Ctx: r.Context(),
 		OnEvent: func(ev agent.AgentEvent) {
 			data, _ := json.Marshal(ev)
 			agentEvents = append(agentEvents, data)
@@ -621,37 +624,49 @@ func (s *Server) createServerToolExecutors(model string, userID string) map[stri
 			if err := json.Unmarshal(args, &p); err != nil || p.Objective == "" {
 				return agent.ToolResult{Result: "Objective required"}, nil
 			}
-			var toolDefs []agent.ToolDefinition
-			allDefs := agent.ChatToolDefinitions()
+			// ponytail: depth ≤1 — sub-agents get research tools only, never task.
+			allow := map[string]bool{"web_search": true, "webfetch": true, "verify_citation": true}
 			if len(p.Tools) > 0 {
-				toolSet := make(map[string]bool, len(p.Tools))
+				allow = map[string]bool{}
 				for _, t := range p.Tools {
-					toolSet[t] = true
-				}
-				for _, d := range allDefs {
-					if toolSet[d.Function.Name] {
-						toolDefs = append(toolDefs, d)
-					}
-				}
-			} else {
-				for _, d := range allDefs {
-					if d.Function.Name == "web_search" || d.Function.Name == "webfetch" {
-						toolDefs = append(toolDefs, d)
+					if t != "task" {
+						allow[t] = true
 					}
 				}
 			}
-		m := model
-		if m == "" {
-			m = "muse-spark-1.3-contributor"
-		}
-			resp, err := agent.SendPromptStream(nil, "You are a research sub-agent.", m, 0.5, toolDefs, nil)
+			builtins := agent.BuiltinToolExecutors()
+			subExecs := map[string]agent.ToolExecutor{
+				"web_search":      builtins.WebSearch,
+				"webfetch":        builtins.WebFetch,
+				"verify_citation": builtins.VerifyCitation,
+			}
+			var subTools []agent.AgentTool
+			for _, d := range agent.ChatToolDefinitions() {
+				if allow[d.Function.Name] {
+					if exec, ok := subExecs[d.Function.Name]; ok {
+						subTools = append(subTools, agent.AgentTool{Definition: d, Execute: exec})
+					}
+				}
+			}
+			m := model
+			if m == "" {
+				m = "muse-spark-1.3-contributor"
+			}
+			sub := agent.NewAgent(agent.AgentConfig{
+				Model:         m,
+				SystemPrompt:  "You are a research sub-agent. Use your tools to gather evidence, then report findings concisely with source URLs. Do not call task.",
+				Temperature:   0.5,
+				MaxIterations: 8,
+				Tools:         subTools,
+			})
+			res, err := sub.Run(p.Objective)
 			if err != nil {
 				return agent.ToolResult{Result: fmt.Sprintf("Sub-agent error: %v", err)}, nil
 			}
-			if resp.Text == "" {
-				resp.Text = "Sub-agent completed with no output."
+			if res.Text == "" {
+				res.Text = "Sub-agent completed with no output."
 			}
-			return agent.ToolResult{Result: resp.Text}, nil
+			return agent.ToolResult{Result: res.Text}, nil
 		},
 	}
 }

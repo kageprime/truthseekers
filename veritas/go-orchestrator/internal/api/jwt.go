@@ -34,6 +34,11 @@ const (
 
 func jwtSecret() []byte {
 	if s := os.Getenv("JWT_SECRET"); s != "" {
+		// ponytail: short HMAC keys are brute-forceable — fail closed in
+		// prod, allowed only under explicit local-dev opt-in.
+		if len(s) < 32 && os.Getenv("ALLOW_DEV_AUTH") != "1" {
+			panic("JWT_SECRET must be at least 32 bytes (or ALLOW_DEV_AUTH=1 for local dev)")
+		}
 		return []byte(s)
 	}
 	// ponytail: fail closed — the old default-secret fallback made forged

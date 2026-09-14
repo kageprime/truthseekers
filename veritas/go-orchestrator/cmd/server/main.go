@@ -11,6 +11,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kageprime/veritas/go-orchestrator/internal/api"
+	"github.com/kageprime/veritas/go-orchestrator/internal/config"
 	"github.com/kageprime/veritas/go-orchestrator/internal/storage"
 )
 
@@ -25,29 +26,19 @@ func main() {
 		}
 	}
 
-	// 1. Initialize Database Connection
-	// In a real environment, read from environment variables
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		log.Printf("DATABASE_URL not set, falling back to File-backed Mode")
-	}
+	cfg := config.Load()
+	cfg.Validate()
+	cfg.Summary()
 
-	// ENCARTA_DATA_DIR points at the encyclopedia JSON directory used by the
-	// file-backed store when no database is available. Defaults to a few
-	// common relative locations resolved inside the storage layer.
-	dataDir := os.Getenv("ENCARTA_DATA_DIR")
-	db, err := storage.NewDB(dbURL, dataDir)
+	// 1. Initialize Database Connection
+	db, err := storage.NewDB(cfg.DatabaseURL, cfg.DataDir)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
 		// 2. Run database migrations
-	migrationsDir := os.Getenv("MIGRATIONS_DIR")
-	if migrationsDir == "" {
-		migrationsDir = "migrations"
-	}
-	if err := db.Migrate(migrationsDir); err != nil {
+	if err := db.Migrate(cfg.MigrationsDir); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 	log.Println("Database migrations applied successfully")
@@ -75,12 +66,7 @@ func main() {
 	}
 
 	// 3. Initialize and Start API Server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "4097" // Matching Hono API server port
-	}
-
-	server := api.NewServer(port, db)
+	server := api.NewServer(cfg.Port, db)
 
 	// Graceful shutdown setup
 	stop := make(chan os.Signal, 1)
@@ -95,7 +81,9 @@ func main() {
 	<-stop
 	log.Println("Shutting down VERITAS Go Orchestrator...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	// ponytail: 60s so Stop() can wait for in-flight generations to
+	// checkpoint; sessions not yet terminal re-queue on next boot.
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	server.SessionEngine().Stop()

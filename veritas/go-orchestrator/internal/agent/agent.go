@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -13,6 +14,9 @@ const (
 	// defaultMaxIterations caps how many LLM tool-calling rounds a single run
 	// may take. A run that hits this cap is NOT cut off abruptly: see finalize().
 	defaultMaxIterations = 25
+	// runTimeout bounds the whole run (25 iters × 300s attempts could
+	// otherwise pin a goroutine for hours on a wedged provider).
+	runTimeout = 10 * time.Minute
 	toolResultTruncation = 1500
 	tokenBudget          = 90000
 	charsPerToken        = 4
@@ -28,7 +32,9 @@ const (
 // LLMCaller is the seam the loop uses to invoke the model. In production this
 // is bound to SendPromptStream (see NewAgent); tests inject a canned responder
 // so the loop can be exercised deterministically without network access.
-type LLMCaller func(messages []Message, systemPrompt, model string, temperature float64, toolDefs []ToolDefinition, onEvent func(AgentEvent)) (LLMResponse, error)
+// ctx carries the run deadline — implementations must fail fast on Done
+// instead of burning tokens into a dead client.
+type LLMCaller func(ctx context.Context, messages []Message, systemPrompt, model string, temperature float64, toolDefs []ToolDefinition, onEvent func(AgentEvent)) (LLMResponse, error)
 
 type Agent struct {
 	config         AgentConfig
@@ -88,9 +94,22 @@ func (a *Agent) Run(input string) (AgentResult, error) {
 	}
 	maxChars := tokenBudget * charsPerToken
 
+	// ponytail: the run ctx is the request ctx (disconnect cancels) plus an
+	// overall deadline. Previously a wedged provider + 25 iterations pinned
+	// a goroutine for hours with no bound at all.
+	runCtx := a.config.Ctx
+	if runCtx == nil {
+		runCtx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(runCtx, runTimeout)
+	defer cancel()
+
 	for a.iterationCount < maxIter {
 		if a.isAborted() {
 			break
+		}
+		if err := ctx.Err(); err != nil {
+			return a.buildResult(a.lastAssistantText()), fmt.Errorf("run deadline: %w", err)
 		}
 		a.iterationCount++
 
@@ -98,6 +117,7 @@ func (a *Agent) Run(input string) (AgentResult, error) {
 
 		startTime := time.Now()
 		response, err := a.llmCall(
+			ctx,
 			a.messages,
 			a.config.SystemPrompt,
 			a.config.Model,
@@ -180,14 +200,14 @@ func (a *Agent) Run(input string) (AgentResult, error) {
 	}
 	// Budget exhausted: force one coherent final answer instead of the old
 	// "Response generated." + stale-text fallthrough.
-	return a.finalize()
+	return a.finalize(ctx)
 }
 
 // finalize forces a single closing LLM pass with no tools available, so the
 // model must synthesize a final answer from whatever it gathered before the
 // iteration cap. The nudge message is local only — it is never appended to
 // a.messages and therefore never persisted by callers.
-func (a *Agent) finalize() (AgentResult, error) {
+func (a *Agent) finalize(ctx context.Context) (AgentResult, error) {
 	lastText := a.lastAssistantText()
 	nudged := append(append([]Message{}, a.messages...), Message{
 		Role: RoleUser,
@@ -195,7 +215,7 @@ func (a *Agent) finalize() (AgentResult, error) {
 	})
 	// Empty toolDefs => the request body omits `tools` entirely, so the model
 	// physically cannot call tools even if it ignores tool_choice hints.
-	resp, err := a.llmCall(nudged, a.config.SystemPrompt, a.config.Model, a.config.Temperature, nil, func(ev AgentEvent) { a.emit(ev) })
+	resp, err := a.llmCall(ctx, nudged, a.config.SystemPrompt, a.config.Model, a.config.Temperature, nil, func(ev AgentEvent) { a.emit(ev) })
 	if err != nil || resp.Text == "" {
 		return a.buildResult(lastText), nil
 	}
