@@ -564,21 +564,13 @@ export async function updateSettings(settings: Record<string, string>): Promise<
 
 export async function fetchFeaturedArticles(): Promise<ArticleSummary[]> {
   if (MOCK) return mock.MOCK_ARTICLE_SUMMARIES.slice(0, 3);
-  const settings = await fetchSettings();
-  const raw = settings.featured_articles;
-  if (!raw) return [];
-  let slugs: string[];
-  try { slugs = JSON.parse(raw); } catch { return []; }
-  if (!Array.isArray(slugs) || slugs.length === 0) return [];
-  const results = await Promise.allSettled(slugs.map((s) => fetchArticle(s)));
-  const articles: ArticleSummary[] = [];
-  for (const r of results) {
-    if (r.status === "fulfilled" && r.value) {
-      const a = r.value;
-      articles.push({ slug: a.slug, title: a.title, abstract: a.abstract, metadata: a.metadata, categories: a.categories });
-    }
-  }
-  return articles;
+  // ponytail: public /featured resolves slugs server-side — the homepage
+  // must never ride admin-gated GET /admin/settings (401s anonymously).
+  const res = await fetch(`${BASE}/featured`, { cache: "no-store", credentials: "include" });
+  if (!res.ok) return [];
+  const articles = await res.json();
+  if (!Array.isArray(articles)) return [];
+  return articles.map((a: any) => ({ slug: a.slug, title: a.title, abstract: a.abstract, metadata: a.metadata, categories: a.categories }));
 }
 
 // ── Models (LLM Gateway) ──

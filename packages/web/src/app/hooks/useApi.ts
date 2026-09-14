@@ -154,7 +154,12 @@ export function useAdminSettings() {
   const mutation = useApiMutation(
     (s: Record<string, string>) => api.updateSettings(s),
     {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "settings"] }),
+      // ponytail: manual saves must bust the featured cache too, or the
+      // homepage keeps showing pre-save picks until a coordinator run.
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["admin", "settings"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "featured"] });
+      },
     }
   );
   return { ...settings, updateSettings: mutation.mutate, updating: mutation.loading };
@@ -226,7 +231,13 @@ export function useSeedPause() {
   const queryClient = useQueryClient();
   return useApiMutation(
     (paused: boolean) => api.setSeedPaused(paused),
-    { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["seed", "status"] }) },
+    {
+      // ponytail: seed_paused is shared with the coordinator — bust both.
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["seed", "status"] });
+        queryClient.invalidateQueries({ queryKey: ["coordinator", "status"] });
+      },
+    },
   );
 }
 

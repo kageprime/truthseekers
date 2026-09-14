@@ -953,6 +953,11 @@ func (s *Server) setupRoutes() {
 	// Contested claims - aggregate dashboard (public read)
 	s.mux.Handle("/contested", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleGetContestedClaims)))
 
+	// Featured articles - public read (pinned admin picks first, then
+	// coordinator top-ups). The homepage must never ride admin-gated
+	// GET /admin/settings or anonymous visitors see an empty hero.
+	s.mux.Handle("/featured", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleGetFeatured)))
+
 	// Global claim graph - cross-encyclopedia claim/evidence/relationship view
 	s.mux.Handle("/claim-graph", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleGetGlobalClaimGraph)))
 

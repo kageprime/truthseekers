@@ -2,12 +2,22 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import PageLayout from "../components/PageLayout";
+import Link from "next/link";
+import { canSeeAdmin } from "@/lib/routes";
 import { useAuth, useAdminSettings, useArticleSearch, useModels, useConnectors, useUpdateCredential, useUsageStats, useSeedStatus, useSeedRun, useSeedPause, useCoordinatorStatus, useCoordinatorRun } from "../hooks";
 import { IconBook, IconX, IconSearch, IconCheck, IconKey, IconCpu, IconActivity, IconLightning } from "../components/Icons";
 
+function Stat({ value, label, tone }: { value: string; label: string; tone?: string }) {
+  return (
+    <div className="px-3 py-2 rounded-[var(--r-radius)] text-center bg-[var(--r-surface)] border border-[var(--r-border)]">
+      <div className="text-[16px] font-bold tabular-nums" style={{ color: tone ?? "var(--r-ink)" }}>{value}</div>
+      <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--r-muted)" }}>{label}</div>
+    </div>
+  );
+}
+
 function SeedPanel() {
-  const { data: seed } = useSeedStatus(10000);
+  const { data: seed, loading } = useSeedStatus(10000);
   const { mutate: runNow, loading: running } = useSeedRun();
   const { mutate: setPaused, loading: pausing } = useSeedPause();
   const [force, setForce] = useState(false);
@@ -28,57 +38,45 @@ function SeedPanel() {
   }
 
   return (
-    <section className="plate p-6 space-y-4">
-      <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: "var(--ink)" }}>
-        <IconLightning size={18} /> Seed Trickle
+    <section className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-3.5 space-y-3">
+      <h2 className="text-[13px] font-bold flex items-center gap-2" style={{ color: "var(--r-ink)" }}>
+        <IconLightning size={15} /> Seed Trickle
       </h2>
       {!seed ? (
-        <div className="text-sm" style={{ color: "var(--subtle)" }}>Loading…</div>
+        <div className="text-[12px] py-4 text-center" style={{ color: "var(--r-muted)" }}>
+          {loading ? "Loading…" : "Seed status unavailable — is the API reachable?"}
+        </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>{seed.today.count}/{seed.today.limit}</div>
-              <div className="text-xs" style={{ color: "var(--subtle)" }}>Today ({seed.today.date})</div>
-            </div>
-            <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>{seed.bench.live.length}/{seed.bench.total}</div>
-              <div className="text-xs" style={{ color: "var(--subtle)" }}>Bench live</div>
-            </div>
-            <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <div className="text-lg font-bold" style={{ color: seed.paused ? "var(--oxblood)" : "var(--green)" }}>{seed.paused ? "Paused" : "Live"}</div>
-              <div className="text-xs" style={{ color: "var(--subtle)" }}>Next tick {new Date(seed.next_tick).toLocaleTimeString()}</div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <Stat value={`${seed.today.count}/${seed.today.limit}`} label={`Today ${seed.today.date}`} />
+            <Stat value={`${seed.bench.live.length}/${seed.bench.total}`} label="Bench live" />
+            <Stat value={seed.paused ? "Paused" : "Live"} label={`Next ${new Date(seed.next_tick).toLocaleTimeString()}`} tone={seed.paused ? "#a33a3a" : "#2e7d32"} />
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <button onClick={handleRun} disabled={running} className="btn btn-primary btn-sm min-h-[40px]">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={handleRun} disabled={running} className="r-btn">
               {running ? "Queueing…" : "Run now"}
             </button>
-            <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--subtle)" }}>
+            <label className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--r-muted)" }}>
               <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
               Override daily ceiling
             </label>
-            <button
-              onClick={() => handlePause(!seed.paused)}
-              disabled={pausing}
-              className="btn btn-sm"
-              style={{ border: "1px solid var(--border)" }}
-            >
+            <button onClick={() => handlePause(!seed.paused)} disabled={pausing} className="r-btn">
               {seed.paused ? "Resume" : "Pause"}
             </button>
-            {seed.auto_gaps && <span className="text-xs" style={{ color: "var(--gold)" }}>gap phase armed</span>}
+            {seed.auto_gaps && <span className="text-[11px]" style={{ color: "var(--r-accent)" }}>gap phase armed</span>}
           </div>
-          {msg && <div className="text-xs" style={{ color: "var(--subtle)" }}>{msg}</div>}
+          {msg && <div className="text-[11px]" style={{ color: "var(--r-muted)" }}>{msg}</div>}
           {seed.bench.pending.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {seed.bench.pending.map((slug) => (
-                <span key={slug} className="text-xs px-2 py-0.5 rounded" style={{ background: "var(--surface)", border: "1px solid var(--border-light)", color: "var(--subtle)" }}>
+                <span key={slug} className="text-[11px] px-2 py-0.5 rounded-sm bg-[var(--r-surface)] border border-[var(--r-border)]" style={{ color: "var(--r-muted)" }}>
                   {slug}
                 </span>
               ))}
             </div>
           ) : (
-            <div className="text-xs" style={{ color: "var(--green)" }}>Bench complete — trickle idles{seed.auto_gaps ? " (gap phase active)" : ""}.</div>
+            <div className="text-[11px]" style={{ color: "#2e7d32" }}>Bench complete — trickle idles{seed.auto_gaps ? " (gap phase active)" : ""}.</div>
           )}
         </>
       )}
@@ -87,8 +85,9 @@ function SeedPanel() {
 }
 
 function CoordinatorPanel() {
-  const { data: coord } = useCoordinatorStatus(10000);
+  const { data: coord, loading } = useCoordinatorStatus(10000);
   const { mutate: runNow, loading: running } = useCoordinatorRun();
+  const { mutate: setPaused, loading: pausing } = useSeedPause();
   const [force, setForce] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -103,57 +102,65 @@ function CoordinatorPanel() {
     setMsg(parts.join(" · ") || "Done");
   }
 
+  async function handlePause(paused: boolean) {
+    setMsg("");
+    const ok = await setPaused(paused);
+    setMsg(ok ? (paused ? "Coordinator paused" : "Coordinator resumed") : "Failed");
+    setTimeout(() => setMsg(""), 2500);
+  }
+
   const last = coord?.last_run ?? null;
   return (
-    <section className="plate p-6 space-y-4">
-      <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: "var(--ink)" }}>
-        <IconBook size={18} /> Site Coordinator
+    <section className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-3.5 space-y-3">
+      <h2 className="text-[13px] font-bold flex items-center gap-2" style={{ color: "var(--r-ink)" }}>
+        <IconBook size={15} /> Site Coordinator
       </h2>
       {!coord ? (
-        <div className="text-sm" style={{ color: "var(--subtle)" }}>Loading…</div>
+        <div className="text-[12px] py-4 text-center" style={{ color: "var(--r-muted)" }}>
+          {loading ? "Loading…" : "Coordinator status unavailable — is the API reachable?"}
+        </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>{coord.today.count}/{coord.today.limit}</div>
-              <div className="text-xs" style={{ color: "var(--subtle)" }}>Refreshes today ({coord.today.date})</div>
-            </div>
-            <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <div className="text-lg font-bold" style={{ color: coord.paused ? "var(--oxblood)" : "var(--green)" }}>{coord.paused ? "Paused" : "Live"}</div>
-              <div className="text-xs" style={{ color: "var(--subtle)" }}>Next tick {new Date(coord.next_tick).toLocaleString()}</div>
-            </div>
-            <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>{last?.featured?.length ?? 0}</div>
-              <div className="text-xs" style={{ color: "var(--subtle)" }}>Featured picks (last run)</div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <Stat value={`${coord.today.count}/${coord.today.limit}`} label={`Refreshes ${coord.today.date}`} />
+            <Stat value={coord.paused ? "Paused" : "Live"} label={`Next ${new Date(coord.next_tick).toLocaleString()}`} tone={coord.paused ? "#a33a3a" : "#2e7d32"} />
+            <Stat value={String(last?.featured?.length ?? 0)} label="Featured picks" />
           </div>
           {last && (
-            <div className="text-xs space-y-1" style={{ color: "var(--subtle)" }}>
-              <div>Last run {new Date(last.at).toLocaleString()}{last.stale_queued ? ` · queued stale: ${last.stale_queued}` : ""}</div>
+            <div className="text-[11px] space-y-1.5 border-t border-[var(--r-border)] pt-2.5" style={{ color: "var(--r-muted)" }}>
+              <div className="tabular-nums">
+                Last run {new Date(last.at).toLocaleString()}
+                {last.stale_queued ? (
+                  <> · queued stale <Link href={`/article/${last.stale_queued}`} className="font-bold underline" style={{ color: "var(--r-accent)" }}>{last.stale_queued}</Link></>
+                ) : ""}
+              </div>
               {last.featured?.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {last.featured.map((slug: string) => (
-                    <span key={slug} className="text-xs px-2 py-0.5 rounded" style={{ background: "var(--surface)", border: "1px solid var(--border-light)", color: "var(--subtle)" }}>
+                    <Link key={slug} href={`/article/${slug}`} className="text-[11px] px-2 py-0.5 rounded-sm bg-[var(--r-surface)] border border-[var(--r-border)] no-underline hover:border-[var(--r-accent)]" style={{ color: "var(--r-ink)" }}>
                       {slug}
-                    </span>
+                    </Link>
                   ))}
                 </div>
               )}
               {last.reason && <div>{last.reason}</div>}
             </div>
           )}
-          <div className="flex items-center gap-3 flex-wrap">
-            <button onClick={handleRun} disabled={running} className="btn btn-primary btn-sm min-h-[40px]">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={handleRun} disabled={running} className="r-btn">
               {running ? "Coordinating…" : "Run now"}
             </button>
-            <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--subtle)" }}>
+            <button onClick={() => handlePause(!coord.paused)} disabled={pausing} className="r-btn">
+              {coord.paused ? "Resume" : "Pause"}
+            </button>
+            <label className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--r-muted)" }}>
               <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
               Override pause + ceiling
             </label>
           </div>
-          {msg && <div className="text-xs" style={{ color: "var(--subtle)" }}>{msg}</div>}
-          <p className="text-xs" style={{ color: "var(--subtle)" }}>
-            Daily at {coord.schedule} UTC: scores published articles (freshness · views · claim depth · recency), writes the top 3 to featured, and queues the stalest article for refresh. Pause is shared with Seed Trickle.
+          {msg && <div className="text-[11px]" style={{ color: "var(--r-muted)" }}>{msg}</div>}
+          <p className="text-[11px] leading-relaxed" style={{ color: "var(--r-muted)" }}>
+            Daily at {coord.schedule} UTC: scores published articles (freshness · views · claim depth · recency), tops up featured around your pinned picks, and queues the stalest article for refresh. Schedule and daily ceiling are backend constants.
           </p>
         </>
       )}
@@ -171,7 +178,7 @@ export default function AdminPage() {
   const { mutate: updateCred, loading: credSaving } = useUpdateCredential();
   const [featured, setFeatured] = useState<string[]>([]);
   const [search, setSearch] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saved" | "failed">("idle");
   const [credService, setCredService] = useState("groq");
   const [credToken, setCredToken] = useState("");
   const [credMsg, setCredMsg] = useState("");
@@ -179,12 +186,15 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
-    else if (!authLoading && user && user.role !== "owner" && user.role !== "admin") router.replace("/");
+    else if (!authLoading && user && !canSeeAdmin(user.role)) router.replace("/");
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    if (settings?.featured_articles) {
-      try { setFeatured(JSON.parse(settings.featured_articles)); } catch { setFeatured([]); }
+    if (settings?.featured_pinned) {
+      try {
+        const parsed = JSON.parse(settings.featured_pinned);
+        setFeatured(Array.isArray(parsed) ? parsed : []);
+      } catch { setFeatured([]); }
     }
   }, [settings]);
 
@@ -198,8 +208,11 @@ export default function AdminPage() {
   }, []);
 
   async function handleSave() {
-    const ok = await updateSettings({ featured_articles: JSON.stringify(featured) });
-    if (ok) { setSaved(true); setTimeout(() => setSaved(false), 2000); }
+    // ponytail: updateSettings resolves undefined on transport failure —
+    // report it instead of showing "Saved" for a silent drop.
+    const ok = await updateSettings({ featured_pinned: JSON.stringify(featured) });
+    setSaveState(ok ? "saved" : "failed");
+    setTimeout(() => setSaveState("idle"), 2500);
   }
 
   async function handleCredSave() {
@@ -213,10 +226,10 @@ export default function AdminPage() {
   if (authLoading) return null;
   if (!user) return null;
   // ponytail: admin surfaces are owner/admin only — members bounce home.
-  if (user.role !== "owner" && user.role !== "admin") {
+  if (!canSeeAdmin(user.role)) {
     return (
       <div className="py-12 text-center">
-        <div className="text-[11px] py-8 border-[2px] bg-[#ffffe1] inline-block px-8" style={{ borderStyle: "outset", borderWidth: 2 }}>
+        <div className="text-[11px] py-8 bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] inline-block px-8">
           Restricted — administrators only.
         </div>
       </div>
@@ -224,176 +237,174 @@ export default function AdminPage() {
   }
 
   return (
-    <PageLayout>
-      <div className="max-w-3xl mx-auto w-full px-4 py-10 space-y-8">
-        <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--ink)" }}>Admin</h1>
-
-        {/* ── Credential Management ── */}
-        <section className="plate p-6 space-y-4">
-          <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: "var(--ink)" }}>
-            <IconKey size={18} /> Credential Management
-          </h2>
-          <p className="text-xs" style={{ color: "var(--subtle)" }}>Hot-swap API tokens without restarting the server.</p>
-          <div className="flex gap-2 items-end flex-col sm:flex-row">
-            <div className="flex-1 min-w-0 w-full space-y-1">
-              <label className="text-xs font-medium" style={{ color: "var(--subtle)" }}>Service</label>
-              <select value={credService} onChange={(e) => setCredService(e.target.value)} className="input text-sm w-full">
-                {["groq", "do", "openai", "tavily", "firecrawl"].map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex-[2] min-w-0 w-full space-y-1">
-              <label className="text-xs font-medium" style={{ color: "var(--subtle)" }}>Token</label>
-              <input type="password" value={credToken} onChange={(e) => setCredToken(e.target.value)} placeholder="sk-..." className="input text-sm w-full" />
-            </div>
-            <button onClick={handleCredSave} disabled={credSaving || !credToken.trim()} className="btn btn-primary btn-sm min-h-[40px] w-full sm:w-auto" style={{ marginBottom: 0 }}>
-              {credSaving ? "Saving…" : "Update"}
-            </button>
-          </div>
-          {credMsg && <span className="text-xs" style={{ color: credMsg === "Token updated" ? "var(--green)" : "var(--oxblood)" }}>{credMsg}</span>}
-        </section>
-
-        {/* ── Seed Trickle (auto-generation ops) ── */}
-        <SeedPanel />
-
-        {/* ── Site Coordinator (featured + stale refresh) ── */}
-        <CoordinatorPanel />
-
-        {/* ── Featured Articles ── */}
-        <section className="plate p-6 space-y-5">
-          <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: "var(--ink)" }}>
-            <IconBook size={18} /> Featured Articles
-          </h2>
-
-          <div className="relative">
-            <IconSearch size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--subtle)", pointerEvents: "none" }} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search articles to feature…"
-              className="input text-sm w-full pl-9"
-            />
-            {search && results && results.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 border rounded-sm z-10" style={{ background: "var(--surface-elevated)", borderColor: "var(--border)", maxHeight: 240, overflowY: "auto" }}>
-                {results.slice(0, 10).map((a) => (
-                  <button
-                    key={a.slug}
-                    onClick={() => addSlug(a.slug)}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--gold-bg)] flex items-center gap-2"
-                    style={{ color: "var(--ink)", borderBottom: "1px solid var(--border-light)" }}
-                  >
-                    <span className="font-medium">{a.title}</span>
-                    {featured.includes(a.slug) && <IconCheck size={14} style={{ color: "var(--green)" }} />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            {settingsLoading ? (
-              <div className="text-sm" style={{ color: "var(--subtle)" }}>Loading…</div>
-            ) : featured.length === 0 ? (
-              <div className="text-sm" style={{ color: "var(--subtle)" }}>No featured articles selected.</div>
-            ) : (
-              featured.map((slug) => (
-                <div key={slug} className="flex items-center justify-between px-3 py-2 rounded-sm text-sm" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-                  <span style={{ color: "var(--ink)" }}>{slug}</span>
-                  <button onClick={() => removeSlug(slug)} className="p-1 rounded hover:bg-[var(--oxblood-subtle)]" style={{ color: "var(--oxblood)" }}>
-                    <IconX size={14} />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button onClick={handleSave} disabled={updating || settingsLoading} className="btn btn-primary btn-sm min-h-[40px]">
-              {updating ? "Saving…" : "Save"}
-            </button>
-            {saved && <span className="flex items-center gap-1 text-sm" style={{ color: "var(--green)" }}><IconCheck size={14} /> Saved</span>}
-          </div>
-        </section>
-
-        {/* ── LLM Models ── */}
-        <section className="plate p-6 space-y-3">
-          <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: "var(--ink)" }}>
-            <IconCpu size={18} /> LLM Models
-          </h2>
-          {!models || models.length === 0 ? (
-            <div className="text-sm" style={{ color: "var(--subtle)" }}>No models loaded.</div>
-          ) : (
-            <div className="space-y-2">
-              {models.map((m: any) => (
-                <div key={m.name} className="flex items-center justify-between px-3 py-2 rounded-sm text-sm" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-                  <div>
-                    <span className="font-medium" style={{ color: "var(--ink)" }}>{m.displayName || m.name}</span>
-                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>{m.provider}</span>
-                  </div>
-                  <div className="flex gap-3 text-xs" style={{ color: "var(--subtle)" }}>
-                    {m.toolCall && <span>tools</span>}
-                    {m.reasoning && <span>reasoning</span>}
-                    {m.contextLimit > 0 && <span>{(m.contextLimit / 1000).toFixed(0)}K ctx</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* ── Connectors ── */}
-        <section className="plate p-6 space-y-3">
-          <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: "var(--ink)" }}>
-            <IconActivity size={18} /> Connectors
-          </h2>
-          {!connectors || connectors.length === 0 ? (
-            <div className="text-sm" style={{ color: "var(--subtle)" }}>No connectors registered.</div>
-          ) : (
-            <div className="space-y-2">
-              {connectors.map((c: any) => (
-                <div key={c.slug} className="flex items-center justify-between px-3 py-2 rounded-sm text-sm" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-                  <div>
-                    <span className="font-medium" style={{ color: "var(--ink)" }}>{c.name || c.slug}</span>
-                    <span className="ml-2 text-xs" style={{ color: "var(--subtle)" }}>{c.provider}</span>
-                  </div>
-                  <div className="flex gap-2 text-xs" style={{ color: "var(--subtle)" }}>
-                    {(c.actions || []).map((a: any) => (
-                      <span key={a.name} className={`px-1.5 py-0.5 rounded ${a.risk === "write" ? "bg-[var(--oxblood-subtle)] text-[var(--oxblood)]" : "bg-[var(--gold-bg)] text-[var(--gold)]"}`}>
-                        {a.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* ── LLM Usage Stats ── */}
-        {usage && (
-          <section className="plate p-6 space-y-3">
-            <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: "var(--ink)" }}>
-              <IconActivity size={18} /> LLM Usage
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-                <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>{usage.totals?.callCount ?? 0}</div>
-                <div className="text-xs" style={{ color: "var(--subtle)" }}>Calls</div>
-              </div>
-              <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-                <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>{(usage.totals?.totalTokens ?? 0).toLocaleString()}</div>
-                <div className="text-xs" style={{ color: "var(--subtle)" }}>Tokens</div>
-              </div>
-              <div className="px-3 py-2 rounded-sm text-center" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-                <div className="text-lg font-bold" style={{ color: "var(--ink)" }}>${(usage.totals?.totalCost ?? 0).toFixed(4)}</div>
-                <div className="text-xs" style={{ color: "var(--subtle)" }}>Cost</div>
-              </div>
-            </div>
-          </section>
-        )}
+    <div className="space-y-4">
+      <div className="border-b border-[var(--r-border)] pb-3">
+        <div className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "var(--r-muted)" }}>Operations</div>
+        <h1 className="r-h1 text-[26px] sm:text-[32px]">Admin</h1>
+        <p className="text-[12px] mt-1" style={{ color: "var(--r-muted)" }}>Seed ops, coordinator, featured content, and system credentials.</p>
       </div>
-    </PageLayout>
+
+      {/* ── Ops ── */}
+      <div className="text-[10px] font-bold tracking-widest uppercase pt-1" style={{ color: "var(--r-muted)" }}>Automation</div>
+      <SeedPanel />
+      <CoordinatorPanel />
+
+      {/* ── Content ── */}
+      <div className="text-[10px] font-bold tracking-widest uppercase pt-1" style={{ color: "var(--r-muted)" }}>Content</div>
+      <section className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-3.5 space-y-3">
+        <h2 className="text-[13px] font-bold flex items-center gap-2" style={{ color: "var(--r-ink)" }}>
+          <IconBook size={15} /> Featured Articles
+        </h2>
+        <p className="text-[11px] leading-relaxed" style={{ color: "var(--r-muted)" }}>
+          Pinned picks always lead the homepage and survive the nightly coordinator, which tops up to 3 around them.
+        </p>
+
+        <div className="relative">
+          <IconSearch size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--r-muted)", pointerEvents: "none" }} />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search articles to pin…"
+            className="w-full bg-[var(--r-surface)] border border-[var(--r-border)] pl-8 pr-3 py-1.5 text-[12px] rounded-[var(--r-radius)] outline-none focus:ring-1"
+            style={{ color: "var(--r-ink)" }}
+          />
+          {search && results && results.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 border rounded-[var(--r-radius)] z-10 bg-[var(--r-surface-elevated)]" style={{ borderColor: "var(--r-border)", maxHeight: 240, overflowY: "auto" }}>
+              {results.slice(0, 10).map((a) => (
+                <button
+                  key={a.slug}
+                  onClick={() => addSlug(a.slug)}
+                  className="w-full text-left px-3 py-2 text-[12px] flex items-center gap-2 bg-transparent border-0 border-b border-[var(--r-border)] cursor-pointer hover:brightness-95"
+                  style={{ color: "var(--r-ink)" }}
+                >
+                  <span className="font-medium">{a.title}</span>
+                  {featured.includes(a.slug) && <IconCheck size={13} style={{ color: "#2e7d32" }} />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          {settingsLoading ? (
+            <div className="text-[12px]" style={{ color: "var(--r-muted)" }}>Loading…</div>
+          ) : featured.length === 0 ? (
+            <div className="text-[12px]" style={{ color: "var(--r-muted)" }}>No pinned articles — the coordinator fills featured on its own.</div>
+          ) : (
+            featured.map((slug) => (
+              <div key={slug} className="flex items-center justify-between px-3 py-1.5 rounded-[var(--r-radius)] text-[12px] bg-[var(--r-surface)] border border-[var(--r-border)]">
+                <span style={{ color: "var(--r-ink)" }}>{slug}</span>
+                <button onClick={() => removeSlug(slug)} className="p-1 rounded-sm bg-transparent border-0 cursor-pointer" style={{ color: "#a33a3a" }} aria-label={`Remove ${slug}`}>
+                  <IconX size={13} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button onClick={handleSave} disabled={updating || settingsLoading} className="r-btn">
+            {updating ? "Saving…" : "Save pins"}
+          </button>
+          {saveState === "saved" && <span className="flex items-center gap-1 text-[12px]" style={{ color: "#2e7d32" }}><IconCheck size={13} /> Saved</span>}
+          {saveState === "failed" && <span className="text-[12px]" style={{ color: "#a33a3a" }}>Save failed — is the API reachable?</span>}
+        </div>
+      </section>
+
+      {/* ── System ── */}
+      <div className="text-[10px] font-bold tracking-widest uppercase pt-1" style={{ color: "var(--r-muted)" }}>System</div>
+      <section className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-3.5 space-y-3">
+        <h2 className="text-[13px] font-bold flex items-center gap-2" style={{ color: "var(--r-ink)" }}>
+          <IconKey size={15} /> Credential Management
+        </h2>
+        <p className="text-[11px]" style={{ color: "var(--r-muted)" }}>Hot-swap API tokens without restarting the server.</p>
+        <div className="flex gap-2 items-end flex-col sm:flex-row">
+          <div className="flex-1 min-w-0 w-full space-y-1">
+            <label className="text-[11px] font-medium" style={{ color: "var(--r-muted)" }}>Service</label>
+            <select value={credService} onChange={(e) => setCredService(e.target.value)} className="w-full bg-[var(--r-surface)] border border-[var(--r-border)] px-2.5 py-1.5 text-[12px] rounded-[var(--r-radius)]" style={{ color: "var(--r-ink)" }}>
+              {["groq", "do", "openai", "tavily", "firecrawl"].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-[2] min-w-0 w-full space-y-1">
+            <label className="text-[11px] font-medium" style={{ color: "var(--r-muted)" }}>Token</label>
+            <input type="password" value={credToken} onChange={(e) => setCredToken(e.target.value)} placeholder="sk-..." className="w-full bg-[var(--r-surface)] border border-[var(--r-border)] px-2.5 py-1.5 text-[12px] rounded-[var(--r-radius)]" style={{ color: "var(--r-ink)" }} />
+          </div>
+          <button onClick={handleCredSave} disabled={credSaving || !credToken.trim()} className="r-btn w-full sm:w-auto">
+            {credSaving ? "Saving…" : "Update"}
+          </button>
+        </div>
+        {credMsg && <span className="text-[11px]" style={{ color: credMsg === "Token updated" ? "#2e7d32" : "#a33a3a" }}>{credMsg}</span>}
+      </section>
+
+      <section className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-3.5 space-y-2">
+        <h2 className="text-[13px] font-bold flex items-center gap-2" style={{ color: "var(--r-ink)" }}>
+          <IconCpu size={15} /> LLM Models
+        </h2>
+        {!models || models.length === 0 ? (
+          <div className="text-[12px]" style={{ color: "var(--r-muted)" }}>No models loaded.</div>
+        ) : (
+          <div className="space-y-1.5">
+            {models.map((m: any) => (
+              <div key={m.name} className="flex items-center justify-between px-3 py-1.5 rounded-[var(--r-radius)] text-[12px] bg-[var(--r-surface)] border border-[var(--r-border)]">
+                <div>
+                  <span className="font-medium" style={{ color: "var(--r-ink)" }}>{m.displayName || m.name}</span>
+                  <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-sm bg-[var(--r-header-accent)] text-black font-bold">{m.provider}</span>
+                </div>
+                <div className="flex gap-2 text-[11px] tabular-nums" style={{ color: "var(--r-muted)" }}>
+                  {m.toolCall && <span>tools</span>}
+                  {m.reasoning && <span>reasoning</span>}
+                  {m.contextLimit > 0 && <span>{(m.contextLimit / 1000).toFixed(0)}K ctx</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-3.5 space-y-2">
+        <h2 className="text-[13px] font-bold flex items-center gap-2" style={{ color: "var(--r-ink)" }}>
+          <IconActivity size={15} /> Connectors
+        </h2>
+        {!connectors || connectors.length === 0 ? (
+          <div className="text-[12px]" style={{ color: "var(--r-muted)" }}>No connectors registered.</div>
+        ) : (
+          <div className="space-y-1.5">
+            {connectors.map((c: any) => (
+              <div key={c.slug} className="flex items-center justify-between px-3 py-1.5 rounded-[var(--r-radius)] text-[12px] bg-[var(--r-surface)] border border-[var(--r-border)]">
+                <div>
+                  <span className="font-medium" style={{ color: "var(--r-ink)" }}>{c.name || c.slug}</span>
+                  <span className="ml-2 text-[11px]" style={{ color: "var(--r-muted)" }}>{c.provider}</span>
+                </div>
+                <div className="flex gap-1.5 text-[10px] font-bold">
+                  {(c.actions || []).map((a: any) => (
+                    <span key={a.name} className="px-1.5 py-0.5 rounded-sm" style={a.risk === "write" ? { background: "rgba(163,58,58,0.12)", color: "#a33a3a" } : { background: "var(--r-nav-bg)", color: "var(--r-muted)" }}>
+                      {a.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-3.5 space-y-2">
+        <h2 className="text-[13px] font-bold flex items-center gap-2" style={{ color: "var(--r-ink)" }}>
+          <IconActivity size={15} /> LLM Usage
+        </h2>
+        {!usage ? (
+          <div className="text-[12px]" style={{ color: "var(--r-muted)" }}>No usage data yet.</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <Stat value={String(usage.totals?.callCount ?? 0)} label="Calls" />
+            <Stat value={(usage.totals?.totalTokens ?? 0).toLocaleString()} label="Tokens" />
+            <Stat value={`$${(usage.totals?.totalCost ?? 0).toFixed(4)}`} label="Cost" />
+          </div>
+        )}
+      </section>
+    </div>
   );
 }

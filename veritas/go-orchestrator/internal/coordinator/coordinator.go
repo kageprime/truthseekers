@@ -71,7 +71,7 @@ func Run(s Store, queue func(slug string) error, force bool) Result {
 		return Result{At: now.Format(time.RFC3339), Reason: fmt.Sprintf("daily ceiling reached (%d/%d)", count, DailyLimit)}
 	}
 
-	featured := pickFeatured(s)
+	featured := withPinned(s, settings, pickFeatured(s))
 	staleSlug, staleReason := pickStale(s)
 
 	queued := ""
@@ -179,6 +179,41 @@ func pickFeatured(s Store) []string {
 	out := make([]string, 0, FeaturedCount)
 	for i := 0; i < len(list) && i < FeaturedCount; i++ {
 		out = append(out, list[i].slug)
+	}
+	return out
+}
+
+// withPinned keeps admin-pinned slugs first and tops up with scored picks
+// to FeaturedCount. Manual picks survive the nightly run; pinned slugs that
+// no longer resolve to a published article drop out silently.
+func withPinned(s Store, settings map[string]string, scored []string) []string {
+	var pinned []string
+	if raw := settings["featured_pinned"]; raw != "" {
+		_ = json.Unmarshal([]byte(raw), &pinned)
+	}
+	published := make(map[string]bool)
+	if articles, err := s.ListArticles(200, 0); err == nil {
+		for _, a := range articles {
+			if a != nil && a.Slug != "" && a.Metadata.Status != "draft" {
+				published[a.Slug] = true
+			}
+		}
+	}
+	out := make([]string, 0, FeaturedCount)
+	seen := make(map[string]bool)
+	for _, slug := range pinned {
+		if len(out) >= FeaturedCount || seen[slug] || !published[slug] {
+			continue
+		}
+		seen[slug] = true
+		out = append(out, slug)
+	}
+	for _, slug := range scored {
+		if len(out) >= FeaturedCount || seen[slug] {
+			continue
+		}
+		seen[slug] = true
+		out = append(out, slug)
 	}
 	return out
 }

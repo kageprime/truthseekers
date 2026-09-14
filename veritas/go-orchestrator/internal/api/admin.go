@@ -62,3 +62,33 @@ func (s *Server) putAdminSettings(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(merged)
 }
+
+// handleGetFeatured resolves the featured slug list (pinned admin picks
+// first, then coordinator top-ups) to articles. Public read — the homepage
+// hero rides this, never the admin-gated settings KV. Unresolvable slugs
+// are skipped; the envelope is always an array, never null.
+func (s *Server) handleGetFeatured(w http.ResponseWriter, r *http.Request) {
+	reqLog(r, "get featured")
+	settings, err := s.db.GetSettings()
+	if err != nil {
+		http.Error(w, `{"error":"Failed to load settings"}`, http.StatusInternalServerError)
+		return
+	}
+	var slugs []string
+	if raw := settings["featured_articles"]; raw != "" {
+		_ = json.Unmarshal([]byte(raw), &slugs)
+	}
+	out := make([]interface{}, 0, len(slugs))
+	for _, slug := range slugs {
+		if slug == "" {
+			continue
+		}
+		a, err := s.db.GetArticle(slug)
+		if err != nil || a == nil {
+			continue
+		}
+		out = append(out, a)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
