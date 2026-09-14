@@ -17,7 +17,8 @@ interface FloatingChatValue {
 
 const FloatingChatContext = createContext<FloatingChatValue | null>(null);
 
-const OVERLAY_ROUTES = ["/maps/"];
+// ponytail: atlas is in-flow article-style now — chat docks everywhere except hidden routes.
+const OVERLAY_ROUTES: string[] = [];
 const HIDDEN_ROUTES = ["/login", "/onboarding", "/chat/"];
 const STORAGE_KEY = "truthseekers_floating_chat";
 

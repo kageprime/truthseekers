@@ -1,35 +1,60 @@
-"use client";
+import MapClient from "./MapClient";
+import type { MapEntry } from "@encarta/core";
+import { BASE } from "@/lib/constants";
+import { QueryClient, dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import type { Metadata } from "next";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import dynamic from "next/dynamic";
+async function fetchMapEntry(slug: string): Promise<MapEntry | null> {
+  try {
+    const res = await fetch(`${BASE}/maps/${encodeURIComponent(slug)}`, {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
 
-const AtlasMap = dynamic(() => import("../../components/AtlasAntiquaMap"), { ssr: false });
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const map = await fetchMapEntry(slug);
+  if (!map) {
+    return { title: `${slug.replace(/-/g, " ")} · Truthseekers` };
+  }
+  const title = map.title || slug.replace(/-/g, " ");
+  const description = map.subtitle || map.description?.slice(0, 200) || `An interactive map of ${title}.`;
+  return {
+    title: `${title} · Truthseekers`,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "article",
+      url: `/maps/${slug}`,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  };
+}
 
-// ponytail: single-map viewport — same inset frame as the atlas index.
-export default function MapDetailPage() {
-  const params = useParams();
-  const [slug, setSlug] = useState<string>("");
+export default async function MapPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const map = await fetchMapEntry(slug);
 
-  useEffect(() => {
-    if (params?.slug) setSlug(params.slug as string);
-  }, [params]);
+  if (!map) {
+    return <MapClient slug={slug} map={null} />;
+  }
+
+  const queryClient = new QueryClient();
+  queryClient.setQueryData(["map", slug], map);
 
   return (
-    <>
-      <div className="border-b-[3px] border-[#0a2a5e] pb-3 mb-4">
-        <div className="text-[10px] text-[#0a2a5e] font-bold tracking-widest uppercase">Atlas • {slug || "…"}</div>
-        <h1 className="r-h1 mt-1" style={{ fontSize: 28 }}>{slug ? slug.replace(/-/g, " ") : "Map"}</h1>
-      </div>
-      <div className="border-[3px] bg-[#d4d0c8]" style={{ borderStyle: "outset", borderColor: "#fff8e0 #8a7f68 #8a7f68 #fff8e0" }}>
-        <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 flex items-center justify-between">
-          <span>TruthSeekers Atlas</span>
-          <span className="bg-[#c9a227] text-black px-1 text-[9px] border border-black">INTERACTIVE</span>
-        </div>
-        <div className="border-[3px] m-1.5 min-h-[60vh]" style={{ borderStyle: "inset", borderColor: "#8a7f68 #fff8e0 #fff8e0 #8a7f68" }}>
-          <AtlasMap focusSlug={slug} />
-        </div>
-      </div>
-    </>
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <MapClient slug={slug} map={map} />
+    </HydrationBoundary>
   );
 }

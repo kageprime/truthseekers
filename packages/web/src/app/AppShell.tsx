@@ -19,12 +19,13 @@ import { useAuth } from "./hooks/useAuth";
 const IS_MOCK = process.env.NEXT_PUBLIC_MOCK === "true";
 // ponytail: retro is the platform default — escape with NEXT_PUBLIC_RETRO=false.
 const IS_RETRO = process.env.NEXT_PUBLIC_RETRO !== "false";
-// Article slugs + claim-graph + chat draw their own RetroWindow; everything else uses the generic shell.
-const isSelfWrapped = (p: string) => p === "/claim-graph" || p.startsWith("/chat/") || p === "/chat" || (/^\/article\/[^/]+$/.test(p) && p !== "/article/new");
+// Article + map slugs + claim-graph + chat draw their own RetroWindow; everything else uses the generic shell.
+const isSelfWrapped = (p: string) => p === "/claim-graph" || p.startsWith("/chat/") || p === "/chat" || (/^\/article\/[^/]+$/.test(p) && p !== "/article/new") || /^\/maps\/[^/]+$/.test(p);
 
 
 const HIDDEN_ROUTES = ["/login", "/onboarding"];
-const OVERLAY_ROUTES = ["/maps/"];
+// ponytail: atlas is in-flow article-style now — no fullscreen overlay routes left.
+const OVERLAY_ROUTES: string[] = [];
 const CHAT_ROUTES = ["/chat/"];
 
 // Client-side gate — replaces edge middleware, which could never see the
