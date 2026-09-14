@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { useChat, useChats, useCreateChat, useModels } from "../../hooks";
+import { useChat, useChats, useCreateChat } from "../../hooks";
 import { useChatStream } from "../../hooks/useChatStream";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import ChatMessage from "../../components/ChatMessage";
@@ -16,7 +16,7 @@ import { useChatContext } from "../ChatContext";
 import { useTheme } from "../../components/ThemeProvider";
 import Spinner from "../../components/Spinner";
 import { IconPlus } from "../../components/Icons";
-import { IconBook, IconGear, IconMap, IconMoon, IconSun } from "../../components/retro/icons";
+import { IconBook, IconGear, IconMap } from "../../components/retro/icons";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -40,7 +40,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [loading, setLoading] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { mutate: createChat } = useCreateChat();
-  const { resolved: theme, toggle: toggleTheme } = useTheme();
+  const { resolved: theme } = useTheme();
 
   const seg = useTraceSegments(convId ?? id ?? null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -98,469 +98,336 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           setConvId(cid);
           try { localStorage.setItem("truthseekers_floating_conv", cid!); } catch {}
           router.replace(`/chat/${cid}`, { scroll: false });
-        } catch (err) {
-          console.error("Failed to create conversation", err);
-          setError("Failed to start conversation. Please try again.");
+        } catch (e: any) {
+          setError(e.message || "Failed to create conversation");
           setLoading(false);
           return;
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
       }
 
-      setSending(true);
+      setInput("");
       setStreamContent("");
       setStreamSteps([]);
       setStreamBlocks([]);
-      setLiveEvents([]);
       agentEventsRef.current = [];
+      setLiveEvents([]);
       finalizedRef.current = false;
       lastUserMsgRef.current = msg;
+      setSending(true);
 
-      const userMsg = {
-        id: `temp-${Date.now()}`,
-        conversationId: cid!,
-        role: "user" as const,
-        content: msg,
-        createdAt: new Date().toISOString(),
-      };
-
-      await queryClient.cancelQueries({ queryKey: ["chat", cid] });
-      queryClient.setQueryData(["chat", cid], (prev: any) => ({
-        ...(prev || { id: cid, title: "Chat", userId: "", createdAt: new Date().toISOString() }),
-        messages: [...(prev?.messages || []), userMsg],
-      }));
-
-      setInput("");
-
-      await streamSend(cid!, msg, {
-        onText: (text) => {
-          setStreamContent(text);
-        },
-        onToolEvent: (event) => {
-          setStreamContent((cur) => {
-            if (cur.trim()) {
-              const step = cur.trim();
-              requestAnimationFrame(() => setStreamSteps((s) => [...s, step]));
+      try {
+        await streamSend(cid!, msg, {
+          onText: (text: string) => {
+            setStreamContent((prev) => prev + text);
+          },
+          onToolEvent: (event: AgentEvent) => {
+            agentEventsRef.current = [...agentEventsRef.current, event];
+            setLiveEvents([...agentEventsRef.current]);
+            if (event.type === "tool_use" && event.data && typeof event.data === "object" && "name" in (event.data as Record<string, unknown>)) {
+              const name = String((event.data as Record<string, unknown>).name || "");
+              setStreamSteps((prev) => [...prev, `Tool call: ${name}`]);
             }
-            return "";
-          });
-          setLiveEvents((prev) => {
-            const next = [...prev, event];
-            agentEventsRef.current = next;
-            return next;
-          });
-        },
-        onDone: (event) => {
-          if (finalizedRef.current) return;
-          finalizedRef.current = true;
-          const savedEvents = agentEventsRef.current;
-          const finalBlocks = event.blocks ?? [];
-          setStreamContent("");
-          setStreamSteps([]);
-          setStreamBlocks(finalBlocks);
-          queryClient.setQueryData(["chat", cid], (prev: any) => {
-            if (!prev) return prev;
-            const real = prev.messages.map((m: any) =>
-              m.id.startsWith("temp-") ? { ...m, id: `${Date.now()}-${Math.random()}`, conversationId: cid } : m,
-            );
-            return {
-              ...prev,
-              messages: [...real, {
-                id: event.msgId ?? `msg-${Date.now()}-${Math.random()}`,
-                conversationId: cid,
-                role: "assistant" as const,
-                content: event.content || "",
-                blocks: finalBlocks,
-                agentEvents: savedEvents,
-                createdAt: new Date().toISOString(),
-              }],
-            };
-          });
-        },
-        onError: (errMsg) => {
-          setError(errMsg || "Something went wrong. Please try again.");
-        },
-      }, "muse-spark-1.3-contributor");
-
-      setTimeout(() => setSending(false), 0);
+          },
+          onDone: () => {
+            if (finalizedRef.current) return;
+            finalizedRef.current = true;
+            queryClient.invalidateQueries({ queryKey: ["chat", cid] });
+            queryClient.invalidateQueries({ queryKey: ["chats"] });
+            setSending(false);
+          },
+          onError: (err: string) => {
+            setError(err || "Connection lost");
+            setSending(false);
+          },
+        });
+      } catch (err: any) {
+        setError(err.message || "Send failed");
+        setSending(false);
+      }
     },
-    [convId, sending, streamSend, queryClient, router],
+    [convId, createChat, router, sending, setSending, setLiveEvents, streamSend, queryClient]
   );
 
-  function handleKeyDown(e: React.KeyboardEvent) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       doSend(input);
     }
-  }
+  };
 
-  function handleNewChat() {
+  const handleNewChat = () => {
     setConvId(null);
     setInput("");
     setStreamContent("");
     setStreamSteps([]);
     setStreamBlocks([]);
-    setLiveEvents([]);
-    agentEventsRef.current = [];
     setError(null);
+    setSending(false);
     router.push("/chat/new");
-  }
+  };
 
-  const isNew = id === "new" && !convId;
-  const showEmpty = messages.length === 0 && !sending && isNew;
+  const showEmpty = !convLoading && messages.length === 0 && !hasStreaming;
 
   const NAV_LINKS = [
-    { href: "/articles", label: "Articles", Icon: IconBook },
-    { href: "/maps", label: "Maps", Icon: IconMap },
-    { href: "/settings", label: "Settings", Icon: IconGear },
+    { label: "Encyclopedia Articles", href: "/articles", Icon: IconBook },
+    { label: "Claim Atlas & Graph", href: "/claim-graph", Icon: IconMap },
+    { label: "Admin & Settings", href: "/admin", Icon: IconGear },
   ];
 
   return (
-    <RetroWindow
-      title={`TruthSeekers — ${conv?.title ?? (isNew ? "New chat" : "Chat")}`}
-      path={convId ? `/chat/${convId}` : "/chat/new"}
-      crumb={conv?.title ?? (isNew ? "New chat" : "Chat")}
-      nav
-      status={`TruthSeekers • ${messages.length} message${messages.length === 1 ? "" : "s"}${sending ? " • streaming" : ""}`}
-    >
-    <div className="flex-1 flex min-h-0 bg-[#efe9d5] w-full">
-      {/* ── Mobile header bar (in-flow: RetroWindow already owns the top chrome) ── */}
-      <div className="md:hidden shrink-0 flex items-center justify-between px-3 h-11 bg-surface/95 backdrop-blur-md border-b border-border/30">
-        <button
-          onClick={() => setMobileSidebarOpen(true)}
-          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-accent-bg/20 transition-all"
-          aria-label="Open menu"
-          style={{ background: "none", border: "none" }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
-        </button>
-        <span className="text-xs font-semibold tracking-tight" style={{ color: "var(--ink)" }}>Truthseekers</span>
-        <button onClick={handleNewChat} className="flex items-center justify-center w-8 h-8 rounded-lg text-muted hover:text-accent hover:bg-accent-bg/20 transition-all" aria-label="New chat" style={{ background: "none", border: "none" }}>
-          <IconPlus size={16} />
-        </button>
-      </div>
-
-      {/* ── Mobile sidebar overlay ── */}
-      {mobileSidebarOpen && (
-        <div className="md:hidden fixed inset-0" style={{ zIndex: 50 }}>
-          <div className="absolute inset-0 bg-black/40 animate-appear-blur" onClick={() => setMobileSidebarOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 flex flex-col bg-[#e8e0c5] border-r-[2px] border-[#8a7f68]">
-            {/* Sidebar header */}
-            <div className="shrink-0 flex items-center justify-between px-2 h-8 bg-[#0a2a5e] text-white">
-              <div className="flex items-center gap-2">
-                <img src="/logo-icon.png" alt="" height={18} style={{ height: 18, width: "auto" }} />
-                <span className="text-[11px] font-bold text-white">TruthSeekers</span>
-              </div>
-              <button
-                onClick={() => setMobileSidebarOpen(false)}
-                className="flex items-center justify-center w-7 h-7 text-white cursor-pointer"
-                aria-label="Close menu"
-                style={{ background: "none", border: "none" }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Nav links */}
-            <div className="shrink-0 px-3 pt-3 pb-2 space-y-0.5">
-              {NAV_LINKS.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMobileSidebarOpen(false)}
-                  className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg no-underline transition-colors hover:bg-accent-bg/15"
-                  style={{ color: "var(--muted)" }}
-                >
-                  <span className="inline-flex" aria-hidden><link.Icon size={16} /></span>
-                  <span>{link.label}</span>
-                </Link>
-              ))}
-              <button
-                onClick={toggleTheme}
-                className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg w-full text-left transition-colors hover:bg-accent-bg/15"
-                style={{ color: "var(--muted)", background: "none", border: "none" }}
-              >
-                <span className="inline-flex" aria-hidden>{theme === "dark" ? <IconSun size={16} /> : <IconMoon size={16} />}</span>
-                <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
-              </button>
-            </div>
-
-            <div className="mx-3 border-t border-border/20" />
-
-            {/* Sessions header */}
-            <div className="shrink-0 flex items-center justify-between px-4 pt-3 pb-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--subtle)" }}>Sessions</span>
-              <button onClick={() => { handleNewChat(); setMobileSidebarOpen(false); }} className="flex items-center justify-center w-5 h-5 rounded text-subtle hover:text-accent hover:bg-accent-bg/30 transition-all cursor-pointer" aria-label="New chat" style={{ background: "none", border: "none" }}>
-                <IconPlus size={12} />
-              </button>
-            </div>
-
-            {/* Session list */}
-            <div className="flex-1 overflow-y-auto min-h-0 p-1.5 pb-3">
-              {chatsLoading ? (
-                <div className="flex items-center justify-center py-6">
-                  <Spinner size={14} />
-                </div>
-              ) : conversations.length === 0 ? (
-                <div className="px-2 py-6 text-[11px] text-center" style={{ color: "#8a7f68" }}>No conversations yet</div>
-              ) : (
-                conversations.map((c: any) => (
-                  <button
-                    key={c.id}
-                    onClick={() => { router.push(`/chat/${c.id}`); setMobileSidebarOpen(false); }}
-                    className={`w-full text-left px-1.5 py-1 text-[12px] border ${c.id === convId ? "bg-[#0a2a5e] text-white border-[#0a2a5e]" : "bg-transparent border-transparent text-black"}`}
-                  >
-                    <div className="truncate leading-[1.25]">{c.title}</div>
-                  </button>
-                ))
-              )}
-            </div>
-          </aside>
-        </div>
-      )}
-
-      {/* ── Sidebar: session list (desktop) ── */}
-      <aside className="hidden md:flex flex-col shrink-0 w-60 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68]">
-        <div className="shrink-0 flex items-center justify-between px-2 h-8 bg-[#0a2a5e] text-white">
-          <span className="text-[11px] font-bold">Sessions</span>
-          <button onClick={handleNewChat} className="flex items-center justify-center w-6 h-6 text-white hover:bg-white/20 cursor-pointer" aria-label="New chat" style={{ background: "none", border: "none" }}>
+    <RetroWindow title={`TruthSeekers — Chat`} status={sending ? "Agent thinking…" : "Ready"}>
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 min-w-0 bg-[var(--r-surface)] rounded-[var(--r-radius)] overflow-hidden transition-colors duration-200 border border-[var(--r-border)]">
+        {/* Mobile Header Bar */}
+        <div className="md:hidden shrink-0 flex items-center justify-between px-3 h-10 bg-[var(--r-nav-bg)] border-b border-[var(--r-border)]">
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold bg-[var(--r-accent)] text-white rounded-[var(--r-radius)]"
+            aria-label="Open session list"
+          >
+            <span>Sessions</span>
+            <span>▾</span>
+          </button>
+          <span className="text-[12px] font-bold truncate max-w-[160px]" style={{ color: "var(--r-ink)" }}>
+            {conv?.title ?? "TruthSeekers Chat"}
+          </span>
+          <button
+            onClick={handleNewChat}
+            className="flex items-center justify-center w-7 h-7 bg-[var(--r-header-accent)] text-black font-bold rounded-sm border border-black/30"
+            aria-label="New chat"
+          >
             <IconPlus size={14} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto min-h-0 p-1.5">
-          {chatsLoading ? (
-            <div className="flex items-center justify-center py-6">
-              <Spinner size={14} />
-            </div>
-          ) : conversations.length === 0 ? (
-            <div className="px-2 py-6 text-[11px] text-center" style={{ color: "#8a7f68" }}>No conversations yet</div>
-          ) : (
-            conversations.map((c: any) => (
-              <button
-                key={c.id}
-                onClick={() => router.push(`/chat/${c.id}`)}
-                className={`w-full text-left px-1.5 py-1 text-[12px] border ${c.id === convId ? "bg-[#0a2a5e] text-white border-[#0a2a5e]" : "bg-transparent border-transparent hover:bg-[#d6cfae] text-black"}`}
-              >
-                <div className="truncate leading-[1.25]">{c.title}</div>
-              </button>
-            ))
-          )}
-        </div>
-      </aside>
 
-      {/* ── Main chat area ── */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* ── Messages area ── */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
-          {loading || convLoading ? (
-            <div className="p-4 sm:p-6 space-y-5 max-w-[880px] mx-auto">
-              <div className="flex justify-end">
-                <div className="rounded-2xl rounded-br-md p-3 sm:p-4 max-w-[70%]" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>
-                  <div className="h-3 skeleton rounded w-40" />
-                </div>
-              </div>
-              <div className="flex justify-start">
-                <div className="rounded-2xl rounded-bl-md p-3 sm:p-4 max-w-[80%]" style={{ background: "color-mix(in srgb, var(--border) 15%, transparent)" }}>
-                  <div className="space-y-2.5">
-                    <div className="h-3 skeleton rounded w-56" />
-                    <div className="h-3 skeleton rounded w-44" />
-                    <div className="h-3 skeleton rounded w-36" />
-                    <div className="h-3 skeleton rounded w-52" />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <div className="rounded-2xl rounded-br-md p-3 sm:p-4 max-w-[60%]" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>
-                  <div className="h-3 skeleton rounded w-32" />
-                </div>
-              </div>
-              <div className="flex justify-start">
-                <div className="rounded-2xl rounded-bl-md p-3 sm:p-4 max-w-[40%]" style={{ background: "color-mix(in srgb, var(--border) 15%, transparent)" }}>
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 rounded-full skeleton" />
-                    <div className="w-2 h-2 rounded-full skeleton" />
-                    <div className="w-2 h-2 rounded-full skeleton" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : showEmpty ? (
-            <EmptyChatState onSetInput={doSend} />
-          ) : (
-            <div className="max-w-[880px] mx-auto">
-              {messages.map((msg: any, i: number) => (
-                <ChatMessage
-                  key={msg.id}
-                  role={msg.role}
-                  content={msg.content}
-                  blocks={msg.blocks}
-                  agentEvents={msg.agentEvents}
-                  createdAt={msg.createdAt}
-                  isLastAssistant={i === lastAssistantIndex}
-                  onRegenerate={i === lastAssistantIndex && lastUserMsg ? () => doSend(lastUserMsg) : undefined}
-                />
-              ))}
-
-              {error && (
-                <div className="mx-3 my-4 px-4 py-3 rounded-xl border border-oxblood/30 bg-oxblood-subtle/30 text-sm text-oxblood flex items-center justify-between gap-3">
-                  <span>{error}</span>
-                  <button
-                    onClick={() => {
-                      setError(null);
-                      if (lastUserMsgRef.current) doSend(lastUserMsgRef.current);
-                    }}
-                    className="shrink-0 text-xs font-medium underline"
-                    style={{ color: "var(--oxblood)" }}
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-
-              {hasStreaming && (
-                <div style={{ background: "color-mix(in srgb, var(--accent-bg) 6%, transparent)" }}>
-                  {streamSteps.length > 0 && (
-                    <div className="px-3 sm:px-6 pt-3 pb-1 space-y-1">
-                      {streamSteps.map((step, i) => (
-                        <div key={i} className="flex items-start gap-2 text-[11px] text-muted">
-                          <span className="mt-1.5 w-1 h-1 rounded-full bg-accent/60 shrink-0" />
-                          <span className="line-clamp-2 font-serif-body">{step}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} agentEvents={liveEvents} streaming />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ── Footer: trace toggle + docked composer ── */}
-        {!showEmpty && (
-          <div className="shrink-0 bg-[#e8e0c5] border-t-[2px] border-[#8a7f68]">
-            <div className="max-w-[880px] mx-auto px-2 sm:px-4">
-              <div className="flex items-center justify-between gap-2 py-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest truncate min-w-0 flex-1" style={{ color: "#8a7f68" }}>
-                  {sending ? "Agent working…" : conv?.title ?? "Conversation"}
-                </span>
+        {/* Mobile Sidebar Drawer */}
+        {mobileSidebarOpen && (
+          <div className="md:hidden fixed inset-0 z-[100]" role="dialog" aria-modal="true">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setMobileSidebarOpen(false)} />
+            <aside className="absolute left-0 top-0 bottom-0 w-72 flex flex-col bg-[var(--r-surface)] border-r border-[var(--r-border)] shadow-xl">
+              <div className="shrink-0 flex items-center justify-between px-3 h-10 bg-[var(--r-accent)] text-white">
+                <span className="text-[12px] font-bold">Conversations</span>
                 <button
-                  onClick={() => setConsoleOpen((o) => !o)}
-                  aria-pressed={consoleOpen}
-                  aria-label="Toggle agent trace panel"
-                  className="r-btn inline-flex items-center gap-1 px-2 py-0.5 min-h-[40px] sm:min-h-0 shrink-0"
-                  style={consoleOpen ? { borderStyle: "inset" } : undefined}
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className="flex items-center justify-center w-6 h-6 text-white"
+                  aria-label="Close menu"
                 >
-                  Trace{seg.unreadCount > 0 && !consoleOpen && <span className="bg-[#a33] text-white text-[9px] px-1 border border-black">{seg.unreadCount}</span>}
+                  ✕
                 </button>
               </div>
-            </div>
+
+              <div className="shrink-0 p-2.5 space-y-1 border-b border-[var(--r-border)]">
+                {NAV_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileSidebarOpen(false)}
+                    className="flex items-center gap-2 px-2.5 py-1.5 text-[12px] font-medium text-[var(--r-ink)] hover:bg-black/5 rounded-[var(--r-radius)] no-underline"
+                  >
+                    <span aria-hidden><link.Icon size={14} /></span>
+                    <span>{link.label}</span>
+                  </Link>
+                ))}
+              </div>
+
+              <div className="flex-1 overflow-y-auto min-h-0 p-2 space-y-1 r-scroll">
+                {chatsLoading ? (
+                  <div className="flex items-center justify-center py-6"><Spinner size={14} /></div>
+                ) : conversations.length === 0 ? (
+                  <div className="px-2 py-6 text-[11px] text-center text-[var(--r-muted)]">No conversations yet</div>
+                ) : (
+                  conversations.map((c: any) => (
+                    <button
+                      key={c.id}
+                      onClick={() => { router.push(`/chat/${c.id}`); setMobileSidebarOpen(false); }}
+                      className={`w-full text-left px-2.5 py-1.5 text-[12px] rounded-[var(--r-radius)] border transition-colors ${
+                        c.id === convId ? "bg-[var(--r-accent)] text-white border-[var(--r-accent)] font-semibold" : "bg-transparent border-transparent text-[var(--r-ink)] hover:bg-black/5"
+                      }`}
+                    >
+                      <div className="truncate">{c.title}</div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </aside>
           </div>
         )}
-        {!showEmpty && (
-          <div className="shrink-0 px-2 sm:px-4 pb-3 sm:pb-4 pt-2 bg-[#efe9d5]">
-            <div className="max-w-[880px] mx-auto">
-              <div className="bezel">
-                <div
-                  className="bezel-inner flex items-end gap-1.5 sm:gap-2 p-1.5 sm:p-2"
-                  style={{ borderRadius: "calc(2rem - 1.5px)" }}
+
+        {/* Desktop Sidebar */}
+        <aside className="hidden md:flex flex-col shrink-0 w-64 bg-[var(--r-nav-bg)] border-r border-[var(--r-border)]">
+          <div className="shrink-0 flex items-center justify-between px-3 h-9 bg-[var(--r-accent)] text-white font-bold text-[11px]">
+            <span>Sessions</span>
+            <button
+              onClick={handleNewChat}
+              className="flex items-center justify-center w-5 h-5 bg-[var(--r-header-accent)] text-black rounded-sm border border-black/30 hover:brightness-110"
+              aria-label="New chat"
+            >
+              <IconPlus size={12} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto min-h-0 p-2 space-y-1 r-scroll">
+            {chatsLoading ? (
+              <div className="flex items-center justify-center py-6"><Spinner size={14} /></div>
+            ) : conversations.length === 0 ? (
+              <div className="px-2 py-6 text-[11px] text-center text-[var(--r-muted)]">No conversations yet</div>
+            ) : (
+              conversations.map((c: any) => (
+                <button
+                  key={c.id}
+                  onClick={() => router.push(`/chat/${c.id}`)}
+                  className={`w-full text-left px-2.5 py-1.5 text-[12px] rounded-[var(--r-radius)] border transition-colors ${
+                    c.id === convId ? "bg-[var(--r-accent)] text-white border-[var(--r-accent)] font-semibold shadow-sm" : "bg-transparent border-transparent text-[var(--r-ink)] hover:bg-black/5"
+                  }`}
                 >
-                  <div className="flex-1 min-w-0">
-                    <textarea
-                      ref={textareaRef}
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder={sending ? "Waiting..." : "Ask anything..."}
-                      disabled={sending}
-                      rows={1}
-                      className="w-full resize-none bg-transparent border-none outline-none text-[13px] sm:text-sm min-h-[24px] sm:min-h-[28px] max-h-[120px] sm:max-h-[180px] text-ink placeholder:text-subtle/60 px-2.5 py-2"
-                      aria-label="Chat message input"
-                      style={{ lineHeight: "1.5" }}
-                    />
+                  <div className="truncate">{c.title}</div>
+                </button>
+              ))
+            )}
+          </div>
+        </aside>
+
+        {/* Main Chat Workarea */}
+        <div className="flex-1 flex flex-col min-w-0 bg-[var(--r-surface)] relative">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 r-scroll">
+            {loading || convLoading ? (
+              <div className="p-4 sm:p-6 space-y-5 max-w-[960px] mx-auto">
+                <div className="flex justify-end">
+                  <div className="rounded-md p-4 max-w-[70%] bg-[var(--r-surface-elevated)] border border-[var(--r-border)]">
+                    <div className="h-3 skeleton rounded w-40" />
                   </div>
+                </div>
+                <div className="flex justify-start">
+                  <div className="rounded-md p-4 max-w-[80%] bg-[var(--r-surface-elevated)] border border-[var(--r-border)] space-y-2">
+                    <div className="h-3 skeleton rounded w-56" />
+                    <div className="h-3 skeleton rounded w-44" />
+                  </div>
+                </div>
+              </div>
+            ) : showEmpty ? (
+              <EmptyChatState onSetInput={doSend} />
+            ) : (
+              <div className="max-w-[960px] mx-auto w-full py-2">
+                {messages.map((msg: any, i: number) => (
+                  <ChatMessage
+                    key={msg.id}
+                    role={msg.role}
+                    content={msg.content}
+                    blocks={msg.blocks}
+                    agentEvents={msg.agentEvents}
+                    createdAt={msg.createdAt}
+                    isLastAssistant={i === lastAssistantIndex}
+                    onRegenerate={i === lastAssistantIndex && lastUserMsg ? () => doSend(lastUserMsg) : undefined}
+                  />
+                ))}
+
+                {error && (
+                  <div className="mx-4 my-4 p-3 rounded-[var(--r-radius)] border border-red-300 bg-red-50 text-red-800 text-xs flex items-center justify-between gap-3">
+                    <span>{error}</span>
+                    <button
+                      onClick={() => {
+                        setError(null);
+                        if (lastUserMsgRef.current) doSend(lastUserMsgRef.current);
+                      }}
+                      className="text-xs font-bold underline cursor-pointer"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+
+                {hasStreaming && (
+                  <div className="border-t border-[var(--r-border)] bg-[var(--r-surface-elevated)]">
+                    {streamSteps.length > 0 && (
+                      <div className="px-4 py-2 space-y-1">
+                        {streamSteps.map((step, i) => (
+                          <div key={i} className="flex items-center gap-2 text-[11px] text-[var(--r-muted)]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--r-accent)]" />
+                            <span>{step}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} agentEvents={liveEvents} streaming />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Footer & Composer Input Area */}
+          {!showEmpty && (
+            <div className="shrink-0 bg-[var(--r-nav-bg)] border-t border-[var(--r-border)] p-2.5 sm:p-4">
+              <div className="max-w-[960px] mx-auto space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[var(--r-muted)] px-1">
+                  <span>{sending ? "Agent working…" : conv?.title ?? "Conversation"}</span>
+                  <button
+                    onClick={() => setConsoleOpen((o) => !o)}
+                    aria-pressed={consoleOpen}
+                    aria-label="Toggle agent trace panel"
+                    className="r-btn inline-flex items-center gap-1.5 px-2 py-0.5"
+                  >
+                    <span>Trace</span>
+                    {seg.unreadCount > 0 && !consoleOpen && (
+                      <span className="bg-red-700 text-white text-[9px] px-1 font-bold rounded-sm">
+                        {seg.unreadCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Sleek Option C Composer Input Container */}
+                <div className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-2 flex items-end gap-2 shadow-sm">
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={sending ? "Agent is typing..." : "Ask a research question or request an article..."}
+                    disabled={sending}
+                    rows={1}
+                    className="flex-1 bg-transparent border-none outline-none text-[13.5px] min-h-[36px] max-h-[160px] text-[var(--r-ink)] placeholder:text-[var(--r-muted)] px-2 py-1 resize-none"
+                    aria-label="Chat message input"
+                    style={{ lineHeight: "1.5" }}
+                  />
                   {sending ? (
                     <button
                       onClick={() => streamStop(convId ?? undefined)}
                       aria-label="Stop generating"
-                      className="cta-bevel shrink-0 !p-1 !gap-0"
-                      style={{ background: "var(--oxblood)" }}
+                      className="bg-red-700 text-white font-bold px-3 py-2 rounded-[var(--r-radius)] hover:bg-red-800 transition-colors text-xs shrink-0 h-[36px]"
                     >
-                      <span
-                        className="cta-bevel-icon !w-7 !h-7 max-sm:!w-10 max-sm:!h-10"
-                        style={{ background: "color-mix(in srgb, var(--surface) 25%, transparent)", color: "var(--surface)" }}
-                        aria-hidden
-                      >
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                          <rect x="6" y="6" width="12" height="12" rx="2" />
-                        </svg>
-                      </span>
+                      Stop
                     </button>
                   ) : (
                     <button
                       onClick={() => doSend(input)}
                       disabled={!input.trim()}
                       aria-label="Send message"
-                      className="cta-bevel shrink-0 !p-1 !gap-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
+                      className="bg-[var(--r-accent)] text-white font-bold px-3 py-2 rounded-[var(--r-radius)] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs shrink-0 h-[36px] flex items-center justify-center gap-1.5"
                     >
-                      <span
-                        className="cta-bevel-icon !w-7 !h-7 max-sm:!w-10 max-sm:!h-10"
-                        style={{ background: input.trim() ? "var(--gold)" : "color-mix(in srgb, var(--border) 60%, transparent)" }}
-                        aria-hidden
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="22" y1="2" x2="11" y2="13" />
-                          <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                        </svg>
-                      </span>
+                      <span>Send</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13" />
+                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                      </svg>
                     </button>
                   )}
                 </div>
               </div>
             </div>
-          </div>
-        )}
-
-      </div>
-
-      {/* ── Agent trace rail (desktop) + bottom sheet (mobile) ── */}
-      {consoleOpen && (
-        <div className="hidden md:flex r-side shrink-0 w-[340px] flex-col bg-[#e8e0c5] border-l-[2px] border-[#8a7f68]">
-          <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 flex items-center justify-between shrink-0">
-            <span>Agent Trace</span>
-            <button onClick={() => setConsoleOpen(false)} aria-label="Close trace panel" className="text-white hover:bg-white/20 px-1 cursor-pointer" style={{ background: "none", border: "none" }}>X</button>
-          </div>
-          <div className="flex-1 min-h-0 overflow-auto">
-          <TruthConsole
-            segments={seg.segments}
-            activeSegmentId={seg.activeSegmentId}
-            liveSegmentId={seg.liveSegmentId}
-            unreadCount={seg.unreadCount}
-            activeEvents={seg.activeEvents}
-            onSelectSegment={seg.selectSegment}
-            onJumpToLive={seg.jumpToLive}
-            onClose={() => setConsoleOpen(false)}
-            loading={sending && seg.activeEvents.length === 0}
-          />
-          </div>
+          )}
         </div>
-      )}
-      {consoleOpen && (
-        <div className="md:hidden fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Agent trace">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setConsoleOpen(false)} />
-          <div className="absolute inset-x-0 bottom-0 top-[10vh] bg-[#e8e0c5] border-t-[3px] flex flex-col" style={{ borderStyle: "outset", borderColor: "#fff8e0 #8a7f68 #8a7f68 #fff8e0" }}>
-            <div className="bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 flex items-center justify-between shrink-0">
+
+        {/* Desktop Trace Sidebar */}
+        {consoleOpen && (
+          <div className="hidden md:flex shrink-0 w-80 flex-col bg-[var(--r-nav-bg)] border-l border-[var(--r-border)]">
+            <div className="bg-[var(--r-accent)] text-white text-[11px] font-bold px-3 py-1.5 flex items-center justify-between shrink-0">
               <span>Agent Trace</span>
-              <button onClick={() => setConsoleOpen(false)} aria-label="Close trace panel" className="text-white px-1 cursor-pointer" style={{ background: "none", border: "none" }}>X</button>
+              <button onClick={() => setConsoleOpen(false)} aria-label="Close trace panel" className="text-white hover:opacity-80">
+                ✕
+              </button>
             </div>
-            <div className="flex-1 min-h-0 overflow-auto">
+            <div className="flex-1 min-h-0 overflow-auto r-scroll">
               <TruthConsole
                 segments={seg.segments}
                 activeSegmentId={seg.activeSegmentId}
@@ -574,9 +441,36 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
               />
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* Mobile Trace Bottom Sheet */}
+        {consoleOpen && (
+          <div className="md:hidden fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Agent trace">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setConsoleOpen(false)} />
+            <div className="absolute inset-x-0 bottom-0 top-[15vh] bg-[var(--r-surface)] border-t border-[var(--r-border)] flex flex-col rounded-t-lg overflow-hidden shadow-2xl">
+              <div className="bg-[var(--r-accent)] text-white text-[11px] font-bold px-3 py-2 flex items-center justify-between shrink-0">
+                <span>Agent Trace</span>
+                <button onClick={() => setConsoleOpen(false)} aria-label="Close trace panel" className="text-white">
+                  ✕
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-auto r-scroll">
+                <TruthConsole
+                  segments={seg.segments}
+                  activeSegmentId={seg.activeSegmentId}
+                  liveSegmentId={seg.liveSegmentId}
+                  unreadCount={seg.unreadCount}
+                  activeEvents={seg.activeEvents}
+                  onSelectSegment={seg.selectSegment}
+                  onJumpToLive={seg.jumpToLive}
+                  onClose={() => setConsoleOpen(false)}
+                  loading={sending && seg.activeEvents.length === 0}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </RetroWindow>
   );
 }

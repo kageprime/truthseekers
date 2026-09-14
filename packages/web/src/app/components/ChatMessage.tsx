@@ -6,6 +6,7 @@ import RetroMarkdown from "./retro/RetroMarkdown";
 import type { Block } from "@encarta/core";
 import { sanitizeMessage } from "@/lib/dsml";
 import { IconThumbsUp, IconThumbsDown, IconRefresh, IconCopy, IconCheck } from "./Icons";
+import { toolLabel } from "./ProcessViewer";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -83,8 +84,6 @@ function toolResultSummaryText(data: any): string {
   return str.length > 120 ? str.slice(0, 120) + "..." : str;
 }
 
-import { toolLabel } from "./ProcessViewer";
-
 function ThinkingBox({ events, streaming }: { events: any[]; streaming?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -103,26 +102,27 @@ function ThinkingBox({ events, streaming }: { events: any[]; streaming?: boolean
     <div className="my-2 text-xs">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 font-medium py-1 px-2 rounded-md hover:bg-accent-bg/10 transition-colors text-subtle border border-border/20 bg-surface-elevated/40"
+        className="flex items-center gap-1.5 font-medium py-1 px-2.5 rounded-[var(--r-radius)] transition-colors border bg-[var(--r-surface-elevated)] text-[var(--r-muted)]"
+        style={{ borderColor: "var(--r-border)" }}
       >
         <span className={`inline-block transition-transform duration-200 text-[8px] ${isOpen ? "rotate-90" : ""}`}>
           ▶
         </span>
-          <span className="flex items-center gap-1.5">
-            <span>Thought process</span>
+        <span className="flex items-center gap-1.5">
+          <span>Thought process</span>
           {toolCallCount > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-border/20 font-mono">
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--r-nav-bg)] font-mono text-[var(--r-ink-secondary)]">
               {toolCallCount} step{toolCallCount !== 1 ? "s" : ""}
             </span>
           )}
           {streaming && (
-            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--r-accent)] animate-pulse" />
           )}
         </span>
       </button>
 
       {isOpen && (
-        <div className="mt-2 pl-3 ml-2.5 border-l border-border/30 space-y-2.5 max-w-2xl py-0.5">
+        <div className="mt-2 pl-3 ml-2.5 border-l border-[var(--r-border)] space-y-2 max-w-2xl py-0.5">
           {activeEvents.map((event, idx) => {
             const isError = event.type === "error";
             const isStatus = event.type === "status";
@@ -150,12 +150,12 @@ function ThinkingBox({ events, streaming }: { events: any[]; streaming?: boolean
             }
 
             return (
-              <div key={idx} className="flex flex-col gap-0.5 border-l-2 border-border/10 pl-2">
-                <div className="flex items-center gap-2 font-medium text-ink-secondary">
+              <div key={idx} className="flex flex-col gap-0.5 border-l-2 border-[var(--r-border)] pl-2">
+                <div className="flex items-center gap-2 font-medium text-[var(--r-ink-secondary)]">
                   <span>{label}</span>
                 </div>
                 {summary && (
-                  <div className="text-[10px] text-subtle/80 pl-0.5 font-mono break-all max-w-lg leading-relaxed">
+                  <div className="text-[10px] text-[var(--r-muted)] pl-0.5 font-mono break-all leading-relaxed">
                     {summary}
                   </div>
                 )}
@@ -182,10 +182,6 @@ const ChatMessage = memo(function ChatMessage({
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
 
-  // Strip any inline DSML/render_blocks markup the model emitted as raw text
-  // and merge its blocks with any the backend already attached. This is the
-  // last line of defense — the backend also extracts these, but stored
-  // messages and live tokens can still carry the raw markup.
   const { content: cleanContent, blocks: mergedBlocks } = sanitizeMessage(content ?? "", blocks);
 
   function handleCopy() {
@@ -199,13 +195,12 @@ const ChatMessage = memo(function ChatMessage({
   if (isUser) {
     return (
       <div className="flex justify-end px-3 sm:px-6 py-3 group">
-        <div className="max-w-[70%] flex flex-col items-end">
+        <div className="max-w-[85%] sm:max-w-[75%] flex flex-col items-end">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[9px] font-semibold uppercase tracking-wider text-subtle">You</span>
-            {createdAt && <span className="text-[9px] text-subtle">{timeAgo(createdAt)}</span>}
+            <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--r-muted)]">You</span>
+            {createdAt && <span className="text-[9px] text-[var(--r-muted)]">{timeAgo(createdAt)}</span>}
           </div>
-          {/* ponytail: user card — navy-tinted paper, outset bevel. */}
-          <div className="px-3 py-2 text-[13px] text-black leading-relaxed border-[2px] bg-[#e4ecf7]" style={{ borderStyle: "outset", borderColor: "#fff8e0 #8a7f68 #8a7f68 #fff8e0" }}>
+          <div className="px-3.5 py-2.5 text-[13.5px] text-white leading-relaxed border bg-[var(--r-accent)] rounded-[var(--r-radius)] shadow-sm" style={{ borderColor: "var(--r-accent)" }}>
             {content}
           </div>
         </div>
@@ -214,62 +209,65 @@ const ChatMessage = memo(function ChatMessage({
   }
 
   return (
-    <div className={`px-3 sm:px-6 py-4 group transition-colors ${streaming ? "" : "hover:bg-accent-bg/[0.04]"}`}>
-      <div className="space-y-1">
-          {/* Label */}
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--accent)" }}>
-              Truthseeker
-            </span>
-            {createdAt && <span className="text-[9px] text-subtle">{timeAgo(createdAt)}</span>}
+    <div className={`px-3 sm:px-6 py-4 group transition-colors ${streaming ? "" : "hover:bg-black/5"}`}>
+      <div className="space-y-1.5 max-w-[100%]">
+        {/* Label */}
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--r-accent)]">
+            Truthseeker Agent
+          </span>
+          {createdAt && <span className="text-[9px] text-[var(--r-muted)]">{timeAgo(createdAt)}</span>}
+        </div>
+
+        {/* Thinking Box */}
+        {agentEvents && agentEvents.length > 0 && (
+          <ThinkingBox events={agentEvents} streaming={streaming} />
+        )}
+
+        {/* Content */}
+        {cleanContent ? (
+          <div
+            className={`text-[14px] leading-[1.7] text-[var(--r-ink)] bg-[var(--r-surface-elevated)] border p-3.5 sm:p-4 rounded-[var(--r-radius)] shadow-sm ${streaming ? "streaming-cursor" : ""}`}
+            style={{ borderColor: "var(--r-border)", fontFamily: "Georgia, 'Times New Roman', serif" }}
+          >
+            <RetroMarkdown content={cleanContent} />
           </div>
+        ) : streaming ? (
+          <div className="flex items-center gap-1.5 py-2">
+            <span className="w-2 h-2 rounded-full bg-[var(--r-accent)] animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="w-2 h-2 rounded-full bg-[var(--r-accent)] animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="w-2 h-2 rounded-full bg-[var(--r-accent)] animate-bounce" style={{ animationDelay: "300ms" }} />
+          </div>
+        ) : null}
 
-          {/* Thinking Box */}
-          {agentEvents && agentEvents.length > 0 && (
-            <ThinkingBox events={agentEvents} streaming={streaming} />
-          )}
+        {/* Blocks */}
+        {mergedBlocks && mergedBlocks.length > 0 && (
+          <div className="mt-2.5">
+            <BlockRenderer blocks={mergedBlocks} compact />
+          </div>
+        )}
 
-          {/* Content */}
-          {cleanContent ? (
-            <div className={`text-[13.5px] leading-[1.65] text-black bg-white border-[2px] p-3 ${streaming ? "streaming-cursor" : ""}`} style={{ borderStyle: "inset", borderColor: "#8a7f68 #fff8e0 #fff8e0 #8a7f68", fontFamily: "Georgia,serif" }}>
-              <RetroMarkdown content={cleanContent} />
-            </div>
-          ) : streaming ? (
-            <div className="flex items-center gap-1.5 py-2">
-              <span className="w-2 h-2 rounded-full bg-accent/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-              <span className="w-2 h-2 rounded-full bg-accent/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-              <span className="w-2 h-2 rounded-full bg-accent/60 animate-bounce" style={{ animationDelay: "300ms" }} />
-            </div>
-          ) : null}
-
-          {/* Blocks */}
-          {mergedBlocks && mergedBlocks.length > 0 && (
-            <div className="mt-2">
-              <BlockRenderer blocks={mergedBlocks} compact />
-            </div>
-          )}
-
-          {/* Action bar */}
-          {!streaming && (
-            <div className={`flex items-center gap-1 pt-1 transition-opacity ${
-              isLastAssistant ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-            }`}>
-              <button onClick={handleCopy} className="btn-ghost text-xs" style={{ color: copied ? "var(--forest)" : "var(--subtle)" }} title="Copy">
-                {copied ? <IconCheck size={12} /> : <IconCopy size={12} />}
+        {/* Action bar */}
+        {!streaming && (
+          <div className={`flex items-center gap-2 pt-1 transition-opacity ${
+            isLastAssistant ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          }`}>
+            <button onClick={handleCopy} className="p-1 text-[11px] text-[var(--r-muted)] hover:text-[var(--r-ink)] transition-colors" title="Copy">
+              {copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
+            </button>
+            <button onClick={() => setFeedback(feedback === "up" ? null : "up")} className={`p-1 text-[11px] transition-colors ${feedback === "up" ? "text-emerald-700 font-bold" : "text-[var(--r-muted)] hover:text-[var(--r-ink)]"}`} title="Helpful">
+              <IconThumbsUp size={13} />
+            </button>
+            <button onClick={() => setFeedback(feedback === "down" ? null : "down")} className={`p-1 text-[11px] transition-colors ${feedback === "down" ? "text-red-700 font-bold" : "text-[var(--r-muted)] hover:text-[var(--r-ink)]"}`} title="Not helpful">
+              <IconThumbsDown size={13} />
+            </button>
+            {isLastAssistant && onRegenerate && (
+              <button onClick={onRegenerate} className="p-1 text-[11px] text-[var(--r-muted)] hover:text-[var(--r-ink)] transition-colors" title="Regenerate">
+                <IconRefresh size={13} />
               </button>
-              <button onClick={() => setFeedback(feedback === "up" ? null : "up")} className="btn-ghost text-xs" style={{ color: feedback === "up" ? "var(--forest)" : "var(--subtle)" }} title="Helpful">
-                <IconThumbsUp size={12} />
-              </button>
-              <button onClick={() => setFeedback(feedback === "down" ? null : "down")} className="btn-ghost text-xs" style={{ color: feedback === "down" ? "var(--oxblood)" : "var(--subtle)" }} title="Not helpful">
-                <IconThumbsDown size={12} />
-              </button>
-              {isLastAssistant && onRegenerate && (
-                <button onClick={onRegenerate} className="btn-ghost text-xs text-subtle" title="Regenerate">
-                  <IconRefresh size={12} />
-                </button>
-              )}
-            </div>
-          )}
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -113,7 +113,7 @@ type tokenBucket struct {
 	lastRefill time.Time
 }
 
-func newRateLimiter(rate int, window time.Duration) *rateLimiter {
+func newRateLimiter(ctx context.Context, rate int, window time.Duration) *rateLimiter {
 	rl := &rateLimiter{
 		buckets: make(map[string]*tokenBucket),
 		rate:    rate,
@@ -123,15 +123,20 @@ func newRateLimiter(rate int, window time.Duration) *rateLimiter {
 	go func() {
 		ticker := time.NewTicker(window)
 		defer ticker.Stop()
-		for range ticker.C {
-			now := time.Now()
-			rl.mu.Lock()
-			for k, b := range rl.buckets {
-				if now.Sub(b.lastRefill) >= 2*rl.window {
-					delete(rl.buckets, k)
+		for {
+			select {
+			case <-ticker.C:
+				now := time.Now()
+				rl.mu.Lock()
+				for k, b := range rl.buckets {
+					if now.Sub(b.lastRefill) >= 2*rl.window {
+						delete(rl.buckets, k)
+					}
 				}
+				rl.mu.Unlock()
+			case <-ctx.Done():
+				return
 			}
-			rl.mu.Unlock()
 		}
 	}()
 	return rl
@@ -860,10 +865,10 @@ func (s *Server) webSearchFirecrawl(query string, maxResults int, apiKey string)
 
 func (s *Server) setupRoutes() {
 	// Rate limiters (local — one per Server, separate from package-level if any)
-	authLimiter := newRateLimiter(10, time.Minute)  // 10 req/min for auth
-	chatLimiter := newRateLimiter(30, time.Minute)   // 30 req/min for chat
-	apiLimiter := newRateLimiter(60, time.Minute)    // 60 req/min for general API
-	userLimiter := newRateLimiter(60, time.Minute)   // 60 req/min per user (S12)
+	authLimiter := newRateLimiter(context.Background(), 10, time.Minute)  // 10 req/min for auth
+	chatLimiter := newRateLimiter(context.Background(), 30, time.Minute)   // 30 req/min for chat
+	apiLimiter := newRateLimiter(context.Background(), 60, time.Minute)    // 60 req/min for general API
+	userLimiter := newRateLimiter(context.Background(), 60, time.Minute)   // 60 req/min per user (S12)
 
 	// Mount executor gateway routes — call path is authed (S5): anon callers
 	// must not burn server-side keys. Connectors list stays rate-limited
@@ -1376,34 +1381,16 @@ func (s *Server) handleAuthOnboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleStripeStub(w http.ResponseWriter, r *http.Request) {
-	reqLog(r, "stripe stub")
+	reqLog(r, "stripe stub -> migrated to paystack")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"stripe_stub_disabled"}`))
+	w.Write([]byte(`{"status":"migrated_to_paystack","paystack_url":"/paystack/initialize"}`))
 }
 
-// handleStripeRouter serves /stripe (stub) plus /stripe/checkout and
-// /stripe/portal. The latter two are called by legacy frontend code paths
-// (both read `data.url` and silently ignore failures), so we return 501
-// unavailable with no `url` field — the UI then no-ops gracefully instead of
-// hitting a 404. Billing is Paystack (F3); these stubs stay frozen.
 func (s *Server) handleStripeRouter(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/stripe")
-	path = strings.Trim(path, "/")
-	if path == "" {
-		s.handleStripeStub(w, r)
-		return
-	}
-
-	parts := strings.Split(path, "/")
-	if len(parts) != 1 {
-		http.NotFound(w, r)
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusNotImplemented)
-	w.Write([]byte(`{"error":"Billing is not configured","status":"unavailable"}`))
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"migrated_to_paystack","paystack_url":"/paystack/initialize"}`))
 }
 
 

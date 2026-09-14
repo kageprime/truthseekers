@@ -21,7 +21,7 @@ import (
 // attaches them as section media, which the frontend already renders via
 // articleToBlocks — no frontend change needed.
 
-var imageNameRe = regexp.MustCompile(`^[a-z0-9-]+\.png$`)
+var imageNameRe = regexp.MustCompile(`^[a-z0-9-]+\.(png|svg)$`)
 
 // handleArticleImage serves GET /images/{name}. Public read (article
 // content is public); rate-limited at registration like other reads.
@@ -167,15 +167,15 @@ func fetchImageBytes(b64, url string) ([]byte, error) {
 
 // generateArticleImages creates up to 3 visuals (hero + first two meaty
 // sections) and attaches them as section media, then re-saves the article.
-// Non-fatal: a missing key or failed call logs loudly and the article ships
-// text-only — never fail a 3-minute generation over images.
+// Guaranteed visual output: if AI image API key is missing or fails, generates
+// crisp SVG editorial visual plates so no article is left text-only.
 func (s *Server) generateArticleImages(slug string, art *storage.Article) {
 	baseURL, model, key, ok := s.imageProvider()
 	if !ok {
-		log.Printf("[images] slug=%s: no image key (MODEL_API_KEY/MODEL_ACCESS_KEY or credstore meta/do) — skipping visuals", slug)
-		return
+		log.Printf("[images] slug=%s: no remote image key configured — using procedural visual plates", slug)
+	} else {
+		log.Printf("[images] slug=%s: generating via %s (%s)", slug, model, baseURL)
 	}
-	log.Printf("[images] slug=%s: generating via %s (%s)", slug, model, baseURL)
 	_ = s.db.SaveJob(slug, "media", "media", map[string]interface{}{"title": art.Title})
 	BroadcastProgress(slug, "progress", map[string]interface{}{
 		"slug": slug, "phase": "media", "node": "generate_media",
@@ -221,12 +221,22 @@ func (s *Server) generateArticleImages(slug string, art *storage.Article) {
 	base := apiPublicBase()
 	made := 0
 	for _, t := range targets {
-		raw, err := callImageAPI(baseURL, model, key, t.prompt)
-		if err != nil {
-			log.Printf("[images] slug=%s %s: %v", slug, t.name, err)
-			continue
+		var raw []byte
+		var mime = "image/png"
+		var err error
+		if ok {
+			raw, err = callImageAPI(baseURL, model, key, t.prompt)
+		} else {
+			err = fmt.Errorf("no image provider key")
 		}
-		if err := s.db.SaveArticleImage(t.name, slug, "image/png", raw); err != nil {
+
+		if err != nil {
+			log.Printf("[images] slug=%s %s: %v — using procedural editorial visual plate", slug, t.name, err)
+			t.name = strings.TrimSuffix(t.name, ".png") + ".svg"
+			raw, mime = makeFallbackSVG(art.Title, t.caption)
+		}
+
+		if err := s.db.SaveArticleImage(t.name, slug, mime, raw); err != nil {
 			log.Printf("[images] slug=%s save %s: %v", slug, t.name, err)
 			continue
 		}
@@ -246,4 +256,36 @@ func (s *Server) generateArticleImages(slug string, art *storage.Article) {
 		return
 	}
 	log.Printf("[images] slug=%s: %d/%d visuals attached", slug, made, len(targets))
+}
+
+func makeFallbackSVG(title, caption string) ([]byte, string) {
+	svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="800" height="500">
+  <defs>
+    <linearGradient id="g1" x1="0%%" y1="0%%" x2="100%%" y2="100%%">
+      <stop offset="0%%" stop-color="#1e293b"/>
+      <stop offset="50%%" stop-color="#0f172a"/>
+      <stop offset="100%%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0%%" y1="0%%" x2="100%%" y2="0%%">
+      <stop offset="0%%" stop-color="#c59b27"/>
+      <stop offset="100%%" stop-color="#eab308"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#g1)"/>
+  <circle cx="400" cy="210" r="140" fill="none" stroke="url(#g2)" stroke-width="2" stroke-dasharray="6,6" opacity="0.4"/>
+  <circle cx="400" cy="210" r="90" fill="none" stroke="#eab308" stroke-width="1.5" opacity="0.6"/>
+  <path d="M 200 350 Q 400 120 600 350" fill="none" stroke="url(#g2)" stroke-width="3" opacity="0.8"/>
+  <rect x="40" y="400" width="720" height="60" fill="rgba(0,0,0,0.6)" rx="8"/>
+  <text x="60" y="432" fill="#ffffff" font-family="Georgia, serif" font-size="20" font-weight="bold">%s</text>
+  <text x="60" y="450" fill="#94a3b8" font-family="sans-serif" font-size="12">%s</text>
+</svg>`, xmlEscape(title), xmlEscape(caption))
+	return []byte(svg), "image/svg+xml"
+}
+
+func xmlEscape(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, `"`, "&quot;")
+	return s
 }

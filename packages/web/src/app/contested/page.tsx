@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useContestedClaims } from "../hooks";
 import { retroStatusColor } from "@/lib/retro";
 
-// ponytail: retro fault-line ledger — rank, status chip, conf bar. Same hook, new chrome.
 export default function ContestedPage() {
   const [limit, setLimit] = useState(50);
   const { data: res, loading } = useContestedClaims(limit);
@@ -14,23 +13,22 @@ export default function ContestedPage() {
   }> | undefined) ?? [];
 
   return (
-    <>
-      <div className="border-b-[3px] border-[#0a2a5e] pb-3 mb-4">
-        <div className="text-[10px] text-[#0a2a5e] font-bold tracking-widest uppercase">Living Encyclopedia • Fault lines</div>
-        <h1 className="r-h1 mt-1" style={{ fontSize: 28 }}>Most Contested Claims</h1>
-        <p className="text-[11px] mt-1" style={{ color: "#555" }}>
-          Where the evidence is genuinely divided, ranked by contradiction.
+    <div className="space-y-4">
+      <div className="border-b border-[var(--r-border)] pb-3">
+        <div className="text-[10px] text-[var(--r-muted)] font-bold tracking-widest uppercase">Living Encyclopedia • Fault Lines</div>
+        <h1 className="r-h1 mt-1 text-[26px] sm:text-[32px]">Most Contested Claims</h1>
+        <p className="text-[12px] text-[var(--r-muted)] mt-1">
+          Where empirical evidence is actively disputed, ranked by contradiction severity.
         </p>
       </div>
 
-      <div className="mb-4 flex items-center gap-1.5 flex-wrap">
-        <span className="text-[11px] font-bold">Show:</span>
+      <div className="flex items-center gap-2 flex-wrap bg-[var(--r-surface-elevated)] p-3 rounded-[var(--r-radius)] border border-[var(--r-border)]">
+        <span className="text-[12px] font-bold text-[var(--r-ink)]">Display Limit:</span>
         {[10, 25, 50, 100].map((n) => (
           <button
             key={n}
             onClick={() => setLimit(n)}
-            className="px-2.5 py-[2px] text-[11px] border-[2px] bg-[#d4d0c8] text-black"
-            style={{ borderStyle: limit === n ? "inset" : "outset" }}
+            className={`r-btn px-3 py-1 ${limit === n ? "bg-[var(--r-accent)] text-white font-bold" : ""}`}
             aria-pressed={limit === n}
           >
             {n}
@@ -38,39 +36,41 @@ export default function ContestedPage() {
         ))}
       </div>
 
-      {loading && <div className="text-[11px] py-8 text-center" style={{ color: "#8a7f68" }}>Reading the fault lines…</div>}
+      {loading && <div className="text-[12px] py-12 text-center text-[var(--r-muted)]">Reading the fault lines…</div>}
 
       {!loading && claims.length === 0 && (
-        <div className="text-[11px] py-12 text-center border-[2px] bg-[#ffffe1]" style={{ borderStyle: "outset", borderWidth: 2 }}>No contested claims recorded yet.</div>
+        <div className="text-[12px] py-12 text-center border border-[var(--r-border)] bg-[var(--r-surface-elevated)] rounded-[var(--r-radius)]">
+          No contested claims recorded yet.
+        </div>
       )}
 
       {claims.length > 0 && (
-        <div className="space-y-1.5">
+        <div className="space-y-2.5">
           {claims.map((c, i) => (
-            <div key={c.id} className="bg-white border-[2px] p-2 flex items-start gap-2" style={{ borderStyle: "outset", borderWidth: 2 }}>
-              <span className="text-[11px] font-bold text-[#8a7f68] tabular-nums w-7 shrink-0 text-center pt-0.5">{i + 1}</span>
-              <span className="w-2.5 h-2.5 rounded-full border border-black shrink-0 mt-1" style={{ background: retroStatusColor(c.status) }} aria-hidden />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 border border-black text-white" style={{ background: retroStatusColor(c.status) }}>
+            <div key={c.id} className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] p-3.5 rounded-[var(--r-radius)] flex items-start gap-3 shadow-sm">
+              <span className="text-[11px] font-bold text-[var(--r-muted)] tabular-nums w-7 shrink-0 text-center pt-0.5">{i + 1}</span>
+              <span className="w-2.5 h-2.5 rounded-full border border-black shrink-0 mt-1.5" style={{ background: retroStatusColor(c.status) }} aria-hidden />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm text-white" style={{ background: retroStatusColor(c.status) }}>
                     {(c.status ?? "unknown").toUpperCase()}
                   </span>
                   {c.derived_confidence > 0 && (
-                    <span className="text-[10px] tabular-nums" style={{ color: "#555" }}>
-                      conf {c.derived_confidence.toFixed(2)}
+                    <span className="text-[11px] tabular-nums font-mono text-[var(--r-muted)]">
+                      conf {(c.derived_confidence * 100).toFixed(0)}%
                     </span>
                   )}
                 </div>
-                <p className="text-[12px] leading-[1.5] text-black" style={{ fontFamily: "Georgia,serif" }}>
+                <p className="text-[14px] leading-relaxed text-[var(--r-ink)]" style={{ fontFamily: "Georgia, serif" }}>
                   {c.text}
                 </p>
                 {c.confidence_vector && (
-                  <div className="mt-1.5 flex items-center gap-2 text-[10px]" style={{ color: "#555" }}>
-                    <span className="w-16">contra</span>
-                    <span className="flex-1 max-w-[220px] h-[6px] bg-[#efe9d5] border border-[#8a7f68]">
-                      <span className="block h-full bg-[#a33a3a]" style={{ width: `${Math.max(0, Math.min(1, c.confidence_vector.contradiction_level ?? 0)) * 100}%` }} />
+                  <div className="flex items-center gap-2 text-[10px] text-[var(--r-muted)] pt-1">
+                    <span className="w-14 font-semibold uppercase">Contra</span>
+                    <span className="flex-1 max-w-[240px] h-[6px] bg-[var(--r-surface)] border border-[var(--r-border)] rounded-sm overflow-hidden">
+                      <span className="block h-full bg-red-700" style={{ width: `${Math.max(0, Math.min(1, c.confidence_vector.contradiction_level ?? 0)) * 100}%` }} />
                     </span>
-                    <span className="tabular-nums">{(c.confidence_vector.contradiction_level ?? 0).toFixed(2)}</span>
+                    <span className="tabular-nums font-mono">{(c.confidence_vector.contradiction_level ?? 0).toFixed(2)}</span>
                   </div>
                 )}
               </div>
@@ -78,6 +78,6 @@ export default function ContestedPage() {
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }

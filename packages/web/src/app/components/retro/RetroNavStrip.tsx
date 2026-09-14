@@ -5,16 +5,15 @@ import { Fragment } from "react";
 import { NAV_GROUPS, RETRO_ROUTES } from "@/lib/routes";
 import { useAuth } from "../../hooks/useAuth";
 
-// ponytail: one-line site nav for self-wrapped pages (map, chat, article). Sidebar pages don't render this.
 export default function RetroNavStrip() {
   const pathname = usePathname();
   const { user } = useAuth();
   const admin = user?.role === "owner" || user?.role === "admin";
   return (
-    <nav aria-label="Site" className="r-navstrip flex items-center gap-x-1 gap-y-0.5 flex-wrap px-2 py-1 bg-[#e8e0c5] border-b-[2px] border-[#8a7f68] text-[11px] shrink-0">
+    <nav aria-label="Site" className="r-navstrip flex items-center gap-x-1.5 gap-y-1 flex-wrap px-3 py-1.5 bg-[var(--r-nav-bg)] border-b border-[var(--r-border)] text-[11px] shrink-0 transition-colors duration-200">
       {NAV_GROUPS.map((g, gi) => (
         <Fragment key={g}>
-          {gi > 0 && <span aria-hidden className="select-none" style={{ color: "#8a7f68" }}>|</span>}
+          {gi > 0 && <span aria-hidden className="select-none text-[var(--r-muted)] opacity-60">|</span>}
           {RETRO_ROUTES.filter((r) => r.group === g && !r.hideInNav && (!r.adminOnly || admin)).map((r) => {
             const active = pathname === r.href || pathname.startsWith(r.href + "/");
             return (
@@ -22,8 +21,12 @@ export default function RetroNavStrip() {
                 key={r.href}
                 href={r.href}
                 aria-current={active ? "page" : undefined}
-                className={`px-1.5 py-0.5 no-underline border ${active ? "bg-[#0a2a5e] text-white border-[#0a2a5e] font-bold" : "text-black border-transparent hover:bg-[#d6cfae]"}`}
-                style={active ? { color: "#fff" } : undefined}
+                className={`px-2 py-0.5 no-underline border rounded-[var(--r-radius)] transition-colors ${
+                  active
+                    ? "bg-[var(--r-accent)] text-white border-[var(--r-accent)] font-semibold"
+                    : "text-[var(--r-ink)] border-transparent hover:bg-black/5"
+                }`}
+                style={active ? { color: "#ffffff" } : undefined}
               >
                 {r.label}
               </Link>

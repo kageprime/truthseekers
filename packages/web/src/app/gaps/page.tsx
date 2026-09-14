@@ -29,11 +29,7 @@ export default function GapsPage() {
   const [filter, setFilter] = useState<string>("all");
 
   const handleUpvote = async (gapId: string) => {
-    const res = await upvoteGap(gapId);
-    if (res && gaps) {
-      // Optimistic: caller will refetch via invalidation; we just update local
-      // state through the cache. (useApiMutation swallows errors as undefined.)
-    }
+    await upvoteGap(gapId);
   };
 
   const handleSubmit = async (gapId: string) => {
@@ -48,87 +44,115 @@ export default function GapsPage() {
     setSubmitting(null);
     setTimeout(() => setSubmitMsg(null), 4000);
   };
+
   const filteredGaps = filter === "all" ? gaps : gaps.filter((g) => g.verification_status === filter);
 
   return (
-    <>
-      <div className="border-b-[3px] border-[#0a2a5e] pb-3 mb-4">
-        <div className="text-[10px] text-[#0a2a5e] font-bold tracking-widest uppercase">Living Encyclopedia • Research wanted</div>
-        <h1 className="r-h1 mt-1" style={{ fontSize: 28 }}>Open Questions</h1>
-        <p className="text-[11px] mt-1" style={{ color: "#555" }}>
-          Claims where expected evidence was not found. Upvote to prioritize, or submit evidence you&apos;ve found.
+    <div className="space-y-4">
+      <div className="border-b border-[var(--r-border)] pb-3">
+        <div className="text-[10px] text-[var(--r-muted)] font-bold tracking-widest uppercase">Living Encyclopedia • Research Wanted</div>
+        <h1 className="r-h1 mt-1 text-[26px] sm:text-[32px]">Open Research Gaps</h1>
+        <p className="text-[12px] text-[var(--r-muted)] mt-1">
+          Claims missing expected verification. Upvote to prioritize investigations or submit missing sources.
         </p>
       </div>
 
       {gaps.length > 0 && (
-        <div className="flex gap-1.5 mb-4 flex-wrap">
+        <div className="flex gap-2 mb-4 flex-wrap bg-[var(--r-surface-elevated)] p-3 rounded-[var(--r-radius)] border border-[var(--r-border)]">
           {["all", "unverified_gap", "verified_gap", "false_positive_risk"].map((f) => (
-            <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f}
-              className="text-[10px] px-2 py-1 border-[2px] bg-[#d4d0c8] text-black"
-              style={{ borderStyle: filter === f ? "inset" : "outset" }}
-            >{f === "all" ? "All" : f.replace(/_/g, " ")}</button>
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              aria-pressed={filter === f}
+              className={`r-btn px-3 py-1 ${filter === f ? "bg-[var(--r-accent)] text-white font-bold" : ""}`}
+            >
+              {f === "all" ? "All Gaps" : f.replace(/_/g, " ")}
+            </button>
           ))}
         </div>
       )}
 
-      {loading && <div className="text-[11px] py-8 text-center" style={{ color: "#8a7f68" }}>Searching the archives…</div>}
+      {loading && <div className="text-[12px] py-12 text-center text-[var(--r-muted)]">Searching the evidence archives…</div>}
       {!loading && filteredGaps.length === 0 && (
-        <div className="text-[11px] py-8 text-center border-[2px] bg-[#ffffe1]" style={{ borderStyle: "outset", borderWidth: 2 }}>No gaps match this filter.</div>
+        <div className="text-[12px] py-12 text-center border border-[var(--r-border)] bg-[var(--r-surface-elevated)] rounded-[var(--r-radius)]">
+          No open gaps match this filter.
+        </div>
       )}
 
       {filteredGaps.length > 0 && (
-        <div className="space-y-1.5">
+        <div className="space-y-2.5">
           {filteredGaps.map((g) => (
-            <div key={g.id} className="bg-white border-[2px] p-2" style={{ borderStyle: "outset", borderWidth: 2 }}>
+            <div key={g.id} className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] p-3.5 rounded-[var(--r-radius)] shadow-sm space-y-2">
               {g.claim_text && (
-                <div className="text-[12px] mb-1.5 leading-[1.5] text-black" style={{ fontFamily: "Georgia,serif" }}>
+                <div className="text-[14px] leading-relaxed text-[var(--r-ink)]" style={{ fontFamily: "Georgia, serif" }}>
                   &ldquo;{g.claim_text}&rdquo;
                 </div>
               )}
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <Link href={`/article/${g.article_slug}`} className="text-[10px] underline break-all" style={{ color: "#0a2a5e" }}>{g.article_slug}</Link>
-                  <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 border border-black text-white" style={{ background: g.gap_type === "expected" ? "#b7791f" : "#6b7a8f" }}>{g.gap_type}</span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 border border-black text-white" style={{ background: g.verification_status === "verified_gap" ? "#a33a3a" : "#6b7a8f" }}>{g.verification_status.replace(/_/g, " ")}</span>
-                    <span className="text-[10px]" style={{ color: "#555" }}>{g.expected_artifact}</span>
-                    {g.cause_label && <span className="text-[10px]" style={{ color: "#555" }}>· {g.cause_label}</span>}
+                  <Link href={`/article/${g.article_slug}`} className="text-[11px] font-bold text-[var(--r-accent)] hover:underline truncate block">
+                    Article: {g.article_slug}
+                  </Link>
+                  <div className="flex flex-wrap gap-2 mt-2 items-center text-[10px]">
+                    <span className="font-bold px-1.5 py-0.5 rounded-sm bg-amber-700 text-white">
+                      {g.gap_type}
+                    </span>
+                    <span className="font-bold px-1.5 py-0.5 rounded-sm bg-stone-700 text-white">
+                      {g.verification_status.replace(/_/g, " ")}
+                    </span>
+                    <span className="text-[var(--r-muted)]">{g.expected_artifact}</span>
+                    {g.cause_label && <span className="text-[var(--r-muted)]">· {g.cause_label}</span>}
                   </div>
                 </div>
-                <button onClick={() => handleUpvote(g.id)} aria-label={`Upvote gap, ${g.upvotes} votes`}
-                  className="r-btn shrink-0 flex flex-col items-center justify-center px-2 py-1 min-h-[40px] min-w-[44px]"
+                <button
+                  onClick={() => handleUpvote(g.id)}
+                  aria-label={`Upvote gap, ${g.upvotes} votes`}
+                  className="r-btn shrink-0 flex flex-col items-center justify-center px-3 py-1.5 min-h-[44px] min-w-[48px]"
                 >
-                  <span className="text-sm leading-none" aria-hidden>▲</span>
-                  <span className="text-[10px] tabular-nums mt-0.5">{g.upvotes}</span>
+                  <span className="text-xs" aria-hidden>▲</span>
+                  <span className="text-[11px] font-bold tabular-nums">{g.upvotes}</span>
                 </button>
               </div>
-              <div className="mt-2 pt-2 border-t border-[#c0c0c0]">
-                <div className="flex gap-1.5 flex-wrap">
-                  <input type="url" placeholder="https://evidence-url.com" aria-label="Evidence URL"
+
+              {/* Submit Evidence Form */}
+              <div className="mt-3 pt-2.5 border-t border-[var(--r-border)]">
+                <div className="flex gap-2 flex-wrap">
+                  <input
+                    type="url"
+                    placeholder="https://evidence-source-url.com"
+                    aria-label="Evidence URL"
                     value={submitting === g.id ? submitUrl : ""}
                     onChange={(e) => { setSubmitting(g.id); setSubmitUrl(e.target.value); }}
                     onFocus={() => setSubmitting(g.id)}
-                    className="flex-1 min-w-0 basis-full sm:basis-auto sm:min-w-[180px] text-[11px] px-2 py-1 bg-white text-black"
-                    style={{ borderStyle: "inset", borderWidth: 2, borderColor: "#808080 #fff #fff #808080" }} />
-                  <input type="text" placeholder="Note (optional)" aria-label="Evidence note"
+                    className="flex-1 min-w-[200px] text-[12px] px-2.5 py-1.5 bg-[var(--r-surface)] text-[var(--r-ink)] border border-[var(--r-border)] rounded-[var(--r-radius)] outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Citation note (optional)"
+                    aria-label="Evidence note"
                     value={submitting === g.id ? submitNote : ""}
                     onChange={(e) => { setSubmitting(g.id); setSubmitNote(e.target.value); }}
                     onFocus={() => setSubmitting(g.id)}
-                    className="w-32 text-[11px] px-2 py-1 bg-white text-black"
-                    style={{ borderStyle: "inset", borderWidth: 2, borderColor: "#808080 #fff #fff #808080" }} />
-                  <button onClick={() => handleSubmit(g.id)} disabled={submitting === g.id && !submitUrl.trim()}
-                    className="r-btn text-[11px] px-3 py-1 disabled:opacity-40"
-                  >Submit</button>
+                    className="w-44 text-[12px] px-2.5 py-1.5 bg-[var(--r-surface)] text-[var(--r-ink)] border border-[var(--r-border)] rounded-[var(--r-radius)] outline-none"
+                  />
+                  <button
+                    onClick={() => handleSubmit(g.id)}
+                    disabled={submitting === g.id && !submitUrl.trim()}
+                    className="r-btn text-[11px] font-bold px-3 py-1.5 bg-[var(--r-accent)] text-white disabled:opacity-40"
+                  >
+                    Submit Evidence
+                  </button>
                 </div>
                 {submitting === g.id && submitMsg && (
-                  <div className="text-[10px] mt-1.5 bg-[#ffffe1] border border-black p-1">{submitMsg}</div>
+                  <div className="text-[11px] mt-2 bg-[var(--r-surface)] border border-[var(--r-border)] p-2 text-[var(--r-ink)] rounded-sm">
+                    {submitMsg}
+                  </div>
                 )}
               </div>
             </div>
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }
-

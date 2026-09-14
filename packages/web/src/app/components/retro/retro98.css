@@ -1,91 +1,344 @@
-/* ponytail: retro98 scoped theme — old editorial theme untouched, active only under .retro98 */
-.retro98 { --r-navy:#0a2a5e; --r-navy2:#1a4a9e; --r-gold:#c9a227; --r-paper:#efe9d5; --r-paper2:#e8e0c5; --r-gray:#d4d0c8; --r-cream:#fdf8e8; --r-tip:#ffffe1; --r-line:#8a7f68; font-family:Verdana,Geneva,sans-serif; }
-.retro98 .r-window { background:var(--r-paper); border:3px outset; border-color:#fff8e0 var(--r-line) var(--r-line) #fff8e0; box-shadow:4px 4px 0 rgba(0,0,0,.35), inset 1px 1px 0 #fff; }
-.retro98 .r-title { min-height:22px; background:linear-gradient(90deg,#0a2a5e 0%,#1a4a9e 100%); }
-.retro98 .r-menu { height:20px; background:var(--r-gray); border-bottom:1px solid #808080; font-size:11px; }
-.retro98 .r-toolbar { background:var(--r-gray); border-bottom:2px solid #808080; }
-.retro98 .r-btn { border-width:2px; border-style:outset; border-color:#fff #404040 #404040 #fff; background:var(--r-gray); font-size:11px; padding:2px 10px; }
-.retro98 .r-btn-inset { border-style:inset; border-color:#404040 #fff #fff #404040; }
-.retro98 .r-inset { border-style:inset; border-color:#8a7f68 #fff8e0 #fff8e0 #8a7f68; }
-.retro98 .r-outset { border-style:outset; border-color:#fff8e0 var(--r-line) var(--r-line) #fff8e0; }
-.retro98 .r-doc { background:#fff; border:3px inset; border-color:#8a7f68 #fff8e0 #fff8e0 #8a7f68; }
-.retro98 .r-h1 { font-family:Georgia,'Times New Roman',serif; font-size:30px; line-height:.95; font-weight:700; color:#0a2a5e; }
-@media (min-width:640px){ .retro98 .r-h1{ font-size:38px; } }
-.retro98 .r-h2 { font-size:15px; font-weight:700; background:#0a2a5e; color:#fff; padding:4px 8px; display:inline-flex; align-items:center; gap:8px; }
-.retro98 .r-body { font-family:Georgia,serif; font-size:14.5px; line-height:1.65; color:#1a1a1a; }
-.retro98 .r-drop::first-letter { float:left; font-size:46px; line-height:.8; font-weight:700; margin:4px 8px 0 0; color:#0a2a5e; font-family:Georgia,serif; }
-.retro98 .r-def { border-bottom:1px dotted #0a2a5e; cursor:help; position:relative; }
-.retro98 ::selection { background:rgba(201,162,39,.3); }
-.retro98 .r-btn:focus-visible, .retro98 a:focus-visible, .retro98 button:focus-visible { outline:2px solid #c9a227; outline-offset:2px; }
-/* ponytail: claim citations — superscript chips with hover cards, keyboard-reachable */
-.retro98 .r-claim { position:relative; display:inline-block; background:none; border:none; padding:0 1px; cursor:pointer; vertical-align:baseline; }
-.retro98 .r-claim sup { font-family:Verdana,sans-serif; font-size:.72em; font-weight:700; color:#0a2a5e; text-decoration:underline; text-underline-offset:2px; }
-.retro98 .r-claim:hover sup, .retro98 .r-claim:focus-visible sup { color:#fff; background:#0a2a5e; text-decoration:none; }
-.retro98 .r-claim-card { display:none; position:absolute; z-index:50; left:0; bottom:1.6em; width:260px; max-width:calc(100vw - 32px); padding:8px; text-align:left; font-family:Verdana,sans-serif; font-size:11px; line-height:1.35; color:#1a1a1a; background:#ffffe1; border:1px solid #000; box-shadow:2px 2px 0 rgba(0,0,0,.3); border-radius:2px; }
-.retro98 .r-claim:hover .r-claim-card, .retro98 .r-claim:focus-visible .r-claim-card { display:block; }
-.retro98 .r-claim-head { display:flex; align-items:center; gap:6px; font-weight:700; color:#0a2a5e; margin-bottom:4px; }
-.retro98 .r-claim-dot { width:9px; height:9px; border-radius:9999px; border:1px solid #000; flex-shrink:0; }
-.retro98 .r-claim-text { display:block; color:#1a1a1a; }
-.retro98 .r-claim-foot { display:block; margin-top:4px; font-size:10px; color:#555; }
-/* ponytail: rich text — every markdown/block element on retro paper */
-/* Tables: navy header, zebra rows, inset frame */
-.retro98 .r-md table, .retro98 .r-block-table table { border-collapse:collapse; width:100%; font-size:12px; background:#fff; }
-.retro98 .r-md div:has(> table), .retro98 .r-block-table { overflow-x:auto; border:3px inset; border-color:#8a7f68 #fff8e0 #fff8e0 #8a7f68; margin:12px 0; background:#fff; }
-.retro98 .r-md th, .retro98 .r-block-table th { background:#0a2a5e; color:#fff; font-family:Verdana,sans-serif; font-size:11px; text-align:left; padding:6px 10px; border:1px solid #0a2a5e; }
-.retro98 .r-md td, .retro98 .r-block-table td { padding:5px 10px; border:1px solid #c0c0c0; font-size:12px; color:#1a1a1a; }
-.retro98 .r-md tr:nth-child(even) td, .retro98 .r-block-table tr:nth-child(even) td { background:#fdf8e8; }
-/* Code: paper block, navy keywords via prism token overrides */
-.retro98 .r-md pre { background:#f7f1db !important; border:2px inset; border-color:#8a7f68 #fff8e0 #fff8e0 #8a7f68; border-radius:0 !important; padding:10px 12px; overflow:auto; font-size:12px; }
-.retro98 .r-md pre code { background:none !important; color:#1a1a1a; text-shadow:none !important; }
-.retro98 .r-md code { font-family:ui-monospace,Consolas,monospace; font-size:.85em; background:#efe9d5; border:1px solid #c0c0c0; padding:0 4px; color:#0a2a5e; border-radius:0; }
-.retro98 .r-md pre code { border:none; padding:0; }
-.retro98 .r-md .token.comment, .retro98 .r-md .token.prolog { color:#6b7a3a; }
-.retro98 .r-md .token.keyword, .retro98 .r-md .token.operator { color:#0a2a5e; }
-.retro98 .r-md .token.string { color:#2e7d32; }
-.retro98 .r-md .token.number, .retro98 .r-md .token.boolean { color:#a33a3a; }
-.retro98 .r-md .token.function { color:#6b4a9e; }
-/* Math: Georgia italics on paper, display scrolls */
-.retro98 .r-md .katex { color:#1a1a1a; font-size:1.02em; }
-.retro98 .r-md .katex-display { overflow-x:auto; padding:8px; background:#fffef6; border:1px solid #c0c0c0; margin:12px 0; }
-/* Quotes, lists, tasks, rules */
-.retro98 .r-md blockquote { border-left:4px solid #c9a227; background:#fdf8e8; margin:12px 0; padding:8px 12px; font-family:Georgia,serif; font-style:italic; }
-.retro98 .r-md ul, .retro98 .r-md ol { padding-left:22px; margin:8px 0; }
-.retro98 .r-md li { margin:3px 0; font-size:13.5px; }
-.retro98 .r-md li:has(> input[type="checkbox"]) { list-style:none; margin-left:-22px; }
-.retro98 .r-md input[type="checkbox"] { appearance:none; width:13px; height:13px; border:2px outset; border-color:#fff #404040 #404040 #fff; background:#fff; vertical-align:-2px; margin-right:6px; }
-.retro98 .r-md input[type="checkbox"]:checked { background:#0a2a5e; }
-.retro98 .r-md hr { border:none; border-top:2px solid #0a2a5e; margin:16px 0; position:relative; }
-.retro98 .r-md h1, .retro98 .r-md h2, .retro98 .r-md h3, .retro98 .r-md h4 { font-family:Georgia,serif; color:#0a2a5e; }
-.retro98 .r-md a { color:#0a2a5e; text-decoration:underline; }
-.retro98 .r-scroll::-webkit-scrollbar, .retro98.r-scroll::-webkit-scrollbar { width:16px; height:16px; }
-.retro98 .r-scroll::-webkit-scrollbar-track { background:#d4d0c8; border:1px solid #808080; }
-.retro98 .r-scroll::-webkit-scrollbar-thumb { background:#d4d0c8; border:2px outset; border-color:#fff #404040 #404040 #fff; }
-/* ponytail: global retro pass — old editorial primitives remapped to bevels, scoped only */
-.retro98 .btn, .retro98 button.btn, .retro98 .btn-primary { border:2px outset !important; border-color:#fff #404040 #404040 #fff !important; border-radius:0 !important; background:#d4d0c8 !important; color:#000 !important; font-family:Verdana,sans-serif !important; font-size:11px !important; box-shadow:none !important; }
-.retro98 .btn:active { border-style:inset !important; }
-.retro98 .glass-card, .retro98 .glass-card-static, .retro98 .plate, .retro98 .content-card { border:2px outset !important; border-color:#fff8e0 #8a7f68 #8a7f68 #fff8e0 !important; border-radius:0 !important; background:#efe9d5 !important; box-shadow:2px 2px 0 rgba(0,0,0,.3) !important; }
-.retro98 .input, .retro98 input, .retro98 textarea, .retro98 select { border:2px inset !important; border-color:#808080 #fff #fff #808080 !important; border-radius:0 !important; background:#fff !important; font-family:Verdana,sans-serif !important; }
-/* ponytail: chat/editorial leftovers — bezel composers, ghost buttons, eyebrow tags, round cards. */
-.retro98 .bezel, .retro98 .bezel-elevated { border:2px outset !important; border-color:#fff8e0 #8a7f68 #8a7f68 #fff8e0 !important; border-radius:0 !important; background:#d4d0c8 !important; padding:2px !important; box-shadow:2px 2px 0 rgba(0,0,0,.3) !important; }
-.retro98 .bezel-inner { border:2px inset !important; border-color:#808080 #fff #fff #808080 !important; border-radius:0 !important; background:#fff !important; }
-.retro98 .cta-bevel { border:2px outset !important; border-color:#fff #404040 #404040 #fff !important; border-radius:0 !important; background:#d4d0c8 !important; box-shadow:none !important; }
-.retro98 .cta-bevel:active { border-style:inset !important; }
-.retro98 .cta-bevel .cta-bevel-icon, .retro98 .cta-bevel-icon { border-radius:0 !important; }
-.retro98 .btn-ghost { border-radius:0 !important; }
-.retro98 .eyebrow { border:1px solid #0a2a5e !important; border-radius:0 !important; background:#0a2a5e !important; color:#fff !important; font-family:Verdana,sans-serif !important; }
-.retro98 .rounded-2xl, .retro98 .rounded-xl, .retro98 .rounded-lg, .retro98 .rounded-md { border-radius:0 !important; }
-.retro98 .skeleton { background:#e8e0c5 !important; animation:none !important; }
-.retro98 a { color:#0a2a5e; }
-.retro98 h1, .retro98 h2 { font-family:Georgia,serif; color:#0a2a5e; }
-/* ponytail: sticky rails — page scrolls, sidebars park. lg+ only; stacked mobile scrolls normally. */
-@media (min-width:1024px){
-  .retro98 .r-side { position:sticky; top:12px; align-self:flex-start; max-height:calc(100dvh - 24px); overflow:auto; }
+/* ════════════════════════════════════════════════════════════════
+   TRUTHSEEKERS — Retro Theme Styles (Option A, B, & C Prototypes)
+   Option C (.retro-hybrid): Neo-Retro / Hybrid Modern (Default)
+   Option A (.retro-win98):  Authentic 90s CD-ROM / Win95-98
+   Option B (.retro-vintage): Vintage Paper / Print Encyclopedia
+   ════════════════════════════════════════════════════════════════ */
+
+/* Base container fallback & Hybrid (Option C - Default) */
+.retro98, .retro-hybrid {
+  --r-bg: #e2dbc8;
+  --r-surface: #faf7f0;
+  --r-surface-elevated: #ffffff;
+  --r-border: #c9c0aa;
+  --r-border-dark: #8c826d;
+  --r-title-bg: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
+  --r-title-text: #ffffff;
+  --r-header-accent: #d4a853;
+  --r-ink: #1c1917;
+  --r-ink-secondary: #57534e;
+  --r-muted: #78716c;
+  --r-accent: #a67c2f;
+  --r-nav-bg: #e8e1d0;
+  --r-card-border: 1px solid #d6cebc;
+  --r-btn-bg: #e8e1d0;
+  --r-btn-border: #b8af9b;
+  --r-radius: 4px;
+  font-family: var(--font-ui, system-ui, -apple-system, sans-serif);
 }
-/* ponytail: PWA touch — 40px targets on coarse pointers so installed-app nav is tappable. */
-@media (pointer:coarse){
-  .retro98 #retro-contents a { min-height:40px; }
-  .retro98 #retro-contents button { min-height:40px; }
-  .retro98 .r-side .r-btn { min-height:40px; }
-  .retro98 .r-navstrip a, .retro98 .r-title button, .retro98 .r-title a { min-height:40px; }
-  .retro98 #retro-palette-list button { min-height:40px; }
+
+/* Option A — Authentic 90s CD-ROM / Win98 */
+.retro-win98 {
+  --r-bg: #c3bda8;
+  --r-surface: #efe9d5;
+  --r-surface-elevated: #ffffff;
+  --r-border: #8a7f68;
+  --r-border-dark: #404040;
+  --r-title-bg: linear-gradient(90deg, #0a2a5e 0%, #1a4a9e 100%);
+  --r-title-text: #ffffff;
+  --r-header-accent: #c9a227;
+  --r-ink: #1a1a1a;
+  --r-ink-secondary: #333333;
+  --r-muted: #666666;
+  --r-accent: #0a2a5e;
+  --r-nav-bg: #d4d0c8;
+  --r-card-border: 2px outset #fff8e0;
+  --r-btn-bg: #d4d0c8;
+  --r-btn-border: #404040;
+  --r-radius: 0px;
+  font-family: Verdana, Geneva, sans-serif;
+}
+
+/* Option B — Vintage Book / Print Encyclopedia */
+.retro-vintage {
+  --r-bg: #d9cfb8;
+  --r-surface: #f4efe2;
+  --r-surface-elevated: #fbf8f0;
+  --r-border: #a89a80;
+  --r-border-dark: #584a35;
+  --r-title-bg: linear-gradient(90deg, #4a1515 0%, #702020 100%);
+  --r-title-text: #fce8d5;
+  --r-header-accent: #c9a45f;
+  --r-ink: #2b2219;
+  --r-ink-secondary: #4a3e31;
+  --r-muted: #786a58;
+  --r-accent: #6b1d1d;
+  --r-nav-bg: #ebdcb9;
+  --r-card-border: 1px solid #bfae91;
+  --r-btn-bg: #e5d8b8;
+  --r-btn-border: #8c7a60;
+  --r-radius: 2px;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+/* Common Window Framework */
+.retro98 .r-window {
+  background: var(--r-surface);
+  border: 2px solid var(--r-border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: var(--r-radius);
+  overflow: hidden;
+}
+
+.retro-win98 .r-window {
+  border: 3px outset;
+  border-color: #fff8e0 var(--r-border) var(--r-border) #fff8e0;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35);
+}
+
+/* Titlebar */
+.retro98 .r-title {
+  min-height: 28px;
+  background: var(--r-title-bg);
+  color: var(--r-title-text);
+  padding: 3px 8px;
+}
+
+.retro98 .r-menu {
+  height: 24px;
+  background: var(--r-nav-bg);
+  border-bottom: 1px solid var(--r-border);
+  font-size: 11px;
+}
+
+.retro98 .r-toolbar {
+  background: var(--r-nav-bg);
+  border-bottom: 1px solid var(--r-border);
+}
+
+/* Buttons */
+.retro98 .r-btn {
+  border: 1px solid var(--r-btn-border);
+  background: var(--r-btn-bg);
+  color: var(--r-ink);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--r-radius);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.retro98 .r-btn:hover {
+  filter: brightness(1.05);
+}
+
+.retro-win98 .r-btn {
+  border-width: 2px;
+  border-style: outset;
+  border-color: #fff #404040 #404040 #fff;
+  border-radius: 0;
+}
+
+.retro-win98 .r-btn:active {
+  border-style: inset;
+  border-color: #404040 #fff #fff #404040;
+}
+
+.retro98 .r-doc {
+  background: var(--r-surface-elevated);
+  border: 1px solid var(--r-border);
+  border-radius: var(--r-radius);
+}
+
+.retro-win98 .r-doc {
+  border: 3px inset;
+  border-color: #8a7f68 #fff8e0 #fff8e0 #8a7f68;
+}
+
+/* Headings & Typography */
+.retro98 .r-h1 {
+  font-family: Georgia, 'Playfair Display', serif;
+  font-size: 30px;
+  line-height: 1.05;
+  font-weight: 700;
+  color: var(--r-accent);
+}
+
+@media (min-width: 640px) {
+  .retro98 .r-h1 { font-size: 36px; }
+}
+
+.retro98 .r-h2 {
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--r-accent);
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: var(--r-radius);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.retro98 .r-body {
+  font-family: Georgia, Lora, serif;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--r-ink);
+}
+
+/* Drop caps */
+.retro98 .r-drop::first-letter {
+  float: left;
+  font-size: 44px;
+  line-height: 0.82;
+  font-weight: 700;
+  margin: 2px 8px 0 0;
+  color: var(--r-accent);
+  font-family: Georgia, serif;
+}
+
+/* Selection */
+.retro98 ::selection {
+  background: rgba(212, 168, 83, 0.35);
+}
+
+/* Claim Citations & Interactive Tooltips */
+.retro98 .r-claim {
+  position: relative;
+  display: inline-block;
+  background: none;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+
+.retro98 .r-claim sup {
+  font-family: system-ui, sans-serif;
+  font-size: 0.72em;
+  font-weight: 700;
+  color: var(--r-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.retro98 .r-claim:hover sup,
+.retro98 .r-claim:focus-visible sup {
+  color: #ffffff;
+  background: var(--r-accent);
+  text-decoration: none;
+  border-radius: 2px;
+}
+
+.retro98 .r-claim-card {
+  display: none;
+  position: absolute;
+  z-index: 50;
+  left: 0;
+  bottom: 1.6em;
+  width: 260px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 10px;
+  text-align: left;
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #1a1a1a;
+  background: #fffef2;
+  border: 1px solid #7c6f55;
+  box-shadow: 2px 4px 12px rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.retro98 .r-claim:hover .r-claim-card,
+.retro98 .r-claim:focus-visible .r-claim-card {
+  display: block;
+}
+
+.retro98 .r-claim-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--r-accent);
+  margin-bottom: 4px;
+}
+
+.retro98 .r-claim-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  border: 1px solid #000;
+  flex-shrink: 0;
+}
+
+/* Rich Tables & Markdown */
+.retro98 .r-md table, .retro98 .r-block-table table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+  background: #ffffff;
+}
+
+.retro98 .r-md div:has(> table), .retro98 .r-block-table {
+  overflow-x: auto;
+  border: 1px solid var(--r-border);
+  margin: 12px 0;
+  border-radius: var(--r-radius);
+  background: #ffffff;
+}
+
+.retro98 .r-md th, .retro98 .r-block-table th {
+  background: var(--r-accent);
+  color: #ffffff;
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  text-align: left;
+  padding: 6px 10px;
+}
+
+.retro98 .r-md td, .retro98 .r-block-table td {
+  padding: 6px 10px;
+  border: 1px solid #e2dab8;
+  font-size: 12px;
+  color: var(--r-ink);
+}
+
+.retro98 .r-md tr:nth-child(even) td, .retro98 .r-block-table tr:nth-child(even) td {
+  background: #fdfaf2;
+}
+
+/* Retro Scrollbar */
+.retro98 .r-scroll::-webkit-scrollbar, .retro98.r-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.retro98 .r-scroll::-webkit-scrollbar-track {
+  background: var(--r-nav-bg);
+  border: 1px solid var(--r-border);
+}
+
+.retro98 .r-scroll::-webkit-scrollbar-thumb {
+  background: var(--r-btn-border);
+  border-radius: var(--r-radius);
+}
+
+.retro-win98 .r-scroll::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+
+.retro-win98 .r-scroll::-webkit-scrollbar-track {
+  background: #d4d0c8;
+  border: 1px solid #808080;
+}
+
+.retro-win98 .r-scroll::-webkit-scrollbar-thumb {
+  background: #d4d0c8;
+  border: 2px outset;
+  border-color: #fff #404040 #404040 #fff;
+}
+
+/* Side navigation sticky positioning */
+@media (min-width: 1024px) {
+  .retro98 .r-side {
+    position: sticky;
+    top: 12px;
+    align-self: flex-start;
+    max-height: calc(100dvh - 24px);
+    overflow: auto;
+  }
 }

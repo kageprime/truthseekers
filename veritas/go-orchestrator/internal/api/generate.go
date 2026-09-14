@@ -50,7 +50,7 @@ func buildArticleWorkflow(contestNote string) *dag.Workflow {
 			{ID: "map_language", DependsOn: []string{"extract_claims"}, Execute: execs["map_language"]},
 			{ID: "scrutinize", DependsOn: []string{"extract_claims", "critique", "detect_missing", "map_language"}, Execute: execs["scrutinize"]},
 			{ID: "resolve", DependsOn: []string{"extract_claims", "map_evidence", "critique", "scrutinize"}, Execute: execs["resolve"]},
-			{ID: "generate_article", DependsOn: []string{"resolve"}, Execute: execs["generate_article"]},
+			{ID: "generate_article", DependsOn: []string{"resolve", "retrieve", "extract_claims"}, Execute: execs["generate_article"]},
 		},
 	}
 }

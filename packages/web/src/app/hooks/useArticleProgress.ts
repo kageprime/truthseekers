@@ -4,6 +4,8 @@ import { useEffect, useRef, useCallback } from "react";
 import { progressUrl } from "@/lib/api";
 import type { AgentEvent } from "../components/ProcessViewer";
 
+import { retroAudio } from "@/lib/retroAudio";
+
 export interface ProgressState {
   phase: string;
   error?: string;
@@ -64,10 +66,18 @@ export function useArticleProgress(
       } catch { /* skip malformed */ }
     });
 
+    es.addEventListener("article_complete", () => {
+      retroAudio.playChime();
+      cbRef.current.onPhase?.("done");
+      cbRef.current.onDone?.();
+      es.close();
+      esRef.current = null;
+    });
+
     es.addEventListener("progress", (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data);
-        if (data.status === "done") {
+        if (data.status === "done" || data.status === "completed" || data.phase === "done") {
           cbRef.current.onPhase?.("done");
           cbRef.current.onDone?.();
           es.close();

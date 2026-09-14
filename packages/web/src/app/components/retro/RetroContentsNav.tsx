@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { NAV_GROUPS, RETRO_ROUTES } from "@/lib/routes";
 import { IconBack, IconFwd, IconBook, IconChat, IconClock, IconGear, IconGraph, IconHome, IconList, IconMap, IconPencil, IconQuestion, IconScale, IconTag, IconWrench } from "./icons";
 
-// ponytail: single contents nav — sidebar tree on desktop, collapsed toggle on mobile. Every list page renders this.
 const ICONS: Record<string, (p: { size?: number }) => React.ReactNode> = {
   home: IconHome, book: IconBook, graph: IconGraph, scale: IconScale, question: IconQuestion,
   clock: IconClock, map: IconMap, chat: IconChat, tag: IconTag, wrench: IconWrench,
@@ -14,30 +13,57 @@ const ICONS: Record<string, (p: { size?: number }) => React.ReactNode> = {
 
 export default function RetroContentsNav({ pathname, showAdmin }: { pathname: string; showAdmin: boolean }) {
   const router = useRouter();
-  // ponytail: collapsed on small screens — the tree no longer shoves content down.
   const [treeOpen, setTreeOpen] = useState(false);
+
   return (
-    <div className="r-side w-full lg:w-[270px] shrink-0 bg-[#e8e0c5] border-r-[2px] border-[#8a7f68] flex flex-col">
+    <div className="r-side w-full lg:w-[260px] shrink-0 bg-[var(--r-nav-bg)] border-r border-[var(--r-border)] flex flex-col rounded-[var(--r-radius)] transition-colors duration-200">
+      {/* Mobile Toggle */}
       <button
-        className="lg:hidden bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 flex items-center justify-between w-full"
+        className="lg:hidden bg-[var(--r-accent)] text-white text-[11px] font-bold px-3 py-2 flex items-center justify-between w-full"
         onClick={() => setTreeOpen((o) => !o)}
         aria-expanded={treeOpen}
         aria-controls="retro-contents"
       >
-        <span>Contents</span><span aria-hidden>{treeOpen ? "▾" : "▸"}</span>
+        <span>ENCYCLOPEDIA CONTENTS</span>
+        <span aria-hidden>{treeOpen ? "▾" : "▸"}</span>
       </button>
-      <div className="hidden lg:flex bg-[#0a2a5e] text-white text-[11px] font-bold px-2 py-1 items-center justify-between"><span>Contents</span><span className="bg-[#c9a227] text-black px-1 text-[9px] border border-black">TREE</span></div>
-      <nav id="retro-contents" className={`${treeOpen ? "block max-h-[50dvh]" : "hidden"} lg:block lg:max-h-none p-2 space-y-2 overflow-auto`} aria-label="Site contents">
+
+      {/* Desktop Header */}
+      <div className="hidden lg:flex bg-[var(--r-accent)] text-white text-[11px] font-bold px-3 py-1.5 items-center justify-between">
+        <span>Contents</span>
+        <span className="bg-[var(--r-header-accent)] text-black px-1.5 py-0.5 text-[9px] font-bold border border-black/50 rounded-sm">
+          INDEX
+        </span>
+      </div>
+
+      {/* Contents Tree */}
+      <nav id="retro-contents" className={`${treeOpen ? "block max-h-[50dvh]" : "hidden"} lg:block lg:max-h-none p-2.5 space-y-3 overflow-auto r-scroll`} aria-label="Site contents">
         {NAV_GROUPS.map((g) => (
-          <div key={g}>
-            <div className="text-[9px] font-bold tracking-widest uppercase px-1.5 pb-0.5" style={{ color: "#8a7f68" }}>{g}</div>
+          <div key={g} className="space-y-1">
+            <div className="text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 text-[var(--r-muted)]">
+              {g}
+            </div>
             <div className="space-y-0.5">
               {RETRO_ROUTES.filter((r) => r.group === g && !r.hideInNav && (!r.adminOnly || showAdmin)).map(({ href, label, icon }) => {
                 const active = pathname === href || pathname.startsWith(href + "/");
                 const Icon = ICONS[icon] ?? IconBook;
                 return (
-                  <Link key={href} href={href} aria-current={active ? "page" : undefined} onClick={() => setTreeOpen(false)} className={`w-full text-left px-1.5 py-1 text-[12px] flex items-center gap-1.5 border no-underline ${active ? "bg-[#0a2a5e] text-white border-[#0a2a5e]" : "bg-transparent border-transparent hover:bg-[#d6cfae] text-black"}`} style={active ? { color: "#fff" } : undefined}>
-                    <span className="inline-flex shrink-0" aria-hidden><Icon size={14} /></span><span className="flex-1 leading-[1.25]">{label}</span>
+                  <Link
+                    key={href}
+                    href={href}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => setTreeOpen(false)}
+                    className={`w-full text-left px-2.5 py-1.5 text-[12px] flex items-center gap-2 border rounded-[var(--r-radius)] no-underline transition-colors ${
+                      active
+                        ? "bg-[var(--r-accent)] text-white border-[var(--r-accent)] font-semibold shadow-sm"
+                        : "bg-transparent border-transparent hover:bg-black/5 text-[var(--r-ink)]"
+                    }`}
+                    style={active ? { color: "#ffffff" } : undefined}
+                  >
+                    <span className="inline-flex shrink-0 opacity-85" aria-hidden>
+                      <Icon size={14} />
+                    </span>
+                    <span className="flex-1 leading-snug">{label}</span>
                   </Link>
                 );
               })}
@@ -45,15 +71,31 @@ export default function RetroContentsNav({ pathname, showAdmin }: { pathname: st
           </div>
         ))}
       </nav>
-      <div className="mt-2 mx-2 border-[2px] bg-[#ffffe1] p-2 hidden lg:block" style={{ borderStyle: "outset", borderWidth: 2 }}>
-        <div className="text-[10px] font-bold bg-[#c9a227] text-black px-1 inline-block border border-black mb-1">WORD OF THE DAY</div>
-        <div className="text-[12px] font-bold" style={{ fontFamily: "Georgia" }}>pis·ci·vore</div>
-        <div className="text-[10px] leading-[1.3] mt-0.5"><i>n.</i> Fish-eater.</div>
+
+      {/* Word of the Day Box */}
+      <div className="mt-2 mx-2.5 border bg-[var(--r-surface-elevated)] p-2.5 hidden lg:block rounded-[var(--r-radius)]" style={{ borderColor: "var(--r-border)" }}>
+        <div className="text-[9px] font-bold bg-[var(--r-header-accent)] text-black px-1.5 py-0.5 inline-block border border-black/30 mb-1 rounded-sm">
+          WORD OF THE DAY
+        </div>
+        <div className="text-[13px] font-bold" style={{ fontFamily: "Georgia, serif", color: "var(--r-ink)" }}>
+          pis·ci·vore
+        </div>
+        <div className="text-[11px] leading-snug mt-0.5" style={{ color: "var(--r-ink-secondary)" }}>
+          <i>n.</i> A fish-eating animal or organism.
+        </div>
       </div>
-      <div className="mt-auto p-2 flex gap-1" style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
-        <button className="r-btn flex-1 inline-flex items-center justify-center gap-1" onClick={() => router.back()} aria-label="Go back"><IconBack size={12} /> Back</button>
-        <button className="r-btn flex-1 inline-flex items-center justify-center gap-1" onClick={() => router.forward()} aria-label="Go forward">Fwd <IconFwd size={12} /></button>
-        <button className="r-btn flex-1 inline-flex items-center justify-center gap-1" onClick={() => router.push("/article/new")} aria-label="Write a new article"><IconPencil size={12} /> New</button>
+
+      {/* Action Footer */}
+      <div className="mt-auto p-2.5 flex gap-1.5 border-t border-[var(--r-border)]" style={{ paddingBottom: "max(0.6rem, env(safe-area-inset-bottom))" }}>
+        <button className="r-btn flex-1 inline-flex items-center justify-center gap-1" onClick={() => router.back()} aria-label="Go back">
+          <IconBack size={12} /> Back
+        </button>
+        <button className="r-btn flex-1 inline-flex items-center justify-center gap-1" onClick={() => router.forward()} aria-label="Go forward">
+          Fwd <IconFwd size={12} />
+        </button>
+        <button className="r-btn flex-1 inline-flex items-center justify-center gap-1" onClick={() => router.push("/article/new")} aria-label="Write a new article">
+          <IconPencil size={12} /> New
+        </button>
       </div>
     </div>
   );

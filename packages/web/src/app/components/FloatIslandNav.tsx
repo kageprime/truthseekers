@@ -372,7 +372,7 @@ function TopHeader({ pathname }: { pathname: string }) {
       {/* Left: Logo */}
       <Link href="/" className="flex items-center gap-2 no-underline shrink-0 -ml-1">
         <img src="/logo-icon.png" alt="" height={20} style={{ height: 20, width: "auto" }} />
-        <span className="text-xs font-semibold tracking-tight" style={{ color: "var(--ink)" }}>Truthseekers</span>
+        <img src="/logo-text.png" alt="Truthseekers" height={14} style={{ height: 14, width: "auto" }} />
       </Link>
 
       {/* Center: Nav links */}
@@ -444,7 +444,7 @@ function MobileHeader({ pathname }: { pathname: string }) {
 
         <Link href="/" className="flex items-center gap-2 no-underline">
           <img src="/logo-icon.png" alt="" height={18} style={{ height: 18, width: "auto" }} />
-          <span className="text-xs font-semibold tracking-tight" style={{ color: "var(--ink)" }}>Truthseekers</span>
+          <img src="/logo-text.png" alt="Truthseekers" height={12} style={{ height: 12, width: "auto" }} />
         </Link>
 
         <div className="w-8 flex items-center justify-center">
@@ -467,7 +467,7 @@ function MobileHeader({ pathname }: { pathname: string }) {
             <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-border/30">
               <div className="flex items-center gap-2">
                 <img src="/logo-icon.png" alt="" height={18} style={{ height: 18, width: "auto" }} />
-                <span className="text-xs font-semibold" style={{ color: "var(--ink)" }}>Truthseekers</span>
+                <img src="/logo-text.png" alt="Truthseekers" height={12} style={{ height: 12, width: "auto" }} />
               </div>
               <button
                 onClick={() => setSidebarOpen(false)}

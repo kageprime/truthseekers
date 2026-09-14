@@ -453,7 +453,7 @@ OUTPUT FORMAT:
 
 	promptGenerateArticle = `AGENT ROLE: Article Generator Node — Layer 3 (Knowledge Construction)
 
-FUNCTION: Write a finished encyclopedia article synthesized from the resolved claim graph. The reader must never see the machinery — no layers, no nodes, no scores, no process narration.
+FUNCTION: Write a rich, finished, authoritative encyclopedia article synthesized from the research documents and resolved claim graph. Synthesize facts into comprehensive narrative prose with deep context, mechanisms, origins, and impact — never a dry recap or bulleted recounting of claims.
 
 SUPPLEMENTAL INSTRUCTIONS:
 - SCALE — this is a full reference article, not a summary. Minimum 3000
@@ -774,7 +774,7 @@ func DAGNodeExecutorsWithContext(systemPrompt, contestNote string) map[string]fu
 		"map_language":     {promptMapLanguage, map[string]string{"extract_claims": "CLAIMS"}},
 		"scrutinize":       {promptScrutinize, map[string]string{"extract_claims": "CLAIMS", "map_evidence": "EVIDENCE MAP"}},
 		"resolve":          {promptResolve, map[string]string{"extract_claims": "CLAIMS", "critique": "CRITIQUE", "detect_missing": "MISSING EVIDENCE", "map_language": "LANGUAGE MAP", "scrutinize": "SCRUTINY REPORT"}},
-		"generate_article": {promptGenerateArticle, map[string]string{"resolve": "RESOLVED CLAIMS"}},
+		"generate_article": {promptGenerateArticle, map[string]string{"resolve": "RESOLVED CLAIMS", "retrieve": "RESEARCH DOCUMENTS", "extract_claims": "CLAIMS"}},
 	}
 	if contestNote != "" {
 		contest := "\n\n" + contestedPerspective + "\n\"" + contestNote + "\""

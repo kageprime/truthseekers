@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo, type FormEvent } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   useGenerateArticle, useArticles, useArticleSearch,
-  useArticleProgress, useCheckArticleStatus,
+  useArticleProgress,
 } from "../hooks";
 import type { ArticleSummary } from "@encarta/core";
 import { usePageSearch } from "../HeaderSearchContext";
@@ -25,11 +25,6 @@ interface GeneratingEntry {
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
 
-/**
- * Wraps a single in-flight article generation with its own SSE connection
- * via `useArticleProgress`. Phase, error, and agent events are tracked
- * locally; the parent is notified on completion / error / dismiss.
- */
 function GeneratingCard({
   slug,
   title,
@@ -75,36 +70,40 @@ function GeneratingCard({
   );
 }
 
-// ponytail: retro file rows — bevel hover, status chips, no glass.
 function ArticleRow({ article, index }: { article: ArticleSummary; index: number }) {
   return (
     <Link
       href={`/article/${article.slug}`}
-      className="block bg-white border-[2px] p-2.5 no-underline text-black hover:bg-[#fff8dc]"
-      style={{ borderStyle: "outset", borderWidth: 2 }}
+      className="block bg-[var(--r-surface-elevated)] border border-[var(--r-border)] p-3 rounded-[var(--r-radius)] no-underline text-[var(--r-ink)] hover:border-[var(--r-accent)] transition-all shadow-sm"
     >
-      <div className="flex items-start gap-2">
-        <span className="text-[10px] font-bold text-[#8a7f68] tabular-nums pt-0.5 w-6 shrink-0">{String(index + 1).padStart(2, "0")}</span>
+      <div className="flex items-start gap-3">
+        <span className="text-[11px] font-bold text-[var(--r-muted)] tabular-nums pt-0.5 w-6 shrink-0">{String(index + 1).padStart(2, "0")}</span>
         <div className="flex-1 min-w-0">
-          <span className="text-[13px] font-bold text-[#0a2a5e] leading-snug" style={{ fontFamily: "Georgia,serif" }}>
-            {article.title}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[14px] font-bold text-[var(--r-accent)] leading-snug" style={{ fontFamily: "Georgia, serif" }}>
+              {article.title}
+            </span>
             {article.metadata?.status === "draft" && (
-              <span className="ml-2 text-[9px] px-1 bg-[#c9a227] text-black border border-black font-bold" style={{ fontFamily: "Verdana,sans-serif" }}>DRAFT</span>
+              <span className="text-[9px] px-1.5 py-0.5 bg-[var(--r-header-accent)] text-black font-bold rounded-sm border border-black/30">
+                DRAFT
+              </span>
             )}
+          </div>
+          <span className="block text-[12px] leading-relaxed mt-1 line-clamp-2 text-[var(--r-ink-secondary)]">
+            {article.abstract || "No description provided."}
           </span>
-          <span className="block text-[11px] leading-[1.4] mt-0.5 line-clamp-2" style={{ color: "#444" }}>
-            {article.abstract || "No description"}
-          </span>
-          <span className="flex items-center gap-2 mt-1.5 text-[10px] flex-wrap" style={{ color: "#8a7f68" }}>
+          <div className="flex items-center gap-2 mt-2 text-[10px] text-[var(--r-muted)] flex-wrap">
             {(article.categories ?? []).slice(0, 3).map((cat) => (
-              <span key={cat}>{cat.replace(/-/g, " ")}</span>
+              <span key={cat} className="bg-[var(--r-nav-bg)] px-1.5 py-0.5 rounded-sm uppercase tracking-wide">
+                {cat.replace(/-/g, " ")}
+              </span>
             ))}
             {article.metadata?.updated && (
               <span className="ml-auto tabular-nums">
-                {new Date(article.metadata.updated).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                Updated {new Date(article.metadata.updated).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
               </span>
             )}
-          </span>
+          </div>
         </div>
       </div>
     </Link>
@@ -122,7 +121,6 @@ export default function ArticlesPage() {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { mutate: generateArticle } = useGenerateArticle();
-  const { mutate: checkStatus } = useCheckArticleStatus();
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -143,241 +141,270 @@ export default function ArticlesPage() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // ponytail: deep-link search (?q= from home) — no Suspense needed, read once on mount.
   useEffect(() => {
     try {
       const q = new URLSearchParams(window.location.search).get("q");
       if (q) { setQuery(q); setDebouncedQuery(q); }
     } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  usePageSearch(useMemo(() => query || debouncedQuery ? {
-    value: query, onChange: setQuery, onSubmit: (e: FormEvent) => { e.preventDefault(); setDebouncedQuery(query); },
-    onClear: () => { setQuery(""); setDebouncedQuery(""); }, placeholder: "Search articles...",
-  } : null, [query, debouncedQuery]));
-
-  // Debounce search input
-  useEffect(() => {
-    if (!mounted) return;
+  const handleQueryChange = (val: string) => {
+    setQuery(val);
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
-      setDebouncedQuery(query);
-      if (query.trim()) setPage(0);
+      setDebouncedQuery(val);
+      setPage(0);
     }, SEARCH_DEBOUNCE_MS);
-    return () => {
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    };
-  }, [mounted, query]);
+  };
 
-  function startGenerate(slug: string) {
-    const title = slug.replace(/-/g, " ");
+  usePageSearch(query ? { value: query, onChange: handleQueryChange, onSubmit: (e) => e.preventDefault(), placeholder: "Search articles..." } : null);
+
+  const allCategories = useMemo(() => {
+    const set = new Set<string>();
+    articles.forEach((a) => (a.categories ?? []).forEach((c) => set.add(c)));
+    return Array.from(set).sort();
+  }, [articles]);
+
+  const filteredArticles = useMemo(() => {
+    if (!selectedCategory) return articles;
+    return articles.filter((a) => (a.categories ?? []).includes(selectedCategory));
+  }, [articles, selectedCategory]);
+
+  const slugify = (text: string) =>
+    text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+  const startGenerate = useCallback((slug: string) => {
+    const rawTitle = query.trim() || slug.replace(/-/g, " ");
+    const title = rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1);
+
     setGenerating((prev) => {
       const next = new Map(prev);
-      next.set(slug, { slug, title, phase: "queued", agentEvents: [] });
+      next.set(slug, { slug, title, phase: "queued" });
       return next;
     });
-    generateArticle({ slug });
-  }
 
-  function handleGenDone(slug: string) {
-    setGenerating((prev) => { const next = new Map(prev); next.delete(slug); return next; });
+    generateArticle({ slug })
+      .then(() => {
+        // Queued successfully
+      })
+      .catch((err) => {
+        setGenerating((prev) => {
+          const next = new Map(prev);
+          const current = next.get(slug);
+          if (current) {
+            next.set(slug, { ...current, phase: "error", error: err.message || "Failed to start generation" });
+          }
+          return next;
+        });
+      });
+  }, [generateArticle, query]);
+
+  const handleGenDone = useCallback((slug: string) => {
     queryClient.invalidateQueries({ queryKey: ["articles"] });
-  }
+    setGenerating((prev) => {
+      const next = new Map(prev);
+      next.delete(slug);
+      return next;
+    });
+    router.push(`/article/${slug}`);
+  }, [queryClient, router]);
 
-  function handleGenError(slug: string, error: string) {
+  const handleGenError = useCallback((slug: string, err: string) => {
     setGenerating((prev) => {
       const next = new Map(prev);
       const entry = next.get(slug);
-      if (entry) next.set(slug, { ...entry, phase: "error", error });
+      if (entry) {
+        next.set(slug, { ...entry, phase: "error", error: err });
+      }
       return next;
     });
-  }
-
-  function handleGenDismiss(slug: string) {
-    setGenerating((prev) => { const next = new Map(prev); next.delete(slug); return next; });
-  }
-
-  const slugify = useCallback((text: string): string => {
-    return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   }, []);
 
-  const allCategories = useMemo(
-    () => Array.from(new Set(articles.flatMap(a => a.categories ?? []))).sort(),
-    [articles]
-  );
-  const filteredArticles = useMemo(
-    () => selectedCategory ? articles.filter(a => a.categories?.includes(selectedCategory)) : articles,
-    [articles, selectedCategory]
-  );
+  const handleGenDismiss = useCallback((slug: string) => {
+    setGenerating((prev) => {
+      const next = new Map(prev);
+      next.delete(slug);
+      return next;
+    });
+  }, []);
+
+  const handleGenRetry = useCallback((slug: string) => {
+    const entry = generating.get(slug);
+    if (!entry) return;
+    setGenerating((prev) => {
+      const next = new Map(prev);
+      next.set(slug, { ...entry, phase: "queued", error: undefined, agentEvents: [] });
+      return next;
+    });
+    generateArticle({ slug });
+  }, [generating, generateArticle]);
+
+  if (!mounted) return null;
+
   return (
-    <>
-      <div className="border-b-[3px] border-[#0a2a5e] pb-3 mb-4">
-        <div className="text-[10px] text-[#0a2a5e] font-bold tracking-widest uppercase">Encyclopedia • Browse</div>
-        <h1 className="r-h1 mt-1">Articles</h1>
-      </div>
-      {/* Search */}
-      <div className="mb-4">
-        <div className="flex items-center gap-1.5">
-          <div className="relative flex-1">
-            <IconSearch size={14} className="absolute left-2 top-1/2 -translate-y-1/2" style={{ color: "#8a7f68" }} />
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search articles..."
-              aria-label="Search articles"
-              className="w-full bg-white text-sm pl-8 pr-2 py-1.5 text-black"
-              style={{ borderStyle: "inset", borderWidth: 2, borderColor: "#808080 #fff #fff #808080" }}
-            />
-          </div>
+    <div className="space-y-4">
+      {/* Header section */}
+      <div className="border-b border-[var(--r-border)] pb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="r-h1 text-[26px] sm:text-[32px]">Encyclopedia Index</h1>
+          <p className="text-[12px] text-[var(--r-muted)] mt-1">Browse, search, and generate evidence-grounded articles.</p>
+        </div>
+
+        {/* Generate CTA */}
+        {query.trim().length > 0 && (
           <button
             onClick={() => {
               const slug = slugify(query.trim());
-              if (slug && !generating.has(slug)) {
-                checkStatus(slug).then((existing) => {
-                  if (existing && "status" in existing && existing.status === "published") {
-                    router.push(`/article/${slug}`);
-                  } else {
-                    startGenerate(slug);
-                  }
-                });
-              }
+              if (slug) startGenerate(slug);
             }}
-            disabled={!query.trim()}
-            className="r-btn shrink-0 inline-flex items-center gap-1 disabled:opacity-40 min-h-[40px]"
+            className="bg-[var(--r-accent)] text-white text-[12px] font-bold px-3 py-1.5 rounded-[var(--r-radius)] hover:brightness-110 flex items-center gap-1.5 shadow-sm"
           >
-            <IconLightning size={13} /> Generate
+            <IconLightning size={14} />
+            <span>Generate &ldquo;{query.trim()}&rdquo;</span>
+          </button>
+        )}
+      </div>
+
+      {/* In-flight generations */}
+      {generating.size > 0 && (
+        <div className="space-y-3">
+          {Array.from(generating.values()).map((entry) => (
+            <GeneratingCard
+              key={entry.slug}
+              slug={entry.slug}
+              title={entry.title}
+              onDone={handleGenDone}
+              onError={handleGenError}
+              onDismiss={handleGenDismiss}
+              onRetry={handleGenRetry}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Filters bar */}
+      <div className="flex flex-wrap items-center gap-3 bg-[var(--r-surface-elevated)] p-3 rounded-[var(--r-radius)] border border-[var(--r-border)]">
+        <div className="relative flex-1 min-w-[200px]">
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => handleQueryChange(e.target.value)}
+            placeholder="Search articles by title or keyword..."
+            className="w-full bg-[var(--r-surface)] border border-[var(--r-border)] px-3 py-1.5 text-[13px] text-[var(--r-ink)] rounded-[var(--r-radius)] outline-none focus:ring-1 focus:ring-[var(--r-accent)]"
+          />
+        </div>
+
+        {allCategories.length > 0 && (
+          <select
+            value={selectedCategory ?? ""}
+            onChange={(e) => setSelectedCategory(e.target.value || null)}
+            className="bg-[var(--r-surface)] text-[12px] px-2.5 py-1.5 text-[var(--r-ink)] border border-[var(--r-border)] rounded-[var(--r-radius)] outline-none"
+          >
+            <option value="">All Categories ({allCategories.length})</option>
+            {allCategories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        )}
+
+        <div className="ml-auto flex gap-1">
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`r-btn px-2.5 py-1.5 ${viewMode === "grid" ? "bg-[var(--r-accent)] text-white" : ""}`}
+            title="Grid view"
+          >
+            <IconGrid size={13} />
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={`r-btn px-2.5 py-1.5 ${viewMode === "list" ? "bg-[var(--r-accent)] text-white" : ""}`}
+            title="List view"
+          >
+            <IconList size={13} />
           </button>
         </div>
       </div>
 
-        {/* Generating entries */}
-        {generating.size > 0 && (
-          <div className="mb-6 space-y-2 max-w-2xl mx-auto">
-            {Array.from(generating.values()).map((gen) => (
-              <GeneratingCard
-                key={gen.slug}
-                slug={gen.slug}
-                title={gen.title}
-                onDone={handleGenDone}
-                onError={handleGenError}
-                onDismiss={handleGenDismiss}
-                onRetry={startGenerate}
-              />
-            ))}
-          </div>
-        )}
+      {/* Count readout */}
+      {!loading && (
+        <div className="text-[11px] font-bold text-[var(--r-muted)] uppercase tracking-wider">
+          {searching ? "Searching..." : `${filteredArticles.length} article${filteredArticles.length !== 1 ? "s" : ""}`}
+          {selectedCategory ? ` in ${selectedCategory}` : ""}
+        </div>
+      )}
 
-        {/* Filter bar */}
-        {!loading && articles.length > 0 && (
-          <div className="flex items-center gap-2 mb-4 flex-wrap">
-            <label className="text-[11px] font-bold" htmlFor="cat-filter">Category:</label>
-            <select
-              id="cat-filter"
-              value={selectedCategory || ""}
-              onChange={(e) => setSelectedCategory(e.target.value || null)}
-              className="bg-white text-[11px] px-2 py-1 text-black"
-              style={{ borderStyle: "inset", borderWidth: 2, borderColor: "#808080 #fff #fff #808080", minWidth: 140 }}
-            >
-              <option value="">All categories</option>
-              {allCategories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
+      {/* Article Results */}
+      {loading ? (
+        <div className="space-y-3 py-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] p-4 rounded-[var(--r-radius)] animate-pulse">
+              <div className="h-4 bg-[var(--r-nav-bg)] w-1/2 rounded" />
+              <div className="h-3 bg-[var(--r-nav-bg)] w-3/4 mt-2 rounded" />
+            </div>
+          ))}
+        </div>
+      ) : filteredArticles.length > 0 ? (
+        <>
+          {viewMode === "list" ? (
+            <div className="space-y-2">
+              {filteredArticles.map((article, i) => (
+                <ArticleRow key={`${article.slug}-${i}`} article={article} index={page * PAGE_SIZE + i} />
               ))}
-            </select>
-            <div className="ml-auto flex gap-1">
-              <button onClick={() => setViewMode("grid")} className="r-btn px-2 py-1 inline-flex items-center min-h-[40px] min-w-[40px] justify-center" title="Grid view" aria-label="Grid view" aria-pressed={viewMode === "grid"} style={viewMode === "grid" ? { borderStyle: "inset" } : undefined}>
-                <IconGrid size={12} />
-              </button>
-              <button onClick={() => setViewMode("list")} className="r-btn px-2 py-1 inline-flex items-center min-h-[40px] min-w-[40px] justify-center" title="List view" aria-label="List view" aria-pressed={viewMode === "list"} style={viewMode === "list" ? { borderStyle: "inset" } : undefined}>
-                <IconList size={12} />
-              </button>
             </div>
-          </div>
-        )}
-
-        {/* Status */}
-        {!loading && (
-          <div className="text-[11px] mb-4 tabular-nums" style={{ color: "#8a7f68" }}>
-            {searching ? "Searching..." : `${filteredArticles.length} article${filteredArticles.length !== 1 ? "s" : ""}`}
-            {selectedCategory ? ` in ${selectedCategory}` : ""}
-          </div>
-        )}
-
-        {/* Results */}
-        {loading ? (
-          <div className="space-y-2 py-8" aria-label="Loading articles">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="bg-white border-[2px] p-2.5 animate-pulse" style={{ borderStyle: "outset", borderWidth: 2 }}>
-                <div className="h-4 bg-[#e8e0c5] w-3/4" />
-                <div className="h-3 bg-[#efe9d5] w-1/2 mt-2" />
-              </div>
-            ))}
-          </div>
-        ) : filteredArticles.length > 0 ? (
-          <>
-            {viewMode === "list" ? (
-              <div className="space-y-1.5">
-                {filteredArticles.map((article, i) => (
-                  <ArticleRow key={`${article.slug}-${i}`} article={article} index={page * PAGE_SIZE + i} />
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {filteredArticles.map((article, i) => (
-                  <ArticleRow key={`${article.slug}-${i}`} article={article} index={page * PAGE_SIZE + i} />
-                ))}
-              </div>
-            )}
-
-            {/* Pagination */}
-            {!debouncedQuery.trim() && totalPages > 1 && (
-              <div className="mt-4 flex items-center justify-center gap-1.5">
-                <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="r-btn px-3 py-1 disabled:opacity-40 min-h-[40px]"
-                  aria-label="Previous page"
-                >
-                  ◀ Prev
-                </button>
-                <span className="text-[11px] tabular-nums px-2" style={{ color: "#8a7f68" }} aria-live="polite">
-                  {page + 1} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="r-btn px-3 py-1 disabled:opacity-40 min-h-[40px]"
-                  aria-label="Next page"
-                >
-                  Next ▶
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-center py-12 border-[2px] bg-[#ffffe1] mt-2" style={{ borderStyle: "outset", borderWidth: 2 }}>
-            <div className="mx-auto mb-3 text-[#0a2a5e] flex justify-center">
-              <IconSearch size={28} />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {filteredArticles.map((article, i) => (
+                <ArticleRow key={`${article.slug}-${i}`} article={article} index={page * PAGE_SIZE + i} />
+              ))}
             </div>
-            <h2 className="text-[15px] font-bold text-[#0a2a5e] mb-2">No articles found</h2>
-            <p className="text-[12px] mb-4" style={{ color: "#555" }}>
-              {query ? `No results for "${query}". Generate one.` : "Your encyclopedia is empty."}
-            </p>
-            {query && (
+          )}
+
+          {/* Pagination */}
+          {!debouncedQuery.trim() && totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-center gap-2">
               <button
-                onClick={() => {
-                  const slug = slugify(query.trim());
-                  if (slug) startGenerate(slug);
-                }}
-                className="r-btn inline-flex items-center gap-1 px-4 py-1.5"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="r-btn px-3 py-1.5 disabled:opacity-40"
               >
-                <IconLightning size={14} /> Generate &ldquo;{query}&rdquo;
+                ◀ Prev
               </button>
-            )}
+              <span className="text-[12px] font-bold text-[var(--r-muted)] px-3">
+                Page {page + 1} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="r-btn px-3 py-1.5 disabled:opacity-40"
+              >
+                Next ▶
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="text-center py-12 border border-[var(--r-border)] bg-[var(--r-surface-elevated)] rounded-[var(--r-radius)] p-6">
+          <div className="mx-auto mb-3 text-[var(--r-accent)] flex justify-center">
+            <IconSearch size={32} />
           </div>
-        )}
-    </>
-    );
-  }
+          <h2 className="text-[16px] font-bold text-[var(--r-accent)] mb-1">No articles found</h2>
+          <p className="text-[12px] text-[var(--r-muted)] mb-4">
+            {query ? `No matching entries for "${query}". You can generate it on-demand.` : "Your encyclopedia index is currently empty."}
+          </p>
+          {query && (
+            <button
+              onClick={() => {
+                const slug = slugify(query.trim());
+                if (slug) startGenerate(slug);
+              }}
+              className="r-btn inline-flex items-center gap-1.5 px-4 py-2 bg-[var(--r-accent)] text-white font-bold"
+            >
+              <IconLightning size={14} /> Generate &ldquo;{query}&rdquo;
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -872,3 +872,5 @@ export function decodeJwt(token: string): JwtPayload | null {
     return JSON.parse(atob(parts[1]));
   } catch { return null; }
 }
+
+export type { Article, JobInfo, ArticleSummary, QuotaInfo, ConversationSummary, ConversationDetail, MapEntry, Section, MediaItem, TimelineEvent, CrossReference, Citation } from "@encarta/core";
