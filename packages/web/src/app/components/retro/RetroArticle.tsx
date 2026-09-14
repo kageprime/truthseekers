@@ -5,6 +5,9 @@ import RetroInspector from "./RetroInspector";
 import RetroMarkdown from "./RetroMarkdown";
 import { IconBone, IconBook, IconClose, IconFlask, IconLock, IconMountain, IconQuestion, IconScale, IconSearch } from "./icons";
 import { retroStatusColor } from "@/lib/retro";
+import { useQueryClient } from "@tanstack/react-query";
+import { useArticleProgress, useAuth, useRefreshArticle, useRefreshDiff } from "../../hooks";
+import ContestDialog from "../ContestDialog";
 
 const ANCHOR_RE = /\[claim:([^\]]+)\]/g;
 
@@ -34,6 +37,28 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
   const [q1, setQ1] = useState<number|null>(null);
   const [inspectId, setInspectId] = useState<string | null>(null);
   const [explorerSel, setExplorerSel] = useState<string | null>(null);
+  // ponytail: article actions — contest, regenerate, what-changed. Same
+  // hooks/endpoints as the modern ArticleClient; no new backend.
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const [contestOpen, setContestOpen] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+  const [regen, setRegen] = useState<string | null>(null);
+  const { mutate: refreshMutate, loading: refreshLoading } = useRefreshArticle();
+  const { data: diff } = useRefreshDiff(article?.slug);
+  const diffCount = (diff?.upgraded ?? 0) + (diff?.downgraded ?? 0) + (diff?.status_changed ?? 0);
+  useArticleProgress(regen !== null ? article?.slug ?? null : null, regen !== null, {
+    onPhase: (p) => setRegen(p === "done" ? null : p),
+    onDone: () => {
+      setRegen(null);
+      queryClient.invalidateQueries({ queryKey: ["article", article?.slug] });
+    },
+    onError: () => setRegen(null),
+  });
+  const handleRegen = () => {
+    if (!article?.slug || regen !== null) return;
+    refreshMutate(article.slug).then((r) => { if (r) setRegen("queued"); });
+  };
   const chipReturn = useRef<HTMLElement | null>(null);
   const refs = useRef<Record<string, HTMLElement|null>>({});
 
@@ -238,6 +263,62 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
               {body && <div className="text-[13px] mt-2 italic text-[var(--r-ink-secondary)] leading-relaxed">{body.slice(0, 180)}…</div>}
             </div>
 
+            {/* Action bar — contest, regenerate, what-changed */}
+            <div className="flex flex-wrap items-center gap-2 mb-6">
+              <button
+                className="r-btn"
+                onClick={() => setContestOpen(true)}
+                disabled={!user}
+                title={user ? "Challenge this article with a counterpoint" : "Log in to contest this article"}
+              >
+                ⚑ Contest
+              </button>
+              <button
+                className="r-btn"
+                onClick={handleRegen}
+                disabled={!user || regen !== null || refreshLoading}
+                title={user ? "Regenerate this article" : "Log in to regenerate"}
+              >
+                {regen !== null ? `⟳ ${regen}…` : "⟳ Regenerate"}
+              </button>
+              {diffCount > 0 && (
+                <button className="r-btn" onClick={() => setShowDiff((v) => !v)} aria-expanded={showDiff}>
+                  {showDiff ? "▾" : "▸"} What changed ({diffCount})
+                </button>
+              )}
+            </div>
+
+            {showDiff && diffCount > 0 && (
+              <div className="mb-6 border bg-[var(--r-surface-elevated)] rounded-[var(--r-radius)] p-3 text-[11px]" style={{ borderColor: "var(--r-border)" }}>
+                <div className="font-bold mb-2" style={{ color: "var(--r-accent)" }}>
+                  What changed since the last refresh
+                  {typeof diff?.total_claims === "number" && (
+                    <span className="font-normal" style={{ color: "var(--r-muted)" }}> — {diff.total_claims} claims tracked</span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {(diff?.claim_diffs ?? []).map((d: any) => {
+                    const delta = typeof d.confidence_delta === "number" ? d.confidence_delta : 0;
+                    const up = delta > 0.05, down = delta < -0.05;
+                    return (
+                      <div key={d.claim_id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-2 py-1 border rounded-sm bg-[var(--r-surface)]" style={{ borderColor: "var(--r-border)" }}>
+                        <span aria-hidden>{up ? "▲" : down ? "▼" : "●"}</span>
+                        <span className="font-mono font-bold" style={{ color: "var(--r-ink)" }}>{d.claim_id}</span>
+                        {d.status_changed ? (
+                          <span style={{ color: "var(--r-ink-secondary)" }}>{d.old_status} → <b>{d.new_status}</b></span>
+                        ) : (
+                          <span style={{ color: "var(--r-muted)" }}>{d.new_status ?? d.old_status}</span>
+                        )}
+                        <span className="ml-auto font-bold tabular-nums" style={{ color: up ? "#2e7d32" : down ? "#a33a3a" : "var(--r-muted)" }}>
+                          {delta >= 0 ? "+" : ""}{(delta * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Section 1: Overview */}
             <section ref={(el)=>{refs.current.overview=el;}} id="overview" className="mb-8 scroll-mt-4">
               <h2 className="r-h2"><span>1</span> Overview</h2>
@@ -378,6 +459,12 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
           </ul>
         </div>
       </div>
+      <ContestDialog
+        slug={article.slug}
+        open={contestOpen}
+        onClose={() => setContestOpen(false)}
+        onQueued={() => setRegen("queued")}
+      />
     </div>
   );
 }
