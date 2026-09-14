@@ -185,7 +185,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
           <span>Article Outline</span>
           <span className="bg-[var(--r-header-accent)] text-black px-1.5 py-0.5 text-[9px] font-bold rounded-sm border border-black/30">TOC</span>
         </div>
-        <div className="p-2 space-y-0.5 overflow-auto max-h-[300px] lg:max-h-none r-scroll">
+        <div className="p-2 space-y-0.5">
           {sections.map((s)=>(
             <button
               key={s.id}
@@ -343,7 +343,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
       </div>
 
       {/* Right Column: Figure Plates & Related */}
-      <div className="r-side w-full lg:w-[320px] shrink-0 bg-[var(--r-nav-bg)] border border-[var(--r-border)] rounded-[var(--r-radius)] flex flex-col gap-3 p-3 overflow-auto transition-colors duration-200">
+      <div className="r-side w-full lg:w-[320px] shrink-0 bg-[var(--r-nav-bg)] border border-[var(--r-border)] rounded-[var(--r-radius)] flex flex-col gap-3 p-3 transition-colors duration-200">
         {/* Figure Plate */}
         <div className="border bg-[var(--r-surface-elevated)] rounded-[var(--r-radius)] overflow-hidden shadow-sm" style={{ borderColor: "var(--r-border)" }}>
           <div className="bg-[var(--r-accent)] text-white text-[11px] font-bold px-3 py-1 flex justify-between items-center">

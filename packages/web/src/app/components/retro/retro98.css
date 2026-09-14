@@ -333,12 +333,12 @@
 }
 
 /* Side navigation sticky positioning */
+/* ponytail: sidebars never scroll — the main doc is the only scroller. */
 @media (min-width: 1024px) {
   .retro98 .r-side {
     position: sticky;
     top: 12px;
     align-self: flex-start;
-    max-height: calc(100dvh - 24px);
-    overflow: auto;
+    overflow: visible;
   }
 }
