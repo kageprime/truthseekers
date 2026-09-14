@@ -46,6 +46,8 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
   const { user } = useAuth();
   const [contestOpen, setContestOpen] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
+  // ponytail: claim graph minimized by default — conditional mount avoids canvas cost until expanded.
+  const [showGraph, setShowGraph] = useState(false);
   const [regen, setRegen] = useState<string | null>(null);
   const [regenMsg, setRegenMsg] = useState<string | null>(null);
   const { mutate: refreshMutate, loading: refreshLoading } = useRefreshArticle();
@@ -126,7 +128,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
   const openInspect = (id: string, el: HTMLElement | null) => { chipReturn.current = el; setInspectId(id); };
   const closeInspect = () => { setInspectId(null); chipReturn.current?.focus?.(); };
   const showInExplorer = (id: string) => {
-    setInspectId(null); setExplorerSel(id);
+    setInspectId(null); setExplorerSel(id); setShowGraph(true);
     refs.current.debate?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -305,9 +307,9 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
               </div>
             )}
 
-            {/* Section 1: Overview */}
+            {/* Section: Overview */}
             <section ref={(el)=>{refs.current.overview=el;}} id="overview" className="mb-8 scroll-mt-4">
-              <h2 className="r-h2"><span>1</span> Overview</h2>
+              <h2 className="r-h2">Overview</h2>
               <div className="mt-3 r-body">
                 <span className="r-drop">{body.slice(0, 1)}</span>
                 {renderRich(body.slice(1)) || "No abstract available. Generate the article to populate this evidence-grounded document."}
@@ -317,15 +319,15 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
               </div>
             </section>
 
-            {/* Section 2: Content Sections */}
+            {/* Section: Content Sections */}
             <section ref={(el)=>{refs.current.discovery=el;}} id="discovery" className="mb-8 scroll-mt-4">
-              <h2 className="r-h2"><span>2</span> Detailed Findings</h2>
+              <h2 className="r-h2">Detailed Findings</h2>
               <div className="mt-3 r-body">{secs.length===0 ? <div className="text-[13px] italic text-[var(--r-muted)]">Full sections will populate once the 9-node DAG completes.</div> : secs.map(sectionBlock)}</div>
             </section>
 
-            {/* Section 3: Claims Grid */}
+            {/* Section: Claims Grid */}
             <section ref={(el)=>{refs.current.anatomy=el;}} id="anatomy" className="mb-8 scroll-mt-4">
-              <h2 className="r-h2"><span>3</span> Extracted Claims ({claims.length})</h2>
+              <h2 className="r-h2">Extracted Claims ({claims.length})</h2>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px]">
                 {claims.slice(0, 6).map((c: any) => (
                   <div key={c.id} className="border bg-[var(--r-surface-elevated)] p-3 rounded-[var(--r-radius)] shadow-sm" style={{ borderColor: "var(--r-border)" }}>
@@ -340,16 +342,20 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
               </div>
             </section>
 
-            {/* Section 4: Interactive Debate & Claim Graph */}
+            {/* Section: Interactive Debate & Claim Graph — minimized by default */}
             <section ref={(el)=>{refs.current.debate=el;}} id="debate" className="mb-8 scroll-mt-4 border-2 bg-[var(--r-surface-elevated)] p-3 rounded-[var(--r-radius)] shadow-sm" style={{ borderColor: "var(--r-accent)" }}>
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h2 className="text-[14px] font-bold bg-[var(--r-accent)] text-white px-2.5 py-1 rounded-sm inline-flex items-center gap-2">
-                  <span>4</span> Interactive Claim Graph & Debate
+                  Interactive Claim Graph & Debate
                 </h2>
                 <span className="text-[9px] bg-amber-700 text-white px-2 py-0.5 font-bold rounded-sm animate-pulse">
                   CONTROVERSY MAP
                 </span>
               </div>
+              <button className="r-btn mb-2" onClick={() => setShowGraph((v) => !v)} aria-expanded={showGraph}>
+                {showGraph ? "▾ Hide claim graph" : `▸ Show claim graph${g.nodes.length > 0 ? ` (${g.nodes.length})` : ""}`}
+              </button>
+              {showGraph && (
               <div className="border bg-[var(--r-surface)] p-2 rounded-[var(--r-radius)]" style={{ borderColor: "var(--r-border)" }}>
                 <div className="flex items-center justify-between bg-[var(--r-accent)] text-white px-2.5 py-1 mb-2 rounded-sm">
                   <div className="text-[11px] font-bold inline-flex items-center gap-1.5"><IconFlask size={13} /> TruthSeekers Explorer</div>
@@ -363,11 +369,12 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
                   </div>
                 )}
               </div>
+              )}
             </section>
 
-            {/* Section 5: Quiz */}
+            {/* Section: Quiz */}
             <section ref={(el)=>{refs.current.related=el;}} id="related" className="mb-4 scroll-mt-4">
-              <h2 className="r-h2"><span>5</span> Epistemic Quiz</h2>
+              <h2 className="r-h2">Epistemic Quiz</h2>
               <div className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] mt-3 p-3 rounded-[var(--r-radius)] text-[12px]">
                 <div className="font-bold mb-2 text-[var(--r-ink)]">Which claim is the weakest link?</div>
                 {weakest ? [weakest, ...siblings].map((o: any, i: number) => {
