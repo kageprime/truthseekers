@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 // Core models matching packages/core/src/types.ts
@@ -240,6 +240,9 @@ type DB struct {
 	mockUsers         map[string]*User
 	mockConversations map[string]*Conversation
 	mockSettings      map[string]string
+	mockPayments      map[string]*PaystackPayment
+	mockUsage         map[string]int
+	mockWebhooks      map[string]bool
 	otpMu             sync.Mutex
 	mockOTP           map[string]otpEntry
 }
@@ -266,6 +269,14 @@ func (d *DB) StorageMode() string {
 		return "postgres"
 	}
 	return d.storageMode
+}
+
+// PingContext tests database connectivity with a timeout context.
+func (d *DB) PingContext(ctx context.Context) error {
+	if d == nil || d.mockMode || d.db == nil {
+		return nil
+	}
+	return d.db.PingContext(ctx)
 }
 
 // ArticleCount returns the number of articles available in the active store.
@@ -315,6 +326,9 @@ func newMockDB(dataDir string) *DB {
 		mockUsers:         make(map[string]*User),
 		mockConversations: make(map[string]*Conversation),
 		mockSettings:      make(map[string]string),
+		mockPayments:      make(map[string]*PaystackPayment),
+		mockUsage:         make(map[string]int),
+		mockWebhooks:      make(map[string]bool),
 	}
 }
 
@@ -1172,6 +1186,9 @@ type PaystackPayment struct {
 // surface as errors.
 func (d *DB) CreatePayment(p PaystackPayment) error {
 	if d.mockMode {
+		cp := p
+		cp.Status = "pending"
+		d.mockPayments[p.Reference] = &cp
 		return nil
 	}
 	_, err := d.db.Exec(
@@ -1183,6 +1200,9 @@ func (d *DB) CreatePayment(p PaystackPayment) error {
 // GetPaymentByReference fetches an intent for idempotent webhook handling.
 func (d *DB) GetPaymentByReference(reference string) (*PaystackPayment, error) {
 	if d.mockMode {
+		if p, ok := d.mockPayments[reference]; ok {
+			return p, nil
+		}
 		return nil, sql.ErrNoRows
 	}
 	var p PaystackPayment
@@ -1199,6 +1219,14 @@ func (d *DB) GetPaymentByReference(reference string) (*PaystackPayment, error) {
 // WHERE status guard makes double webhooks/verifies no-ops).
 func (d *DB) MarkPaymentPaid(reference string) (bool, error) {
 	if d.mockMode {
+		p, ok := d.mockPayments[reference]
+		if !ok {
+			return false, sql.ErrNoRows
+		}
+		if p.Status == "paid" {
+			return false, nil
+		}
+		p.Status = "paid"
 		return true, nil
 	}
 	res, err := d.db.Exec(
@@ -1211,6 +1239,79 @@ func (d *DB) MarkPaymentPaid(reference string) (bool, error) {
 	return n > 0, nil
 }
 
+// RecordWebhookEvent inserts an event key, reporting whether it is fresh.
+// Replayed bodies hit the PK conflict and are ignored by callers.
+func (d *DB) RecordWebhookEvent(key string) (fresh bool, err error) {
+	if d.mockMode {
+		if d.mockWebhooks[key] {
+			return false, nil
+		}
+		d.mockWebhooks[key] = true
+		return true, nil
+	}
+	res, err := d.db.Exec(
+		"INSERT INTO webhook_events (event_key) VALUES ($1) ON CONFLICT DO NOTHING", key)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// DeleteWebhookEvent releases a dedup key so a transiently-failed event can
+// be reprocessed when Paystack retries it.
+func (d *DB) DeleteWebhookEvent(key string) {
+	if d.mockMode {
+		delete(d.mockWebhooks, key)
+		return
+	}
+	_, _ = d.db.Exec("DELETE FROM webhook_events WHERE event_key = $1", key)
+}
+
+func todayKey(userID string) string {
+	return userID + "|" + time.Now().UTC().Format("2006-01-02")
+}
+
+// CheckAndIncrementDailyUsage atomically consumes one generation from the
+// user's daily budget. Race-safe: the WHERE guard runs inside the upsert, so
+// concurrent enqueues can't overshoot. Returns (allowed, remaining).
+func (d *DB) CheckAndIncrementDailyUsage(userID string, limit int) (bool, int, error) {
+	if d.mockMode {
+		k := todayKey(userID)
+		if d.mockUsage[k] >= limit {
+			return false, 0, nil
+		}
+		d.mockUsage[k]++
+		return true, limit - d.mockUsage[k], nil
+	}
+	var n int
+	err := d.db.QueryRow(`
+		INSERT INTO daily_usage (user_id, day, generations) VALUES ($1, CURRENT_DATE, 1)
+		ON CONFLICT (user_id, day) DO UPDATE SET generations = daily_usage.generations + 1
+		WHERE daily_usage.generations < $2
+		RETURNING generations`, userID, limit).Scan(&n)
+	if err == sql.ErrNoRows {
+		return false, 0, nil
+	}
+	if err != nil {
+		return false, 0, err
+	}
+	return true, limit - n, nil
+}
+
+// DailyUsageUsed reports today's consumed generations (quota display).
+func (d *DB) DailyUsageUsed(userID string) int {
+	if d.mockMode {
+		return d.mockUsage[todayKey(userID)]
+	}
+	var n int
+	if err := d.db.QueryRow(
+		"SELECT generations FROM daily_usage WHERE user_id = $1 AND day = CURRENT_DATE", userID).Scan(&n); err != nil {
+		return 0
+	}
+	return n
+}
+
 func (d *DB) GetArticleViewCount(slug string) (int, error) {
 	if d.mockMode {
 		if d.fs != nil {
@@ -1221,6 +1322,70 @@ func (d *DB) GetArticleViewCount(slug string) (int, error) {
 	var count int
 	err := d.db.QueryRow("SELECT COUNT(*) FROM article_views WHERE slug = $1", slug).Scan(&count)
 	return count, err
+}
+
+// GetViewCounts batches view counts for many slugs in one GROUP BY — the
+// coordinator tick did ~200 sequential COUNT(*) queries per pass.
+func (d *DB) GetViewCounts(slugs []string) (map[string]int, error) {
+	out := make(map[string]int, len(slugs))
+	if len(slugs) == 0 {
+		return out, nil
+	}
+	if d.mockMode {
+		for _, s := range slugs {
+			if d.fs != nil {
+				out[s] = d.fs.views[s]
+			}
+		}
+		return out, nil
+	}
+	rows, err := d.db.Query("SELECT slug, COUNT(*) FROM article_views WHERE slug = ANY($1) GROUP BY slug", pq.Array(slugs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var slug string
+		var n int
+		if err := rows.Scan(&slug, &n); err != nil {
+			return nil, err
+		}
+		out[slug] = n
+	}
+	return out, rows.Err()
+}
+
+// GetClaimCounts batches per-article claim counts the same way.
+func (d *DB) GetClaimCounts(slugs []string) (map[string]int, error) {
+	out := make(map[string]int, len(slugs))
+	if len(slugs) == 0 {
+		return out, nil
+	}
+	if d.mockMode {
+		for _, s := range slugs {
+			if d.fs != nil {
+				out[s] = len(d.fs.claims[s])
+			}
+		}
+		return out, nil
+	}
+	rows, err := d.db.Query(`
+		SELECT a.slug, COUNT(ac.claim_id)
+		FROM articles a LEFT JOIN article_claims ac ON ac.article_id = a.id
+		WHERE a.slug = ANY($1) GROUP BY a.slug`, pq.Array(slugs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var slug string
+		var n int
+		if err := rows.Scan(&slug, &n); err != nil {
+			return nil, err
+		}
+		out[slug] = n
+	}
+	return out, rows.Err()
 }
 
 func (d *DB) GetTopArticles(limit int) ([]*Article, error) {
@@ -1769,3 +1934,4 @@ func (d *DB) GetEpistemicPipelineForArticle(articleID string) (*EpistemicPipelin
 func (d *DB) IsMockMode() bool {
 	return d.mockMode
 }
+

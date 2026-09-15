@@ -812,13 +812,17 @@ func DAGNodeExecutorsWithContext(systemPrompt, contestNote string) map[string]fu
 					if err != nil {
 						return nil, fmt.Errorf("dag node %q: %w", name, err)
 					}
-					var output interface{}
-					if err := json.Unmarshal(result, &output); err != nil {
-						return nil, fmt.Errorf("dag node %q parse: %w", name, err)
-					}
-					return output, nil
+				var output interface{}
+				if err := json.Unmarshal(result, &output); err != nil {
+					return nil, fmt.Errorf("dag node %q parse: %w", name, err)
 				}
-				// Fall through to LLM-only mode if retrieval yielded nothing.
+				// ponytail: attach the executed research plan (free,
+				// deterministic — the aspects actually searched) so the
+				// progress feed can show it live without an extra LLM call.
+				output = attachResearchPlan(output, query)
+				return output, nil
+			}
+			// Fall through to LLM-only mode if retrieval yielded nothing.
 			}
 
 			select {
@@ -906,6 +910,25 @@ func backfillClaimTexts(input map[string]interface{}, output interface{}) interf
 		}
 	}
 	return output
+}
+
+// attachResearchPlan adds the executed aspect plan to a retrieve output map.
+// No-op for non-map outputs. Extra keys are ignored by persistence readers
+// (which only look at "documents") but picked up by the progress feed.
+func attachResearchPlan(output interface{}, query string) interface{} {
+	m, ok := output.(map[string]interface{})
+	if !ok {
+		return output
+	}
+	aspects := aspectQueries(query)
+	plan := []string{"Origins & background", "Mechanism & evidence", "Debate & reception"}
+	qs := []string{}
+	for _, group := range aspects {
+		qs = append(qs, group...)
+	}
+	m["research_plan"] = plan
+	m["research_queries"] = qs
+	return m
 }
 
 // indentJSON pretty-prints raw JSON for injection into LLM prompts.

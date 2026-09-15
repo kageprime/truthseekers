@@ -75,6 +75,9 @@ func (s *Server) handleContestArticle(w http.ResponseWriter, r *http.Request, sl
 	if !s.checkWriteBudget(w, r) {
 		return
 	}
+	if !s.checkGenerationQuota(w, r) {
+		return
+	}
 	userID := userIDFromRequest(r)
 
 	var body struct {

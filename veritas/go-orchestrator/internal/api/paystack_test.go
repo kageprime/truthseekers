@@ -68,6 +68,28 @@ func TestPaystackWebhookIgnoresUnknown(t *testing.T) {
 	}
 }
 
+// Replayed webhook body → second delivery acked as duplicate, never re-fired.
+func TestPaystackWebhookReplayDeduped(t *testing.T) {
+	t.Setenv("PAYSTACK_SECRET_KEY", "whsec-test")
+	s := testPaystackServer(t)
+	body := []byte(`{"event":"invoice.created","data":{"id":4242}}`)
+	sig := signPaystack(t, "whsec-test", body)
+	rec1 := httptest.NewRecorder()
+	req1 := httptest.NewRequest(http.MethodPost, "/paystack/webhook", strings.NewReader(string(body)))
+	req1.Header.Set("x-paystack-signature", sig)
+	s.handlePaystackWebhook(rec1, req1)
+	rec2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodPost, "/paystack/webhook", strings.NewReader(string(body)))
+	req2.Header.Set("x-paystack-signature", sig)
+	s.handlePaystackWebhook(rec2, req2)
+	if rec1.Code != http.StatusOK || rec2.Code != http.StatusOK {
+		t.Fatalf("codes %d/%d, want 200/200", rec1.Code, rec2.Code)
+	}
+	if !strings.Contains(rec2.Body.String(), `"duplicate":true`) {
+		t.Fatalf("replay not flagged duplicate: %s", rec2.Body.String())
+	}
+}
+
 // Unknown tier → 400 before any provider call.
 func TestPaystackInitUnknownTier(t *testing.T) {
 	s := testPaystackServer(t)

@@ -32,6 +32,7 @@ type ProgressUpdate struct {
 	Status    string // running | completed | failed
 	Output    interface{}
 	Error     string
+	Duration  time.Duration `json:"duration,omitempty"`
 	Timestamp time.Time
 }
 
@@ -114,12 +115,13 @@ func (w *Workflow) Execute(ctx context.Context, query string) (<-chan ProgressUp
 				inProgress[node.ID] = true
 				mu.Unlock()
 
-			go func(n Node) {
-				safeSend(ProgressUpdate{
-					NodeID:    n.ID,
-					Status:    "running",
-					Timestamp: time.Now(),
-				})
+				go func(n Node) {
+					startTime := time.Now()
+					safeSend(ProgressUpdate{
+						NodeID:    n.ID,
+						Status:    "running",
+						Timestamp: startTime,
+					})
 
 					mu.RLock()
 					// Gather inputs. If it has no dependencies, pass the query.
@@ -176,27 +178,30 @@ func (w *Workflow) Execute(ctx context.Context, query string) (<-chan ProgressUp
 						}
 					}
 
+					dur := time.Since(startTime)
 					mu.Lock()
 					inProgress[n.ID] = false
-				if err != nil {
-					failed[n.ID] = true
-					mu.Unlock()
-					safeSend(ProgressUpdate{
-						NodeID:    n.ID,
-						Status:    "failed",
-						Error:     err.Error(),
-						Timestamp: time.Now(),
-					})
-				} else {
-					completed[n.ID] = output
-					mu.Unlock()
-					safeSend(ProgressUpdate{
-						NodeID:    n.ID,
-						Status:    "completed",
-						Output:    output,
-						Timestamp: time.Now(),
-					})
-				}
+					if err != nil {
+						failed[n.ID] = true
+						mu.Unlock()
+						safeSend(ProgressUpdate{
+							NodeID:    n.ID,
+							Status:    "failed",
+							Error:     err.Error(),
+							Duration:  dur,
+							Timestamp: time.Now(),
+						})
+					} else {
+						completed[n.ID] = output
+						mu.Unlock()
+						safeSend(ProgressUpdate{
+							NodeID:    n.ID,
+							Status:    "completed",
+							Output:    output,
+							Duration:  dur,
+							Timestamp: time.Now(),
+						})
+					}
 					doneCh <- struct{}{}
 				}(node)
 			}

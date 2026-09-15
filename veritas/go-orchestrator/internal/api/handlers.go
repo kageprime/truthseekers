@@ -222,6 +222,11 @@ func (s *Server) handleGenerateArticle(w http.ResponseWriter, r *http.Request, s
 
 	userID := userIDFromRequest(r)
 
+	// ponytail: quota burns only on real enqueues — not on already_exists or
+	// busy-dedup short-circuits below/above.
+	if !s.checkGenerationQuota(w, r) {
+		return
+	}
 	// Enqueue through the session lifecycle engine. CreateSession dedupes by
 	// slug and applies backpressure.
 	_, err := s.sessionEngine.CreateSession(sessionlifecycle.CreateCommand{
@@ -248,6 +253,9 @@ func (s *Server) handleRefreshArticle(w http.ResponseWriter, r *http.Request, sl
 		return
 	}
 	userID := userIDFromRequest(r)
+	if !s.checkGenerationQuota(w, r) {
+		return
+	}
 	_, err := s.sessionEngine.CreateSession(sessionlifecycle.CreateCommand{
 		Slug:    slug,
 		UserID:  userID,
@@ -866,28 +874,70 @@ func (s *Server) handleGetContestedClaims(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleGetQuota(w http.ResponseWriter, r *http.Request) {
 	reqLog(r, "quota")
-	// Tier-aware limits matching the pricing page. Usage counting stays a
-	// stub (used=2) until generation metering lands — the limit side is real.
-	limit := 10
+	// Tier-aware daily limits matching the pricing page, counted for real.
 	tier := "free"
-	if uid := userIDFromContext(r.Context()); uid != "" {
-		if u, err := s.db.GetUser(uid); err == nil && u != nil && u.SubscriptionTier != "" {
-			tier = u.SubscriptionTier
-		}
+	uid := userIDFromContext(r.Context())
+	if uid != "" {
+		tier = s.tierOf(uid)
 	}
-	switch tier {
-	case "pro":
-		limit = 100
-	case "enterprise":
+	limit := tierDailyLimit(tier)
+	if limit <= 0 {
 		limit = 999999
 	}
-	const used = 2
+	used := s.db.DailyUsageUsed(uid)
 	remaining := limit - used
 	if remaining < 0 {
 		remaining = 0
 	}
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, `{"allowed":%t,"limit":%d,"used":%d,"remaining":%d,"tier":%q}`, remaining > 0, limit, used, remaining, tier)
+}
+
+// tierDailyLimit maps a tier to generations/day. Enterprise (<=0) is unlimited.
+func tierDailyLimit(tier string) int {
+	switch tier {
+	case "pro":
+		return 100
+	case "enterprise":
+		return 0
+	default:
+		return 10
+	}
+}
+
+func (s *Server) tierOf(userID string) string {
+	if u, err := s.db.GetUser(userID); err == nil && u != nil && u.SubscriptionTier != "" {
+		return u.SubscriptionTier
+	}
+	return "free"
+}
+
+// checkGenerationQuota consumes one daily generation. False + 429 (with
+// Retry-After till midnight UTC) when the tier budget is spent. Call after
+// checkWriteBudget so floods hit the cheap limiter first.
+func (s *Server) checkGenerationQuota(w http.ResponseWriter, r *http.Request) bool {
+	userID := userIDFromContext(r.Context())
+	if limit := tierDailyLimit(s.tierOf(userID)); limit > 0 {
+		ok, _, err := s.db.CheckAndIncrementDailyUsage(userID, limit)
+		if err != nil {
+			// ponytail: fail open on ledger errors — a down usage table must
+			// not brick generation; log loud instead.
+			reqLog(r, "quota ledger failed: %v", err)
+			return true
+		}
+		if !ok {
+			w.Header().Set("Retry-After", strconv.Itoa(secondsUntilMidnightUTC()))
+			http.Error(w, `{"error":"daily generation quota exceeded"}`, http.StatusTooManyRequests)
+			return false
+		}
+	}
+	return true
+}
+
+func secondsUntilMidnightUTC() int {
+	now := time.Now().UTC()
+	next := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
+	return int(next.Sub(now).Seconds()) + 1
 }
 
 func (s *Server) handleGetQueue(w http.ResponseWriter, r *http.Request) {

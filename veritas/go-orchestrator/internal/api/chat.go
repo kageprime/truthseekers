@@ -399,7 +399,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("🤖 Starting agent run (model=%s, history=%d msgs)", model, len(history))
-	os.WriteFile("agent_trace.log", []byte(fmt.Sprintf("Starting agent run for conv=%s at %s\n", convID, time.Now().String())), 0644)
+	appendAgentTrace(fmt.Sprintf("[%s] Starting agent run for conv=%s\n", time.Now().UTC().Format(time.RFC3339), convID))
 	agt := agent.NewAgent(agentConfig)
 
 	// Register so the /chat/:id/stop route and client-disconnect watcher can Abort().
@@ -414,7 +414,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	result, runErr := agt.Run(body.Content)
-	os.WriteFile("agent_trace.log", []byte(fmt.Sprintf("Agent run completed at %s, err=%v\n", time.Now().String(), runErr)), 0644)
+	appendAgentTrace(fmt.Sprintf("[%s] Agent run for conv=%s completed, err=%v\n", time.Now().UTC().Format(time.RFC3339), convID, runErr))
 
 	if runErr != nil {
 		log.Printf("🤖 Agent run error: %v", runErr)
@@ -864,4 +864,14 @@ func filterToolsByManifest(tools map[string]agent.ToolExecutor, m *manifest.Mani
 	}
 	log.Printf("[manifest] filtered %d tools → %d for agent %q", len(tools), len(filtered), def.Name)
 	return filtered
+}
+
+// appendAgentTrace safely appends trace lines to agent_trace.log instead of overwriting.
+func appendAgentTrace(line string) {
+	f, err := os.OpenFile("agent_trace.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = f.WriteString(line)
 }

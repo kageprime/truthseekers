@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha512"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -39,6 +41,14 @@ var paystackTier = map[string]struct{ planEnv, amountEnv string }{
 }
 
 var paystackRefRe = regexp.MustCompile(`^[A-Za-z0-9_-]{4,100}$`)
+
+// errPaystackTransient marks failures worth retrying: transport down,
+// provider 5xx, or our own DB write failed. Webhooks answer these non-2xx
+// so Paystack retries; permanent rejects (bad amount, unknown tier) are
+// acked 200 after logging since retries can't fix them.
+var errPaystackTransient = errors.New("paystack transient")
+
+func paystackTransient(err error) bool { return errors.Is(err, errPaystackTransient) }
 
 func paystackSecret(s *Server) string {
 	if k := s.credStore.Get("paystack"); k != "" {
@@ -82,7 +92,7 @@ func paystackAPI(secret, method, path string, payload interface{}) (map[string]i
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("paystack unreachable: %w", err)
+		return nil, fmt.Errorf("paystack unreachable (%v): %w", err, errPaystackTransient)
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
@@ -92,9 +102,15 @@ func paystackAPI(secret, method, path string, payload interface{}) (map[string]i
 		Data    map[string]interface{} `json:"data"`
 	}
 	if err := json.Unmarshal(raw, &env); err != nil {
+		if resp.StatusCode >= 500 {
+			return nil, fmt.Errorf("paystack bad response %d: %w", resp.StatusCode, errPaystackTransient)
+		}
 		return nil, fmt.Errorf("paystack bad response: %d", resp.StatusCode)
 	}
 	if !env.Status {
+		if resp.StatusCode >= 500 {
+			return nil, fmt.Errorf("paystack: %w: %s", errPaystackTransient, env.Message)
+		}
 		return nil, fmt.Errorf("paystack: %s", env.Message)
 	}
 	if env.Data == nil {
@@ -239,7 +255,8 @@ func (s *Server) fulfillPaid(reference string) (userID, tier string, err error) 
 		return "", "", fmt.Errorf("unattributed payment")
 	}
 	if err := s.db.SetSubscriptionTier(userID, tier); err != nil {
-		return "", "", fmt.Errorf("entitlement failed: %w", err)
+		// ponytail: our DB write failed, not their payment — retryable.
+		return "", "", fmt.Errorf("entitlement failed (%v): %w", err, errPaystackTransient)
 	}
 	return userID, tier, nil
 }
@@ -308,6 +325,7 @@ func (s *Server) handlePaystackWebhook(w http.ResponseWriter, r *http.Request) {
 	var evt struct {
 		Event string `json:"event"`
 		Data  struct {
+			ID        int64  `json:"id"`
 			Reference string `json:"reference"`
 			Customer  struct {
 				Email string `json:"email"`
@@ -318,6 +336,34 @@ func (s *Server) handlePaystackWebhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
 		return
 	}
+	email := strings.ToLower(strings.TrimSpace(evt.Data.Customer.Email))
+	// ponytail: dedup key prefers Paystack's event id, falls back to the
+	// reference/email the handler actually acts on. A captured valid body
+	// replayed forever is otherwise a free re-downgrade button.
+	key := evt.Event + ":"
+	switch {
+	case evt.Data.ID != 0:
+		key += strconv.FormatInt(evt.Data.ID, 10)
+	case evt.Data.Reference != "":
+		key += "ref:" + evt.Data.Reference
+	case email != "":
+		key += "email:" + email
+	default:
+		key += "noid"
+	}
+	fresh, err := s.db.RecordWebhookEvent(key)
+	if err != nil {
+		// Can't tell new from replay without the ledger — fail transient so
+		// Paystack retries instead of us double-firing blind.
+		log.Printf("[paystack] dedup write failed: %v", err)
+		http.Error(w, `{"error":"try again"}`, http.StatusServiceUnavailable)
+		return
+	}
+	if !fresh {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"received","duplicate":true}`))
+		return
+	}
 	switch evt.Event {
 	case "charge.success":
 		if !paystackRefRe.MatchString(evt.Data.Reference) {
@@ -325,8 +371,16 @@ func (s *Server) handlePaystackWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if _, _, err := s.fulfillPaid(evt.Data.Reference); err != nil {
-			// Return 200 anyway so Paystack stops retrying a payment WE
-			// reject (amount mismatch etc.) — retries can't fix it. Log loud.
+			if paystackTransient(err) {
+				// Provider/DB blip — release the dedup key and non-2xx so
+				// Paystack's retry reprocesses instead of hitting duplicate.
+				s.db.DeleteWebhookEvent(key)
+				log.Printf("[paystack] webhook transient ref=%s: %v", evt.Data.Reference, err)
+				http.Error(w, `{"error":"try again"}`, http.StatusBadGateway)
+				return
+			}
+			// Permanent reject (amount mismatch etc.) — 200 so Paystack
+			// stops retrying what retries can't fix. Log loud.
 			log.Printf("[paystack] webhook fulfill failed ref=%s: %v", evt.Data.Reference, err)
 		} else {
 			log.Printf("[paystack] webhook fulfilled ref=%s", evt.Data.Reference)
@@ -334,20 +388,31 @@ func (s *Server) handlePaystackWebhook(w http.ResponseWriter, r *http.Request) {
 	case "subscription.disable":
 		// No transaction reference here — attribute by customer email, and
 		// only touch existing users (never auto-provision from webhooks).
-		email := strings.ToLower(strings.TrimSpace(evt.Data.Customer.Email))
 		if email == "" {
 			break
 		}
 		u, err := s.db.GetUserByEmail(email)
-		if err != nil || u == nil {
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				log.Printf("[paystack] disable for unknown email")
+				break
+			}
+			s.db.DeleteWebhookEvent(key)
+			log.Printf("[paystack] disable lookup failed: %v", err)
+			http.Error(w, `{"error":"try again"}`, http.StatusServiceUnavailable)
+			return
+		}
+		if u == nil {
 			log.Printf("[paystack] disable for unknown email")
 			break
 		}
 		if err := s.db.SetSubscriptionTier(u.ID, "free"); err != nil {
+			s.db.DeleteWebhookEvent(key)
 			log.Printf("[paystack] downgrade failed user=%s: %v", u.ID, err)
-		} else {
-			log.Printf("[paystack] downgraded user=%s to free", u.ID)
+			http.Error(w, `{"error":"try again"}`, http.StatusServiceUnavailable)
+			return
 		}
+		log.Printf("[paystack] downgraded user=%s to free", u.ID)
 	default:
 		// subscription.create/enable, invoice.* etc. carry no new money
 		// movement beyond charge.success — acknowledge and ignore.

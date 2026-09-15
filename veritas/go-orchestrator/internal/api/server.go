@@ -679,14 +679,25 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if version == "" {
 		version = "dev"
 	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	dbStatus := "ok"
+	statusCode := http.StatusOK
+	if err := s.db.PingContext(ctx); err != nil {
+		dbStatus = "unreachable"
+		statusCode = http.StatusServiceUnavailable
+	}
+
 	body, _ := json.Marshal(map[string]interface{}{
-		"status":    "ok",
-		"version":   version,
-		"uptime":    uptime,
-		"mockMode":  s.db.IsMockMode(),
+		"status":        dbStatus,
+		"version":       version,
+		"uptime":        uptime,
+		"mockMode":      s.db.IsMockMode(),
 		"storage_mode":  s.db.StorageMode(),
+		"db_status":     dbStatus,
 		"article_count": s.db.ArticleCount(),
-		"goVersion": runtime.Version(),
+		"goVersion":     runtime.Version(),
 		"queue": map[string]int{
 			"active": active,
 			"queued": queued,
@@ -694,7 +705,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	})
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(statusCode)
 	w.Write(body)
 }
 
@@ -1533,6 +1544,24 @@ func (s *Server) handleArticlesDynamicRoute(w http.ResponseWriter, r *http.Reque
 	// Split parts: e.g. "jfk-assassination/status" -> ["jfk-assassination", "status"]
 	parts := strings.Split(path, "/")
 	slug := parts[0]
+
+	// Handle reserved subroutes under /articles/ to prevent slug collisions
+	switch slug {
+	case "top":
+		if r.Method == "GET" {
+			s.handleGetTopArticles(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	case "search":
+		if r.Method == "GET" {
+			s.handleSearchArticles(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
 
 	if len(parts) == 1 {
 		// GET /articles/:slug

@@ -1131,17 +1131,61 @@ func (d *DB) GetClaimVersionDiff(claimID string) (*ClaimVersionDiff, error) {
 }
 
 // GetRefreshDiff summarizes what changed across all claims in an article
-// between the last two generation runs.
+// between the last two generation runs. One window-function query replaces
+// the old 1+N loop (GetClaimsByArticle + a version query per claim).
 func (d *DB) GetRefreshDiff(slug string) (map[string]interface{}, error) {
 	claims, err := d.GetClaimsByArticle(slug)
 	if err != nil {
 		return nil, err
 	}
+	byID := make(map[string]*ClaimVersionDiff, len(claims))
+	if len(claims) > 0 && !d.mockMode {
+		ids := make([]string, 0, len(claims))
+		for _, c := range claims {
+			ids = append(ids, c.ID)
+		}
+		rows, err := d.db.Query(`
+			SELECT claim_id, derived_confidence, confidence_vector->>'status'
+			FROM (
+				SELECT claim_id, derived_confidence, confidence_vector,
+					ROW_NUMBER() OVER (PARTITION BY claim_id ORDER BY created_at DESC) AS rn
+				FROM claim_versions WHERE claim_id = ANY($1)
+			) t WHERE rn <= 2 ORDER BY claim_id, rn`, pq.Array(ids))
+		if err != nil {
+			return nil, err
+		}
+		type v struct {
+			id     string
+			conf   float64
+			status string
+		}
+		// Latest two versions per claim, newest first.
+		vers := make(map[string][]v)
+		for rows.Next() {
+			var x v
+			if err := rows.Scan(&x.id, &x.conf, &x.status); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			vers[x.id] = append(vers[x.id], x)
+		}
+		rows.Close()
+		for id, vs := range vers {
+			if len(vs) < 2 {
+				continue
+			}
+			byID[id] = &ClaimVersionDiff{
+				ClaimID: id, OldConfidence: vs[1].conf, NewConfidence: vs[0].conf,
+				ConfidenceDelta: vs[0].conf - vs[1].conf, OldStatus: vs[1].status,
+				NewStatus: vs[0].status, StatusChanged: vs[1].status != vs[0].status,
+			}
+		}
+	}
 	var upgraded, downgraded, statusChanged int
 	var diffs []*ClaimVersionDiff
 	for _, c := range claims {
-		diff, err := d.GetClaimVersionDiff(c.ID)
-		if err != nil || diff == nil {
+		diff := byID[c.ID]
+		if diff == nil {
 			continue
 		}
 		diffs = append(diffs, diff)

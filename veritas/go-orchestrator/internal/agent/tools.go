@@ -13,7 +13,9 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -184,6 +186,13 @@ type item struct {
 }
 
 func generalWebSearch(query string, maxResults int) ([]item, error) {
+	return generalWebSearchDomains(query, maxResults, nil)
+}
+
+// generalWebSearchDomains is generalWebSearch plus an optional Tavily
+// include_domains filter (e.g. ["x.com","twitter.com"] for social voices,
+// ["reddit.com"] when the JSON API throttles). Empty domains = web-wide.
+func generalWebSearchDomains(query string, maxResults int, domains []string) ([]item, error) {
 	key := os.Getenv("TAVILY_API_KEY")
 	if key == "" {
 		key = os.Getenv("FIRECRAWL_API_KEY")
@@ -193,14 +202,18 @@ func generalWebSearch(query string, maxResults int) ([]item, error) {
 		return nil, fmt.Errorf("no search API key configured")
 	}
 	body := map[string]interface{}{
-		"api_key":       key,
-		"query":         query,
-		"max_results":   maxResults,
-		"search_depth":  "advanced",
+		"api_key":        key,
+		"query":          query,
+		"max_results":    maxResults,
+		"search_depth":   "advanced",
 		"include_answer": false,
 	}
+	if len(domains) > 0 {
+		body["include_domains"] = domains
+	}
 	payload, _ := json.Marshal(body)
-	resp, err := http.Post("https://api.tavily.com/search", "application/json", bytes.NewReader(payload))
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Post("https://api.tavily.com/search", "application/json", bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
 	}
@@ -224,70 +237,331 @@ func generalWebSearch(query string, maxResults int) ([]item, error) {
 		return items, nil
 }
 
-// RealRetrieveDocuments performs real web retrieval for the epistemic
-// retrieve node. It runs the main query plus 2–3 sub-queries through
-// generalWebSearch (Tavily or Firecrawl), then fetches the full text of
-// the top 3 URLs via a simple HTTP GET. Results are deduplicated by URL.
-// Returns a flat list of RetrievedDoc. When no search API key is
-// configured, returns nil (the pipeline falls back to LLM-only mode).
-func RealRetrieveDocuments(query string) ([]RetrievedDoc, error) {
-	// Build related sub-queries to broaden recall.
-	subQueries := []string{
-		query,
-		query + " history background",
-		query + " controversy debate",
+// deepDocCap bounds total fetched docs per article retrieval (2 rounds).
+const deepDocCap = 30
+
+// fetchTextLen is the per-page evidence budget (up from 8000).
+const fetchTextLen = 12000
+
+// aspectQueries groups sub-queries into 3 parallel research aspects so each
+// can run as a concurrent unit: origins, mechanism, and debate/reception.
+func aspectQueries(query string) [3][]string {
+	return [3][]string{
+		{query, query + " history background origins"},
+		{query + " how it works mechanism explained", query + " evidence data study"},
+		{query + " controversy debate criticism", query + " recent news"},
 	}
+}
 
-	var allDocs []RetrievedDoc
+// scoreDomain boosts primary/academic/official sources in the merge so the
+// top-30 cut prefers evidence over SEO filler. Tiny heuristic, no new deps.
+func scoreDomain(rawURL string) int {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return 0
+	}
+	h := strings.ToLower(u.Host)
+	switch {
+	case strings.HasSuffix(h, ".edu") || strings.HasSuffix(h, ".gov"),
+		strings.Contains(h, "arxiv.org"), strings.Contains(h, "nature.com"),
+		strings.Contains(h, "science.org"), strings.Contains(h, "nih.gov"),
+		strings.Contains(h, "archive.org"):
+		return 3
+	case strings.Contains(h, "wikipedia.org"), strings.Contains(h, "britannica.com"),
+		strings.Contains(h, "reuters.com"), strings.Contains(h, "apnews.com"),
+		strings.Contains(h, "bbc."):
+		return 2
+	case strings.Contains(h, "x.com") || strings.Contains(h, "twitter.com"),
+		strings.Contains(h, "reddit.com"):
+		return 1
+	default:
+		return 0
+	}
+}
+
+type cand struct {
+	item   item
+	score  int
+	aspect int
+}
+
+type fetchedDoc struct {
+	item   item
+	text   string
+	aspect int
+}
+
+// RealRetrieveDocuments performs 2-round deep retrieval for the epistemic
+// retrieve node: 3 aspect groups fan out concurrently (web + reddit +
+// archive), results merge by source score, full text is fetched in parallel,
+// then a gap-driven round 2 covers the weakest aspect. Returns up to
+// deepDocCap docs. When no search API key is configured, returns nil (the
+// pipeline falls back to LLM-only mode).
+func RealRetrieveDocuments(query string) ([]RetrievedDoc, error) {
+	aspects := aspectQueries(query)
+
+	type hit struct {
+		item   item
+		aspect int
+	}
+	hitCh := make(chan hit, 128)
+	var wg sync.WaitGroup
+
+	// Round 1: 3 aspects in parallel; within an aspect the two web queries
+	// plus reddit + archive run sequentially (bounded API fan-out: 6 web +
+	// 3 reddit + 3 archive calls total).
+	for ai, queries := range aspects {
+		wg.Add(1)
+		go func(ai int, queries []string) {
+			defer wg.Done()
+			for _, sq := range queries {
+				for _, r := range searchAll(sq, 5, ai == 2) {
+					hitCh <- hit{item: r, aspect: ai}
+				}
+			}
+			for _, r := range redditOrEmpty(query, 5) {
+				hitCh <- hit{item: r, aspect: ai}
+			}
+			for _, r := range archiveOrEmpty(query, 5) {
+				hitCh <- hit{item: r, aspect: ai}
+			}
+		}(ai, queries)
+	}
+	go func() { wg.Wait(); close(hitCh) }()
+
 	seen := map[string]bool{}
-
-	for _, sq := range subQueries {
-		results, err := generalWebSearch(sq, 5)
-		if err != nil {
-			continue // one failed sub-query shouldn't kill the whole retrieve
+	var cands []cand
+	for h := range hitCh {
+		if h.item.URL == "" || seen[h.item.URL] {
+			continue
 		}
-		for _, r := range results {
-			if seen[r.URL] || r.URL == "" {
+		seen[h.item.URL] = true
+		cands = append(cands, cand{item: h.item, score: scoreDomain(h.item.URL), aspect: h.aspect})
+	}
+	if len(cands) == 0 {
+		return nil, fmt.Errorf("no search API key configured")
+	}
+	sortCands(cands)
+
+	// Parallel fetch with a small semaphore; Wayback fallback inside
+	// fetchURLText covers dead/suppressed pages.
+	limit := len(cands)
+	if limit > deepDocCap-6 {
+		limit = deepDocCap - 6 // reserve headroom for round-2 + follow-links
+	}
+	fetched := fetchParallel(cands[:limit])
+
+	// Round 2: cover the aspect with fewest fetched docs (gap-driven).
+	counts := map[int]int{}
+	for _, d := range fetched {
+		counts[d.aspect]++
+	}
+	weakest, fewest := 0, int(^uint(0)>>1)
+	for ai := 0; ai < 3; ai++ {
+		if counts[ai] < fewest {
+			weakest, fewest = ai, counts[ai]
+		}
+	}
+	if fewest < 4 {
+		extra := searchAll(query+" "+[]string{"primary sources", "in-depth analysis", "opposing views"}[weakest], 5, weakest == 2)
+		var extraCands []cand
+		for _, r := range extra {
+			if r.URL == "" || seen[r.URL] {
 				continue
 			}
 			seen[r.URL] = true
-
-			// Fetch the full page text for richer evidence.
-			text := fetchURLText(r.URL)
-			if text == "" {
-				text = r.Snippet
-			}
-			if len(text) > 8000 {
-				text = text[:8000]
-			}
-
-			allDocs = append(allDocs, RetrievedDoc{
-				ID:      "doc-" + shortHash(r.URL),
-				Title:   r.Title,
-				Text:    text,
-				URL:     r.URL,
-				Snippet: r.Snippet,
-			})
-
-			if len(allDocs) >= 9 {
-				return allDocs, nil
-			}
+			extraCands = append(extraCands, cand{item: r, score: scoreDomain(r.URL), aspect: weakest})
 		}
+		sortCands(extraCands)
+		if len(extraCands) > 6 {
+			extraCands = extraCands[:6]
+		}
+		fetched = append(fetched, fetchParallel(extraCands)...)
 	}
 
+	// Follow-links: one hop from the top-5 scored docs.
+	followed := followOutlinks(fetched, seen, 6)
+	fetched = append(fetched, followed...)
+
+	var allDocs []RetrievedDoc
+	for _, f := range fetched {
+		text := f.text
+		if text == "" {
+			text = f.item.Snippet
+		}
+		allDocs = append(allDocs, RetrievedDoc{
+			ID:      "doc-" + shortHash(f.item.URL),
+			Title:   f.item.Title,
+			Text:    text,
+			URL:     f.item.URL,
+			Snippet: f.item.Snippet,
+		})
+		if len(allDocs) >= deepDocCap {
+			break
+		}
+	}
 	if len(allDocs) == 0 {
 		return nil, fmt.Errorf("no search API key configured")
 	}
 	return allDocs, nil
 }
 
-// fetchURLText does a guarded HTTP GET and strips HTML to plain text (S8).
-func fetchURLText(rawURL string) string {
-	text, err := fetchSafeText(rawURL, 8000)
+// searchAll runs the web query plus an x.com/reddit-scoped twin for the
+// debate aspect (social voices without a new scraper or key).
+func searchAll(sq string, n int, social bool) []item {
+	results, err := generalWebSearch(sq, n)
+	if err != nil {
+		return nil
+	}
+	if social {
+		if extra, err := generalWebSearchDomains(sq, 3, []string{"x.com", "twitter.com", "reddit.com"}); err == nil {
+			results = append(results, extra...)
+		}
+	}
+	return results
+}
+
+func redditOrEmpty(q string, n int) []item {
+	if r, err := redditSearch(q, n); err == nil {
+		return r
+	}
+	return nil
+}
+
+func archiveOrEmpty(q string, n int) []item {
+	if r, err := archiveSearch(q, n); err == nil {
+		return r
+	}
+	return nil
+}
+
+// sortCands orders candidates by source score (primaries first), stable.
+func sortCands(cands []cand) {
+	sort.SliceStable(cands, func(i, j int) bool { return cands[i].score > cands[j].score })
+}
+
+// fetchParallel fetches full text for candidates with bounded concurrency,
+// preserving input order. Empty fetches keep the snippet (filled by caller).
+func fetchParallel(cands []cand) []fetchedDoc {
+	out := make([]fetchedDoc, len(cands))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 8)
+	for i, c := range cands {
+		wg.Add(1)
+		go func(i int, c cand) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			text := fetchURLText(c.item.URL)
+			if len(text) > fetchTextLen {
+				text = text[:fetchTextLen]
+			}
+			out[i] = fetchedDoc{item: c.item, text: text, aspect: c.aspect}
+		}(i, c)
+	}
+	wg.Wait()
+	return out
+}
+
+var hrefRe = regexp.MustCompile(`href=["'](https?://[^"'<> ]+)["']`)
+
+// followOutlinks fetches one hop from the top-5 fetched docs: up to n fresh
+// absolute http(s) outlinks not already seen. Best-effort, failures skipped.
+func followOutlinks(fetched []fetchedDoc, seen map[string]bool, n int) []fetchedDoc {
+	top := len(fetched)
+	if top > 5 {
+		top = 5
+	}
+	var extra []cand
+	for _, f := range fetched[:top] {
+		raw := fetchRawHTML(f.item.URL)
+		if raw == "" {
+			continue
+		}
+		for _, m := range hrefRe.FindAllStringSubmatch(raw, -1) {
+			if len(extra) >= n*2 {
+				break
+			}
+			u := m[1]
+			if seen[u] {
+				continue
+			}
+			seen[u] = true
+			extra = append(extra, cand{item: item{Title: u, URL: u}, score: scoreDomain(u), aspect: f.aspect})
+			if len(extra) >= n*2 {
+				break
+			}
+		}
+		if len(extra) >= n*2 {
+			break
+		}
+	}
+	if len(extra) == 0 {
+		return nil
+	}
+	sortCands(extra)
+	if len(extra) > n {
+		extra = extra[:n]
+	}
+	return fetchParallel(extra)
+}
+
+// fetchRawHTML returns up to 300KB of raw HTML for outlink extraction,
+// reusing the SSRF-safe client. Empty on any failure.
+func fetchRawHTML(rawURL string) string {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return ""
+	}
+	if hostBlocked(u.Hostname()) {
+		return ""
+	}
+	resp, err := safeClient().Do(&http.Request{Method: "GET", URL: u, Header: http.Header{"User-Agent": []string{"Truthseekers/1.0 (encyclopedia agent)"}}})
 	if err != nil {
 		return ""
 	}
-	return text
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return ""
+	}
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 300<<10))
+	return string(body)
+}
+
+// fetchURLText does a guarded HTTP GET and strips HTML to plain text (S8),
+// falling back to the Wayback Machine's latest snapshot when the live fetch
+// fails (dead pages, suppressed sources).
+func fetchURLText(rawURL string) string {
+	if text, err := fetchSafeText(rawURL, fetchTextLen); err == nil && text != "" {
+		return text
+	}
+	if snap := waybackSnapshot(rawURL); snap != "" {
+		if text, err := fetchSafeText(snap, fetchTextLen); err == nil {
+			return text
+		}
+	}
+	return ""
+}
+
+// waybackSnapshot resolves the latest archived snapshot URL for rawURL via
+// the archive.org availability API (no key, stdlib). Empty when none exists.
+func waybackSnapshot(rawURL string) string {
+	api := "https://archive.org/wayback/available?url=" + url.QueryEscape(rawURL)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(api)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	var parsed struct {
+		Closest struct {
+			URL string `json:"url"`
+		} `json:"closest"`
+	}
+	if json.NewDecoder(resp.Body).Decode(&parsed) != nil || parsed.Closest.URL == "" {
+		return ""
+	}
+	return parsed.Closest.URL
 }
 
 // fetchSafeText fetches a URL with SSRF guards: http/https only, no

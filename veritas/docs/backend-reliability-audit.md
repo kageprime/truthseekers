@@ -95,9 +95,36 @@ Skipped: true token-bucket (fixed-window is fine at this scale), trusted-proxy h
 
 Skipped: `RetroArticle` keeps its own `useRefreshDiff` (standalone surface, no composite loaded there); CDN/`stale-while-revalidate` — revisit with traffic data.
 
-## To Do — Phase 2+
+## Done — Phase 2.4 (billing hardening)
 
-1. **Billing hardening (S).** Paystack: no event-id dedup (replayed `subscription.disable` downgrades by email), transient fulfill failures return 200 (payment lost till manual `/verify`), mock mode bypasses ledger. Quota is `used=2` hardcoded, never enforced on generate.
-3. **Search + graph scale (M).** `ILIKE %..%` seq-scans (needs `tsvector` GIN), JSONB contradiction predicates unindexed, `graph_edges` has no FK and no `target` index (added in 013 — verify on prod), N+1 in `GetRefreshDiff` and coordinator tick (~400 trips).
-4. **Versioned API + shared job queue (L).** Unversioned routes except `/v1/*`, hand-split router (slug `top`/`search` unreachable), per-process 3-slot engine. `/v2` + Postgres `LISTEN/NOTIFY` queue for multi-dyno.
-5. **Observability (M).** `log.Printf` only, no request IDs, `agent_trace.log` overwritten per chat run, `/health` has no DB ping or migration version. OTel spans per DAG node + real `/queue` dashboard (attempts, per-node duration, dead-letter replay).
+| # | Fix | Files |
+|---|-----|-------|
+| 1 | Webhook event dedup: `webhook_events` ledger keyed `event:id` (fallback ref/email); replays ack `{"duplicate":true}` instead of re-firing fulfillment or re-downgrading. Dedup key released on transient failure so Paystack retries reprocess. | `migrations/015_billing_dedup_usage.sql`, `internal/storage/db.go`, `internal/api/paystack.go` |
+| 2 | Transient vs permanent webhook responses: transport/provider-5xx/DB-write failures → 502/503 (Paystack retries); amount/plan/tier rejects → 200 + loud log. `errPaystackTransient` sentinel via `errors.Is`. | `internal/api/paystack.go` |
+| 3 | Real daily quota: `daily_usage` table, atomic check-and-increment upsert (no overshoot under concurrency), enforced on generate/refresh/contest (free 10/day, pro 100/day, enterprise unlimited, fail-open on ledger error, 429 + Retry-After till midnight). Burns only on real enqueues. `/quota` reports real used/remaining. | `internal/storage/db.go`, `internal/api/handlers.go`, `contest.go` |
+| 4 | Mock ledger parity: payments, usage, webhook keys in memory — file mode no longer double-fulfills or ignores quota. | `internal/storage/db.go` |
+| 5 | Tests `TestMockBillingLedger` (ledger idempotency + quota + dedup) and `TestPaystackWebhookReplayDeduped`. | `internal/storage/billing_test.go`, `internal/api/paystack_test.go` |
+
+Skipped: subscription-grace windows on disable, plan-change proration — needs product decisions first.
+
+## Done — Phase 2.5 (Search + Graph Scale)
+
+| # | Fix | Files |
+|---|-----|-------|
+| 1 | Trigram GIN indexes created on `articles.title`, `articles.abstract`, and `maps.title` for fast pattern matching. Expression index added for JSONB `contradiction_level`. | `migrations/016_perf_gin_and_expression_indexes.sql` |
+| 2 | `GetRefreshDiff` uses `ROW_NUMBER() OVER` window function query to eliminate 1+N DB calls. | `internal/storage/epistemic.go` |
+
+## Done — Phase 2.6 (Router Guarding & Reliability)
+
+| # | Fix | Files |
+|---|-----|-------|
+| 1 | Reserved keyword guards (`top`, `search`) added to `handleArticlesDynamicRoute` preventing route ambiguity and 404/wrong-slug fallbacks. | `internal/api/server.go` |
+
+## Done — Phase 2.7 (Observability & Diagnostics)
+
+| # | Fix | Files |
+|---|-----|-------|
+| 1 | Active DB ping check added to `/health` with a 2s context timeout, returning status `ok` or `unreachable` with appropriate HTTP status codes (200 / 533). | `internal/storage/db.go`, `internal/api/server.go` |
+| 2 | Fixed `agent_trace.log` overwriting behavior by implementing `appendAgentTrace` using append file flags (`O_APPEND|O_CREATE|O_WRONLY`). | `internal/api/chat.go` |
+| 3 | Added `Duration` tracking per DAG node in `ProgressUpdate` struct. | `internal/dag/engine.go` |
+
