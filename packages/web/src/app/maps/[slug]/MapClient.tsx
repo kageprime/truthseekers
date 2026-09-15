@@ -128,23 +128,7 @@ export default function MapClient({ slug, map: initialMap }: MapClientProps) {
     <PageLayout maxWidthClass="max-w-[88rem]">
       <div className="w-full">
         <article className="px-4 sm:px-6 lg:px-10 pt-3 sm:pt-4 pb-6 sm:pb-8 w-full animate-appear-up">
-          {/* Back link — gold badge with hover arrow */}
-          <button
-            onClick={() => router.back()}
-            className="group inline-flex items-center gap-2 mb-4 no-underline cursor-pointer"
-            style={{ color: "var(--muted)", background: "none", border: "none", padding: 0 }}
-          >
-            <span className="flex items-center justify-center w-7 h-7 rounded-full transition-all duration-500" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)", transitionTimingFunction: "cubic-bezier(0.32, 0.72, 0, 1)" }}>
-              <svg
-                width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                style={{ color: "var(--accent)", transition: "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)" }}
-                className="group-hover:-translate-x-0.5"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </span>
-            <span className="text-[11px] font-medium tracking-wide" style={{ letterSpacing: "0.06em" }}>Back to atlas</span>
-          </button>
+
 
           {/* Masthead — natural-history plate: folio row, Didone headline,
               italic deck, double rule. */}

@@ -287,15 +287,16 @@ function ListBlock({ data }: { data: ListBlockData }) {
 }
 
 function HeadingBlock({ data }: { data: HeadingBlockData }) {
-  if (!data) return null;
+  if (!data || !data.text) return null;
   const level = data.level ?? 3;
   const Tag = level === 1 ? "h1" : level === 2 ? "h2" : "h3";
+  const id = data.text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const style: React.CSSProperties = level === 1
-    ? { fontFamily: "var(--font-display)", fontSize: "1.85rem", fontWeight: 700, margin: "2.25rem 0 0.75rem", letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.25 }
+    ? { fontFamily: "var(--font-display)", fontSize: "1.85rem", fontWeight: 700, margin: "2.25rem 0 0.75rem", letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.25, scrollMarginTop: "5rem" }
     : level === 2
-    ? { fontFamily: "var(--font-display)", fontSize: "1.4rem", fontWeight: 700, margin: "1.75rem 0 0.5rem", paddingBottom: "0.4rem", borderBottom: "1px solid var(--gold)", color: "var(--ink)", letterSpacing: "-0.01em" }
-    : { fontFamily: "var(--font-display)", fontSize: "1.15rem", fontWeight: 600, margin: "1.4rem 0 0.5rem", color: "var(--ink)", fontStyle: "italic" };
-  return <Tag style={style}>{data.text}</Tag>;
+    ? { fontFamily: "var(--font-display)", fontSize: "1.4rem", fontWeight: 700, margin: "1.75rem 0 0.5rem", paddingBottom: "0.4rem", borderBottom: "1px solid var(--gold)", color: "var(--ink)", letterSpacing: "-0.01em", scrollMarginTop: "5rem" }
+    : { fontFamily: "var(--font-display)", fontSize: "1.15rem", fontWeight: 600, margin: "1.4rem 0 0.5rem", color: "var(--ink)", fontStyle: "italic", scrollMarginTop: "5rem" };
+  return <Tag id={id} data-section-id={id} style={style}>{data.text}</Tag>;
 }
 
 function TextBlock({

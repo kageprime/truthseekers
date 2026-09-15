@@ -46,7 +46,7 @@ export default function EmptyChatState({ onSetInput }: EmptyChatStateProps) {
             What should we research?
           </h1>
           <p className="text-[13px] max-w-md mx-auto leading-relaxed" style={{ color: "#555" }}>
-            Ask anything — we research deeply, then return maps, timelines, diagrams, and sourced claims. Use the composer below.
+            Ask anything — I can read your current article, delegate research tasks to sub-agents, and fact-check claims in real time.
           </p>
         </div>
       </div>

@@ -26,6 +26,8 @@ import type { Article } from "@encarta/core";
 import { IconXCircle, IconBook, IconLightning, IconFile, IconFileText, IconUser, IconRefresh, IconAlert } from "../../components/Icons";
 import RetroWindow from "../../components/retro/RetroWindow";
 import RetroArticle from "../../components/retro/RetroArticle";
+import ArticleTocDrawer from "../../components/ArticleTocDrawer";
+import { articleBus } from "@/lib/articleBus";
 import { IS_RETRO } from "@/lib/retro";
 
 interface ArticleClientProps {
@@ -96,14 +98,16 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   const [trailClaimId, setTrailClaimId] = useState<string | null>(null);
   const handleChipSelect = useCallback((id: string) => {
     setActiveClaimId(id);
+    articleBus.emit({ type: "CLAIM_CLICKED", payload: { claimId: id, text: claimsIndex[id]?.text } });
     requestAnimationFrame(() => {
       document.getElementById(`claim-note-${id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     });
-  }, []);
+  }, [claimsIndex]);
   const openTrail = useCallback((id: string) => {
     setActiveClaimId(id);
     setTrailClaimId(id);
-  }, []);
+    articleBus.emit({ type: "CLAIM_CLICKED", payload: { claimId: id, text: claimsIndex[id]?.text } });
+  }, [claimsIndex]);
   const closeTrail = useCallback(() => {
     setTrailClaimId(null);
     setActiveClaimId(null);
@@ -372,26 +376,11 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
 
   return (
     <PageLayout maxWidthClass="max-w-[88rem]">
+      <ArticleTocDrawer blocks={bodyBlocks} />
       {/* No card frame — the page itself is the surface. */}
       <div className="w-full">
       <article className="px-4 sm:px-6 lg:px-10 pt-3 sm:pt-4 pb-6 sm:pb-8 w-full animate-appear-up">
-        {/* Back link — gold badge with hover arrow */}
-        <button
-          onClick={() => router.back()}
-          className="group inline-flex items-center gap-2 mb-4 no-underline cursor-pointer"
-          style={{ color: "var(--muted)", background: "none", border: "none", padding: 0 }}
-        >
-          <span className="flex items-center justify-center w-7 h-7 rounded-full transition-all duration-500" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)", transitionTimingFunction: "cubic-bezier(0.32, 0.72, 0, 1)" }}>
-            <svg
-              width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              style={{ color: "var(--accent)", transition: "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)" }}
-              className="group-hover:-translate-x-0.5"
-            >
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </span>
-          <span className="text-[11px] font-medium tracking-wide" style={{ letterSpacing: "0.06em" }}>Back to encyclopedia</span>
-        </button>
+
 
         {/* Admin float-island — floating pill at top-right */}
           <div

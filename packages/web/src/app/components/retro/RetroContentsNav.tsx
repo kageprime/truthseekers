@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { NAV_GROUPS, RETRO_ROUTES } from "@/lib/routes";
-import { IconBack, IconFwd, IconBook, IconChat, IconClock, IconGear, IconGraph, IconHome, IconList, IconMap, IconPencil, IconQuestion, IconScale, IconTag, IconWrench } from "./icons";
+import { IconBook, IconChat, IconClock, IconGear, IconGraph, IconHome, IconList, IconMap, IconPencil, IconQuestion, IconScale, IconTag, IconWrench } from "./icons";
+
 
 const ICONS: Record<string, (p: { size?: number }) => React.ReactNode> = {
   home: IconHome, book: IconBook, graph: IconGraph, scale: IconScale, question: IconQuestion,
@@ -34,8 +34,8 @@ export default function RetroContentsNav({ pathname, showAdmin, outline, activeO
   sessionsLoading?: boolean;
   alwaysOpen?: boolean;
 }) {
-  const router = useRouter();
   const [treeOpen, setTreeOpen] = useState(false);
+
   const navOpen = alwaysOpen || treeOpen;
 
   return (
@@ -185,18 +185,7 @@ export default function RetroContentsNav({ pathname, showAdmin, outline, activeO
         </div>
       </div>
 
-      {/* Action Footer — ponytail: compact icon-only row, same on mobile. */}
-      <div className="mt-auto p-1.5 flex gap-1 border-t border-[var(--r-border)]" style={{ paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))" }}>
-        <button className="r-btn flex-1 inline-flex items-center justify-center px-1 py-1" onClick={() => router.back()} aria-label="Go back" title="Back">
-          <IconBack size={12} />
-        </button>
-        <button className="r-btn flex-1 inline-flex items-center justify-center px-1 py-1" onClick={() => router.forward()} aria-label="Go forward" title="Forward">
-          <IconFwd size={12} />
-        </button>
-        <button className="r-btn flex-1 inline-flex items-center justify-center px-1 py-1" onClick={() => router.push("/article/new")} aria-label="Write a new article" title="New article">
-          <IconPencil size={12} />
-        </button>
-      </div>
+
     </div>
   );
 }

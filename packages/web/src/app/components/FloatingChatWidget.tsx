@@ -14,12 +14,15 @@ import TruthConsole from "./TruthConsole";
 import TruthConsoleDeck from "./truth-console/TruthConsoleDeck";
 import { useTraceSegments } from "./truth-console/useTraceSegments";
 import Spinner from "./Spinner";
+import { useVisibleContent } from "../hooks/useVisibleContent";
+import { articleBus } from "@/lib/articleBus";
 
 const CONV_STORAGE_KEY = "truthseekers_floating_conv";
 
 export default function FloatingChatWidget() {
   const queryClient = useQueryClient();
-  const { close, activeConversationId, setActiveConversationId, toggleExpanded } = useFloatingChat();
+  const { open, close, activeConversationId, setActiveConversationId, toggleExpanded } = useFloatingChat();
+  const visibleContent = useVisibleContent();
   // Console + sending state now live in ChatContext so this widget and the
   // chat page share one source of truth (useTraceSegments reads them).
   const { liveEvents, sending, setSending, setLiveEvents } = useChatContext();
@@ -55,6 +58,18 @@ export default function FloatingChatWidget() {
     if (switcherOpen) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [switcherOpen]);
+
+  // Article bus listener for claim clicks
+  useEffect(() => {
+    const unsubscribe = articleBus.subscribe((event) => {
+      if (event.type === "CLAIM_CLICKED") {
+        const text = event.payload.text || event.payload.claimId;
+        setInput(`What is the evidence for claim: "${text}"?`);
+        open();
+      }
+    });
+    return unsubscribe;
+  }, [open]);
 
   // Load saved conversation ID
   useEffect(() => {
@@ -145,6 +160,14 @@ export default function FloatingChatWidget() {
         const finalBlocks = event.blocks ?? [];
         setStreamContent("");
         setStreamBlocks(finalBlocks);
+
+        // Memory persistence — save last query & answer summary
+        try {
+          const memKey = `truthseekers_mem_${cid}`;
+          const summary = { query: msg, answer: (event.content || "").slice(0, 250), timestamp: Date.now() };
+          localStorage.setItem(memKey, JSON.stringify(summary));
+        } catch {}
+
         queryClient.setQueryData(["chat", cid!], (prev: any) => {
           if (!prev) return prev;
           const real = prev.messages.map((m: any) =>
@@ -167,7 +190,7 @@ export default function FloatingChatWidget() {
       onError: (err: string) => {
         setError(err || "Stream error occurred");
       },
-    }, model);
+    }, model, visibleContent.hasContent ? visibleContent : undefined);
 
     setTimeout(() => setSending(false), 0);
   }, [convId, sending, streamSend, queryClient, setLiveEvents, setActiveConversationId, createChat, setSending, model]);

@@ -291,8 +291,13 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Content string `json:"content"`
-		Model   string `json:"model"`
+		Content     string `json:"content"`
+		Model       string `json:"model"`
+		PageContext *struct {
+			ArticleSlug     *string  `json:"articleSlug"`
+			ArticleTitle    *string  `json:"articleTitle"`
+			VisibleSections []string `json:"visibleSections"`
+		} `json:"pageContext"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Content == "" || len(body.Content) > 50000 || len(body.Model) > 100 {
@@ -303,6 +308,23 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	model := body.Model
 	if model == "" {
 		model = "muse-spark-1.3-contributor"
+	}
+
+	sysPrompt := chatSystemPrompt
+	if body.PageContext != nil {
+		ctxNote := "\n\n[USER SCREEN CONTEXT:"
+		if body.PageContext.ArticleSlug != nil && *body.PageContext.ArticleSlug != "" {
+			title := ""
+			if body.PageContext.ArticleTitle != nil {
+				title = *body.PageContext.ArticleTitle
+			}
+			ctxNote += fmt.Sprintf(" Reading article '%s' (%s).", *body.PageContext.ArticleSlug, title)
+		}
+		if len(body.PageContext.VisibleSections) > 0 {
+			ctxNote += fmt.Sprintf(" Visible sections on screen: %s.", strings.Join(body.PageContext.VisibleSections, ", "))
+		}
+		ctxNote += " Answer questions with awareness of what the user is currently looking at on screen.]"
+		sysPrompt += ctxNote
 	}
 
 	// Load existing messages (before this new one)
@@ -379,7 +401,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 
 	agentConfig := agent.AgentConfig{
 		Model:        model,
-		SystemPrompt: chatSystemPrompt,
+		SystemPrompt: sysPrompt,
 		Messages:     history,
 		Temperature:  0.7,
 		// ponytail: request ctx parents the run — tab close aborts in-flight

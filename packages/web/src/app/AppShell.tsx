@@ -178,11 +178,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {/* Floating toggle button — hidden on mobile (bottom dock provides nav) */}
+      {/* Floating toggle button — desktop only (mobile uses bottom tab bar) */}
       {!isOpen && !isHidden && !isChatRoute && (
         <button
           onClick={toggle}
-          className={`fixed bottom-6 right-6 fab-chat ${isMobile ? "hidden md:flex" : ""}`} style={{ zIndex: "var(--z-chat-toggle)" }}
+          className="hidden lg:flex fixed bottom-6 right-6 fab-chat" style={{ zIndex: "var(--z-chat-toggle)" }}
           aria-label="Open chat"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -190,6 +190,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </svg>
         </button>
       )}
+
 
       {/* Mock mode controls */}
       {IS_MOCK && user && (

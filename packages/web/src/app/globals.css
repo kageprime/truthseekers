@@ -805,7 +805,11 @@ body::before {
 }
 /* Narrow screens: stack everything, floats become full width. */
 @media (max-width: 1023px) {
-  .mag-flow { columns: 1; }
+  .mag-flow {
+    columns: 1;
+    font-size: 1rem;
+    line-height: 1.75;
+  }
 }
 @media (max-width: 640px) {
   .mag-float-right,
@@ -1944,4 +1948,24 @@ code[class*="language-"] {
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.04),
     inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Mobile Article Presentation & TOC Drawer */
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (max-width: 640px) {
+  .plate-deck {
+    -webkit-line-clamp: unset !important;
+    max-height: none !important;
+  }
+  .plate-controls {
+    gap: 0.35rem;
+  }
 }
