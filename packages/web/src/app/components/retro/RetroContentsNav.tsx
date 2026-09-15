@@ -16,19 +16,32 @@ export interface OutlineItem {
   label: string;
 }
 
-export default function RetroContentsNav({ pathname, showAdmin, outline, activeOutline, onOutlineSelect }: {
+export interface SessionItem {
+  id: string;
+  label: string;
+}
+
+export default function RetroContentsNav({ pathname, showAdmin, outline, activeOutline, onOutlineSelect, sessions, activeSessionId, onSelectSession, onNewSession, sessionsLoading, alwaysOpen }: {
   pathname: string;
   showAdmin: boolean;
   outline?: OutlineItem[];
   activeOutline?: string;
   onOutlineSelect?: (id: string) => void;
+  sessions?: SessionItem[];
+  activeSessionId?: string | null;
+  onSelectSession?: (id: string) => void;
+  onNewSession?: () => void;
+  sessionsLoading?: boolean;
+  alwaysOpen?: boolean;
 }) {
   const router = useRouter();
   const [treeOpen, setTreeOpen] = useState(false);
+  const navOpen = alwaysOpen || treeOpen;
 
   return (
     <div className="r-side w-full lg:w-[260px] shrink-0 bg-[var(--r-nav-bg)] border-r border-[var(--r-border)] flex flex-col rounded-[var(--r-radius)] transition-colors duration-200">
       {/* Mobile Toggle */}
+      {!alwaysOpen && (
       <button
         className="lg:hidden bg-[var(--r-accent)] text-white text-[11px] font-bold px-3 py-2 flex items-center justify-between w-full"
         onClick={() => setTreeOpen((o) => !o)}
@@ -38,6 +51,7 @@ export default function RetroContentsNav({ pathname, showAdmin, outline, activeO
         <span>ENCYCLOPEDIA CONTENTS</span>
         <span aria-hidden>{treeOpen ? "▾" : "▸"}</span>
       </button>
+      )}
 
       {/* Desktop Header */}
       <div className="hidden lg:flex bg-[var(--r-accent)] text-white text-[11px] font-bold px-3 py-1.5 items-center justify-between">
@@ -48,7 +62,7 @@ export default function RetroContentsNav({ pathname, showAdmin, outline, activeO
       </div>
 
       {/* Contents Tree */}
-      <nav id="retro-contents" className={`${treeOpen ? "block max-h-[50dvh]" : "hidden"} lg:block lg:max-h-none p-2.5 space-y-3 overflow-auto r-scroll`} aria-label="Site contents">
+      <nav id="retro-contents" className={`${navOpen ? "block max-h-[50dvh]" : "hidden"} lg:block lg:max-h-none p-2.5 space-y-3 overflow-auto r-scroll`} aria-label="Site contents">
         {NAV_GROUPS.map((g) => (
           <div key={g} className="space-y-1">
             <div className="text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 text-[var(--r-muted)]">
@@ -81,6 +95,51 @@ export default function RetroContentsNav({ pathname, showAdmin, outline, activeO
             </div>
           </div>
         ))}
+        {/* ponytail: chat injects sessions here so site menu + chat drawer share one component. */}
+        {sessions !== undefined && (
+          <div className="space-y-1 pt-2 mt-1 border-t border-[var(--r-border)]">
+            <div className="flex items-center justify-between px-2 py-0.5">
+              <div className="text-[9px] font-bold tracking-widest uppercase text-[var(--r-muted)]">
+                Sessions
+              </div>
+              {onNewSession && (
+                <button
+                  onClick={onNewSession}
+                  aria-label="New chat"
+                  className="text-[10px] font-bold px-1.5 py-0.5 border border-[var(--r-border)] rounded-[var(--r-radius)] hover:bg-black/5 text-[var(--r-ink)] cursor-pointer"
+                >
+                  + New
+                </button>
+              )}
+            </div>
+            <div className="space-y-0.5">
+              {sessionsLoading ? (
+                <div className="px-2 py-4 text-[11px] text-center text-[var(--r-muted)]">Loading…</div>
+              ) : sessions.length === 0 ? (
+                <div className="px-2 py-4 text-[11px] text-center text-[var(--r-muted)]">No conversations yet</div>
+              ) : (
+                sessions.map((s) => {
+                  const isActive = activeSessionId === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => { onSelectSession?.(s.id); if (!alwaysOpen) setTreeOpen(false); }}
+                      aria-current={isActive ? "true" : undefined}
+                      className={`w-full text-left px-2.5 py-1.5 text-[12px] border rounded-[var(--r-radius)] transition-colors cursor-pointer ${
+                        isActive
+                          ? "bg-[var(--r-accent)] border-[var(--r-accent)] font-semibold shadow-sm"
+                          : "bg-transparent border-transparent hover:bg-black/5 text-[var(--r-ink)]"
+                      }`}
+                      style={isActive ? { color: "#ffffff" } : undefined}
+                    >
+                      <span className="block truncate leading-snug">{s.label}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
         {/* ponytail: article pages inject their outline here so every page
             shares one nav component instead of a bespoke sidebar. */}
         {outline && outline.length > 0 && (

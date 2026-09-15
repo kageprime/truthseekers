@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, use, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChat, useChats, useCreateChat } from "../../hooks";
 import { useChatStream } from "../../hooks/useChatStream";
@@ -11,18 +10,23 @@ import ChatMessage from "../../components/ChatMessage";
 import EmptyChatState from "../../components/EmptyChatState";
 import TruthConsole from "../../components/TruthConsole";
 import RetroWindow from "../../components/retro/RetroWindow";
+import RetroContentsNav from "../../components/retro/RetroContentsNav";
+import { canSeeAdmin } from "@/lib/routes";
+import { useAuth } from "../../hooks/useAuth";
 import { useTraceSegments } from "../../components/truth-console/useTraceSegments";
 import { useChatContext } from "../ChatContext";
 import { useTheme } from "../../components/ThemeProvider";
 import Spinner from "../../components/Spinner";
 import { IconPlus } from "../../components/Icons";
-import { IconBook, IconGear, IconMap } from "../../components/retro/icons";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const { send: streamSend, stop: streamStop } = useChatStream();
+  const { user } = useAuth();
+  const showAdmin = canSeeAdmin(user?.role);
 
   const {
     consoleOpen, setConsoleOpen,
@@ -33,7 +37,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   const [input, setInput] = useState("");
   const [streamContent, setStreamContent] = useState("");
-  const [streamSteps, setStreamSteps] = useState<string[]>([]);
   const [streamBlocks, setStreamBlocks] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [convId, setConvId] = useState<string | null>(id !== "new" ? id : null);
@@ -65,7 +68,20 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }
     });
-  }, [messages, streamContent, streamSteps]);
+  }, [messages, streamContent, liveEvents]);
+
+  // ponytail: iOS keyboard resizes visualViewport — keep pinned to bottom so composer stays visible.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    };
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
 
   const resizeRAF = useRef(0);
   useEffect(() => {
@@ -109,7 +125,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
       setInput("");
       setStreamContent("");
-      setStreamSteps([]);
       setStreamBlocks([]);
       agentEventsRef.current = [];
       setLiveEvents([]);
@@ -119,20 +134,18 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
       try {
         await streamSend(cid!, msg, {
+          // ponytail: useChatStream already accumulates fullText — replace, don't append (append doubles text).
           onText: (text: string) => {
-            setStreamContent((prev) => prev + text);
+            setStreamContent(text);
           },
           onToolEvent: (event: AgentEvent) => {
             agentEventsRef.current = [...agentEventsRef.current, event];
             setLiveEvents([...agentEventsRef.current]);
-            if (event.type === "tool_use" && event.data && typeof event.data === "object" && "name" in (event.data as Record<string, unknown>)) {
-              const name = String((event.data as Record<string, unknown>).name || "");
-              setStreamSteps((prev) => [...prev, `Tool call: ${name}`]);
-            }
           },
-          onDone: () => {
+          onDone: (event: any) => {
             if (finalizedRef.current) return;
             finalizedRef.current = true;
+            if (event?.blocks) setStreamBlocks(event.blocks);
             queryClient.invalidateQueries({ queryKey: ["chat", cid] });
             queryClient.invalidateQueries({ queryKey: ["chats"] });
             setSending(false);
@@ -161,7 +174,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     setConvId(null);
     setInput("");
     setStreamContent("");
-    setStreamSteps([]);
     setStreamBlocks([]);
     setError(null);
     setSending(false);
@@ -170,45 +182,68 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   const showEmpty = !convLoading && messages.length === 0 && !hasStreaming;
 
-  const NAV_LINKS = [
-    { label: "Encyclopedia Articles", href: "/articles", Icon: IconBook },
-    { label: "Claim Atlas & Graph", href: "/claim-graph", Icon: IconMap },
-    { label: "Admin & Settings", href: "/admin", Icon: IconGear },
-  ];
-
   return (
     <RetroWindow title={`TruthSeekers — Chat`} status={sending ? "Agent thinking…" : "Ready"} fixed>
       {/* ponytail: fixed shell → this fills the viewport; messages scroll, sessions + composer stay pinned. */}
       <div className="flex-1 flex flex-col md:flex-row h-full min-h-0 min-w-0 bg-[var(--r-surface)] rounded-[var(--r-radius)] overflow-hidden transition-colors duration-200 border border-[var(--r-border)]">
-        {/* Mobile Header Bar */}
-        <div className="md:hidden shrink-0 flex items-center justify-between px-3 h-10 bg-[var(--r-nav-bg)] border-b border-[var(--r-border)]">
-          <button
-            onClick={() => setMobileSidebarOpen(true)}
-            className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold bg-[var(--r-accent)] text-white rounded-[var(--r-radius)]"
-            aria-label="Open session list"
-          >
-            <span>Sessions</span>
-            <span>▾</span>
-          </button>
-          <span className="text-[12px] font-bold truncate max-w-[160px]" style={{ color: "var(--r-ink)" }}>
-            {conv?.title ?? "TruthSeekers Chat"}
-          </span>
-          <button
-            onClick={handleNewChat}
-            className="flex items-center justify-center w-7 h-7 bg-[var(--r-header-accent)] text-black font-bold rounded-sm border border-black/30"
-            aria-label="New chat"
-          >
-            <IconPlus size={14} />
-          </button>
+        {/* Mobile Header Bar - Native App Style */}
+        <div className="md:hidden shrink-0 flex items-center justify-between px-3 h-12 bg-[var(--r-nav-bg)] border-b border-[var(--r-border)] gap-2 shadow-xs">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--r-surface-elevated)] border border-[var(--r-border)] text-[var(--r-ink)] active:scale-95"
+              aria-label="Open sessions list"
+              title="Sessions"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <button
+              onClick={handleNewChat}
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--r-surface-elevated)] border border-[var(--r-border)] text-[var(--r-ink)] active:scale-95"
+              aria-label="New chat"
+              title="New Chat"
+            >
+              <IconPlus size={14} />
+            </button>
+          </div>
+
+          <div className="flex flex-col items-center min-w-0 flex-1 px-1">
+            <span className="text-[12.5px] font-bold truncate max-w-[170px]" style={{ color: "var(--r-ink)" }}>
+              {conv?.title ?? "TruthSeekers Chat"}
+            </span>
+            <span className="text-[9.5px] text-[var(--r-muted)] flex items-center gap-1">
+              <span className={`w-1.5 h-1.5 rounded-full ${sending ? "bg-[var(--r-accent)] animate-pulse" : "bg-emerald-500"}`} />
+              <span>{sending ? "Agent working…" : "Ready"}</span>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setConsoleOpen((o) => !o)}
+              aria-label="Toggle agent trace"
+              className="flex items-center gap-1 px-2 h-8 text-[11px] font-medium bg-[var(--r-surface-elevated)] border border-[var(--r-border)] text-[var(--r-ink)] rounded-lg active:scale-95"
+            >
+              <span>Trace</span>
+              {seg.unreadCount > 0 && (
+                <span className="bg-red-700 text-white text-[8px] px-1 py-0.2 rounded-full font-bold">
+                  {seg.unreadCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* Mobile Sidebar Drawer */}
+        {/* Mobile Sidebar Drawer — ponytail: same RetroContentsNav as site, sessions injected. */}
         {mobileSidebarOpen && (
           <div className="md:hidden fixed inset-0 z-[100]" role="dialog" aria-modal="true">
             <div className="absolute inset-0 bg-black/50" onClick={() => setMobileSidebarOpen(false)} />
-            <aside className="absolute left-0 top-0 bottom-0 w-72 flex flex-col bg-[var(--r-surface)] border-r border-[var(--r-border)] shadow-xl">
+            <aside className="absolute left-0 top-0 bottom-0 w-72 flex flex-col bg-[var(--r-surface)] border-r border-[var(--r-border)] shadow-xl overflow-hidden">
               <div className="shrink-0 flex items-center justify-between px-3 h-10 bg-[var(--r-accent)] text-white">
-                <span className="text-[12px] font-bold">Conversations</span>
+                <span className="text-[12px] font-bold">Menu</span>
                 <button
                   onClick={() => setMobileSidebarOpen(false)}
                   className="flex items-center justify-center w-6 h-6 text-white"
@@ -218,38 +253,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                 </button>
               </div>
 
-              <div className="shrink-0 p-2.5 space-y-1 border-b border-[var(--r-border)]">
-                {NAV_LINKS.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setMobileSidebarOpen(false)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 text-[12px] font-medium text-[var(--r-ink)] hover:bg-black/5 rounded-[var(--r-radius)] no-underline"
-                  >
-                    <span aria-hidden><link.Icon size={14} /></span>
-                    <span>{link.label}</span>
-                  </Link>
-                ))}
-              </div>
-
-              <div className="flex-1 overflow-y-auto min-h-0 p-2 space-y-1 r-scroll">
-                {chatsLoading ? (
-                  <div className="flex items-center justify-center py-6"><Spinner size={14} /></div>
-                ) : conversations.length === 0 ? (
-                  <div className="px-2 py-6 text-[11px] text-center text-[var(--r-muted)]">No conversations yet</div>
-                ) : (
-                  conversations.map((c: any) => (
-                    <button
-                      key={c.id}
-                      onClick={() => { router.push(`/chat/${c.id}`); setMobileSidebarOpen(false); }}
-                      className={`w-full text-left px-2.5 py-1.5 text-[12px] rounded-[var(--r-radius)] border transition-colors ${
-                        c.id === convId ? "bg-[var(--r-accent)] text-white border-[var(--r-accent)] font-semibold" : "bg-transparent border-transparent text-[var(--r-ink)] hover:bg-black/5"
-                      }`}
-                    >
-                      <div className="truncate">{c.title}</div>
-                    </button>
-                  ))
-                )}
+              <div className="flex-1 min-h-0 overflow-y-auto r-scroll p-1.5">
+                <RetroContentsNav
+                  pathname={pathname}
+                  showAdmin={showAdmin}
+                  alwaysOpen
+                  sessions={conversations.map((c: any) => ({ id: c.id, label: c.title }))}
+                  activeSessionId={convId}
+                  sessionsLoading={chatsLoading}
+                  onNewSession={() => { handleNewChat(); setMobileSidebarOpen(false); }}
+                  onSelectSession={(sid) => { router.push(`/chat/${sid}`); setMobileSidebarOpen(false); }}
+                />
               </div>
             </aside>
           </div>
@@ -323,7 +337,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                 ))}
 
                 {error && (
-                  <div className="mx-4 my-4 p-3 rounded-[var(--r-radius)] border border-red-300 bg-red-50 text-red-800 text-xs flex items-center justify-between gap-3">
+                  <div className="mx-4 my-4 p-3 rounded-xl border border-red-300 bg-red-50 text-red-800 text-xs flex items-center justify-between gap-3">
                     <span>{error}</span>
                     <button
                       onClick={() => {
@@ -338,17 +352,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                 )}
 
                 {hasStreaming && (
-                  <div className="border-t border-[var(--r-border)] bg-[var(--r-surface-elevated)]">
-                    {streamSteps.length > 0 && (
-                      <div className="px-4 py-2 space-y-1">
-                        {streamSteps.map((step, i) => (
-                          <div key={i} className="flex items-center gap-2 text-[11px] text-[var(--r-muted)]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--r-accent)]" />
-                            <span>{step}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  <div className="border-t border-[var(--r-border)] bg-[var(--r-surface-elevated)]/60">
                     <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} agentEvents={liveEvents} streaming />
                   </div>
                 )}
@@ -356,11 +360,24 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
 
-          {/* Footer & Composer Input Area */}
-          {!showEmpty && (
-            <div className="shrink-0 bg-[var(--r-nav-bg)] border-t border-[var(--r-border)] p-2.5 sm:p-4">
-              <div className="max-w-[960px] mx-auto space-y-2">
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[var(--r-muted)] px-1">
+          {/* Footer & Composer — ponytail: always pinned outside scroll, empty state is display-only. */}
+          <div className="shrink-0 sticky bottom-0 bg-[var(--r-nav-bg)]/95 backdrop-blur-md border-t border-[var(--r-border)] p-2 sm:p-3" style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
+            <div className="max-w-[960px] mx-auto space-y-1.5">
+              {error && (
+                <div className="p-2.5 rounded-xl border border-red-300 bg-red-50 text-red-800 text-xs flex items-center justify-between gap-3">
+                  <span>{error}</span>
+                  <button
+                    onClick={() => {
+                      setError(null);
+                      if (lastUserMsgRef.current) doSend(lastUserMsgRef.current);
+                    }}
+                    className="text-xs font-bold underline cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+                <div className="hidden sm:flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[var(--r-muted)] px-1">
                   <span>{sending ? "Agent working…" : conv?.title ?? "Conversation"}</span>
                   <button
                     onClick={() => setConsoleOpen((o) => !o)}
@@ -377,17 +394,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                   </button>
                 </div>
 
-                {/* Sleek Option C Composer Input Container */}
-                <div className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-2 flex items-end gap-2 shadow-sm">
+                {/* Sleek Mobile-Friendly Composer Input Container */}
+                <div className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-2xl p-1.5 sm:p-2 flex items-end gap-1.5 sm:gap-2 shadow-sm">
                   <textarea
                     ref={textareaRef}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={sending ? "Agent is typing..." : "Ask a research question or request an article..."}
+                    placeholder={sending ? "Agent is researching & writing..." : "Ask a research question or request an article..."}
                     disabled={sending}
                     rows={1}
-                    className="flex-1 bg-transparent border-none outline-none text-[13.5px] min-h-[36px] max-h-[160px] text-[var(--r-ink)] placeholder:text-[var(--r-muted)] px-2 py-1 resize-none"
+                    className="flex-1 bg-transparent border-none outline-none text-[15px] sm:text-[13.5px] min-h-[36px] max-h-[160px] text-[var(--r-ink)] placeholder:text-[var(--r-muted)] px-3 py-1.5 resize-none"
                     aria-label="Chat message input"
                     style={{ lineHeight: "1.5" }}
                   />
@@ -395,7 +412,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                     <button
                       onClick={() => streamStop(convId ?? undefined)}
                       aria-label="Stop generating"
-                      className="bg-red-700 text-white font-bold px-3 py-2 rounded-[var(--r-radius)] hover:bg-red-800 transition-colors text-xs shrink-0 h-[36px]"
+                      className="bg-red-700 text-white font-bold px-3 py-1.5 rounded-xl hover:bg-red-800 transition-colors text-xs shrink-0 h-[36px] flex items-center justify-center active:scale-95"
                     >
                       Stop
                     </button>
@@ -404,10 +421,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                       onClick={() => doSend(input)}
                       disabled={!input.trim()}
                       aria-label="Send message"
-                      className="bg-[var(--r-accent)] text-white font-bold px-3 py-2 rounded-[var(--r-radius)] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs shrink-0 h-[36px] flex items-center justify-center gap-1.5"
+                      className="bg-[var(--r-accent)] text-white font-bold w-9 h-9 rounded-xl hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs shrink-0 flex items-center justify-center active:scale-95"
                     >
-                      <span>Send</span>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="22" y1="2" x2="11" y2="13" />
                         <polygon points="22 2 15 22 11 13 2 9 22 2" />
                       </svg>
@@ -416,7 +432,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                 </div>
               </div>
             </div>
-          )}
         </div>
 
         {/* Desktop Trace Sidebar */}

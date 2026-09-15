@@ -6,7 +6,7 @@ import type { AgentEvent } from "../components/ProcessViewer";
 
 export interface StreamEvent {
   type: string;
-  data?: string;
+  data?: unknown;
   name?: string;
   content?: string;
   blocks?: any[];
@@ -76,14 +76,15 @@ export function useChatStream() {
           try {
             const event: StreamEvent = JSON.parse(payload);
             if (event.type === "text") {
-              if (needsReset) { fullText = event.data ?? ""; needsReset = false; }
-              else { fullText += event.data ?? ""; }
+              if (needsReset) { fullText = (event.data as string) ?? ""; needsReset = false; }
+              else { fullText += (event.data as string) ?? ""; }
               callbacks.onText(fullText);
-            } else if (event.type === "tool_use" || event.type === "tool_result" || event.type === "trace") {
+            } else if (event.type === "tool_use" || event.type === "tool_result") {
               needsReset = true;
-              if (event.type === "tool_use" || event.type === "tool_result") {
-                callbacks.onToolEvent({ type: event.type, data: event.data, timestamp: Date.now() });
-              }
+              callbacks.onToolEvent({ type: event.type, data: event.data, timestamp: Date.now() });
+            } else if (event.type === "status" || event.type === "error") {
+              // ponytail: feed Thoughts without wiping accumulated text.
+              callbacks.onToolEvent({ type: event.type, data: event.data, timestamp: Date.now() });
             } else if (event.type === "done") {
               receivedDone = true;
               callbacks.onDone(event);
