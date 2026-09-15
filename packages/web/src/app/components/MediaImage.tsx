@@ -100,12 +100,12 @@ export function MediaLightbox({ src, caption, onClose }: { src: string; caption?
   );
 }
 
-export function MediaImage({ src, caption, prompt }: { src?: string; caption?: string; prompt?: string }) {
+export function MediaImage({ src, caption, prompt, source }: { src?: string; caption?: string; prompt?: string; source?: string }) {
   const [open, setOpen] = useState(false);
   if (src) {
     return (
       <>
-        <FigureImage src={src} caption={caption || "Image"} onClick={() => setOpen(true)} />
+        <FigureImage src={src} caption={caption || "Image"} source={source} onClick={() => setOpen(true)} />
         {open && <MediaLightbox src={src} caption={caption} onClose={() => setOpen(false)} />}
       </>
     );
@@ -123,7 +123,15 @@ export function FigureImage({ src, caption, source, onClick }: { src: string; ca
     <figure className="glass-card-static p-3 my-2 cursor-pointer group" onClick={onClick}>
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-medium" style={{ color: "var(--subtle)" }}>IMAGE</span>
-        {source && <span className="text-[9px]" style={{ color: "var(--subtle)" }}>via {source}</span>}
+        {source && (
+          <span
+            className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full border"
+            style={{ color: "var(--gold)", borderColor: "var(--gold)", background: "var(--gold-bg)" }}
+            title={`Source: ${source}`}
+          >
+            Source: {source}
+          </span>
+        )}
       </div>
       <div className="bg-[var(--surface-elevated)]/50 rounded overflow-hidden relative">
         <img src={resolvedSrc} alt={caption} className="w-full h-auto max-h-96 object-contain transition-transform duration-300 group-hover:scale-[1.02]" loading="lazy" />

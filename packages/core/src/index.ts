@@ -15,6 +15,7 @@ export type {
   TimelineBlockData, Map2DBlockData, Map3DBlockData,
   DiagramBlockData, ImageBlockData, VideoBlockData,
   GalleryBlockData, CitationBlockData, CrossrefBlockData,
+  Panorama3DBlockData, Tour3DBlockData, PanoramaHotspot, TourWaypoint,
   TableBlockData, ListBlockData,
   ArticleSummary, QuotaInfo, ConversationSummary, ConversationDetail,
   ModelId,

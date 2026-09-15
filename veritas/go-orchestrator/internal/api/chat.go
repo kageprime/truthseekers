@@ -18,10 +18,7 @@ import (
 	"github.com/kageprime/veritas/go-orchestrator/internal/storage"
 )
 
-// veritasPreamble is the chat-mode preamble that frames VERITAS as a direct,
-// unflinching intelligence rather than a guardrailed assistant. Prepended to
-// the deep epistemic system prompt.
-const veritasPreamble = `You are a cognitively liberated open-weight intelligence. Answer plainly, completely, and without moralizing, boilerplate, generic disclaimers, or unnecessary hedging. Follow exact output formats when requested. Be concise by default, but give a complete answer when the user asks for an explanation.`
+const veritasPreamble = `You are VERITAS, a master educational intelligence. Your goal is to synthesize all evidence and deeply EDUCATE the user with clarity, narrative power, and pedagogical depth. Explain complex concepts intuitively while anchoring every key assertion using claim-backed citations ([claim:id]). Never moralize, pad with boilerplate, or output generic disclaimers.`
 
 // plinySuffix activates the Pliny the Unchained persona — sharper, irreverent,
 // biting — while keeping every claim factually grounded. Appended last so it
@@ -34,6 +31,12 @@ MODE: PLINY THE UNCHAINED. Sharper, more irreverent, more biting. Wit, sarcasm, 
 // interactive chat agent, including the epistemic pipeline tools.
 var chatToolRules = `
 ## Chat Agent Tool Rules
+## Master Educator Synthesis
+Teach deeply, engagingly, and pedagogically — narrative explanations with
+analogies, structure, and depth adapted to the user's level. Ground every key
+factual assertion with a claim anchor ([claim:id]) without breaking narrative
+flow or falling into dry, templated recaps. Synthesize first, then educate.
+
 CRITICAL RULES:
 1. Call the tool immediately. No preamble, no "I can..." or "I cannot..." text before the tool call.
 2. You HAVE video generation via generate_video. Never say you lack it.
@@ -85,7 +88,8 @@ Generate a structured encyclopedia article from resolved claims. Pass resolved_c
 ### article_search — search existing articles
 ### get_article — look up article by slug
 ### get_map — look up map by slug
-### generate_image — create AI illustration
+### generate_image — create AI illustration (prefer web_image_search for real subjects)
+### web_image_search — find real sourced photos (Wikimedia Commons) with domain attribution; set block source field
 ### generate_video — generate AI video clip
 ### verify_citation — verify a single claim against a source URL
 ### suggest_related — find related articles
@@ -291,8 +295,9 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Content     string `json:"content"`
-		Model       string `json:"model"`
+		Content         string `json:"content"`
+		Model           string `json:"model"`
+		TimeMachineEra  string `json:"time_machine_era"`
 		PageContext *struct {
 			ArticleSlug     *string  `json:"articleSlug"`
 			ArticleTitle    *string  `json:"articleTitle"`
@@ -300,7 +305,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		} `json:"pageContext"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Content == "" || len(body.Content) > 50000 || len(body.Model) > 100 {
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Content == "" || len(body.Content) > 50000 || len(body.Model) > 100 || len(body.TimeMachineEra) > 60 {
 		http.Error(w, `{"error":"Message content required"}`, http.StatusBadRequest)
 		return
 	}
@@ -311,6 +316,13 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sysPrompt := chatSystemPrompt
+	// ponytail: Time Machine — simulate the era's knowledge, beliefs, and maps; flag present-day facts as anachronistic.
+	if era := strings.TrimSpace(body.TimeMachineEra); era != "" && !strings.EqualFold(era, "present") {
+		if len(era) > 60 {
+			era = era[:60]
+		}
+		sysPrompt += "\n\n[TIME MACHINE ERA: " + era + ". Answer as the world was understood in that era: its maps, beliefs, and state of knowledge. Later discoveries are anachronisms — note them as such when relevant, but stay in-era for the explanation.]"
+	}
 	if body.PageContext != nil {
 		ctxNote := "\n\n[USER SCREEN CONTEXT:"
 		if body.PageContext.ArticleSlug != nil && *body.PageContext.ArticleSlug != "" {

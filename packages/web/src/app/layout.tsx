@@ -8,6 +8,8 @@ import { ChatProvider } from "./chat/ChatContext";
 import { HeaderSearchProvider } from "./HeaderSearchContext";
 import { ArticleViewProvider } from "./ArticleViewContext";
 import { AuthProvider } from "./components/AuthProvider";
+import { TimeMachineProvider } from "./hooks/useTimeMachine";
+import TimeMachineBar from "./components/TimeMachineBar";
 import RegisterSw from "./components/RegisterSw";
 import ScrollReveal from "./components/ScrollReveal";
 import { ToastProvider } from "./components/Toast";
@@ -54,15 +56,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <AuthProvider>
                 <FloatingChatProvider>
                     <ChatProvider>
-                      <HeaderSearchProvider>
-                        <ArticleViewProvider>
-                          <ToastProvider>
-                          <ScrollReveal />
-                          <RegisterSw />
-                          <AppShell>{children}</AppShell>
+                      <TimeMachineProvider>
+                       <HeaderSearchProvider>
+                         <ArticleViewProvider>
+                           <ToastProvider>
+                           <ScrollReveal />
+                           <RegisterSw />
+                           {/* ponytail: fixed overlay — one instance covers retro + island nav shells. */}
+                           <TimeMachineBar />
+                           <AppShell>{children}</AppShell>
                           </ToastProvider>
                         </ArticleViewProvider>
                       </HeaderSearchProvider>
+                      </TimeMachineProvider>
                     </ChatProvider>
                 </FloatingChatProvider>
                 </AuthProvider>

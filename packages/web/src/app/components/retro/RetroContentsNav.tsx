@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { NAV_GROUPS, RETRO_ROUTES } from "@/lib/routes";
+import { useTimeMachine } from "../../hooks/useTimeMachine";
 import { IconBook, IconChat, IconClock, IconGear, IconGraph, IconHome, IconList, IconMap, IconPencil, IconQuestion, IconScale, IconTag, IconWrench } from "./icons";
 
 
@@ -37,6 +38,8 @@ export default function RetroContentsNav({ pathname, showAdmin, outline, activeO
   const [treeOpen, setTreeOpen] = useState(false);
 
   const navOpen = alwaysOpen || treeOpen;
+  // ponytail: graceful fallback when rendered outside the provider.
+  const { activeEra, isActive, toggleOpen } = useTimeMachine();
 
   return (
     <div className="r-side w-full lg:w-[260px] shrink-0 bg-[var(--r-nav-bg)] border-r border-[var(--r-border)] flex flex-col rounded-[var(--r-radius)] transition-colors duration-200">
@@ -171,6 +174,24 @@ export default function RetroContentsNav({ pathname, showAdmin, outline, activeO
           </div>
         )}
       </nav>
+
+      {/* Time Machine toggle */}
+      <div className="mx-2.5 mt-2 hidden lg:block">
+        <button
+          onClick={toggleOpen}
+          aria-label="Toggle Time Machine"
+          title={isActive ? `Time Machine: ${activeEra} — click to change` : "Time Machine — explore history as of an era"}
+          className={`w-full text-left px-2.5 py-1.5 text-[12px] flex items-center gap-2 border rounded-[var(--r-radius)] transition-colors cursor-pointer ${
+            isActive
+              ? "bg-[var(--r-accent)] border-[var(--r-accent)] font-semibold shadow-sm"
+              : "bg-transparent border-[var(--r-border)] hover:bg-black/5 text-[var(--r-ink)]"
+          }`}
+          style={isActive ? { color: "#ffffff" } : undefined}
+        >
+          <span aria-hidden className="inline-flex shrink-0">⏳</span>
+          <span className="flex-1 leading-snug">Time Machine{isActive ? ` — ${activeEra}` : ""}</span>
+        </button>
+      </div>
 
       {/* Word of the Day Box */}
       <div className="mt-2 mx-2.5 border bg-[var(--r-surface-elevated)] p-2.5 hidden lg:block rounded-[var(--r-radius)]" style={{ borderColor: "var(--r-border)" }}>

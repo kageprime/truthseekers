@@ -58,7 +58,8 @@ func ChatToolDefinitions() []ToolDefinition {
 			{Type: "function", Function: ToolFunctionDef{Name: "webfetch", Description: "Fetch the content of a specific URL and return its text.", Parameters: json.RawMessage(`{"type":"object","properties":{"url":{"type":"string","description":"The URL to fetch"}},"required":["url"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "article_search", Description: "Search the encyclopedia's existing knowledge base for articles matching a query.", Parameters: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search query"},"maxResults":{"type":"number","description":"Max results (default 5)"}},"required":["query"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "get_map", Description: "Look up an existing map by slug or search by region/era.", Parameters: json.RawMessage(`{"type":"object","properties":{"slug":{"type":"string","description":"Map slug"}},"required":["slug"]}`)}},
-			{Type: "function", Function: ToolFunctionDef{Name: "generate_image", Description: "Generate an image using AI. Returns a URL to the generated image.", Parameters: json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string","description":"Detailed image generation prompt"},"caption":{"type":"string","description":"Optional short caption"}},"required":["prompt"]}`)}},
+			{Type: "function", Function: ToolFunctionDef{Name: "generate_image", Description: "Generate an image using AI. Returns a URL to the generated image. Prefer web_image_search first when a real photo (place, person, artifact, species) would teach better than an illustration.", Parameters: json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string","description":"Detailed image generation prompt"},"caption":{"type":"string","description":"Optional short caption"}},"required":["prompt"]}`)}},
+		{Type: "function", Function: ToolFunctionDef{Name: "web_image_search", Description: "Search for real, freely-licensed photos (Wikimedia Commons) on a topic. Returns direct image URLs with source domain attribution — emit them as image/gallery blocks with the source field set so the UI shows a Source badge. Prefer this over generate_image for real-world subjects.", Parameters: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Image search query"},"maxResults":{"type":"number","description":"Max images (default 4, max 10)"}},"required":["query"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "generate_video", Description: "Generate a short video clip from a text description using AI video generation.", Parameters: json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string","description":"Detailed text description"},"caption":{"type":"string","description":"Caption for the video"}},"required":["prompt"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "verify_citation", Description: "Verify a claim against a source URL. Returns a confidence score and explanation.", Parameters: json.RawMessage(`{"type":"object","properties":{"claim":{"type":"string","description":"The claim to verify"},"sourceUrl":{"type":"string","description":"The URL of the source"}},"required":["claim","sourceUrl"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "suggest_related", Description: "Find articles and topics related to a given slug.", Parameters: json.RawMessage(`{"type":"object","properties":{"slug":{"type":"string","description":"Article slug to find related topics for"}},"required":["slug"]}`)}},
@@ -76,6 +77,7 @@ type ToolExecutors struct {
 	VerifyCitation  ToolExecutor
 	GenerateImage   ToolExecutor
 	GenerateVideo   ToolExecutor
+	WebImageSearch  ToolExecutor
 }
 
 func BuiltinToolExecutors() ToolExecutors {
@@ -86,6 +88,7 @@ func BuiltinToolExecutors() ToolExecutors {
 		VerifyCitation:  verifyCitationExecutor,
 		GenerateImage:   generateImageExecutor,
 		GenerateVideo:   generateVideoExecutor,
+		WebImageSearch:  webImageSearchExecutor,
 	}
 }
 
@@ -103,6 +106,7 @@ func MergeExecutorsWithEpistemic(builtins ToolExecutors, server map[string]ToolE
 	m["verify_citation"] = builtins.VerifyCitation
 	m["generate_image"] = builtins.GenerateImage
 	m["generate_video"] = builtins.GenerateVideo
+	m["web_image_search"] = builtins.WebImageSearch
 	for k, v := range server {
 		m[k] = v
 	}
@@ -977,8 +981,97 @@ func generateImageExecutor(args json.RawMessage) (ToolResult, error) {
 	return ToolResult{Result: string(result), Blocks: []Block{{Type: "image", Data: blockData}}}, nil
 }
 
-func generateVideoExecutor(args json.RawMessage) (ToolResult, error) {
+// webImageResult is a real sourced photo: direct image URL plus the domain
+// attribution the frontend renders as a Source badge.
+type webImageResult struct {
+	Title        string `json:"title"`
+	ImageURL     string `json:"imageUrl"`
+	PageURL      string `json:"pageUrl"`
+	Source       string `json:"source"`
+	SourceDomain string `json:"sourceDomain"`
+}
+
+// webImageSearchExecutor searches Wikimedia Commons (no key, stdlib) for
+// real freely-licensed photos. Results carry source attribution so image /
+// gallery blocks can set their source field.
+func webImageSearchExecutor(args json.RawMessage) (ToolResult, error) {
 	var p struct {
+		Query      string `json:"query"`
+		MaxResults int    `json:"maxResults"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil || strings.TrimSpace(p.Query) == "" {
+		return ToolResult{Result: "Query required"}, nil
+	}
+	if p.MaxResults <= 0 {
+		p.MaxResults = 4
+	}
+	if p.MaxResults > 10 {
+		p.MaxResults = 10
+	}
+	results, err := commonsImageSearch(p.Query, p.MaxResults)
+	if err != nil || len(results) == 0 {
+		return ToolResult{Result: "[]"}, nil
+	}
+	data, _ := json.Marshal(results)
+	return ToolResult{Result: string(data)}, nil
+}
+
+// commonsImageSearch queries the Wikimedia Commons API for filetype:bitmap
+// images matching query, returning thumb URLs (1024px) + file page URLs.
+func commonsImageSearch(query string, n int) ([]webImageResult, error) {
+	api := "https://commons.wikimedia.org/w/api.php?action=query&format=json" +
+		"&generator=search&gsrsearch=" + url.QueryEscape("filetype:bitmap "+query) +
+		"&gsrnamespace=6&gsrlimit=" + fmt.Sprintf("%d", n) +
+		"&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=1024"
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, _ := http.NewRequest("GET", api, nil)
+	req.Header.Set("User-Agent", "Truthseekers/1.0 (encyclopedia agent)")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var parsed struct {
+		Query struct {
+			Pages map[string]struct {
+				Title     string `json:"title"`
+				ImageInfo []struct {
+					ThumbURL    string `json:"thumburl"`
+					URL         string `json:"url"`
+					Description string `json:"descriptionurl"`
+				} `json:"imageinfo"`
+			} `json:"pages"`
+		} `json:"query"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return nil, err
+	}
+	var out []webImageResult
+	for _, page := range parsed.Query.Pages {
+		if len(page.ImageInfo) == 0 {
+			continue
+		}
+		ii := page.ImageInfo[0]
+		src := ii.ThumbURL
+		if src == "" {
+			src = ii.URL
+		}
+		if src == "" {
+			continue
+		}
+		title := strings.TrimPrefix(page.Title, "File:")
+		out = append(out, webImageResult{
+			Title:        title,
+			ImageURL:     src,
+			PageURL:      ii.Description,
+			Source:       "Wikimedia Commons",
+			SourceDomain: "commons.wikimedia.org",
+		})
+	}
+	return out, nil
+}
+
+func generateVideoExecutor(args json.RawMessage) (ToolResult, error) {	var p struct {
 		Prompt  string `json:"prompt"`
 		Caption string `json:"caption"`
 	}

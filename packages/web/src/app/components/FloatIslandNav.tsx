@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useTheme } from "./ThemeProvider";
 import { useAuth } from "../hooks/useAuth";
 import Avatar from "./Avatar";
+import { useTimeMachine } from "../hooks/useTimeMachine";
 
 // ─── SVG Icons ────────────────────────────────────────────────────
 
@@ -357,6 +358,7 @@ function MoreDropdown({ pathname }: { pathname: string }) {
 function TopHeader({ pathname }: { pathname: string }) {
   const { resolved, toggle } = useTheme();
   const { user } = useAuth();
+  const { activeEra, isActive, toggleOpen } = useTimeMachine();
 
   return (
     <header
@@ -385,8 +387,22 @@ function TopHeader({ pathname }: { pathname: string }) {
         <MoreDropdown pathname={pathname} />
       </nav>
 
-      {/* Right: Theme + Avatar */}
+      {/* Right: Time Machine + Theme + Avatar */}
       <div className="flex items-center gap-1.5">
+        <button
+          onClick={toggleOpen}
+          className="flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer"
+          style={{
+            color: isActive ? "var(--accent)" : "var(--muted)",
+            background: isActive ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "none",
+            border: isActive ? "1px solid var(--accent)" : "1px solid transparent",
+          }}
+          aria-label="Toggle Time Machine"
+          title={isActive ? `Time Machine: ${activeEra} — click to change` : "Time Machine — explore history as of an era"}
+        >
+          <span aria-hidden>⏳</span>
+          <span className="hidden lg:inline text-xs">{isActive ? activeEra : "Time Machine"}</span>
+        </button>
         <button onClick={toggle} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-accent-bg/30 transition-all duration-200 cursor-pointer" style={{ background: "none", border: "none" }} aria-label="Toggle theme">
           {resolved === "dark" ? (
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /></svg>
@@ -413,6 +429,7 @@ function MobileHeader({ pathname }: { pathname: string }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { resolved, toggle } = useTheme();
   const { user } = useAuth();
+  const { activeEra, isActive, toggleOpen } = useTimeMachine();
 
   // Chat pages render their own mobile header
   if (pathname.startsWith("/chat")) return null;
@@ -484,6 +501,19 @@ function MobileHeader({ pathname }: { pathname: string }) {
 
             {/* Nav links */}
             <div className="flex-1 px-3 pt-3 space-y-0.5">
+              <button
+                onClick={() => { toggleOpen(); setSidebarOpen(false); }}
+                className="flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium rounded-lg w-full text-left transition-colors hover:bg-accent-bg/15 cursor-pointer"
+                style={{
+                  color: isActive ? "var(--accent)" : "var(--muted)",
+                  background: isActive ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "none",
+                  border: "none",
+                }}
+                aria-label="Toggle Time Machine"
+              >
+                <span aria-hidden className="text-base leading-none">⏳</span>
+                <span>Time Machine{isActive ? ` — ${activeEra}` : ""}</span>
+              </button>
               {NAV_LINKS.map((link) => (
                 <Link
                   key={link.href}

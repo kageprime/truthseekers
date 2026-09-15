@@ -1,8 +1,9 @@
 "use client";
 
-type ArticleBusEvent = 
+export type ArticleBusEvent = 
   | { type: "CLAIM_CLICKED"; payload: { claimId: string; text?: string } }
-  | { type: "SECTION_ENTERED"; payload: { sectionId: string; title: string } };
+  | { type: "SECTION_ENTERED"; payload: { sectionId: string; title: string } }
+  | { type: "TOUR_WAYPOINT_REACHED"; payload: { title: string; narration: string; claimId?: string } };
 
 class ArticleBus extends EventTarget {
   emit(event: ArticleBusEvent) {

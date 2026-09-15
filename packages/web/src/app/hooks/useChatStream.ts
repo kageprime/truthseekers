@@ -37,7 +37,7 @@ export function useChatStream() {
     abortRef.current?.abort();
   }, []);
 
-  const send = useCallback(async (id: string, msg: string, callbacks: StreamCallbacks, model?: string, pageContext?: any) => {
+  const send = useCallback(async (id: string, msg: string, callbacks: StreamCallbacks, model?: string, pageContext?: any, era?: string) => {
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -48,7 +48,7 @@ export function useChatStream() {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         credentials: "include",
-        body: JSON.stringify({ content: msg, ...(model ? { model } : {}), ...(pageContext ? { pageContext } : {}) }),
+        body: JSON.stringify({ content: msg, ...(model ? { model } : {}), ...(pageContext ? { pageContext } : {}), ...(era && era !== "Present" ? { time_machine_era: era } : {}) }),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error("Failed to send");

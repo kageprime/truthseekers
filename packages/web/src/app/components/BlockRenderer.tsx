@@ -14,6 +14,7 @@ import { ProvenanceChipInline } from "./ProvenanceChip";
 const InteractiveTimeline = dynamic(() => import("./InteractiveTimeline"), { ssr: false });
 const MapViewer = dynamic(() => import("./MapViewer"), { ssr: false });
 const ThreeDMapViewer = dynamic(() => import("./ThreeDMapViewer"), { ssr: false });
+const PanoramaViewer = dynamic(() => import("./PanoramaViewer"), { ssr: false });
 // ponytail: mermaid is the heaviest renderer by far and only needed when a
 // diagram block exists — never in the initial bundle.
 const MermaidDiagram = dynamic(() => import("./MermaidDiagram"), {
@@ -217,6 +218,10 @@ function BlockCard({
       return <Map2DBlock data={block.data as unknown as Map2DBlockData} />;
     case "map_3d":
       return <Map3DBlock data={block.data as unknown as Map3DBlockData} />;
+    case "panorama_360":
+      return <PanoramaViewer data={block.data as any} isTour={false} />;
+    case "tour_360":
+      return <PanoramaViewer data={block.data as any} isTour={true} />;
     case "diagram":
       return <DiagramBlock data={block.data as unknown as DiagramBlockData} figureNum={figureNum} />;
     case "image":
@@ -442,7 +447,7 @@ function ImageBlock({ data, figureNum }: { data: ImageBlockData; figureNum?: num
   const num = figureNum;
   return (
     <figure className="figure-plate mb-4">
-      <MediaImage src={data.src} caption={undefined} prompt={data.prompt} />
+      <MediaImage src={data.src} caption={undefined} prompt={data.prompt} source={data.source} />
       {(num != null || data.caption) && (
         <figcaption className="figure-caption">
           {num != null && <span className="figure-num">Fig. {num}</span>}
@@ -495,7 +500,7 @@ function GalleryBlock({ data, figureNum }: { data: GalleryBlockData; figureNum?:
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 p-2">
         {data.images.filter(Boolean).map((img, i) => (
           <div key={i} className="overflow-hidden" style={{ border: "1px solid var(--rule)", borderRadius: "var(--radius-sharp)", aspectRatio: "4/3" }}>
-            <MediaImage src={img.src} caption={undefined} prompt={img.prompt} />
+            <MediaImage src={img.src} caption={undefined} prompt={img.prompt} source={img.source ?? data.source} />
           </div>
         ))}
       </div>

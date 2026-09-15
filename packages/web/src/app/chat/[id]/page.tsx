@@ -5,12 +5,12 @@ import { useRouter, usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChat, useChats, useCreateChat } from "../../hooks";
 import { useChatStream } from "../../hooks/useChatStream";
+import { useTimeMachine } from "../../hooks/useTimeMachine";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import ChatMessage from "../../components/ChatMessage";
 import EmptyChatState from "../../components/EmptyChatState";
 import TruthConsole from "../../components/TruthConsole";
 import RetroWindow from "../../components/retro/RetroWindow";
-import RetroContentsNav from "../../components/retro/RetroContentsNav";
 import { canSeeAdmin } from "@/lib/routes";
 import { useAuth } from "../../hooks/useAuth";
 import { useTraceSegments } from "../../components/truth-console/useTraceSegments";
@@ -42,8 +42,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [convId, setConvId] = useState<string | null>(id !== "new" ? id : null);
   const [loading, setLoading] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [sessionFilter, setSessionFilter] = useState("");
   const { mutate: createChat } = useCreateChat();
   const { resolved: theme } = useTheme();
+  const { activeEra, isActive: timeTravelActive } = useTimeMachine();
 
   const seg = useTraceSegments(convId ?? id ?? null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -154,13 +156,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             setError(err || "Connection lost");
             setSending(false);
           },
-        });
+        }, undefined, undefined, timeTravelActive ? activeEra : undefined);
       } catch (err: any) {
         setError(err.message || "Send failed");
         setSending(false);
       }
     },
-    [convId, createChat, router, sending, setSending, setLiveEvents, streamSend, queryClient]
+    [convId, createChat, router, sending, setSending, setLiveEvents, streamSend, queryClient, timeTravelActive, activeEra]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -237,33 +239,65 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           </div>
         </div>
 
-        {/* Mobile Sidebar Drawer — ponytail: same RetroContentsNav as site, sessions injected. */}
+        {/* Mobile Sidebar Drawer — Dedicated Research Sessions List */}
         {mobileSidebarOpen && (
-          <div className="md:hidden fixed inset-0 z-[100]" role="dialog" aria-modal="true">
-            <div className="absolute inset-0 bg-black/50" onClick={() => setMobileSidebarOpen(false)} />
-            <aside className="absolute left-0 top-0 bottom-0 w-72 flex flex-col bg-[var(--r-surface)] border-r border-[var(--r-border)] shadow-xl overflow-hidden">
-              <div className="shrink-0 flex items-center justify-between px-3 h-10 bg-[var(--r-accent)] text-white">
-                <span className="text-[12px] font-bold">Menu</span>
+          <div className="md:hidden fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Research Sessions">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={() => setMobileSidebarOpen(false)} />
+            <aside className="absolute left-0 top-0 bottom-0 w-80 max-w-[85vw] flex flex-col bg-[var(--r-surface)] border-r border-[var(--r-border)] shadow-2xl overflow-hidden animate-slide-in-left">
+              <div className="shrink-0 flex items-center justify-between px-4 h-12 bg-[var(--r-accent)] text-white font-bold text-xs">
+                <span>Research Sessions</span>
                 <button
                   onClick={() => setMobileSidebarOpen(false)}
-                  className="flex items-center justify-center w-6 h-6 text-white"
-                  aria-label="Close menu"
+                  className="flex items-center justify-center w-7 h-7 text-white/90 hover:text-white"
+                  aria-label="Close sessions"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto r-scroll p-1.5">
-                <RetroContentsNav
-                  pathname={pathname}
-                  showAdmin={showAdmin}
-                  alwaysOpen
-                  sessions={conversations.map((c: any) => ({ id: c.id, label: c.title }))}
-                  activeSessionId={convId}
-                  sessionsLoading={chatsLoading}
-                  onNewSession={() => { handleNewChat(); setMobileSidebarOpen(false); }}
-                  onSelectSession={(sid) => { router.push(`/chat/${sid}`); setMobileSidebarOpen(false); }}
+              {/* New Session Action */}
+              <div className="p-3 border-b border-[var(--r-border)] bg-[var(--r-nav-bg)]">
+                <button
+                  onClick={() => { handleNewChat(); setMobileSidebarOpen(false); }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-[var(--r-accent)] text-white font-semibold text-xs active:scale-98 shadow-sm cursor-pointer"
+                >
+                  <IconPlus size={14} />
+                  <span>New Research Session</span>
+                </button>
+              </div>
+
+              {/* Sessions List */}
+              <div className="px-3 pt-2 shrink-0">
+                <input
+                  value={sessionFilter}
+                  onChange={(e) => setSessionFilter(e.target.value)}
+                  placeholder="Filter sessions…"
+                  aria-label="Filter research sessions"
+                  className="w-full bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-lg px-3 py-2 text-xs text-[var(--r-ink)] placeholder:text-[var(--r-muted)] outline-none focus:border-[var(--r-accent)]"
                 />
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1 r-scroll">
+                {chatsLoading ? (
+                  <div className="flex items-center justify-center py-8"><Spinner size={18} /></div>
+                ) : conversations.length === 0 ? (
+                  <div className="px-3 py-8 text-xs text-center text-[var(--r-muted)]">No research sessions yet</div>
+                ) : (
+                  conversations
+                    .filter((c: any) => !sessionFilter.trim() || (c.title ?? "").toLowerCase().includes(sessionFilter.trim().toLowerCase()))
+                    .map((c: any) => (
+                    <button
+                      key={c.id}
+                      onClick={() => { router.push(`/chat/${c.id}`); setMobileSidebarOpen(false); }}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all text-xs ${
+                        c.id === convId
+                          ? "bg-[var(--r-accent)] text-white border-[var(--r-accent)] font-semibold shadow-sm"
+                          : "bg-[var(--r-surface-elevated)] border-[var(--r-border)] text-[var(--r-ink)] active:bg-black/5"
+                      }`}
+                    >
+                      <div className="truncate font-medium">{c.title}</div>
+                    </button>
+                  ))
+                )}
               </div>
             </aside>
           </div>

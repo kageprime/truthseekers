@@ -256,7 +256,9 @@ export type BlockType =
   | "divider"
   | "table"
   | "list"
-  | "pullquote";
+  | "pullquote"
+  | "panorama_360"
+  | "tour_360";
 
 export interface Block {
   id: string;
@@ -330,9 +332,46 @@ export interface VideoBlockData {
 }
 
 export interface GalleryBlockData {
-  images: Array<{ src: string; caption?: string; prompt?: string }>;
+  images: Array<{ src: string; caption?: string; prompt?: string; source?: string }>;
   caption?: string;
   source?: string;
+}
+
+export interface PanoramaHotspot {
+  id: string;
+  pitch: number; // -90 to +90 degrees
+  yaw: number;   // -180 to +180 degrees
+  label: string;
+  description?: string;
+  claimId?: string;
+}
+
+export interface TourWaypoint {
+  id: string;
+  pitch: number;
+  yaw: number;
+  fov?: number;
+  title: string;
+  narration: string;
+  claimId?: string;
+}
+
+export interface Panorama3DBlockData {
+  title?: string;
+  src: string;
+  altSrc?: string;
+  primaryEra?: string;
+  secondaryEra?: string;
+  caption?: string;
+  hotspots?: PanoramaHotspot[];
+}
+
+export interface Tour3DBlockData {
+  title?: string;
+  src: string;
+  caption?: string;
+  waypoints: TourWaypoint[];
+  hotspots?: PanoramaHotspot[];
 }
 
 export interface CitationBlockData {

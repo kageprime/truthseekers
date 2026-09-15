@@ -15,6 +15,7 @@ import TruthConsoleDeck from "./truth-console/TruthConsoleDeck";
 import { useTraceSegments } from "./truth-console/useTraceSegments";
 import Spinner from "./Spinner";
 import { useVisibleContent } from "../hooks/useVisibleContent";
+import { useTimeMachine } from "../hooks/useTimeMachine";
 import { articleBus } from "@/lib/articleBus";
 
 const CONV_STORAGE_KEY = "truthseekers_floating_conv";
@@ -27,6 +28,7 @@ export default function FloatingChatWidget() {
   // chat page share one source of truth (useTraceSegments reads them).
   const { liveEvents, sending, setSending, setLiveEvents } = useChatContext();
   const { send: streamSend, stop: streamStop } = useChatStream();
+  const { activeEra, isActive: timeTravelActive } = useTimeMachine();
   const { data: conversationsData, loading: chatsLoading } = useChats();
   const conversations = conversationsData || [];
   const { mutate: createChat } = useCreateChat();
@@ -59,12 +61,15 @@ export default function FloatingChatWidget() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [switcherOpen]);
 
-  // Article bus listener for claim clicks
+  // Article bus listener for claim clicks & tour waypoints
   useEffect(() => {
     const unsubscribe = articleBus.subscribe((event) => {
       if (event.type === "CLAIM_CLICKED") {
         const text = event.payload.text || event.payload.claimId;
         setInput(`What is the evidence for claim: "${text}"?`);
+        open();
+      } else if (event.type === "TOUR_WAYPOINT_REACHED") {
+        setInput(`Tell me more about ${event.payload.title}: "${event.payload.narration}"`);
         open();
       }
     });
@@ -190,10 +195,10 @@ export default function FloatingChatWidget() {
       onError: (err: string) => {
         setError(err || "Stream error occurred");
       },
-    }, model, visibleContent.hasContent ? visibleContent : undefined);
+    }, model, visibleContent.hasContent ? visibleContent : undefined, timeTravelActive ? activeEra : undefined);
 
     setTimeout(() => setSending(false), 0);
-  }, [convId, sending, streamSend, queryClient, setLiveEvents, setActiveConversationId, createChat, setSending, model]);
+  }, [convId, sending, streamSend, queryClient, setLiveEvents, setActiveConversationId, createChat, setSending, model, timeTravelActive, activeEra]);
 
   const messages = useMemo(() => (conv?.messages ?? []).filter((m: any) => m.role !== "tool"), [conv?.messages]);
   const hasStreaming = sending && streamContent !== "";
