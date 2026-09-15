@@ -217,7 +217,8 @@ npm run dev                    # from repo root, runs the Next.js app
 | `FIRECRAWL_API_KEY` / `TAVILY_API_KEY` | Web-search backend for the `web_search` tool |
 | `ENCARTA_IMAGE_DIR` | Output dir for generated images (default `public/images`) |
 | `NEXT_PUBLIC_API_URL` | API URL for the frontend (default `http://localhost:4097`) |
-| `JWT_SECRET` | Required — server panics on boot without it unless `ALLOW_DEV_AUTH=1` |
+| `JWT_SECRET` | Required — server panics on boot without it unless `ALLOW_DEV_AUTH=1`. 32+ bytes (`openssl rand -base64 48`); set via Heroku config, never in git. Rotation logs out every session once |
+| `NEXT_PUBLIC_MOCK` | `true` = frontend mock auth (`truthseekers_mock` + hardcoded admin) for local UI work only; must be unset/`false` in production builds |
 | `ALLOW_DEV_AUTH` | `1` permits the dev JWT secret (local dev only, never production) |
 | `PAYSTACK_SECRET_KEY` | Paystack secret key (or hot-swap via `PATCH /v1/credentials` service `paystack`) |
 | `PAYSTACK_PLAN_PRO` / `PAYSTACK_PLAN_ENTERPRISE` | Paystack plan codes for subscriptions (unset → one-time amounts) |

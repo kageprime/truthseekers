@@ -203,6 +203,19 @@ export interface AuthUser {
 
 export async function fetchMe(token: string): Promise<AuthUser | null> {
   if (MOCK) return null; // AuthProvider handles mock with MOCK_USER
+  // ponytail: single-flight — StrictMode / poller / focus-revalidate can fire
+  // concurrent checks; dedupe so they share one response.
+  const key = `bearer:${token.slice(-16)}`;
+  const inflight = meInflight.get(key);
+  if (inflight) return inflight;
+  const p = fetchMeInner(token).finally(() => { if (meInflight.get(key) === p) meInflight.delete(key); });
+  meInflight.set(key, p);
+  return p;
+}
+
+const meInflight = new Map<string, Promise<AuthUser | null>>();
+
+async function fetchMeInner(token: string): Promise<AuthUser | null> {
   // Contract: null means genuine rejection (401 / user gone) — the caller
   // may clear credentials. Anything else throws so transient failures
   // (network, 5xx, restart) never masquerade as logout.
@@ -225,6 +238,15 @@ export async function fetchMe(token: string): Promise<AuthUser | null> {
 // cookie-only users with no JS-readable token (e.g. after reload). Same
 // contract as fetchMe: null is rejection, anything else throws.
 export async function fetchMeCookie(): Promise<AuthUser | null> {
+  if (MOCK) return null;
+  const inflight = meInflight.get("cookie");
+  if (inflight) return inflight;
+  const p = fetchMeCookieInner().finally(() => { if (meInflight.get("cookie") === p) meInflight.delete("cookie"); });
+  meInflight.set("cookie", p);
+  return p;
+}
+
+async function fetchMeCookieInner(): Promise<AuthUser | null> {
   if (MOCK) return null;
   const res = await fetch(`${BASE}/auth/me`, { cache: "no-store", credentials: "include" });
   if (res.status === 401) return null;

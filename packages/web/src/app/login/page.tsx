@@ -33,14 +33,19 @@ export default function LoginPage() {
   const { mutate: activateMutate } = useActivateSignup();
   const { mutate: fetchMeMutate } = useFetchMe();
 
+  // ponytail: single post-login destination — honor ?redirect= (bounce-back
+  // from a protected page), else home. replace (not push) so back-button
+  // never returns to /login.
+  const redirectAfterLogin = (onboarded?: boolean) => {
+    const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+    router.replace(onboarded ? safeRedirect(params.get("redirect")) : "/onboarding");
+  };
+
   const handleToken = (data: { token?: string; user?: { onboarded?: boolean }; error?: string }) => {
     if (data.error) { setError(data.error); setLoading(false); return false; }
     if (data.token) {
       storeToken(data.token);
-      const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-      const redirectTo = safeRedirect(params.get("redirect"));
-      if (data.user?.onboarded) router.push(redirectTo);
-      else router.push("/onboarding");
+      redirectAfterLogin(data.user?.onboarded);
       return true;
     }
     return false;
@@ -62,8 +67,7 @@ export default function LoginPage() {
       const token = hash.slice(7);
       storeToken(token);
       fetchMeMutate(token).then((u) => {
-        if (u?.onboarded) router.replace("/");
-        else router.replace("/onboarding");
+        redirectAfterLogin(u?.onboarded ?? true);
       }).catch(() => router.replace("/"));
       window.location.hash = "";
     }
@@ -78,10 +82,7 @@ export default function LoginPage() {
       if (data.error) { setError(data.error); setLoading(false); return; }
       if (data.token) {
         storeToken(data.token);
-        const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-        const redirectTo = safeRedirect(params.get("redirect"));
-        if (data.user?.onboarded) router.push(redirectTo);
-        else router.push("/onboarding");
+        redirectAfterLogin(data.user?.onboarded);
       } else if (data.sent) {
         setSent(true);
       }
@@ -444,7 +445,7 @@ export default function LoginPage() {
                       <button
                         onClick={() => {
                           storeToken("truthseekers_mock");
-                          router.push("/");
+                          redirectAfterLogin(true);
                         }}
                         className="r-btn text-[11px] font-bold px-3 py-1"
                       >

@@ -36,6 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userRef = useRef<User | null>(null);
   userRef.current = user;
   const lastReval = useRef(0);
+  // ponytail: first run must read storage synchronously — token state starts
+  // null (SSR-safe) while the real JWT sits in localStorage, and hitting the
+  // cookie-only path first 401s under blocked third-party cookies, which the
+  // AppShell gate reads as "logged out" and bounces to /login.
+  const didInit = useRef(false);
 
   // Sync token state from storage (catches changes across navigations)
   useEffect(() => {
@@ -63,8 +68,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchMeWithRole = useCallback(async (t: string | null): Promise<User | null> => {
     if (!t) return null;
     if (t === MOCK_KEY) return MOCK_USER;
-    const u = await fetchMe(t);
-    if (!u) { clearToken(); return null; }
+    let u = await fetchMe(t);
+    if (!u) {
+      // ponytail: a single 401 can be a blip (restart, clock skew), not a dead
+      // session — and clearToken() below is irreversible. Retry once; only a
+      // confirmed second rejection wipes the persisted token.
+      await new Promise((r) => setTimeout(r, 750));
+      u = await fetchMe(t).catch(() => null);
+      if (!u) { clearToken(); return null; }
+    }
     // Decode role from JWT payload — the server includes it in the token.
     const { decodeJwt } = await import("@/lib/api");
     const payload = decodeJwt(t);
@@ -76,7 +88,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     (async () => {
       try {
-        if (!token) {
+        let t = token;
+        if (!didInit.current) {
+          didInit.current = true;
+          // Sync read: localStorage survives reloads, memoryToken does not.
+          const stored = getStoredToken();
+          if (stored) { t = stored; setToken(stored); }
+        }
+        if (!t) {
           // Cookie-only session (S7): no JS token (e.g. after reload) — the
           // browser still sends the HttpOnly cookie via credentials:include.
           const { fetchMeCookie } = await import("@/lib/api");
@@ -87,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           return;
         }
-        const u = await fetchMeWithRole(token);
+        const u = await fetchMeWithRole(t);
         if (!cancelled) { setUser(u); setLoading(false); }
       } catch {
         // Transport/server failure (never a rejection — those return null
