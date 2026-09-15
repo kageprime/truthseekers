@@ -8,6 +8,7 @@ interface EpisodeFeedProps {
 }
 
 const META: Record<string, { icon: string; tone: string; label: string }> = {
+  research_plan:     { icon: "☰", tone: "var(--accent)",  label: "Research plan" },
   source_found:      { icon: "◉", tone: "var(--accent)",  label: "Source found" },
   claim_discovered:  { icon: "◆", tone: "var(--accent)",  label: "Claim extracted" },
   evidence_mapped:   { icon: "↔", tone: "var(--green)",   label: "Evidence mapped" },
@@ -20,6 +21,13 @@ const META: Record<string, { icon: string; tone: string; label: string }> = {
 function summarize(ev: AgentEvent): string {
   const d = (ev.data ?? {}) as Record<string, unknown>;
   switch (ev.type) {
+    case "research_plan": {
+      const steps = (d.steps ?? d.plan ?? []) as unknown;
+      const list = Array.isArray(steps) ? steps.map(String) : [];
+      const nq = Array.isArray(d.queries) ? (d.queries as unknown[]).length : 0;
+      const head = list.length > 0 ? list.slice(0, 3).join(" · ") : "planned";
+      return nq > 0 ? `${head} — ${nq} queries` : head;
+    }
     case "source_found":
       return String(d.title ?? d.url ?? d.id ?? "source");
     case "claim_discovered":
@@ -73,6 +81,9 @@ export default function EpisodeFeed({ events }: EpisodeFeedProps) {
 
   const counts: Record<string, number> = {};
   for (const e of events) counts[e.type] = (counts[e.type] ?? 0) + 1;
+  // ponytail: research plan stays pinned — the source burst scrolls under it.
+  const plan = events.filter((e) => e.type === "research_plan");
+  const rest = events.filter((e) => e.type !== "research_plan");
 
   return (
     <div className="mt-4 rounded border" style={{ borderColor: "var(--border)", background: "color-mix(in srgb, var(--surface) 60%, transparent)" }}>
@@ -101,7 +112,33 @@ export default function EpisodeFeed({ events }: EpisodeFeedProps) {
         </span>
       </div>
       <div className="max-h-72 overflow-y-auto px-2 py-2 space-y-1.5" style={{ scrollBehavior: "smooth" }}>
-        {[...events].reverse().map((ev, i) => {
+        {plan.slice(0, 1).map((ev, i) => {
+          const meta = META[ev.type];
+          const d = (ev.data ?? {}) as Record<string, unknown>;
+          const steps = Array.isArray(d.steps) ? (d.steps as unknown[]).map(String) : [];
+          return (
+            <div
+              key={`plan-${ev.timestamp}-${i}`}
+              className="activity-card flex items-start gap-2 px-2.5 py-1.5 rounded border"
+              style={{ background: "color-mix(in srgb, var(--accent) 8%, transparent)", borderColor: "var(--border-light)" }}
+            >
+              <span className="shrink-0 w-4 text-center font-bold text-sm leading-none mt-0.5" style={{ color: meta.tone }} aria-hidden>
+                {meta.icon}
+              </span>
+              <div className="flex-1 min-w-0">
+                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: meta.tone }}>
+                  {meta.label}
+                </span>
+                <ul className="text-[11px] mt-0.5 space-y-0.5" style={{ color: "var(--ink)" }}>
+                  {steps.map((s) => (
+                    <li key={s}>· {s}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          );
+        })}
+        {[...rest].reverse().map((ev, i) => {
           const meta = META[ev.type] ?? { icon: "•", tone: "var(--muted)", label: ev.type };
           return (
             <div

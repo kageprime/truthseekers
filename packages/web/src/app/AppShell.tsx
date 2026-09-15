@@ -11,6 +11,7 @@ import FloatIslandNav from "./components/FloatIslandNav";
 import LiveNowTicker from "./components/LiveNowTicker";
 import RetroShell from "./components/retro/RetroShell";
 import RetroPalette from "./components/retro/RetroPalette";
+import MobileTabBar from "./components/MobileTabBar";
 import "./components/retro/retro98.css";
 import { useFloatingChat } from "./FloatingChatContext";
 import { useArticleView } from "./ArticleViewContext";
@@ -22,16 +23,10 @@ const IS_RETRO = process.env.NEXT_PUBLIC_RETRO !== "false";
 // Article + map slugs + claim-graph + chat draw their own RetroWindow; everything else uses the generic shell.
 const isSelfWrapped = (p: string) => p === "/claim-graph" || p.startsWith("/chat/") || p === "/chat" || (/^\/article\/[^/]+$/.test(p) && p !== "/article/new") || /^\/maps\/[^/]+$/.test(p);
 
-
 const HIDDEN_ROUTES = ["/login", "/onboarding"];
-// ponytail: atlas is in-flow article-style now — no fullscreen overlay routes left.
 const OVERLAY_ROUTES: string[] = [];
 const CHAT_ROUTES = ["/chat/"];
 
-// Client-side gate — replaces edge middleware, which could never see the
-// cross-site session (Heroku-domain cookie) and bounced even logged-in users.
-// The browser sees the real session, so this fires only when truly logged
-// out. Backend APIs remain the actual enforcers.
 const PROTECTED_ROUTES = ["/chat", "/admin", "/settings", "/onboarding", "/article/new", "/queue"];
 
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -81,9 +76,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // ponytail: global retro — every route gets TruthSeekers chrome; article/claim-graph draw their own.
   if (IS_RETRO && !isSelfWrapped(pathname)) {
     return (
-      <div className="retro98">
+      <div className="retro98 pb-12 md:pb-0">
         <RetroShell>{children}</RetroShell>
         <RetroPalette />
+        <MobileTabBar />
         {showChat && (
           <div className="fixed inset-0 z-50 flex flex-col justify-end pointer-events-none">
             <div className="absolute inset-0 bg-black/30 pointer-events-auto" onClick={close} />
@@ -100,7 +96,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="h-dvh overflow-hidden flex flex-col">
+    <div className="h-dvh overflow-hidden flex flex-col pb-12 md:pb-0">
       {/* B1: third-party-cookie warning — session lives on this tab only */}
       {user && cookieOk === false && !cookieWarnDismissed && (
         <div className="flex items-center justify-center gap-3 px-4 py-1.5 text-xs" style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>
@@ -153,12 +149,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       {/* Expanded full-screen overlay */}
       {isExpanded && (
-            <div className="fixed inset-0 flex flex-col items-center bg-surface glass-lg animate-appear-blur" style={{ zIndex: "var(--z-overlay)" }}>
+        <div className="fixed inset-0 flex flex-col items-center bg-surface glass-lg animate-appear-blur" style={{ zIndex: "var(--z-overlay)" }}>
           <div className="w-full max-w-4xl h-full flex flex-col chat-message-enter chat-shell my-4">
             <FloatingChatWidget />
           </div>
         </div>
       )}
+
+      {/* Mobile Tab Bar on smartphone viewports */}
+      <MobileTabBar />
 
       {/* Explore overlay */}
       <ExploreView />
@@ -174,7 +173,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       {/* Floating ViewSwitcher for stream mode — clear mobile nav */}
       {article && mode === "stream" && (
-        <div className="fixed md:bottom-6 bottom-24 left-1/2 -translate-x-1/2 shadow-elev-2 rounded-full p-0.5 bg-surface-elevated border border-rule animate-appear-up" style={{ zIndex: "var(--z-view-switcher)" }}>
+        <div className="fixed md:bottom-6 bottom-20 left-1/2 -translate-x-1/2 shadow-elev-2 rounded-full p-0.5 bg-surface-elevated border border-rule animate-appear-up" style={{ zIndex: "var(--z-view-switcher)" }}>
           <ViewSwitcher />
         </div>
       )}

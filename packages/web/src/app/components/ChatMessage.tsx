@@ -97,31 +97,64 @@ function ThinkingBox({ events, streaming }: { events: any[]; streaming?: boolean
   if (activeEvents.length === 0) return null;
 
   const toolCallCount = activeEvents.filter(e => e.type === "tool_use").length;
+  
+  // Find the latest active step for the live header preview
+  const lastEvent = activeEvents[activeEvents.length - 1];
+  let livePreview = "";
+  if (lastEvent) {
+    if (lastEvent.type === "tool_use") {
+      const name = lastEvent.data?.name || "";
+      livePreview = toolUseSummaryText(name, lastEvent.data?.args) || toolLabel(name);
+    } else if (lastEvent.type === "tool_result") {
+      livePreview = `Completed ${toolLabel(lastEvent.data?.name || "").replace(/^[^\s]+\s+/, "")}`;
+    } else if (lastEvent.type === "status") {
+      livePreview = String(lastEvent.data || "");
+    }
+  }
 
   return (
-    <div className="my-2 text-xs">
+    <div className="my-2.5 text-xs select-none">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 py-0.5 px-0 rounded-[var(--r-radius)] transition-colors bg-transparent border-0 cursor-pointer text-[var(--r-muted)] hover:text-[var(--r-ink)]"
+        className="w-full flex items-center justify-between gap-2 py-1.5 px-3 rounded-xl transition-all border cursor-pointer text-[var(--r-ink)] bg-[var(--r-nav-bg)]/80 hover:bg-[var(--r-nav-bg)] border-[var(--r-border)]"
+        aria-expanded={isOpen}
       >
-        <span className={`inline-block transition-transform duration-200 text-[8px] ${isOpen ? "rotate-90" : ""}`}>
-          ▶
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span>Thought process</span>
-          {toolCallCount > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--r-nav-bg)] font-mono text-[var(--r-ink-secondary)]">
-              {toolCallCount} step{toolCallCount !== 1 ? "s" : ""}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full transition-transform duration-200 text-[9px] ${isOpen ? "rotate-90" : ""}`}>
+            ▶
+          </span>
+          <span className="font-semibold text-[11px] sm:text-[12px] text-[var(--r-accent)] flex items-center gap-1.5 shrink-0">
+            <span>Agent Thoughts</span>
+            {toolCallCount > 0 && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--r-surface-elevated)] border border-[var(--r-border)] font-mono text-[var(--r-ink-secondary)]">
+                {toolCallCount} {toolCallCount === 1 ? "step" : "steps"}
+              </span>
+            )}
+          </span>
+          {streaming && livePreview && (
+            <span className="text-[11px] text-[var(--r-muted)] truncate max-w-[160px] sm:max-w-[280px]">
+              · {livePreview}
             </span>
           )}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
           {streaming && (
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--r-accent)] animate-pulse" />
+            <span className="flex items-center gap-1 text-[10px] font-mono text-[var(--r-accent)] font-medium">
+              <span className="w-2 h-2 rounded-full bg-[var(--r-accent)] animate-pulse" />
+              <span>Working</span>
+            </span>
           )}
-        </span>
+          {!streaming && (
+            <span className="text-[10px] text-[var(--r-muted)] font-mono">
+              {isOpen ? "Hide" : "Show"}
+            </span>
+          )}
+        </div>
       </button>
 
       {isOpen && (
-        <div className="mt-2 pl-3 ml-2.5 border-l border-[var(--r-border)] space-y-2 max-w-2xl py-0.5">
+        <div className="mt-2 pl-3 pr-2 py-2.5 rounded-xl border border-[var(--r-border)] bg-[var(--r-nav-bg)]/40 space-y-2.5 max-w-2xl">
           {activeEvents.map((event, idx) => {
             const isError = event.type === "error";
             const isStatus = event.type === "status";
@@ -138,7 +171,7 @@ function ThinkingBox({ events, streaming }: { events: any[]; streaming?: boolean
               summary = toolUseSummaryText(name, args);
             } else if (isResult) {
               const name = event.data?.name || "";
-              label = `Returned: ${toolLabel(name).replace(/^[^\s]+\s+/, "")}`;
+              label = `Result: ${toolLabel(name).replace(/^[^\s]+\s+/, "")}`;
               summary = toolResultSummaryText(event.data);
             } else if (isStatus) {
               label = `Status`;
@@ -149,12 +182,12 @@ function ThinkingBox({ events, streaming }: { events: any[]; streaming?: boolean
             }
 
             return (
-              <div key={idx} className="flex flex-col gap-0.5 border-l-2 border-[var(--r-border)] pl-2">
-                <div className="flex items-center gap-2 font-medium text-[var(--r-ink-secondary)]">
+              <div key={idx} className="flex flex-col gap-0.5 border-l-2 border-[var(--r-accent)]/60 pl-2.5 py-0.5">
+                <div className="flex items-center gap-2 font-medium text-[11px] text-[var(--r-ink)]">
                   <span>{label}</span>
                 </div>
                 {summary && (
-                  <div className="text-[10px] text-[var(--r-muted)] pl-0.5 font-mono break-all leading-relaxed">
+                  <div className="text-[10.5px] text-[var(--r-muted)] font-mono break-all leading-relaxed bg-[var(--r-surface)]/60 px-2 py-1 rounded-md mt-0.5 border border-[var(--r-border)]/50">
                     {summary}
                   </div>
                 )}
@@ -194,13 +227,13 @@ const ChatMessage = memo(function ChatMessage({
 
   if (isUser) {
     return (
-      <div className="flex justify-end px-3 sm:px-6 py-3 group">
-        <div className="max-w-[85%] sm:max-w-[75%] flex flex-col items-end">
-          <div className="flex items-center gap-2 mb-1">
+      <div className="flex justify-end px-3 sm:px-6 py-2.5 group">
+        <div className="max-w-[88%] sm:max-w-[75%] flex flex-col items-end">
+          <div className="flex items-center gap-2 mb-1 px-1">
             <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--r-muted)]">You</span>
             {createdAt && <span className="text-[9px] text-[var(--r-muted)]">{timeAgo(createdAt)}</span>}
           </div>
-          <div className="px-3.5 py-2.5 text-[13.5px] text-white leading-relaxed border bg-[var(--r-accent)] rounded-[var(--r-radius)] shadow-sm" style={{ borderColor: "var(--r-accent)" }}>
+          <div className="px-4 py-2.5 text-[14px] text-white leading-relaxed bg-[var(--r-accent)] rounded-2xl rounded-tr-xs shadow-sm border border-[var(--r-accent)]">
             {content}
           </div>
         </div>
@@ -209,17 +242,18 @@ const ChatMessage = memo(function ChatMessage({
   }
 
   return (
-    <div className={`px-3 sm:px-6 py-4 group transition-colors ${streaming ? "" : "hover:bg-black/5"}`}>
+    <div className={`px-2.5 sm:px-6 py-3 group transition-colors ${streaming ? "" : "hover:bg-black/5"}`}>
       <div className="space-y-1.5 max-w-[100%]">
         {/* Label */}
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--r-accent)]">
-            Truthseeker Agent
+        <div className="flex items-center gap-2 mb-1 px-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--r-accent)] flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--r-accent)]" />
+            <span>Truthseeker Agent</span>
           </span>
           {createdAt && <span className="text-[9px] text-[var(--r-muted)]">{timeAgo(createdAt)}</span>}
         </div>
 
-        {/* Thinking Box */}
+        {/* Thinking Box (Agent Thoughts) */}
         {agentEvents && agentEvents.length > 0 && (
           <ThinkingBox events={agentEvents} streaming={streaming} />
         )}
@@ -227,7 +261,7 @@ const ChatMessage = memo(function ChatMessage({
         {/* Content */}
         {cleanContent ? (
           <div
-            className={`text-[14px] leading-[1.7] text-[var(--r-ink)] bg-[var(--r-surface-elevated)] border p-3.5 sm:p-4 rounded-[var(--r-radius)] shadow-sm ${streaming ? "streaming-cursor" : ""}`}
+            className={`text-[14.5px] leading-[1.75] text-[var(--r-ink)] bg-[var(--r-surface-elevated)] border p-3.5 sm:p-4 rounded-2xl rounded-tl-xs shadow-sm ${streaming ? "streaming-cursor" : ""}`}
             style={{ borderColor: "var(--r-border)", fontFamily: "Georgia, 'Times New Roman', serif" }}
           >
             <RetroMarkdown content={cleanContent} />

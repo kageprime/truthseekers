@@ -90,7 +90,7 @@ export default function AppFooter() {
             © {year} Truthseekers · Veritas
           </p>
           <p className="text-xs italic font-serif" style={{ color: "var(--subtle)" }}>
-            Powered by the nine-stage epistemic pipeline
+            Evidence-grounded encyclopedia
           </p>
         </div>
       </div>

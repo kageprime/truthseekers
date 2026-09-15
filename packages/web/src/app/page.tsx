@@ -116,7 +116,7 @@ export default function HomePage() {
 
       {/* Colophon */}
       <footer className="border-t-[2px] border-[#0a2a5e] pt-2 pb-1 text-[10px] flex flex-wrap gap-x-3 gap-y-1 items-center" style={{ color: "#8a7f68" }}>
-        <span>Every article passes a nine-stage epistemic pipeline.</span>
+        <span>Every article is researched and sourced.</span>
         <span className="ml-auto flex gap-2">
           <Link href="/claim-graph" className="underline">Claim Map</Link>•
           <Link href="/contested" className="underline">Contested</Link>•

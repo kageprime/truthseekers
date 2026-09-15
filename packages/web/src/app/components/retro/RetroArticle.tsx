@@ -322,7 +322,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
             {/* Section: Content Sections */}
             <section ref={(el)=>{refs.current.discovery=el;}} id="discovery" className="mb-8 scroll-mt-4">
               <h2 className="r-h2">Detailed Findings</h2>
-              <div className="mt-3 r-body">{secs.length===0 ? <div className="text-[13px] italic text-[var(--r-muted)]">Full sections will populate once the 9-node DAG completes.</div> : secs.map(sectionBlock)}</div>
+              <div className="mt-3 r-body">{secs.length===0 ? <div className="text-[13px] italic text-[var(--r-muted)]">Full sections are still researching…</div> : secs.map(sectionBlock)}</div>
             </section>
 
             {/* Section: Claims Grid */}
@@ -448,7 +448,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
           </div>
           <ul className="text-[11px] list-disc ml-4 space-y-1.5 leading-snug text-[var(--r-ink-secondary)]">
             <li>Epistemic confidence is derived from converging multi-source evidence, not single assertions.</li>
-            <li>Contradictions are mapped as first-class edges in the DAG.</li>
+            <li>Conflicting sources are mapped together.</li>
           </ul>
         </div>
       </div>
