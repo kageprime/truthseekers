@@ -99,6 +99,7 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
   const [trailClaimId, setTrailClaimId] = useState<string | null>(null);
   const handleChipSelect = useCallback((id: string) => {
     setActiveClaimId(id);
+    setTrailClaimId(id);
     articleBus.emit({ type: "CLAIM_CLICKED", payload: { claimId: id, text: claimsIndex[id]?.text } });
     requestAnimationFrame(() => {
       document.getElementById(`claim-note-${id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -114,8 +115,8 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
     setActiveClaimId(null);
   }, []);
   const trailClaim = useMemo(
-    () => (epistemicClaims as Array<{ id: string }>).find((c) => c?.id === trailClaimId) ?? null,
-    [epistemicClaims, trailClaimId]
+    () => (epistemicClaims as Array<{ id: string }>).find((c) => c?.id === trailClaimId) ?? (trailClaimId ? { id: trailClaimId, text: claimsIndex[trailClaimId]?.text } : null),
+    [epistemicClaims, trailClaimId, claimsIndex]
   );
   const trailGaps = useMemo(() => {
     const gaps = (epistemic as any)?.gaps;
