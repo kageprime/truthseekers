@@ -2,17 +2,17 @@
 
 import { useEffect, useState } from "react";
 
-export type RetroStyleMode = "hybrid" | "win98" | "vintage";
+export type RetroStyleMode = "win7" | "hybrid" | "win98" | "vintage";
 
 const THEME_KEY = "truthseekers_retro_style";
 
 export function getRetroStyleMode(): RetroStyleMode {
-  if (typeof window === "undefined") return "hybrid";
+  if (typeof window === "undefined") return "win7";
   try {
     const saved = localStorage.getItem(THEME_KEY);
-    if (saved === "win98" || saved === "vintage" || saved === "hybrid") return saved;
+    if (saved === "win7" || saved === "win98" || saved === "vintage" || saved === "hybrid") return saved;
   } catch {}
-  return "hybrid";
+  return "win7";
 }
 
 export function setRetroStyleMode(mode: RetroStyleMode) {
@@ -23,13 +23,13 @@ export function setRetroStyleMode(mode: RetroStyleMode) {
 }
 
 export function useRetroTheme(): [RetroStyleMode, (mode: RetroStyleMode) => void] {
-  const [theme, setTheme] = useState<RetroStyleMode>("hybrid");
+  const [theme, setTheme] = useState<RetroStyleMode>("win7");
 
   useEffect(() => {
     setTheme(getRetroStyleMode());
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      if (detail === "win98" || detail === "vintage" || detail === "hybrid") {
+      if (detail === "win7" || detail === "win98" || detail === "vintage" || detail === "hybrid") {
         setTheme(detail);
       }
     };

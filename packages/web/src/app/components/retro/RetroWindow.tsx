@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import "./retro98.css";
+import "./7css.css";
 import RetroNavStrip from "./RetroNavStrip";
 import { crumbLabel } from "@/lib/routes";
 import { useRetroTheme, type RetroStyleMode } from "@/lib/retroTheme";
@@ -35,7 +36,14 @@ export default function RetroWindow({ title, children, status, path, crumb, nav,
     crumbs.push({ label: last && crumb ? crumb : crumbLabel(s), href: last ? null : href });
   });
 
-  const themeClass = theme === "win98" ? "retro-win98" : theme === "vintage" ? "retro-vintage" : "retro-hybrid";
+  const themeClass =
+    theme === "win7"
+      ? "retro-win7"
+      : theme === "win98"
+      ? "retro-win98"
+      : theme === "vintage"
+      ? "retro-vintage"
+      : "retro-hybrid";
 
   return (
     <div className={`retro98 ${themeClass} min-h-dvh p-0 sm:p-2.5 transition-colors duration-200`} style={{ background: "var(--r-bg)" }}>
