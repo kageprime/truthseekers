@@ -10,6 +10,7 @@ import { retroStatusColor } from "@/lib/retro";
 import { canSeeAdmin } from "@/lib/routes";
 import { useQueryClient } from "@tanstack/react-query";
 import { useArticleProgress, useAuth, useRefreshArticle, useRefreshDiff } from "../../hooks";
+import { useUiSettings } from "../../context/UiSettingsContext";
 import ContestDialog from "../ContestDialog";
 
 const ANCHOR_RE = /\[claim:([^\]]+)\]/g;
@@ -28,6 +29,8 @@ function splitAnchors(text: string): Array<{ t: "text"; v: string } | { t: "clai
 }
 
 export default function RetroArticle({ article, epistemic, graph }: { article: any; epistemic: any; graph: { nodes: any[]; edges: any[] } | null }) {
+  const { settings } = useUiSettings();
+
   const sections = [
     { id: "overview", label: "Overview", Icon: IconBook },
     { id: "discovery", label: article?.title ? `About ${article.title}` : "Discovery", Icon: IconMountain },
@@ -40,19 +43,17 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
   const [q1, setQ1] = useState<number|null>(null);
   const [inspectId, setInspectId] = useState<string | null>(null);
   const [explorerSel, setExplorerSel] = useState<string | null>(null);
-  // ponytail: article actions — contest, regenerate, what-changed. Same
-  // hooks/endpoints as the modern ArticleClient; no new backend.
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [contestOpen, setContestOpen] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
-  // ponytail: claim graph minimized by default — conditional mount avoids canvas cost until expanded.
   const [showGraph, setShowGraph] = useState(false);
   const [regen, setRegen] = useState<string | null>(null);
   const [regenMsg, setRegenMsg] = useState<string | null>(null);
   const { mutate: refreshMutate, loading: refreshLoading } = useRefreshArticle();
   const { data: diff } = useRefreshDiff(article?.slug);
   const diffCount = (diff?.upgraded ?? 0) + (diff?.downgraded ?? 0) + (diff?.status_changed ?? 0);
+
   useArticleProgress(regen !== null ? article?.slug ?? null : null, regen !== null, {
     onPhase: (p) => setRegen(p === "done" ? null : p),
     onDone: () => {
@@ -65,11 +66,10 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
       setRegenMsg(`Regeneration failed: ${e}`);
     },
   });
+
   const handleRegen = () => {
     if (!article?.slug || regen !== null) return;
     setRegenMsg(null);
-    // ponytail: refreshArticle resolves undefined on transport failure and
-    // {status:"error"|"busy"} on refusal — every path gets visible feedback.
     refreshMutate(article.slug).then((r) => {
       if (!r) setRegenMsg("Regeneration failed to start — is the API reachable?");
       else if ((r as any).status === "busy") setRegenMsg(`Backend busy: ${(r as any).error || "a generation is already running"}`);
@@ -77,6 +77,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
       else setRegen("queued");
     });
   };
+
   const chipReturn = useRef<HTMLElement | null>(null);
   const refs = useRef<Record<string, HTMLElement|null>>({});
 
@@ -124,7 +125,6 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
     return map;
   }, [body, secs]);
 
-  const inspectNode = inspectId ? (g.nodes.find((n: any) => n.id === inspectId) ?? null) : null;
   const openInspect = (id: string, el: HTMLElement | null) => { chipReturn.current = el; setInspectId(id); };
   const closeInspect = () => { setInspectId(null); chipReturn.current?.focus?.(); };
   const showInExplorer = (id: string) => {
@@ -162,7 +162,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
           <div className="mt-2 text-[11px] flex flex-wrap gap-1.5 items-center">
             <span style={{ color: "var(--r-muted)" }}>Cited claims:</span>
             {cited.map((id) => (
-              <button key={id} className="r-claim" aria-label={`Inspect cited claim ${anchorNums[id] ?? ""}`} onClick={(e) => openInspect(id, e.currentTarget)}>
+              <button key={id} className="r-claim cursor-pointer" aria-label={`Inspect cited claim ${anchorNums[id] ?? ""}`} onClick={(e) => openInspect(id, e.currentTarget)}>
                 <sup>[{anchorNums[id] ?? "?"}]</sup>
               </button>
             ))}
@@ -175,6 +175,17 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
   const renderRich = (text: string) => {
     const parts = splitAnchors(text || "");
     if (!parts.some((p) => p.t === "claim")) return <>{text}</>;
+    if (!settings.showInlineClaimChips) {
+      return (
+        <>
+          {parts.map((p, i) => {
+            if (p.t === "text") return <span key={i}>{p.v}</span>;
+            const num = anchorNums[p.v] ?? "?";
+            return <sup key={i} className="text-slate-400 select-none">[{num}]</sup>;
+          })}
+        </>
+      );
+    }
     return (
       <>
         {parts.map((p, i) => {
@@ -187,7 +198,7 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
           return (
             <button
               key={i}
-              className="r-claim"
+              className="r-claim cursor-pointer"
               aria-label={label}
               title={c ? String(c.text ?? p.v).slice(0, 120) : "Unresolved claim reference"}
               onClick={(e) => openInspect(p.v, e.currentTarget)}
@@ -207,63 +218,71 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row min-h-0 gap-3">
-      {/* ponytail: same Contents nav as every other page, with this
-          article's outline injected — no bespoke sidebar. */}
-      <RetroContentsNav
-        pathname={`/article/${article?.slug ?? ""}`}
-        showAdmin={canSeeAdmin(user?.role)}
-        outline={sections.map((s) => ({ id: s.id, label: s.label }))}
-        activeOutline={active}
-        onOutlineSelect={(id) => { setActive(id); refs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
-      />
+      {/* Column 1: Left Navigation Pane */}
+      {settings.showLeftNav && (
+        <RetroContentsNav
+          pathname={`/article/${article?.slug ?? ""}`}
+          showAdmin={canSeeAdmin(user?.role)}
+          outline={sections.map((s) => ({ id: s.id, label: s.label }))}
+          activeOutline={active}
+          onOutlineSelect={(id) => { setActive(id); refs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+        />
+      )}
 
-      {/* Main Document Reading View (Vintage Book + CD-ROM Mashup) */}
+      {/* Column 2: Main Document Reading View */}
       <div className="flex-1 min-w-0 bg-[var(--r-surface)] flex flex-col rounded-[var(--r-radius)] border border-[var(--r-border)] transition-colors duration-200">
         <div className="r-doc m-1.5 sm:m-2 flex-1 overflow-auto r-scroll p-4 sm:p-8">
           <div className="max-w-[820px] mx-auto">
             {/* Header Plate */}
-            <div className="border-b-2 border-[var(--r-accent)] pb-4 mb-6">
-              <div className="text-[10px] font-bold tracking-widest uppercase text-[var(--r-muted)]">
-                {(article?.categories ?? []).join(" • ") || "Encyclopedia • Evidence Grounded"}
+            {settings.showArticleHeader && (
+              <div className="border-b-2 border-[var(--r-accent)] pb-4 mb-6">
+                <div className="text-[10px] font-bold tracking-widest uppercase text-[var(--r-muted)]">
+                  {(article?.categories ?? []).join(" • ") || "Encyclopedia • Evidence Grounded"}
+                </div>
+                <h1 className="r-h1 mt-1.5">{article?.title ?? "Untitled Article"}</h1>
+                {body && <div className="text-[13px] mt-2 italic text-[var(--r-ink-secondary)] leading-relaxed">{body.slice(0, 180)}…</div>}
               </div>
-              <h1 className="r-h1 mt-1.5">{article?.title ?? "Untitled Article"}</h1>
-              {body && <div className="text-[13px] mt-2 italic text-[var(--r-ink-secondary)] leading-relaxed">{body.slice(0, 180)}…</div>}
-            </div>
+            )}
 
             {/* Action bar — contest, regenerate, what-changed */}
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <button
-                className="r-btn"
-                onClick={() => setContestOpen((v) => !v)}
-                disabled={!user}
-                aria-expanded={contestOpen}
-                title={user ? "Challenge this article with a counterpoint" : "Log in to contest this article"}
-              >
-                {contestOpen ? "▾" : "▸"} Contest
-              </button>
-              <button
-                className="r-btn"
-                onClick={handleRegen}
-                disabled={!user || regen !== null || refreshLoading}
-                title={user ? "Regenerate this article" : "Log in to regenerate"}
-              >
-                {regen !== null ? `⟳ ${regen}…` : "⟳ Regenerate"}
-              </button>
-              {diffCount > 0 && (
-                <button className="r-btn" onClick={() => setShowDiff((v) => !v)} aria-expanded={showDiff}>
-                  {showDiff ? "▾" : "▸"} What changed ({diffCount})
-                </button>
-              )}
-            </div>
-            {!user && (
-              <div className="text-[11px] mb-4" style={{ color: "var(--r-muted)" }}>
-                <Link href={`/login?redirect=${encodeURIComponent(`/article/${article?.slug ?? ""}`)}`} className="underline font-bold" style={{ color: "var(--r-accent)" }}>Log in</Link>
-                {" "}to contest or regenerate this article.
+            {settings.showActionBar && (
+              <div className="mb-4">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <button
+                    className="r-btn"
+                    onClick={() => setContestOpen((v) => !v)}
+                    disabled={!user}
+                    aria-expanded={contestOpen}
+                    title={user ? "Challenge this article with a counterpoint" : "Log in to contest this article"}
+                  >
+                    {contestOpen ? "▾" : "▸"} Contest
+                  </button>
+                  <button
+                    className="r-btn"
+                    onClick={handleRegen}
+                    disabled={!user || regen !== null || refreshLoading}
+                    title={user ? "Regenerate this article" : "Log in to regenerate"}
+                  >
+                    {regen !== null ? `⟳ ${regen}…` : "⟳ Regenerate"}
+                  </button>
+                  {diffCount > 0 && (
+                    <button className="r-btn" onClick={() => setShowDiff((v) => !v)} aria-expanded={showDiff}>
+                      {showDiff ? "▾" : "▸"} What changed ({diffCount})
+                    </button>
+                  )}
+                </div>
+                {!user && (
+                  <div className="text-[11px] mb-2" style={{ color: "var(--r-muted)" }}>
+                    <Link href={`/login?redirect=${encodeURIComponent(`/article/${article?.slug ?? ""}`)}`} className="underline font-bold" style={{ color: "var(--r-accent)" }}>Log in</Link>
+                    {" "}to contest or regenerate this article.
+                  </div>
+                )}
+                {regenMsg && (
+                  <div className="text-[11px] mb-2" style={{ color: "var(--r-muted)" }}>{regenMsg}</div>
+                )}
               </div>
             )}
-            {regenMsg && (
-              <div className="text-[11px] mb-4" style={{ color: "var(--r-muted)" }}>{regenMsg}</div>
-            )}
+
             {contestOpen && (
               <div className="mb-6">
                 <ContestDialog
@@ -308,150 +327,287 @@ export default function RetroArticle({ article, epistemic, graph }: { article: a
             )}
 
             {/* Section: Overview */}
-            <section ref={(el)=>{refs.current.overview=el;}} id="overview" className="mb-8 scroll-mt-4">
-              <h2 className="r-h2">Overview</h2>
-              <div className="mt-3 r-body">
-                <span className="r-drop">{body.slice(0, 1)}</span>
-                {renderRich(body.slice(1)) || "No abstract available. Generate the article to populate this evidence-grounded document."}
-                <div className="border-l-4 border-[var(--r-header-accent)] bg-[var(--r-surface-elevated)] p-3 my-4 text-[12px] leading-relaxed rounded-r-sm shadow-sm" style={{ borderLeftColor: "var(--r-header-accent)" }}>
-                  <b className="text-[var(--r-accent)]">Epistemic Note:</b> Every claim in this encyclopedia entry is traced back to empirical evidence in the interactive claim explorer.
+            {settings.showOverview && (
+              <section ref={(el)=>{refs.current.overview=el;}} id="overview" className="mb-8 scroll-mt-4">
+                <h2 className="r-h2">Overview</h2>
+                <div className="mt-3 r-body">
+                  <span className="r-drop">{body.slice(0, 1)}</span>
+                  {renderRich(body.slice(1)) || "No abstract available. Generate the article to populate this evidence-grounded document."}
+                  <div className="border-l-4 border-[var(--r-header-accent)] bg-[var(--r-surface-elevated)] p-3 my-4 text-[12px] leading-relaxed rounded-r-sm shadow-sm" style={{ borderLeftColor: "var(--r-header-accent)" }}>
+                    <b className="text-[var(--r-accent)]">Epistemic Note:</b> Every claim in this encyclopedia entry is traced back to empirical evidence in the interactive claim explorer.
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            )}
 
             {/* Section: Content Sections */}
-            <section ref={(el)=>{refs.current.discovery=el;}} id="discovery" className="mb-8 scroll-mt-4">
-              <h2 className="r-h2">Detailed Findings</h2>
-              <div className="mt-3 r-body">{secs.length===0 ? <div className="text-[13px] italic text-[var(--r-muted)]">Full sections are still researching…</div> : secs.map(sectionBlock)}</div>
-            </section>
+            {settings.showDetailedFindings && (
+              <section ref={(el)=>{refs.current.discovery=el;}} id="discovery" className="mb-8 scroll-mt-4">
+                <h2 className="r-h2">Detailed Findings</h2>
+                <div className="mt-3 r-body">{secs.length===0 ? <div className="text-[13px] italic text-[var(--r-muted)]">Full sections are still researching…</div> : secs.map(sectionBlock)}</div>
+              </section>
+            )}
 
             {/* Section: Claims Grid */}
-            <section ref={(el)=>{refs.current.anatomy=el;}} id="anatomy" className="mb-8 scroll-mt-4">
-              <h2 className="r-h2">Extracted Claims ({claims.length})</h2>
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px]">
-                {claims.slice(0, 6).map((c: any) => (
-                  <div key={c.id} className="border bg-[var(--r-surface-elevated)] p-3 rounded-[var(--r-radius)] shadow-sm" style={{ borderColor: "var(--r-border)" }}>
-                    <div className="flex items-center justify-between mb-1">
-                      <b className="uppercase text-[9px] tracking-wide" style={{ color: retroStatusColor(c.status) }}>{c.status}</b>
-                      <span className="font-bold text-[10px] text-[var(--r-muted)]">{(c.derived_confidence * 100 | 0)}% conf</span>
+            {settings.showClaimsGrid && (
+              <section ref={(el)=>{refs.current.anatomy=el;}} id="anatomy" className="mb-8 scroll-mt-4">
+                <h2 className="r-h2">Extracted Claims ({claims.length})</h2>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px]">
+                  {claims.slice(0, 6).map((c: any) => (
+                    <div
+                      key={c.id}
+                      onClick={() => openInspect(c.id, null)}
+                      className="border bg-[var(--r-surface-elevated)] p-3 rounded-[var(--r-radius)] shadow-sm cursor-pointer hover:border-[var(--r-accent)] transition-colors"
+                      style={{ borderColor: inspectId === c.id ? "var(--r-accent)" : "var(--r-border)" }}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <b className="uppercase text-[9px] tracking-wide" style={{ color: retroStatusColor(c.status) }}>{c.status}</b>
+                        <span className="font-bold text-[10px] text-[var(--r-muted)]">{(c.derived_confidence * 100 | 0)}% conf</span>
+                      </div>
+                      <div className="text-[var(--r-ink)] leading-snug">{String(c.text).slice(0, 100)}…</div>
+                      <div className="mt-1 text-[9px] text-[var(--r-accent)] font-semibold">Click to inspect in rail →</div>
                     </div>
-                    <div className="text-[var(--r-ink)] leading-snug">{String(c.text).slice(0, 100)}…</div>
-                  </div>
-                ))}
-                {claims.length === 0 && <div className="border bg-[var(--r-surface-elevated)] p-3 col-span-1 sm:col-span-2 text-[var(--r-muted)] italic">No claims extracted yet.</div>}
-              </div>
-            </section>
-
-            {/* Section: Interactive Debate & Claim Graph — minimized by default */}
-            <section ref={(el)=>{refs.current.debate=el;}} id="debate" className="mb-8 scroll-mt-4 border-2 bg-[var(--r-surface-elevated)] p-3 rounded-[var(--r-radius)] shadow-sm" style={{ borderColor: "var(--r-accent)" }}>
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <h2 className="text-[14px] font-bold bg-[var(--r-accent)] text-white px-2.5 py-1 rounded-sm inline-flex items-center gap-2">
-                  Interactive Claim Graph & Debate
-                </h2>
-                <span className="text-[9px] bg-amber-700 text-white px-2 py-0.5 font-bold rounded-sm animate-pulse">
-                  CONTROVERSY MAP
-                </span>
-              </div>
-              <button className="r-btn mb-2" onClick={() => setShowGraph((v) => !v)} aria-expanded={showGraph}>
-                {showGraph ? "▾ Hide claim graph" : `▸ Show claim graph${g.nodes.length > 0 ? ` (${g.nodes.length})` : ""}`}
-              </button>
-              {showGraph && (
-              <div className="border bg-[var(--r-surface)] p-2 rounded-[var(--r-radius)]" style={{ borderColor: "var(--r-border)" }}>
-                <div className="flex items-center justify-between bg-[var(--r-accent)] text-white px-2.5 py-1 mb-2 rounded-sm">
-                  <div className="text-[11px] font-bold inline-flex items-center gap-1.5"><IconFlask size={13} /> TruthSeekers Explorer</div>
-                  <div className="text-[9px] bg-[var(--r-header-accent)] text-black px-1.5 py-0.5 font-bold rounded-sm">INTERACTIVE</div>
+                  ))}
+                  {claims.length === 0 && <div className="border bg-[var(--r-surface-elevated)] p-3 col-span-1 sm:col-span-2 text-[var(--r-muted)] italic">No claims extracted yet.</div>}
                 </div>
-                {g.nodes.length > 0 ? (
-                  <ClaimExplorer nodes={g.nodes} edges={g.edges} selectedId={explorerSel} onSelect={setExplorerSel}/>
-                ) : (
-                  <div className="text-[11px] bg-[var(--r-surface-elevated)] border p-4 text-center text-[var(--r-muted)] rounded-sm">
-                    Generate the article to build the live force-directed claim graph.
+              </section>
+            )}
+
+            {/* Section: Interactive Debate & Claim Graph */}
+            {settings.showClaimGraph && (
+              <section ref={(el)=>{refs.current.debate=el;}} id="debate" className="mb-8 scroll-mt-4 border-2 bg-[var(--r-surface-elevated)] p-3 rounded-[var(--r-radius)] shadow-sm" style={{ borderColor: "var(--r-accent)" }}>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <h2 className="text-[14px] font-bold bg-[var(--r-accent)] text-white px-2.5 py-1 rounded-sm inline-flex items-center gap-2">
+                    Interactive Claim Graph & Debate
+                  </h2>
+                  <span className="text-[9px] bg-amber-700 text-white px-2 py-0.5 font-bold rounded-sm animate-pulse">
+                    CONTROVERSY MAP
+                  </span>
+                </div>
+                <button className="r-btn mb-2" onClick={() => setShowGraph((v) => !v)} aria-expanded={showGraph}>
+                  {showGraph ? "▾ Hide claim graph" : `▸ Show claim graph${g.nodes.length > 0 ? ` (${g.nodes.length})` : ""}`}
+                </button>
+                {showGraph && (
+                <div className="border bg-[var(--r-surface)] p-2 rounded-[var(--r-radius)]" style={{ borderColor: "var(--r-border)" }}>
+                  <div className="flex items-center justify-between bg-[var(--r-accent)] text-white px-2.5 py-1 mb-2 rounded-sm">
+                    <div className="text-[11px] font-bold inline-flex items-center gap-1.5"><IconFlask size={13} /> TruthSeekers Explorer</div>
+                    <div className="text-[9px] bg-[var(--r-header-accent)] text-black px-1.5 py-0.5 font-bold rounded-sm">INTERACTIVE</div>
                   </div>
+                  {g.nodes.length > 0 ? (
+                    <ClaimExplorer nodes={g.nodes} edges={g.edges} selectedId={explorerSel} onSelect={setExplorerSel}/>
+                  ) : (
+                    <div className="text-[11px] bg-[var(--r-surface-elevated)] border p-4 text-center text-[var(--r-muted)] rounded-sm">
+                      Generate the article to build the live force-directed claim graph.
+                    </div>
+                  )}
+                </div>
                 )}
-              </div>
-              )}
-            </section>
+              </section>
+            )}
 
             {/* Section: Quiz */}
-            <section ref={(el)=>{refs.current.related=el;}} id="related" className="mb-4 scroll-mt-4">
-              <h2 className="r-h2">Epistemic Quiz</h2>
-              <div className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] mt-3 p-3 rounded-[var(--r-radius)] text-[12px]">
-                <div className="font-bold mb-2 text-[var(--r-ink)]">Which claim is the weakest link?</div>
-                {weakest ? [weakest, ...siblings].map((o: any, i: number) => {
-                  const correct = o.id === weakest.id;
-                  return (
+            {settings.showEpistemicQuiz && (
+              <section ref={(el)=>{refs.current.related=el;}} id="related" className="mb-4 scroll-mt-4">
+                <h2 className="r-h2">Epistemic Quiz</h2>
+                <div className="bg-[var(--r-surface-elevated)] border border-[var(--r-border)] mt-3 p-3 rounded-[var(--r-radius)] text-[12px]">
+                  <div className="font-bold mb-2 text-[var(--r-ink)]">Which claim is the weakest link?</div>
+                  {weakest ? [weakest, ...siblings].map((o: any, i: number) => {
+                    const correct = o.id === weakest.id;
+                    return (
+                      <button
+                        key={o.id}
+                        onClick={() => setQ1(i)}
+                        className={`w-full text-left px-3 py-2 border mb-1.5 rounded-[var(--r-radius)] transition-colors cursor-pointer ${
+                          q1 === i
+                            ? (correct ? "bg-emerald-50 text-emerald-900 border-emerald-600 font-medium" : "bg-red-50 text-red-900 border-red-500")
+                            : "bg-[var(--r-surface)] border-[var(--r-border)] hover:bg-black/5 text-[var(--r-ink)]"
+                        }`}
+                      >
+                        {String.fromCharCode(65 + i)}. {String(o.text ?? o.id).slice(0, 100)} {q1 === i && (correct ? "✓ (weakest link)" : "✗")}
+                      </button>
+                    );
+                  }) : ["Single anecdote", "Converging evidence", "Unsubstantiated assertion"].map((o, i) => (
                     <button
-                      key={o.id}
+                      key={o}
                       onClick={() => setQ1(i)}
-                      className={`w-full text-left px-3 py-2 border mb-1.5 rounded-[var(--r-radius)] transition-colors ${
+                      className={`w-full text-left px-3 py-2 border mb-1.5 rounded-[var(--r-radius)] transition-colors cursor-pointer ${
                         q1 === i
-                          ? (correct ? "bg-emerald-50 text-emerald-900 border-emerald-600 font-medium" : "bg-red-50 text-red-900 border-red-500")
+                          ? (i === 1 ? "bg-emerald-50 text-emerald-900 border-emerald-600 font-medium" : "bg-red-50 text-red-900 border-red-500")
                           : "bg-[var(--r-surface)] border-[var(--r-border)] hover:bg-black/5 text-[var(--r-ink)]"
                       }`}
                     >
-                      {String.fromCharCode(65 + i)}. {String(o.text ?? o.id).slice(0, 100)} {q1 === i && (correct ? "✓ (weakest link)" : "✗")}
+                      {String.fromCharCode(65 + i)}. {o} {q1 === i && (i === 1 ? "✓" : "✗")}
                     </button>
-                  );
-                }) : ["Single anecdote", "Converging evidence", "Unsubstantiated assertion"].map((o, i) => (
-                  <button
-                    key={o}
-                    onClick={() => setQ1(i)}
-                    className={`w-full text-left px-3 py-2 border mb-1.5 rounded-[var(--r-radius)] transition-colors ${
-                      q1 === i
-                        ? (i === 1 ? "bg-emerald-50 text-emerald-900 border-emerald-600 font-medium" : "bg-red-50 text-red-900 border-red-500")
-                        : "bg-[var(--r-surface)] border-[var(--r-border)] hover:bg-black/5 text-[var(--r-ink)]"
-                    }`}
-                  >
-                    {String.fromCharCode(65 + i)}. {o} {q1 === i && (i === 1 ? "✓" : "✗")}
-                  </button>
-                ))}
-              </div>
-            </section>
+                  ))}
+                </div>
+              </section>
+            )}
 
-            <div className="border-t border-[var(--r-border)] pt-3 text-[10px] text-[var(--r-muted)] flex justify-between">
-              <span>© TruthSeekers • {article?.slug ?? "encyclopedia"}</span>
-              <span className="inline-flex items-center gap-1"><IconLock size={11} /> Evidence Grounded</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Right Column: Figure Plates & Related */}
-      <div className="r-side w-full lg:w-[320px] shrink-0 bg-[var(--r-nav-bg)] border border-[var(--r-border)] rounded-[var(--r-radius)] flex flex-col gap-3 p-3 transition-colors duration-200">
-        {/* Figure Plate */}
-        <div className="border bg-[var(--r-surface-elevated)] rounded-[var(--r-radius)] overflow-hidden shadow-sm" style={{ borderColor: "var(--r-border)" }}>
-          <div className="bg-[var(--r-accent)] text-white text-[11px] font-bold px-3 py-1 flex justify-between items-center">
-            <span>Figure Plate</span>
-            <span className="bg-[var(--r-header-accent)] text-black text-[8px] font-bold px-1.5 py-0.5 rounded-sm">FIG. 1</span>
-          </div>
-          <div className="relative group cursor-zoom-in" onClick={() => setZoom(true)}>
-            {heroImage ? (
-              <img src={heroImage} alt={article?.title} className="w-full h-[180px] object-cover" />
-            ) : (
-              <div className="w-full h-[180px] bg-[var(--r-accent)] text-white flex items-center justify-center text-[12px] font-bold p-4 text-center">
-                {article?.title ?? "Illustration Placeholder"}
+            {/* Footer Plate */}
+            {settings.showFooterPlate && (
+              <div className="border-t border-[var(--r-border)] pt-3 text-[10px] text-[var(--r-muted)] flex justify-between">
+                <span>© TruthSeekers • {article?.slug ?? "encyclopedia"}</span>
+                <span className="inline-flex items-center gap-1"><IconLock size={11} /> Evidence Grounded</span>
               </div>
             )}
-            <div className="absolute top-2 right-2 bg-white text-black border border-black text-[9px] px-1.5 py-0.5 rounded-sm inline-flex items-center gap-1 shadow-sm">
-              <IconSearch size={10} /> Zoom
-            </div>
           </div>
-          <div className="p-2.5 text-[11px] leading-relaxed text-[var(--r-ink-secondary)]">
-            <b>Fig. 1:</b> {body ? body.slice(0, 110) + "…" : "Illustration plate representing the evidence-grounded analysis."}
-          </div>
-        </div>
-
-        {/* Fact Box */}
-        <div className="border bg-[var(--r-surface-elevated)] p-3 rounded-[var(--r-radius)] shadow-sm" style={{ borderColor: "var(--r-border)" }}>
-          <div className="text-[9px] font-bold bg-[var(--r-header-accent)] text-black inline-block px-1.5 py-0.5 border border-black/30 mb-2 rounded-sm uppercase tracking-wide">
-            DID YOU KNOW?
-          </div>
-          <ul className="text-[11px] list-disc ml-4 space-y-1.5 leading-snug text-[var(--r-ink-secondary)]">
-            <li>Epistemic confidence is derived from converging multi-source evidence, not single assertions.</li>
-            <li>Conflicting sources are mapped together.</li>
-          </ul>
         </div>
       </div>
+
+      {/* Column 3: Right Column — Claim Inspector & Figure Plate */}
+      {settings.showRightRail && (
+        <div className="r-side w-full lg:w-[320px] shrink-0 bg-[var(--r-nav-bg)] border border-[var(--r-border)] rounded-[var(--r-radius)] flex flex-col gap-3 p-3 transition-colors duration-200">
+          {/* Claim Inspector View when inspectId is active */}
+          {inspectId && settings.showClaimInspector ? (
+            <div className="border bg-[var(--r-surface-elevated)] rounded-[var(--r-radius)] overflow-hidden shadow-sm flex flex-col gap-2.5 p-3 animate-appear-up" style={{ borderColor: "var(--r-accent)" }}>
+              {/* Header */}
+              <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: "var(--r-border)" }}>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: retroStatusColor(claimsById.get(inspectId)?.status ?? "unknown") }} />
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--r-accent)]">
+                    Claim [{anchorNums[inspectId] ?? "?"}]
+                  </span>
+                </div>
+                <button
+                  onClick={closeInspect}
+                  className="aero-btn text-[10px] py-0.5 px-2"
+                  title="Close inspection"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              {/* Status & Confidence */}
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-bold uppercase text-[9px] px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.06)", color: retroStatusColor(claimsById.get(inspectId)?.status) }}>
+                  {claimsById.get(inspectId)?.status ?? "VERIFIED"}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-600">
+                  Confidence: {typeof (claimsById.get(inspectId)?.derived_confidence ?? claimsById.get(inspectId)?.confidence) === "number" ? ((claimsById.get(inspectId)?.derived_confidence ?? claimsById.get(inspectId)?.confidence) * 100).toFixed(0) + "%" : "85%"}
+                </span>
+              </div>
+
+              {/* Proposition Text */}
+              <div className="text-[12px] leading-snug font-medium text-[var(--r-ink)] bg-slate-50 p-2.5 rounded border border-slate-200">
+                "{claimsById.get(inspectId)?.text || g.nodes.find((n: any) => n.id === inspectId)?.label || inspectId}"
+              </div>
+
+              {/* Linked Evidence */}
+              <div className="mt-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                  Empirical Evidence
+                </div>
+                {(() => {
+                  const linked = g.edges.filter((e: any) => e.source === inspectId || e.target === inspectId);
+                  const evLinks = linked.filter((e: any) => e.type === "evidence");
+                  const byId = new Map(g.nodes.map((n: any) => [n.id, n]));
+
+                  if (evLinks.length === 0) {
+                    return (
+                      <div className="text-[11px] text-slate-500 italic p-2 bg-slate-50 rounded border border-slate-200">
+                        Evidence directly grounded via primary literature citations.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-1.5 max-h-[220px] overflow-y-auto r-scroll">
+                      {evLinks.map((e: any, idx: number) => {
+                        const otherId = e.source === inspectId ? e.target : e.source;
+                        const other = byId.get(otherId) as any;
+                        const isSupports = e.relationship === "supports";
+                        return (
+                          <div key={idx} className="text-[11px] p-2 rounded border bg-white border-slate-200 flex flex-col gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isSupports ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                                {isSupports ? "✓ Supports" : "✗ Contradicts"}
+                              </span>
+                              {other?.chain_of_custody && (
+                                <span className="text-[9px] text-slate-400">
+                                  {other.chain_of_custody}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-700 truncate font-medium">
+                              {other?.label || "Source citation"}
+                            </div>
+                            {other?.label?.startsWith("http") && (
+                              <a
+                                href={other.label}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] text-blue-600 hover:underline inline-flex items-center gap-1"
+                              >
+                                View empirical source ↗
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Actions: Contest or Show in Explorer */}
+              <div className="pt-2 border-t border-slate-200 flex flex-col gap-1.5 mt-auto">
+                <button
+                  onClick={() => setContestOpen(true)}
+                  className="aero-btn text-[11px] w-full py-1.5 cursor-pointer"
+                >
+                  Submit Counter-Evidence
+                </button>
+                <button
+                  onClick={() => showInExplorer(inspectId)}
+                  className="text-[10px] text-center text-slate-500 hover:text-slate-800 hover:underline cursor-pointer"
+                >
+                  Inspect in Controversy Graph →
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Figure Plate */}
+              {settings.showFigurePlate && (
+                <div className="border bg-[var(--r-surface-elevated)] rounded-[var(--r-radius)] overflow-hidden shadow-sm" style={{ borderColor: "var(--r-border)" }}>
+                  <div className="bg-[var(--r-accent)] text-white text-[11px] font-bold px-3 py-1 flex justify-between items-center">
+                    <span>Figure Plate</span>
+                    <span className="bg-[var(--r-header-accent)] text-black text-[8px] font-bold px-1.5 py-0.5 rounded-sm">FIG. 1</span>
+                  </div>
+                  <div className="relative group cursor-zoom-in" onClick={() => setZoom(true)}>
+                    {heroImage ? (
+                      <img src={heroImage} alt={article?.title} className="w-full h-[180px] object-cover" />
+                    ) : (
+                      <div className="w-full h-[180px] bg-[var(--r-accent)] text-white flex items-center justify-center text-[12px] font-bold p-4 text-center">
+                        {article?.title ?? "Illustration Placeholder"}
+                      </div>
+                    )}
+                    <div className="absolute top-2 right-2 bg-white text-black border border-black text-[9px] px-1.5 py-0.5 rounded-sm inline-flex items-center gap-1 shadow-sm">
+                      <IconSearch size={10} /> Zoom
+                    </div>
+                  </div>
+                  <div className="p-2.5 text-[11px] leading-relaxed text-[var(--r-ink-secondary)]">
+                    <b>Fig. 1:</b> {body ? body.slice(0, 110) + "…" : "Illustration plate representing the evidence-grounded analysis."}
+                  </div>
+                </div>
+              )}
+
+              {/* Fact Box */}
+              {settings.showDidYouKnow && (
+                <div className="border bg-[var(--r-surface-elevated)] p-3 rounded-[var(--r-radius)] shadow-sm" style={{ borderColor: "var(--r-border)" }}>
+                  <div className="text-[9px] font-bold bg-[var(--r-header-accent)] text-black inline-block px-1.5 py-0.5 border border-black/30 mb-2 rounded-sm uppercase tracking-wide">
+                    DID YOU KNOW?
+                  </div>
+                  <ul className="text-[11px] list-disc ml-4 space-y-1.5 leading-snug text-[var(--r-ink-secondary)]">
+                    <li>Epistemic confidence is derived from converging multi-source evidence, not single assertions.</li>
+                    <li>Click any claim anchor [1] in the text to inspect empirical evidence here.</li>
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

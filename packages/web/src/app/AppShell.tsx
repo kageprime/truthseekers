@@ -11,6 +11,7 @@ import FloatIslandNav from "./components/FloatIslandNav";
 import LiveNowTicker from "./components/LiveNowTicker";
 import RetroShell from "./components/retro/RetroShell";
 import RetroPalette from "./components/retro/RetroPalette";
+import UiSettingsDrawer from "./components/retro/UiSettingsDrawer";
 import MobileTabBar from "./components/MobileTabBar";
 import "./components/retro/retro98.css";
 import { useFloatingChat } from "./FloatingChatContext";
@@ -79,6 +80,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <div className="retro98 pb-12 md:pb-0">
         <RetroShell>{children}</RetroShell>
         <RetroPalette />
+        <UiSettingsDrawer />
         <MobileTabBar />
         {showChat && (
           <div className="fixed inset-0 z-50 flex flex-col justify-end pointer-events-none">
@@ -165,6 +167,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {/* ponytail: palette everywhere in retro — including self-wrapped article/graph/chat. */}
       {IS_RETRO && <RetroPalette />}
 
+      {/* UI Scaffolding & Component Remodeling Drawer */}
+      <UiSettingsDrawer />
+
       {/* Press overlay */}
       <PressView />
 
@@ -190,7 +195,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </svg>
         </button>
       )}
-
 
       {/* Mock mode controls */}
       {IS_MOCK && user && (

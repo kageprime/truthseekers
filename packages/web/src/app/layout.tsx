@@ -9,6 +9,7 @@ import { HeaderSearchProvider } from "./HeaderSearchContext";
 import { ArticleViewProvider } from "./ArticleViewContext";
 import { AuthProvider } from "./components/AuthProvider";
 import { TimeMachineProvider } from "./hooks/useTimeMachine";
+import { UiSettingsProvider } from "./context/UiSettingsContext";
 import TimeMachineBar from "./components/TimeMachineBar";
 import RegisterSw from "./components/RegisterSw";
 import ScrollReveal from "./components/ScrollReveal";
@@ -59,15 +60,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       <TimeMachineProvider>
                        <HeaderSearchProvider>
                          <ArticleViewProvider>
+                           <UiSettingsProvider>
                            <ToastProvider>
-                           <ScrollReveal />
-                           <RegisterSw />
-                           {/* ponytail: fixed overlay — one instance covers retro + island nav shells. */}
-                           <TimeMachineBar />
-                           <AppShell>{children}</AppShell>
-                          </ToastProvider>
-                        </ArticleViewProvider>
-                      </HeaderSearchProvider>
+                            <ScrollReveal />
+                            <RegisterSw />
+                            {/* ponytail: fixed overlay — one instance covers retro + island nav shells. */}
+                            <TimeMachineBar />
+                            <AppShell>{children}</AppShell>
+                           </ToastProvider>
+                           </UiSettingsProvider>
+                         </ArticleViewProvider>
+                       </HeaderSearchProvider>
                       </TimeMachineProvider>
                     </ChatProvider>
                 </FloatingChatProvider>
