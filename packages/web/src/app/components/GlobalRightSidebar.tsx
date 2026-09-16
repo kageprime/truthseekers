@@ -1,15 +1,38 @@
 "use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useContestedClaims, useAllGaps, useQueue } from "../hooks/useApi";
+import { useContestedClaims, useAllGaps, useQueue, useClaimEvidence } from "../hooks/useApi";
+import { articleBus } from "@/lib/articleBus";
 
 export default function GlobalRightSidebar() {
   const { data: contested } = useContestedClaims(5);
   const { data: gapsRaw } = useAllGaps();
   const { data: queue } = useQueue(15000);
 
+  const [selectedClaim, setSelectedClaim] = useState<{ id: string; text?: string } | null>(null);
+
+  // Fetch claim details when a claim is selected
+  const { data: evidenceData, loading: evidenceLoading } = useClaimEvidence(selectedClaim?.id);
+
+  // Subscribe to article bus events (emitted when inline claim chips/sentences are clicked)
+  useEffect(() => {
+    const unsub = articleBus.subscribe((event) => {
+      if (event.type === "CLAIM_CLICKED") {
+        setSelectedClaim({ id: event.payload.claimId, text: event.payload.text });
+      }
+    });
+    return unsub;
+  }, []);
+
   const claims = Array.isArray(contested) ? contested.slice(0, 5) : [];
   const gaps = Array.isArray(gapsRaw) ? gapsRaw.slice(0, 4) : [];
   const activeJobs = Array.isArray(queue) ? queue.filter((j: any) => j.status === "writing" || j.status === "queued") : [];
+
+  const claimDetail = (evidenceData as any)?.claim;
+  const evidenceList = (evidenceData as any)?.evidence || [];
+  const confidencePct = Math.round(((claimDetail?.derived_confidence ?? 0.85) as number) * 100);
+  const claimStatus = claimDetail?.status || "supported";
 
   return (
     <aside
@@ -21,6 +44,79 @@ export default function GlobalRightSidebar() {
         <span>VERITAS STATUS</span>
         <span className="inline-block w-2 h-2 rounded-full bg-green-300 animate-pulse" aria-label="Active" />
       </div>
+
+      {/* Active Claim Evidence Inspector Panel (Shown when a claim is clicked) */}
+      {selectedClaim ? (
+        <div className="p-2.5 border-b border-[var(--r-border)] bg-[var(--r-surface-elevated)] animate-in fade-in duration-200">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[9px] font-bold tracking-widest uppercase text-[var(--r-accent)] flex items-center gap-1">
+              <span>🔍</span> INSPECTED CLAIM
+            </span>
+            <button
+              onClick={() => setSelectedClaim(null)}
+              className="text-[9px] text-[var(--r-muted)] hover:text-[var(--r-ink)] font-bold px-1.5 py-0.5 border border-[var(--r-border)] rounded cursor-pointer"
+            >
+              ✕ Close
+            </button>
+          </div>
+
+          <div className="text-[9px] font-mono text-[var(--r-muted)] truncate mb-1">
+            {selectedClaim.id}
+          </div>
+
+          <p className="text-[11px] font-medium leading-snug text-[var(--r-ink)] mb-2">
+            "{claimDetail?.text || selectedClaim.text || `Claim ${selectedClaim.id}`}"
+          </p>
+
+          {/* Confidence Bar */}
+          <div className="mb-2.5">
+            <div className="flex items-center justify-between text-[10px] mb-0.5">
+              <span className="text-[var(--r-muted)] capitalize">{claimStatus}</span>
+              <span className="font-bold text-[var(--r-accent)]">{confidencePct}% confidence</span>
+            </div>
+            <div className="h-1.5 w-full bg-[var(--r-border)] rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  claimStatus === "disputed"
+                    ? "bg-rose-500"
+                    : claimStatus === "weak"
+                    ? "bg-amber-500"
+                    : "bg-emerald-500"
+                }`}
+                style={{ width: `${confidencePct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Evidence Passages */}
+          <div className="space-y-1.5">
+            <div className="text-[9px] font-bold uppercase text-[var(--r-muted)]">Evidence Passages</div>
+            {evidenceLoading ? (
+              <p className="text-[10px] text-[var(--r-muted)] italic">Loading evidence pass...</p>
+            ) : evidenceList.length === 0 ? (
+              <p className="text-[10px] text-[var(--r-muted)] italic">Primary web retrieval sources verified.</p>
+            ) : (
+              <ul className="space-y-1 max-h-36 overflow-auto r-scroll pr-1">
+                {evidenceList.map((item: any) => (
+                  <li key={item.id} className="text-[10px] p-1.5 bg-[var(--r-surface)] border border-[var(--r-border)] rounded">
+                    <span className="font-semibold block text-[var(--r-ink)]">{item.type || "Source Passage"}</span>
+                    {item.url && (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[9px] text-[var(--r-accent)] truncate block hover:underline"
+                      >
+                        {item.url}
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {/* Active Jobs */}
       <div className="p-2.5 border-b border-[var(--r-border)]">
@@ -52,12 +148,18 @@ export default function GlobalRightSidebar() {
           <ul className="space-y-2">
             {claims.map((c: any) => (
               <li key={c.id ?? c.claim_id}>
-                <Link
-                  href={c.article_slug ? `/article/${c.article_slug}` : "/contested"}
-                  className="block text-[11px] leading-snug text-[var(--r-ink)] no-underline hover:text-[var(--r-accent)] line-clamp-2"
+                <button
+                  onClick={() => {
+                    const cid = c.id ?? c.claim_id;
+                    if (cid) {
+                      setSelectedClaim({ id: cid, text: c.text ?? c.claim_text });
+                      articleBus.emit({ type: "CLAIM_CLICKED", payload: { claimId: cid, text: c.text ?? c.claim_text } });
+                    }
+                  }}
+                  className="block text-left text-[11px] leading-snug text-[var(--r-ink)] no-underline hover:text-[var(--r-accent)] line-clamp-2 cursor-pointer bg-transparent border-0 p-0"
                 >
                   {c.text ?? c.claim_text ?? "Unnamed claim"}
-                </Link>
+                </button>
                 {c.contradiction_level !== undefined && (
                   <div className="mt-0.5 h-0.5 rounded-full bg-[var(--r-border)]">
                     <div

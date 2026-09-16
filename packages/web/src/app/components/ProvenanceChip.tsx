@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import type { ClaimStatus } from "@/lib/claim-parser";
 import { useClaimEvidence } from "../hooks";
 import ConfidenceRadar from "./ConfidenceRadar";
+import { articleBus } from "@/lib/articleBus";
 
 const CHIP_COLORS: Record<string, { dot: string; bg: string; border: string }> = {
   supported: { dot: "#2b7a4b", bg: "rgba(43,122,75,0.08)", border: "rgba(43,122,75,0.25)" },
@@ -56,10 +57,16 @@ export function ProvenanceChipInline({ claimId, status, active, onSelect, n, tit
 
   const freshnessColor = freshness === null ? "#888" : freshness > 0.7 ? "#2b7a4b" : freshness > 0.4 ? "#b87a2e" : "#b33c3c";
 
+  const handleChipClick = () => {
+    setOpen(!open);
+    onSelect?.(claimId);
+    articleBus.emit({ type: "CLAIM_CLICKED", payload: { claimId, text: titleText } });
+  };
+
   return (
     <span ref={ref} className="cite-wrap">
       <button
-        onClick={() => { setOpen(!open); if (!open) onSelect?.(claimId); }}
+        onClick={handleChipClick}
         className={"cite-mark" + (active ? " cite-active" : "")}
         style={{ ["--cite" as string]: colors.dot }}
         title={titleText || (status === "unknown" ? "Unresolved claim reference" : `Claim · ${s}`)}
