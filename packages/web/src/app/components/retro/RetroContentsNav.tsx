@@ -68,7 +68,7 @@ export default function RetroContentsNav({ pathname, showAdmin, outline, activeO
       <nav id="retro-contents" className={`${navOpen ? "block max-h-[50dvh]" : "hidden"} lg:block lg:max-h-none p-2.5 space-y-3 overflow-auto r-scroll`} aria-label="Site contents">
         {NAV_GROUPS.map((g) => (
           <div key={g} className="space-y-1">
-            <div className="text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 text-[var(--r-muted)]">
+            <div className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-1 text-[var(--r-muted)] w-full">
               {g}
             </div>
             <div className="space-y-0.5">

@@ -19,14 +19,14 @@ type KeyStore interface {
 }
 
 type Gateway struct {
-	Catalog      []ModelSpec
-	Meter        *Meter
-	DoKey        string
-	GroqKey      string
-	MetaKey      string
-	OpenAIKey    string
-	CredStore    KeyStore
-	mu           sync.RWMutex
+	Catalog   []ModelSpec
+	Meter     *Meter
+	DoKey     string
+	GroqKey   string
+	MetaKey   string
+	OpenAIKey string
+	CredStore KeyStore
+	mu        sync.RWMutex
 }
 
 // CompletionRequest mirrors the OpenAI chat completion format.
@@ -241,9 +241,9 @@ func (g *Gateway) HandleUsage(w http.ResponseWriter, r *http.Request) {
 	}
 	totals := g.Meter.GetUserTotals(userID)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"userId":    userID,
-		"totals":    totals,
-		"recent":    g.Meter.GetRecent(10),
+		"userId": userID,
+		"totals": totals,
+		"recent": g.Meter.GetRecent(10),
 	})
 }
 

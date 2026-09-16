@@ -69,12 +69,12 @@ type CallResult struct {
 // ── Connector ───────────────────────────────────────────────
 
 type Connector struct {
-	Slug        string  // Unique id
-	Name        string  // Human label
-	Provider    string  // "http", "openapi", "mcp", "pipedream"
-	BaseURL     string  // Base URL for API calls
+	Slug        string // Unique id
+	Name        string // Human label
+	Provider    string // "http", "openapi", "mcp", "pipedream"
+	BaseURL     string // Base URL for API calls
 	AuthType    AuthType
-	AccessToken string  // Resolved server-side credential
+	AccessToken string // Resolved server-side credential
 	Actions     []NormalizedAction
 	// Scope gates who may invoke this connector (S19). Zero value ("")
 	// means ShareProject. OwnerID + Grants apply to private/member scopes.
@@ -86,13 +86,13 @@ type Connector struct {
 // ── Audit ───────────────────────────────────────────────────
 
 type ExecutionRecord struct {
-	ConnectorSlug string      `json:"connectorSlug"`
-	Action        string      `json:"action"`
-	Args          interface{} `json:"args"`
-	UserID        string      `json:"userId"`
-	SessionID     string      `json:"sessionId"`
-	Status        string      `json:"status"` // "allowed", "denied", "error"
-	Risk          Risk        `json:"risk"`
-	Error         string      `json:"error,omitempty"`
+	ConnectorSlug string          `json:"connectorSlug"`
+	Action        string          `json:"action"`
+	Args          interface{}     `json:"args"`
+	UserID        string          `json:"userId"`
+	SessionID     string          `json:"sessionId"`
+	Status        string          `json:"status"` // "allowed", "denied", "error"
+	Risk          Risk            `json:"risk"`
+	Error         string          `json:"error,omitempty"`
 	RawArgs       json.RawMessage `json:"-"`
 }

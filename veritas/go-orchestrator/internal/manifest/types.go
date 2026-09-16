@@ -2,22 +2,22 @@ package manifest
 
 // Manifest is the top-level project configuration loaded from veritas.json.
 type Manifest struct {
-	Agents    []AgentSpec     `json:"agents,omitempty"`
+	Agents     []AgentSpec     `json:"agents,omitempty"`
 	Connectors []ConnectorSpec `json:"connectors,omitempty"`
-	Pipeline  *PipelineSpec   `json:"pipeline,omitempty"`
-	Policies  []PolicySpec    `json:"policies,omitempty"`
-	Triggers  []TriggerSpec   `json:"triggers,omitempty"`
-	Sandbox   *SandboxSpec    `json:"sandbox,omitempty"`
+	Pipeline   *PipelineSpec   `json:"pipeline,omitempty"`
+	Policies   []PolicySpec    `json:"policies,omitempty"`
+	Triggers   []TriggerSpec   `json:"triggers,omitempty"`
+	Sandbox    *SandboxSpec    `json:"sandbox,omitempty"`
 }
 
 // AgentSpec declares an agent persona with its model binding, tool set, and
 // IAM grants. The first agent entry is the default.
 type AgentSpec struct {
-	Name         string   `json:"name"`
-	Model        string   `json:"model,omitempty"`
-	MaxIterations int     `json:"max_iterations,omitempty"`
-	Tools        []string `json:"tools,omitempty"`
-	Grants       []string `json:"grants,omitempty"`
+	Name          string   `json:"name"`
+	Model         string   `json:"model,omitempty"`
+	MaxIterations int      `json:"max_iterations,omitempty"`
+	Tools         []string `json:"tools,omitempty"`
+	Grants        []string `json:"grants,omitempty"`
 }
 
 // ConnectorSpec declares an external service connector. The KeyEnv field
@@ -45,8 +45,8 @@ type NodeSpec struct {
 
 // PolicySpec overrides the default allow/block/approval for an action.
 type PolicySpec struct {
-	Action string `json:"action"`
-	Effect string `json:"effect"` // allow | block | require_approval
+	Action string   `json:"action"`
+	Effect string   `json:"effect"` // allow | block | require_approval
 	Roles  []string `json:"roles,omitempty"`
 }
 

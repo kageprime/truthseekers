@@ -74,7 +74,9 @@ func normalizeEmail(email string) string {
 // requestOTPCode generates, stores, and emails a login code. Shared by
 // /auth/login (legacy route, now OTP-only) and /auth/otp/request.
 func (s *Server) requestOTPCode(w http.ResponseWriter, r *http.Request) {
-	var body struct{ Email string `json:"email"` }
+	var body struct {
+		Email string `json:"email"`
+	}
 	if !decodeBody(w, r, &body) {
 		return
 	}

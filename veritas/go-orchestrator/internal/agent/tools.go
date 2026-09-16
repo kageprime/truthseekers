@@ -59,36 +59,38 @@ func ChatToolDefinitions() []ToolDefinition {
 			{Type: "function", Function: ToolFunctionDef{Name: "article_search", Description: "Search the encyclopedia's existing knowledge base for articles matching a query.", Parameters: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search query"},"maxResults":{"type":"number","description":"Max results (default 5)"}},"required":["query"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "get_map", Description: "Look up an existing map by slug or search by region/era.", Parameters: json.RawMessage(`{"type":"object","properties":{"slug":{"type":"string","description":"Map slug"}},"required":["slug"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "generate_image", Description: "Generate an image using AI. Returns a URL to the generated image. Prefer web_image_search first when a real photo (place, person, artifact, species) would teach better than an illustration.", Parameters: json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string","description":"Detailed image generation prompt"},"caption":{"type":"string","description":"Optional short caption"}},"required":["prompt"]}`)}},
-		{Type: "function", Function: ToolFunctionDef{Name: "web_image_search", Description: "Search for real, freely-licensed photos (Wikimedia Commons) on a topic. Returns direct image URLs with source domain attribution — emit them as image/gallery blocks with the source field set so the UI shows a Source badge. Prefer this over generate_image for real-world subjects.", Parameters: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Image search query"},"maxResults":{"type":"number","description":"Max images (default 4, max 10)"}},"required":["query"]}`)}},
+			{Type: "function", Function: ToolFunctionDef{Name: "web_image_search", Description: "Search for real, freely-licensed photos (Wikimedia Commons) on a topic. Returns direct image URLs with source domain attribution — emit them as image/gallery blocks with the source field set so the UI shows a Source badge. Prefer this over generate_image for real-world subjects.", Parameters: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Image search query"},"maxResults":{"type":"number","description":"Max images (default 4, max 10)"}},"required":["query"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "generate_video", Description: "Generate a short video clip from a text description using AI video generation.", Parameters: json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string","description":"Detailed text description"},"caption":{"type":"string","description":"Caption for the video"}},"required":["prompt"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "verify_citation", Description: "Verify a claim against a source URL. Returns a confidence score and explanation.", Parameters: json.RawMessage(`{"type":"object","properties":{"claim":{"type":"string","description":"The claim to verify"},"sourceUrl":{"type":"string","description":"The URL of the source"}},"required":["claim","sourceUrl"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "suggest_related", Description: "Find articles and topics related to a given slug.", Parameters: json.RawMessage(`{"type":"object","properties":{"slug":{"type":"string","description":"Article slug to find related topics for"}},"required":["slug"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "task", Description: "Delegate a sub-task to a sub-agent for parallel research.", Parameters: json.RawMessage(`{"type":"object","properties":{"objective":{"type":"string","description":"What the sub-agent should accomplish"},"tools":{"type":"array","items":{"type":"string"},"description":"Tools the sub-agent may use"}},"required":["objective"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "mem_store", Description: "Store a piece of information about the user for future conversations.", Parameters: json.RawMessage(`{"type":"object","properties":{"key":{"type":"string","description":"Memory key"},"value":{"type":"string","description":"The value to remember"}},"required":["key","value"]}`)}},
 			{Type: "function", Function: ToolFunctionDef{Name: "mem_recall", Description: "Retrieve stored information about the user from previous conversations.", Parameters: json.RawMessage(`{"type":"object","properties":{"key":{"type":"string","description":"Memory key to look up"}},"required":["key"]}`)}},
+			{Type: "function", Function: ToolFunctionDef{Name: "get_platform_status", Description: "Get real-time CMS platform metrics, active article generation jobs, open evidence gaps, contested claims, and platform health.", Parameters: json.RawMessage(`{"type":"object","properties":{}}`)}},
+			{Type: "function", Function: ToolFunctionDef{Name: "get_autonomous_summary", Description: "Get a summary of all autonomous CMS actions Veritas has taken while you were away: stale article refreshes, gap scrutiny runs, graph reindexes, and any blocked actions that require your approval.", Parameters: json.RawMessage(`{"type":"object","properties":{}}`)}},
 		}...,
 	)
 }
 
 type ToolExecutors struct {
-	WebSearch       ToolExecutor
-	RenderBlocks    ToolExecutor
-	WebFetch        ToolExecutor
-	VerifyCitation  ToolExecutor
-	GenerateImage   ToolExecutor
-	GenerateVideo   ToolExecutor
-	WebImageSearch  ToolExecutor
+	WebSearch      ToolExecutor
+	RenderBlocks   ToolExecutor
+	WebFetch       ToolExecutor
+	VerifyCitation ToolExecutor
+	GenerateImage  ToolExecutor
+	GenerateVideo  ToolExecutor
+	WebImageSearch ToolExecutor
 }
 
 func BuiltinToolExecutors() ToolExecutors {
 	return ToolExecutors{
-		WebSearch:       webSearchExecutor,
-		RenderBlocks:    renderBlocksExecutor,
-		WebFetch:        webFetchExecutor,
-		VerifyCitation:  verifyCitationExecutor,
-		GenerateImage:   generateImageExecutor,
-		GenerateVideo:   generateVideoExecutor,
-		WebImageSearch:  webImageSearchExecutor,
+		WebSearch:      webSearchExecutor,
+		RenderBlocks:   renderBlocksExecutor,
+		WebFetch:       webFetchExecutor,
+		VerifyCitation: verifyCitationExecutor,
+		GenerateImage:  generateImageExecutor,
+		GenerateVideo:  generateVideoExecutor,
+		WebImageSearch: webImageSearchExecutor,
 	}
 }
 
@@ -238,7 +240,7 @@ func generalWebSearchDomains(query string, maxResults int, domains []string) ([]
 		}
 		items = append(items, item{Title: r.Title, URL: r.URL, Snippet: s})
 	}
-		return items, nil
+	return items, nil
 }
 
 // deepDocCap bounds total fetched docs per article retrieval (2 rounds).
@@ -692,8 +694,8 @@ func shortHash(s string) string {
 func firecrawlSearch(query string, maxResults int) ([]item, error) {
 	key := os.Getenv("FIRECRAWL_API_KEY")
 	body := map[string]interface{}{
-		"query": query,
-		"limit": maxResults,
+		"query":         query,
+		"limit":         maxResults,
 		"scrapeOptions": map[string]interface{}{"formats": []string{"markdown"}},
 	}
 	payload, _ := json.Marshal(body)
@@ -747,11 +749,11 @@ func redditSearch(query string, maxResults int) ([]item, error) {
 		Data struct {
 			Children []struct {
 				Data struct {
-					Title   string `json:"title"`
+					Title     string `json:"title"`
 					Permalink string `json:"permalink"`
-					Selftext string `json:"selftext"`
+					Selftext  string `json:"selftext"`
 					Subreddit string `json:"subreddit"`
-					URL     string `json:"url"`
+					URL       string `json:"url"`
 				} `json:"data"`
 			} `json:"children"`
 		} `json:"data"`
@@ -921,13 +923,13 @@ func generateImageExecutor(args json.RawMessage) (ToolResult, error) {
 		return ToolResult{Result: "Image generation: MODEL_ACCESS_KEY not configured"}, nil
 	}
 	body := map[string]interface{}{
-		"model": "stable-diffusion-3.5-large",
-		"prompt": p.Prompt,
-		"n": 1,
-		"size": "1024x1024",
-		"quality": "auto",
+		"model":           "stable-diffusion-3.5-large",
+		"prompt":          p.Prompt,
+		"n":               1,
+		"size":            "1024x1024",
+		"quality":         "auto",
 		"response_format": "b64_json",
-		"output_format": "png",
+		"output_format":   "png",
 	}
 	payload, _ := json.Marshal(body)
 	resp, err := http.Post("https://inference.do-ai.run/v1/images/generations", "application/json", bytes.NewReader(payload))
@@ -1008,9 +1010,19 @@ func webImageSearchExecutor(args json.RawMessage) (ToolResult, error) {
 	if p.MaxResults > 10 {
 		p.MaxResults = 10
 	}
-	results, err := commonsImageSearch(p.Query, p.MaxResults)
-	if err != nil || len(results) == 0 {
+	scored := MultiSourceImageSearch(p.Query, p.MaxResults)
+	if len(scored) == 0 {
 		return ToolResult{Result: "[]"}, nil
+	}
+	var results []webImageResult
+	for _, item := range scored {
+		results = append(results, webImageResult{
+			Title:        item.Candidate.Title,
+			ImageURL:     item.Candidate.ImageURL,
+			PageURL:      item.Candidate.PageURL,
+			Source:       item.Candidate.Source,
+			SourceDomain: item.Candidate.SourceDomain,
+		})
 	}
 	data, _ := json.Marshal(results)
 	return ToolResult{Result: string(data)}, nil
@@ -1071,7 +1083,8 @@ func commonsImageSearch(query string, n int) ([]webImageResult, error) {
 	return out, nil
 }
 
-func generateVideoExecutor(args json.RawMessage) (ToolResult, error) {	var p struct {
+func generateVideoExecutor(args json.RawMessage) (ToolResult, error) {
+	var p struct {
 		Prompt  string `json:"prompt"`
 		Caption string `json:"caption"`
 	}
@@ -1082,7 +1095,3 @@ func generateVideoExecutor(args json.RawMessage) (ToolResult, error) {	var p str
 		{Type: "text", Data: json.RawMessage(`{"content":"Video generation is not yet available in this deployment."}`)},
 	}}, nil
 }
-
-
-
-

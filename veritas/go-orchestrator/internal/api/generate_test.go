@@ -26,24 +26,24 @@ func testGenerateServer(t *testing.T) *Server {
 // verify sampler stays silent; prose stays clean so the writer never retries.
 func fakeWorkflow(article interface{}) func(string) *dag.Workflow {
 	canned := map[string]interface{}{
-		"retrieve":        map[string]interface{}{"documents": map[string]interface{}{"web": []interface{}{map[string]interface{}{"id": "doc-1", "title": "Test Source", "url": "https://example.com/test"}}}},
-		"extract_claims":  map[string]interface{}{"claims": []interface{}{map[string]interface{}{"claim_id": "c1", "text": "Reliability testing catches regressions before users do.", "type": "factual", "status": "supported"}}},
-		"map_evidence":    map[string]interface{}{"mappings": []interface{}{}},
-		"critique":        map[string]interface{}{},
-		"detect_missing":  map[string]interface{}{"gaps": []interface{}{}},
-		"map_language":    map[string]interface{}{"language_flags": []interface{}{}},
-		"scrutinize":      map[string]interface{}{"risk_assessments": []interface{}{}},
-		"resolve":         map[string]interface{}{"resolved_claims": []interface{}{map[string]interface{}{"claim_id": "c1", "text": "Reliability testing catches regressions before users do.", "status": "supported", "derived_confidence": 0.9, "evidence_ids": []interface{}{}}}},
+		"retrieve":         map[string]interface{}{"documents": map[string]interface{}{"web": []interface{}{map[string]interface{}{"id": "doc-1", "title": "Test Source", "url": "https://example.com/test"}}}},
+		"extract_claims":   map[string]interface{}{"claims": []interface{}{map[string]interface{}{"claim_id": "c1", "text": "Reliability testing catches regressions before users do.", "type": "factual", "status": "supported"}}},
+		"map_evidence":     map[string]interface{}{"mappings": []interface{}{}},
+		"critique":         map[string]interface{}{},
+		"detect_missing":   map[string]interface{}{"gaps": []interface{}{}},
+		"map_language":     map[string]interface{}{"language_flags": []interface{}{}},
+		"scrutinize":       map[string]interface{}{"risk_assessments": []interface{}{}},
+		"resolve":          map[string]interface{}{"resolved_claims": []interface{}{map[string]interface{}{"claim_id": "c1", "text": "Reliability testing catches regressions before users do.", "status": "supported", "derived_confidence": 0.9, "evidence_ids": []interface{}{}}}},
 		"generate_article": article,
 	}
 	deps := map[string][]string{
 		"retrieve": {}, "extract_claims": {"retrieve"},
-		"map_evidence": {"retrieve", "extract_claims"},
-		"critique":     {"retrieve", "extract_claims", "map_evidence"},
-		"detect_missing": {"extract_claims", "map_evidence"},
-		"map_language":   {"extract_claims"},
-		"scrutinize":     {"extract_claims", "critique", "detect_missing", "map_language"},
-		"resolve":        {"extract_claims", "map_evidence", "critique", "scrutinize"},
+		"map_evidence":     {"retrieve", "extract_claims"},
+		"critique":         {"retrieve", "extract_claims", "map_evidence"},
+		"detect_missing":   {"extract_claims", "map_evidence"},
+		"map_language":     {"extract_claims"},
+		"scrutinize":       {"extract_claims", "critique", "detect_missing", "map_language"},
+		"resolve":          {"extract_claims", "map_evidence", "critique", "scrutinize"},
 		"generate_article": {"resolve", "retrieve", "extract_claims"},
 	}
 	return func(string) *dag.Workflow {
@@ -69,11 +69,11 @@ func goodArticle() map[string]interface{} {
 			"id": "overview", "title": "Overview",
 			"content": "Reliability testing exercises failure paths under controlled conditions. Teams record outcomes and compare them across releases to track progress.",
 		}},
-		"categories": []interface{}{"test"},
-		"crossrefs":  []interface{}{},
-		"citations":  []interface{}{map[string]interface{}{"title": "Test Source", "url": "https://example.com/test"}},
-		"confidence_vector":    map[string]interface{}{"coverage": 0.9},
-		"derived_confidence":   0.9,
+		"categories":         []interface{}{"test"},
+		"crossrefs":          []interface{}{},
+		"citations":          []interface{}{map[string]interface{}{"title": "Test Source", "url": "https://example.com/test"}},
+		"confidence_vector":  map[string]interface{}{"coverage": 0.9},
+		"derived_confidence": 0.9,
 	}}
 }
 

@@ -41,59 +41,6 @@ export default function RetroWindow({ title, children, status, path, crumb, nav,
     <div className={`retro98 ${themeClass} min-h-dvh p-0 sm:p-2.5 transition-colors duration-200`} style={{ background: "var(--r-bg)" }}>
       {/* Full-bleed on mobile, classic window frame on tablet/desktop */}
       <div className={`r-window w-full flex flex-col border-0 sm:border ${fixed ? "h-dvh sm:h-[calc(100dvh-20px)]" : "min-h-dvh sm:min-h-[calc(100dvh-20px)]"}`}>
-        {/* Titlebar */}
-        <div className="r-title flex items-center justify-between px-2 select-none shrink-0 gap-2 min-h-[32px] sm:min-h-[26px]" style={{ paddingTop: "max(4px, env(safe-area-inset-top))" }}>
-          <div className="flex items-center gap-2 text-white text-[12px] font-bold min-w-0">
-            <Link href="/" aria-label="TruthSeekers home" className="flex items-center shrink-0 no-underline hover:opacity-85 transition-opacity">
-              <img src="/logo-icon.png" alt="TruthSeekers Logo" className="w-[18px] h-[18px] object-contain shrink-0" />
-            </Link>
-            <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 min-w-0 overflow-hidden text-[12px]">
-              {crumbs.map((c, i) => {
-                const last = i === crumbs.length - 1;
-                const first = i === 0;
-                const hideMobile = !first && !last ? "hidden sm:flex" : "";
-                return (
-                  <span key={i} className={`flex items-center gap-1 min-w-0 ${hideMobile}`}>
-                    {i > 0 && <span aria-hidden className="opacity-50 shrink-0">/</span>}
-                    {c.href ? (
-                      <Link href={c.href} className="hover:underline truncate max-w-[120px] sm:max-w-[150px]" style={{ color: "var(--r-title-text)", opacity: 0.9 }}>
-                        {c.label}
-                      </Link>
-                    ) : (
-                      <span aria-current="page" className="truncate max-w-[160px] sm:max-w-[220px] font-semibold" title={c.label} style={{ color: "var(--r-title-text)" }}>
-                        {c.label}
-                      </span>
-                    )}
-                  </span>
-                );
-              })}
-            </nav>
-          </div>
-
-          <div className="flex gap-1.5 items-center shrink-0">
-            <button
-              onClick={() => {
-                retroAudio.toggle();
-                retroAudio.playClick();
-              }}
-              aria-label="Toggle retro sound FX"
-              title="Toggle retro CD-ROM sound effects"
-              className="hidden sm:inline-flex h-[22px] px-1.5 bg-[var(--r-header-accent)] text-black text-[10px] font-bold border border-black hover:brightness-110 cursor-pointer rounded-sm items-center"
-            >
-              🔊 Audio
-            </button>
-
-            <button
-              onClick={() => window.dispatchEvent(new CustomEvent("retro-palette-open"))}
-              aria-label="Go to a page (Ctrl+K)"
-              title="Go to… (Ctrl+K)"
-              className="h-[24px] sm:h-[22px] px-2 bg-[var(--r-header-accent)] text-black text-[11px] sm:text-[10px] font-bold border border-black hover:brightness-110 cursor-pointer rounded-sm active:scale-95"
-            >
-              Search
-            </button>
-          </div>
-        </div>
-
         {nav && <RetroNavStrip />}
 
         {/* ponytail: no tab-bar offset in chat thread (tab hides there) — everywhere else reserves pb-14. */}

@@ -106,6 +106,9 @@ type Server struct {
 	// user at 10/min. The shared 60/min IP bucket never bound these, so one
 	// account could queue unbounded 15-minute pipelines.
 	writeLimiter *rateLimiter
+
+	// veritasWorker is the autonomous CMS background engine.
+	veritasWorker *VeritasWorker
 }
 
 // checkWriteBudget enforces the expensive-write budget. Returns false + 429
@@ -132,10 +135,10 @@ type agentRun struct {
 // rateLimiter provides simple in-memory token-bucket rate limiting per key
 // (IP for outer middleware, userID for inner per-user middleware).
 type rateLimiter struct {
-	mu       sync.Mutex
-	buckets  map[string]*tokenBucket
-	rate     int           // requests per window
-	window   time.Duration // window size
+	mu      sync.Mutex
+	buckets map[string]*tokenBucket
+	rate    int           // requests per window
+	window  time.Duration // window size
 }
 
 type tokenBucket struct {
@@ -197,7 +200,7 @@ func (rl *rateLimiter) reject(w http.ResponseWriter) {
 func (rl *rateLimiter) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := clientIP(r)
-		if !rl.allow("ip:"+ip) {
+		if !rl.allow("ip:" + ip) {
 			rl.reject(w)
 			return
 		}
@@ -355,21 +358,21 @@ func validateBody(model interface{}) func(http.Handler) http.Handler {
 				http.Error(w, `{"error":"body too large"}`, http.StatusRequestEntityTooLarge)
 				return
 			}
-		var target interface{}
-		switch v := model.(type) {
-		case func() interface{}:
-			target = v()
-		default:
-			// ponytail: fresh target per request — Unmarshal merges into
-			// non-nil maps, so reusing one pointer leaks state across
-			// requests. A by-value model can't unmarshal at all (register
-			// pointers; S13 re-wrap still applies per request).
-			if rv := reflect.ValueOf(model); rv.Kind() == reflect.Ptr {
-				target = reflect.New(rv.Type().Elem()).Interface()
-			} else {
-				target = model
+			var target interface{}
+			switch v := model.(type) {
+			case func() interface{}:
+				target = v()
+			default:
+				// ponytail: fresh target per request — Unmarshal merges into
+				// non-nil maps, so reusing one pointer leaks state across
+				// requests. A by-value model can't unmarshal at all (register
+				// pointers; S13 re-wrap still applies per request).
+				if rv := reflect.ValueOf(model); rv.Kind() == reflect.Ptr {
+					target = reflect.New(rv.Type().Elem()).Interface()
+				} else {
+					target = model
+				}
 			}
-		}
 			if err := json.Unmarshal(raw, target); err != nil {
 				http.Error(w, `{"error":"Invalid JSON body"}`, http.StatusBadRequest)
 				return
@@ -485,29 +488,29 @@ type (
 	generateArticleReq struct {
 		Persona string `json:"persona" validate:"omitempty,max=50"`
 	}
-	
+
 	credentialsReq struct {
 		Service string `json:"service" validate:"required,max=100"`
 		Token   string `json:"token" validate:"required,max=5000"`
 	}
-	
+
 	adminSettingsReq struct {
 		Settings map[string]string `json:"settings" validate:"required"`
 	}
-	
+
 	createChatReq struct {
 		Title string `json:"title" validate:"omitempty,max=200"`
 	}
-	
+
 	updateChatReq struct {
 		Title string `json:"title" validate:"required,max=200"`
 	}
-	
+
 	sendMessageReq struct {
 		Content string `json:"content" validate:"required,max=50000"`
 		Model   string `json:"model" validate:"omitempty,max=100"`
 	}
-	
+
 	trackReq struct {
 		Slug  string `json:"slug" validate:"required,max=200"`
 		Event string `json:"event" validate:"omitempty,max=50"`
@@ -562,12 +565,12 @@ func NewServer(port string, db *storage.DB) *Server {
 
 	// Credential store — hot-swappable tokens, initialized from env vars.
 	s.credStore = credstore.New(map[string]string{
-		"MODEL_ACCESS_KEY":   "do",
-		"GROQ_API_KEY":       "groq",
-		"MODEL_API_KEY":      "meta",
-		"OPENAI_API_KEY":     "openai",
-		"TAVILY_API_KEY":     "tavily",
-		"FIRECRAWL_API_KEY":  "firecrawl",
+		"MODEL_ACCESS_KEY":    "do",
+		"GROQ_API_KEY":        "groq",
+		"MODEL_API_KEY":       "meta",
+		"OPENAI_API_KEY":      "openai",
+		"TAVILY_API_KEY":      "tavily",
+		"FIRECRAWL_API_KEY":   "firecrawl",
 		"PAYSTACK_SECRET_KEY": "paystack",
 	})
 	// ponytail: gateway was built before credStore existed — link it now so PATCH /v1/credentials works for meta.
@@ -613,6 +616,8 @@ func NewServer(port string, db *storage.DB) *Server {
 			s.sessionEngine.Restore(restored)
 		}
 	}
+	s.veritasWorker = NewVeritasWorker(s)
+	s.veritasWorker.StartWorker(s.runCtx)
 	s.setupRoutes()
 	return s
 }
@@ -790,7 +795,7 @@ func (s *Server) wireAgentGateway() {
 		}
 		return "", fmt.Errorf("%s: %s", result.Status, result.Reason)
 	}
-		agent.GatewaySearch = gatewayCall
+	agent.GatewaySearch = gatewayCall
 	agent.GatewayGenerateImage = gatewayCall
 
 	// Wire real web retrieval into the epistemic retrieve node.
@@ -799,7 +804,7 @@ func (s *Server) wireAgentGateway() {
 	// absent, RealRetrieve stays nil and the pipeline falls back to
 	// LLM-only mode (graceful degradation).
 	if os.Getenv("TAVILY_API_KEY") != "" || os.Getenv("FIRECRAWL_API_KEY") != "" {
-				agent.RealRetrieve = agent.RealRetrieveDocuments
+		agent.RealRetrieve = agent.RealRetrieveDocuments
 		log.Printf("[veritas] real web retrieval enabled (Tavily/Firecrawl)")
 	} else {
 		log.Printf("[veritas] web retrieval offline — pipeline falling back to LLM-only mode")
@@ -808,7 +813,7 @@ func (s *Server) wireAgentGateway() {
 	// Register custom executors for tools that need specialized HTTP handling
 	// (the generic HTTP executor in the gateway doesn't handle their API shapes).
 	s.executorGateway.CustomExecutors = map[string]executor.CustomExecutor{
-		"web_search.search":          s.webSearchExecutorCustom,
+		"web_search.search":                 s.webSearchExecutorCustom,
 		"generate_image.images/generations": s.generateImageExecutorCustom,
 	}
 }
@@ -891,10 +896,10 @@ func (s *Server) webSearchExecutorCustom(input executor.CallInput, conn *executo
 
 func (s *Server) webSearchTavily(query string, maxResults int, apiKey string) executor.CallResult {
 	body := map[string]interface{}{
-		"api_key":       apiKey,
-		"query":         query,
-		"max_results":   maxResults,
-		"search_depth":  "advanced",
+		"api_key":        apiKey,
+		"query":          query,
+		"max_results":    maxResults,
+		"search_depth":   "advanced",
 		"include_answer": false,
 	}
 	payload, _ := json.Marshal(body)
@@ -933,8 +938,8 @@ func (s *Server) webSearchTavily(query string, maxResults int, apiKey string) ex
 
 func (s *Server) webSearchFirecrawl(query string, maxResults int, apiKey string) executor.CallResult {
 	body := map[string]interface{}{
-		"query": query,
-		"limit": maxResults,
+		"query":         query,
+		"limit":         maxResults,
 		"scrapeOptions": map[string]interface{}{"formats": []string{"markdown"}},
 	}
 	payload, _ := json.Marshal(body)
@@ -984,10 +989,10 @@ func (s *Server) webSearchFirecrawl(query string, maxResults int, apiKey string)
 
 func (s *Server) setupRoutes() {
 	// Rate limiters (local — one per Server, separate from package-level if any)
-	authLimiter := newRateLimiter(context.Background(), 10, time.Minute)  // 10 req/min for auth
-	chatLimiter := newRateLimiter(context.Background(), 30, time.Minute)   // 30 req/min for chat
-	apiLimiter := newRateLimiter(context.Background(), 60, time.Minute)    // 60 req/min for general API
-	userLimiter := newRateLimiter(context.Background(), 60, time.Minute)   // 60 req/min per user (S12)
+	authLimiter := newRateLimiter(context.Background(), 10, time.Minute) // 10 req/min for auth
+	chatLimiter := newRateLimiter(context.Background(), 30, time.Minute) // 30 req/min for chat
+	apiLimiter := newRateLimiter(context.Background(), 60, time.Minute)  // 60 req/min for general API
+	userLimiter := newRateLimiter(context.Background(), 60, time.Minute) // 60 req/min per user (S12)
 
 	// Mount executor gateway routes — call path is authed (S5): anon callers
 	// must not burn server-side keys. Connectors list stays rate-limited
@@ -1131,7 +1136,7 @@ func (s *Server) setupRoutes() {
 
 func (s *Server) Start() error {
 	s.server = &http.Server{
-		Addr: ":" + s.port,
+		Addr:    ":" + s.port,
 		Handler: s.corsHandler(s.mux),
 		// ReadHeaderTimeout is the only server-level timeout safe to set here:
 		// it protects against slowloris header attacks without bounding the
@@ -1524,8 +1529,6 @@ func (s *Server) handleStripeRouter(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"migrated_to_paystack","paystack_url":"/paystack/initialize"}`))
 }
-
-
 
 // handleArticlesDynamicRoute handles routes matching /articles/...
 func (s *Server) handleArticlesDynamicRoute(w http.ResponseWriter, r *http.Request) {

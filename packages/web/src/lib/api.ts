@@ -869,6 +869,20 @@ export async function paystackVerify(reference: string): Promise<{ status?: stri
   }
 }
 
+// ── Platform Status & Autonomous Summary ──
+
+export async function fetchPlatformStatus(): Promise<any> {
+  const res = await authed("/platform/status", {});
+  if (!res.ok) throw new Error("Failed to fetch platform status");
+  return res.json();
+}
+
+export async function fetchAutonomousSummary(): Promise<any> {
+  const res = await authed("/platform/autonomous-summary", {});
+  if (!res.ok) throw new Error("Failed to fetch autonomous summary");
+  return res.json();
+}
+
 // ── JWT payload decode (no dependency, works client-side) ──
 
 export interface JwtPayload {

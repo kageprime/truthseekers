@@ -14,24 +14,24 @@ const (
 
 // Account-scoped actions (always scope_type='account')
 const (
-	AccountRead    = "account.read"
-	AccountWrite   = "account.write"
-	BillingAll     = "billing.*"
-	MemberAll      = "member.*"
-	GroupAll       = "group.*"
-	TokenAll       = "token.*"
-	ProjectCreate  = "project.create"
+	AccountRead   = "account.read"
+	AccountWrite  = "account.write"
+	BillingAll    = "billing.*"
+	MemberAll     = "member.*"
+	GroupAll      = "group.*"
+	TokenAll      = "token.*"
+	ProjectCreate = "project.create"
 )
 
 // Project-scoped actions (scope_type='project' or 'account')
 const (
-	ProjectAll      = "project.*"
-	ProjectDeploy   = "project.deploy"
-	ProjectCROpen   = "project.cr.open"
-	ProjectCRAll    = "project.cr.*"
-	ProjectSession  = "project.session.*"
-	ProjectTrigger  = "project.trigger.*"
-	ProjectGateway  = "project.gateway.*"
+	ProjectAll     = "project.*"
+	ProjectDeploy  = "project.deploy"
+	ProjectCROpen  = "project.cr.open"
+	ProjectCRAll   = "project.cr.*"
+	ProjectSession = "project.session.*"
+	ProjectTrigger = "project.trigger.*"
+	ProjectGateway = "project.gateway.*"
 )
 
 // Article-scoped actions
@@ -45,11 +45,11 @@ const (
 
 // Chat/Agent-scoped actions
 const (
-	ChatRead    = "chat.read"
-	ChatSend    = "chat.send"
-	ChatAll     = "chat.*"
-	AgentRun    = "agent.run"
-	AgentStop   = "agent.stop"
+	ChatRead  = "chat.read"
+	ChatSend  = "chat.send"
+	ChatAll   = "chat.*"
+	AgentRun  = "agent.run"
+	AgentStop = "agent.stop"
 )
 
 // Trigger-scoped actions

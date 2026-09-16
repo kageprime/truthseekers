@@ -37,7 +37,7 @@ func main() {
 	}
 	defer db.Close()
 
-		// 2. Run database migrations
+	// 2. Run database migrations
 	if err := db.Migrate(cfg.MigrationsDir); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}

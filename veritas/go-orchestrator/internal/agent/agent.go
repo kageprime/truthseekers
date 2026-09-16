@@ -16,7 +16,7 @@ const (
 	defaultMaxIterations = 25
 	// runTimeout bounds the whole run (25 iters × 300s attempts could
 	// otherwise pin a goroutine for hours on a wedged provider).
-	runTimeout = 10 * time.Minute
+	runTimeout           = 10 * time.Minute
 	toolResultTruncation = 1500
 	tokenBudget          = 90000
 	charsPerToken        = 4
@@ -210,7 +210,7 @@ func (a *Agent) Run(input string) (AgentResult, error) {
 func (a *Agent) finalize(ctx context.Context) (AgentResult, error) {
 	lastText := a.lastAssistantText()
 	nudged := append(append([]Message{}, a.messages...), Message{
-		Role: RoleUser,
+		Role:    RoleUser,
 		Content: "You have used all available tool-call steps. Provide your final answer now using only the information gathered so far. Do not call any tools.",
 	})
 	// Empty toolDefs => the request body omits `tools` entirely, so the model

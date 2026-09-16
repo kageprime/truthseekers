@@ -27,6 +27,7 @@ import { IconXCircle, IconBook, IconLightning, IconFile, IconFileText, IconUser,
 import RetroWindow from "../../components/retro/RetroWindow";
 import RetroArticle from "../../components/retro/RetroArticle";
 import ArticleTocDrawer from "../../components/ArticleTocDrawer";
+import EpistemicInspectorDrawer from "../../components/EpistemicInspectorDrawer";
 import { articleBus } from "@/lib/articleBus";
 import { IS_RETRO } from "@/lib/retro";
 
@@ -560,6 +561,13 @@ export default function ArticleClient({ slug, article: initialArticle, isGenerat
           allClaims={epistemicClaims}
           onClose={closeTrail}
           onSelectClaim={openTrail}
+        />
+      )}
+      {activeClaimId && (
+        <EpistemicInspectorDrawer
+          slug={slug}
+          claimId={activeClaimId}
+          onClose={() => setActiveClaimId(null)}
         />
       )}
       <ContestDialog

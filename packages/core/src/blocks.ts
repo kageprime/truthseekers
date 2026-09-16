@@ -88,6 +88,21 @@ export function articleToBlocks(
       if (media.type === "video" && media.src) {
         blocks.push({ id: idGen(), type: "video", data: { src: media.src, caption: media.caption, prompt: media.prompt } satisfies VideoBlockData, meta: { sectionId: sec.id } });
       }
+      if (media.type === "image_compare") {
+        blocks.push({ id: idGen(), type: "image_compare", data: media as any, meta: { sectionId: sec.id } });
+      }
+      if (media.type === "chart") {
+        blocks.push({ id: idGen(), type: "chart", data: media as any, meta: { sectionId: sec.id } });
+      }
+      if (media.type === "epistemic_graph") {
+        blocks.push({ id: idGen(), type: "epistemic_graph", data: media as any, meta: { sectionId: sec.id } });
+      }
+      if (media.type === "map_compare") {
+        blocks.push({ id: idGen(), type: "map_compare", data: media as any, meta: { sectionId: sec.id } });
+      }
+      if (media.type === "interactive_calc") {
+        blocks.push({ id: idGen(), type: "interactive_calc", data: media as any, meta: { sectionId: sec.id } });
+      }
     }
   }
 

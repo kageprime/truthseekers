@@ -59,6 +59,7 @@ func buildArticleWorkflow(contestNote string) *dag.Workflow {
 			n("scrutinize", 2*time.Minute, "extract_claims", "critique", "detect_missing", "map_language"),
 			n("resolve", 2*time.Minute, "extract_claims", "map_evidence", "critique", "scrutinize"),
 			n("generate_article", 5*time.Minute, "resolve", "retrieve", "extract_claims"),
+			n("generate_media", 2*time.Minute, "resolve", "retrieve"),
 		},
 	}
 }
@@ -75,6 +76,7 @@ var humanPhase = map[string]string{
 	"scrutinize":       "verify",
 	"resolve":          "verify",
 	"generate_article": "write",
+	"generate_media":   "media",
 }
 
 // processArticle executes the full generation pipeline for a slug and persists
@@ -426,8 +428,8 @@ func extractLiveEvents(nodeID string, raw interface{}) []map[string]interface{} 
 	case "map_evidence":
 		var r struct {
 			Mappings []struct {
-				ClaimID      string   `json:"claim_id"`
-				Supporting   []string `json:"supporting"`
+				ClaimID       string   `json:"claim_id"`
+				Supporting    []string `json:"supporting"`
 				Contradicting []string `json:"contradicting"`
 			} `json:"claim_evidence_map"`
 		}
@@ -437,8 +439,8 @@ func extractLiveEvents(nodeID string, raw interface{}) []map[string]interface{} 
 					continue
 				}
 				out = append(out, mkEvent("evidence_mapped", "evidence", map[string]interface{}{
-					"claim_id":     m.ClaimID,
-					"supporting":   len(m.Supporting),
+					"claim_id":      m.ClaimID,
+					"supporting":    len(m.Supporting),
 					"contradicting": len(m.Contradicting),
 				}, now))
 			}
@@ -540,16 +542,16 @@ func extractLiveEvents(nodeID string, raw interface{}) []map[string]interface{} 
 // `{article: {title, abstract, sections[], timeline[], categories[], crossrefs[], citations[]}}`.
 type articlePayload struct {
 	Article struct {
-		Title       string                 `json:"title"`
-		Abstract    string                 `json:"abstract"`
-		Summary     string                 `json:"summary"` // legacy/mock field; used iff Abstract is empty
-		Sections    []storage.Section      `json:"sections"`
-		Timeline    []storage.TimelineEvent `json:"timeline"`
-		Categories  []string               `json:"categories"`
-		Crossrefs   []storage.CrossReference `json:"crossrefs"`
-		Citations   []storage.Citation     `json:"citations"`
-		Confidence  map[string]interface{} `json:"confidence_vector,omitempty"`
-		Derived     float64                `json:"derived_confidence,omitempty"`
+		Title      string                   `json:"title"`
+		Abstract   string                   `json:"abstract"`
+		Summary    string                   `json:"summary"` // legacy/mock field; used iff Abstract is empty
+		Sections   []storage.Section        `json:"sections"`
+		Timeline   []storage.TimelineEvent  `json:"timeline"`
+		Categories []string                 `json:"categories"`
+		Crossrefs  []storage.CrossReference `json:"crossrefs"`
+		Citations  []storage.Citation       `json:"citations"`
+		Confidence map[string]interface{}   `json:"confidence_vector,omitempty"`
+		Derived    float64                  `json:"derived_confidence,omitempty"`
 	} `json:"article"`
 }
 
@@ -720,15 +722,15 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 					// Save as evidence
 					evID := stableUUID(d.ID + "-ev")
 					if err := s.db.SaveEvidence(&storage.Evidence{
-						ID:             evID,
-						Type:           "primary_document",
-						URL:            d.URL,
-						ChainOfCustody: "unverified",
+						ID:                evID,
+						Type:              "primary_document",
+						URL:               d.URL,
+						ChainOfCustody:    "unverified",
 						AcquisitionMethod: "retrieval",
-						Accessibility:  "public",
-						SupportsClaim:  true,
-						SourceID:       &sourceID,
-						CreatedAt:      now,
+						Accessibility:     "public",
+						SupportsClaim:     true,
+						SourceID:          &sourceID,
+						CreatedAt:         now,
 					}); err != nil {
 						log.Printf("[epistemic] save evidence %s: %v", evID, err)
 					}
@@ -743,8 +745,8 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 	if raw, ok := outputs["map_evidence"]; ok {
 		var result struct {
 			ClaimEvidenceMap []struct {
-				ClaimID      string   `json:"claim_id"`
-				Supporting   []string `json:"supporting"`
+				ClaimID       string   `json:"claim_id"`
+				Supporting    []string `json:"supporting"`
 				Contradicting []string `json:"contradicting"`
 			} `json:"claim_evidence_map"`
 		}
@@ -771,11 +773,11 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 				linkEvidence := func(eid string, supports bool) {
 					evID := stableUUID(eid + "-ev")
 					ev := &storage.Evidence{
-						ID:          evID,
-						ClaimID:     m.ClaimID,
-						Type:        "primary_document",
+						ID:            evID,
+						ClaimID:       m.ClaimID,
+						Type:          "primary_document",
 						SupportsClaim: supports,
-						CreatedAt:   now,
+						CreatedAt:     now,
 					}
 					// Re-attach provenance: the upsert overwrites the whole
 					// row, so a bare link would wipe the step-0 URL.
@@ -985,13 +987,13 @@ func (s *Server) persistNodeOutputs(slug string, outputs map[string]interface{})
 	if raw, ok := outputs["scrutinize"]; ok {
 		var result struct {
 			Assessments []struct {
-				ClaimID    string   `json:"claim_id"`
+				ClaimID     string   `json:"claim_id"`
 				RiskFactors []string `json:"risk_factors"`
-				RiskScore  float64  `json:"risk_score"`
-				Action     struct {
+				RiskScore   float64  `json:"risk_score"`
+				Action      struct {
 					RequiresExtraCorroboration bool     `json:"requires_extra_corroboration"`
-					ExcludedEvidenceIDs       []string `json:"excluded_evidence_ids"`
-					MinimumIndependentSources int      `json:"minimum_independent_sources"`
+					ExcludedEvidenceIDs        []string `json:"excluded_evidence_ids"`
+					MinimumIndependentSources  int      `json:"minimum_independent_sources"`
 				} `json:"action"`
 			} `json:"risk_assessments"`
 		}
@@ -1097,6 +1099,7 @@ func warnEmpty(section string, raw interface{}) {
 		log.Printf("[epistemic] WARN %s: 0 items parsed; raw %s", section, status)
 	}
 }
+
 // reformatting its signature hash into UUID shape. Same wording always maps
 // to the same ID — across nodes, regenerations, and runs — so re-running the
 // pipeline upserts rows (with version history) instead of accumulating
@@ -1447,6 +1450,3 @@ func (s *Server) verifySampleWeakClaims(slug string, nodeOutputs map[string]inte
 		log.Printf("[verify-sample] slug=%s claim=%s supported=%t conf=%.2f %s", slug, r.ClaimID, r.Supported, r.Conf, r.Note)
 	}
 }
-
-
-

@@ -47,7 +47,7 @@ func SendPromptJSON(system, user, model string) (json.RawMessage, error) {
 		"model":           route.ModelID,
 		"messages":        []map[string]string{{"role": "system", "content": system}, {"role": "user", "content": user}},
 		"response_format": map[string]string{"type": "json_object"},
-		"temperature":    0,
+		"temperature":     0,
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
@@ -520,6 +520,10 @@ OUTPUT FORMAT (return a JSON object with root "article" key):
 Return JSON only. The title MUST be a specific, concrete article title about the actual topic — never a generic label like "Analysis of Resolved Claims" or "Article Generation Result".`
 )
 
+var promptGenerateMedia = `AGENT ROLE: Media Generator Node — Parallel Layer 3
+
+FUNCTION: Retrieve and generate rich media assets (sourced archival photos, before/after compare sliders, interactive charts) matching resolved claims and research documents.`
+
 // ────────────────────────────────────────────────────────────
 // Node executors — each is a ToolExecutor
 // ────────────────────────────────────────────────────────────
@@ -727,15 +731,15 @@ func EpistemicToolDefinitions() []ToolDefinition {
 // pipeline.
 func EpistemicToolExecutors(systemPrompt string) map[string]ToolExecutor {
 	return map[string]ToolExecutor{
-		"epistemic_retrieve":          epistemicRetrieveExecutor(systemPrompt),
-		"epistemic_extract_claims":    epistemicExtractClaimsExecutor(systemPrompt),
-		"epistemic_map_evidence":      epistemicMapEvidenceExecutor(systemPrompt),
-		"epistemic_critique":          epistemicCritiqueExecutor(systemPrompt),
-		"epistemic_detect_missing":    epistemicDetectMissingExecutor(systemPrompt),
-		"epistemic_map_language":      epistemicMapLanguageExecutor(systemPrompt),
-		"epistemic_scrutinize":        epistemicScrutinizeExecutor(systemPrompt),
-		"epistemic_resolve":           epistemicResolveExecutor(systemPrompt),
-		"epistemic_generate_article":  epistemicGenerateArticleExecutor(systemPrompt),
+		"epistemic_retrieve":         epistemicRetrieveExecutor(systemPrompt),
+		"epistemic_extract_claims":   epistemicExtractClaimsExecutor(systemPrompt),
+		"epistemic_map_evidence":     epistemicMapEvidenceExecutor(systemPrompt),
+		"epistemic_critique":         epistemicCritiqueExecutor(systemPrompt),
+		"epistemic_detect_missing":   epistemicDetectMissingExecutor(systemPrompt),
+		"epistemic_map_language":     epistemicMapLanguageExecutor(systemPrompt),
+		"epistemic_scrutinize":       epistemicScrutinizeExecutor(systemPrompt),
+		"epistemic_resolve":          epistemicResolveExecutor(systemPrompt),
+		"epistemic_generate_article": epistemicGenerateArticleExecutor(systemPrompt),
 	}
 }
 
@@ -775,6 +779,7 @@ func DAGNodeExecutorsWithContext(systemPrompt, contestNote string) map[string]fu
 		"scrutinize":       {promptScrutinize, map[string]string{"extract_claims": "CLAIMS", "map_evidence": "EVIDENCE MAP"}},
 		"resolve":          {promptResolve, map[string]string{"extract_claims": "CLAIMS", "critique": "CRITIQUE", "detect_missing": "MISSING EVIDENCE", "map_language": "LANGUAGE MAP", "scrutinize": "SCRUTINY REPORT"}},
 		"generate_article": {promptGenerateArticle, map[string]string{"resolve": "RESOLVED CLAIMS", "retrieve": "RESEARCH DOCUMENTS", "extract_claims": "CLAIMS"}},
+		"generate_media":   {promptGenerateMedia, map[string]string{"resolve": "RESOLVED CLAIMS", "retrieve": "RESEARCH DOCUMENTS"}},
 	}
 	if contestNote != "" {
 		contest := "\n\n" + contestedPerspective + "\n\"" + contestNote + "\""
@@ -788,10 +793,55 @@ func DAGNodeExecutorsWithContext(systemPrompt, contestNote string) map[string]fu
 		}
 	}
 
-		executors := make(map[string]func(context.Context, map[string]interface{}) (interface{}, error))
+	executors := make(map[string]func(context.Context, map[string]interface{}) (interface{}, error))
 	for name, cfg := range configs {
 		name, cfg := name, cfg
 		executors[name] = func(ctx context.Context, input map[string]interface{}) (interface{}, error) {
+			// Conditional DAG Branching: skip scrutinize node when 0 claims are contested
+			if name == "scrutinize" {
+				if contestNote == "" && !hasContestedClaims(input["map_evidence"]) {
+					log.Printf("⚡ [dag] node scrutinize skipped (0 contested claims)")
+					return map[string]interface{}{
+						"risk_assessments": []interface{}{},
+						"skipped":          true,
+						"reason":           "0 contested claims",
+					}, nil
+				}
+			}
+
+			// Parallel Media Node: execute multi-source scored image search concurrently
+			if name == "generate_media" {
+				topic := ""
+				if q, ok := input["query"].(string); ok {
+					topic = q
+				}
+				if topic == "" {
+					if res, ok := input["resolve"].(map[string]interface{}); ok {
+						if title, ok := res["title"].(string); ok {
+							topic = title
+						}
+					}
+				}
+				var mediaItems []map[string]interface{}
+				if topic != "" {
+					scoredMedia := MultiSourceImageSearch(topic, 4)
+					for _, item := range scoredMedia {
+						if item.Score.TotalScore >= 50.0 {
+							mediaItems = append(mediaItems, map[string]interface{}{
+								"type":    "image",
+								"src":     item.Candidate.ImageURL,
+								"caption": item.Candidate.Title,
+								"source":  item.Candidate.Source,
+								"score":   item.Score.TotalScore,
+							})
+						}
+					}
+				}
+				return map[string]interface{}{
+					"media": mediaItems,
+				}, nil
+			}
+
 			// Special case: the retrieve node can use real web search
 			// (RealRetrieve) to ground the pipeline in live evidence. When
 			// RealRetrieve is nil (no search keys) or fails, we fall back to
@@ -812,17 +862,17 @@ func DAGNodeExecutorsWithContext(systemPrompt, contestNote string) map[string]fu
 					if err != nil {
 						return nil, fmt.Errorf("dag node %q: %w", name, err)
 					}
-				var output interface{}
-				if err := json.Unmarshal(result, &output); err != nil {
-					return nil, fmt.Errorf("dag node %q parse: %w", name, err)
+					var output interface{}
+					if err := json.Unmarshal(result, &output); err != nil {
+						return nil, fmt.Errorf("dag node %q parse: %w", name, err)
+					}
+					// ponytail: attach the executed research plan (free,
+					// deterministic — the aspects actually searched) so the
+					// progress feed can show it live without an extra LLM call.
+					output = attachResearchPlan(output, query)
+					return output, nil
 				}
-				// ponytail: attach the executed research plan (free,
-				// deterministic — the aspects actually searched) so the
-				// progress feed can show it live without an extra LLM call.
-				output = attachResearchPlan(output, query)
-				return output, nil
-			}
-			// Fall through to LLM-only mode if retrieval yielded nothing.
+				// Fall through to LLM-only mode if retrieval yielded nothing.
 			}
 
 			select {
@@ -844,19 +894,19 @@ func DAGNodeExecutorsWithContext(systemPrompt, contestNote string) map[string]fu
 					parts = append(parts, fmt.Sprintf("%s:\n%s", label, s))
 				}
 			}
-		userPrompt := cfg.prompt + "\n\n" + strings.Join(parts, "\n\n") + "\n\nReturn JSON only."
-		result, err := SendPromptJSON(systemPrompt, userPrompt, epistemicModel)
-		if err != nil {
-			return nil, fmt.Errorf("dag node %q: %w", name, err)
-		}
-		var output interface{}
-		if err := json.Unmarshal(result, &output); err != nil {
-			return nil, fmt.Errorf("dag node %q parse: %w", name, err)
-		}
-		if name == "resolve" {
-			output = backfillClaimTexts(input, output)
-		}
-		return output, nil
+			userPrompt := cfg.prompt + "\n\n" + strings.Join(parts, "\n\n") + "\n\nReturn JSON only."
+			result, err := SendPromptJSON(systemPrompt, userPrompt, epistemicModel)
+			if err != nil {
+				return nil, fmt.Errorf("dag node %q: %w", name, err)
+			}
+			var output interface{}
+			if err := json.Unmarshal(result, &output); err != nil {
+				return nil, fmt.Errorf("dag node %q parse: %w", name, err)
+			}
+			if name == "resolve" {
+				output = backfillClaimTexts(input, output)
+			}
+			return output, nil
 		}
 	}
 	return executors
@@ -932,8 +982,84 @@ func attachResearchPlan(output interface{}, query string) interface{} {
 }
 
 // indentJSON pretty-prints raw JSON for injection into LLM prompts.
+// EnrichArticleWithScoredMedia enriches generated article JSON by querying real photos
+// from open archives (Wikimedia, NASA, Met) and attaching scored images (TotalScore >= 50).
+func EnrichArticleWithScoredMedia(output interface{}) interface{} {
+	m, ok := output.(map[string]interface{})
+	if !ok {
+		return output
+	}
+	art, ok := m["article"].(map[string]interface{})
+	if !ok {
+		return output
+	}
+	articleTitle, _ := art["title"].(string)
+
+	sections, ok := art["sections"].([]interface{})
+	if !ok {
+		return output
+	}
+
+	for _, sec := range sections {
+		sm, ok := sec.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		secTitle, _ := sm["title"].(string)
+		media, _ := sm["media"].([]interface{})
+
+		// If section has no media items yet, search for top-scored real photos
+		if len(media) == 0 && (secTitle != "" || articleTitle != "") {
+			query := secTitle
+			if articleTitle != "" {
+				query = articleTitle + " " + secTitle
+			}
+			scored := MultiSourceImageSearch(query, 2)
+			for _, item := range scored {
+				if item.Score.TotalScore >= 50.0 {
+					mediaItem := map[string]interface{}{
+						"type":    "image",
+						"src":     item.Candidate.ImageURL,
+						"caption": item.Candidate.Title,
+						"source":  item.Candidate.Source,
+					}
+					media = append(media, mediaItem)
+					break
+				}
+			}
+			sm["media"] = media
+		}
+	}
+	return output
+}
+
 func indentJSON(raw json.RawMessage) string {
 	var buf bytes.Buffer
 	json.Indent(&buf, raw, "", "  ")
 	return buf.String()
+}
+
+// hasContestedClaims checks whether map_evidence contains any claims with contradicting evidence.
+func hasContestedClaims(mapEvidenceInput interface{}) bool {
+	if mapEvidenceInput == nil {
+		return false
+	}
+	b, err := json.Marshal(mapEvidenceInput)
+	if err != nil {
+		return false
+	}
+	var mapEv struct {
+		ClaimEvidenceMap []struct {
+			Contradicting []interface{} `json:"contradicting"`
+		} `json:"claim_evidence_map"`
+	}
+	if json.Unmarshal(b, &mapEv) != nil {
+		return false
+	}
+	for _, item := range mapEv.ClaimEvidenceMap {
+		if len(item.Contradicting) > 0 {
+			return true
+		}
+	}
+	return false
 }

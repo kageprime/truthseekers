@@ -14,18 +14,18 @@ import (
 const minJWTSecretLen = 32
 
 type Config struct {
-	Port            string
-	DatabaseURL     string
-	MigrationsDir   string
-	DataDir         string
-	JWTSecret       string
-	AllowDevAuth    bool
+	Port             string
+	DatabaseURL      string
+	MigrationsDir    string
+	DataDir          string
+	JWTSecret        string
+	AllowDevAuth     bool
 	RevalidateURL    string
 	RevalidateSecret string
 	HasLLMKey        bool
-	HasSearchKey    bool
-	HasPaystackKey  bool
-	MockMode        bool
+	HasSearchKey     bool
+	HasPaystackKey   bool
+	MockMode         bool
 }
 
 func getenv(key, fallback string) string {

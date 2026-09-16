@@ -20,12 +20,12 @@ type FetchImpl interface {
 // ExecuteCall performs the actual HTTP call with server-side credential
 // attachment. The secret is resolved server-side and never reaches the agent.
 func ExecuteCall(opts struct {
-	Binding  ActionBinding
-	BaseURL  string
-	Auth     ExecutorAuth
-	Secret   string
-	Args     map[string]interface{}
-	Fetch    FetchImpl
+	Binding ActionBinding
+	BaseURL string
+	Auth    ExecutorAuth
+	Secret  string
+	Args    map[string]interface{}
+	Fetch   FetchImpl
 }) CallResult {
 	url := resolveURL(opts.BaseURL, opts.Binding, opts.Args)
 	body := buildBody(opts.Binding, opts.Args)

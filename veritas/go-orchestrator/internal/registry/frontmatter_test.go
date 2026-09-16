@@ -60,5 +60,3 @@ func TestScanSkillsDir(t *testing.T) {
 		t.Fatalf("expected 1 skill, got %+v", skills)
 	}
 }
-
-

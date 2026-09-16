@@ -29,8 +29,8 @@ const adjudicateTimeout = 25 * time.Second
 const adjudicateSystem = `You judge whether a reader's challenge to an encyclopedia article warrants regeneration. Be skeptical but fair: the bar is new perspective or new information, not restatement or tone. Answer JSON only: {"verdict": "warrants_regeneration" | "no_change", "reasoning": "one or two sentences", "affected_claim_ids": ["..."]}.`
 
 type adjudicateVerdict struct {
-	Verdict         string   `json:"verdict"`
-	Reasoning       string   `json:"reasoning"`
+	Verdict          string   `json:"verdict"`
+	Reasoning        string   `json:"reasoning"`
 	AffectedClaimIDs []string `json:"affected_claim_ids"`
 }
 
@@ -143,9 +143,9 @@ func (s *Server) handleContestArticle(w http.ResponseWriter, r *http.Request, sl
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{
-			"status":           "no_change",
-			"reasoning":        verdict.Reasoning,
-			"contestation_id":  contestID,
+			"status":          "no_change",
+			"reasoning":       verdict.Reasoning,
+			"contestation_id": contestID,
 		})
 		return
 	}

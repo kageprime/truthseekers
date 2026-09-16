@@ -51,11 +51,11 @@ func countingExecutor(result string) (ToolExecutor, *int32) {
 	var n int32
 	var mu sync.Mutex
 	return func(_ json.RawMessage) (ToolResult, error) {
-			mu.Lock()
-			n++
-			mu.Unlock()
-			return ToolResult{Result: result}, nil
-		}, &n
+		mu.Lock()
+		n++
+		mu.Unlock()
+		return ToolResult{Result: result}, nil
+	}, &n
 }
 
 func tc(name, args string) ToolCall {

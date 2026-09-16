@@ -55,7 +55,7 @@ func TestMatchCronStep(t *testing.T) {
 func TestMatchCronWeekday(t *testing.T) {
 	// July 11 2026 is a Saturday (6)
 	tm := time.Date(2026, 7, 11, 0, 0, 0, 0, time.UTC)
-	mustMatch(t, "0 0 * * 6", tm)  // Saturday
+	mustMatch(t, "0 0 * * 6", tm)    // Saturday
 	mustNotMatch(t, "0 0 * * 0", tm) // Sunday
 	mustNotMatch(t, "0 0 * * 1", tm) // Monday
 }

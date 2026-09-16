@@ -258,7 +258,13 @@ export type BlockType =
   | "list"
   | "pullquote"
   | "panorama_360"
-  | "tour_360";
+  | "tour_360"
+  | "image_compare"
+  | "chart"
+  | "epistemic_graph"
+  | "map_compare"
+  | "interactive_calc"
+  | "map_panoramic";
 
 export interface Block {
   id: string;
@@ -403,6 +409,72 @@ export interface TableBlockData {
 export interface ListBlockData {
   style?: "ordered" | "unordered";
   items: string[];
+}
+
+export interface ImageCompareBlockData {
+  beforeSrc: string;
+  afterSrc: string;
+  beforeLabel?: string;
+  afterLabel?: string;
+  caption?: string;
+  source?: string;
+}
+
+export interface ChartDataset {
+  label: string;
+  data: number[];
+  color?: string;
+}
+
+export interface ChartBlockData {
+  chartType: "bar" | "line" | "scatter";
+  title?: string;
+  caption?: string;
+  xAxisLabel?: string;
+  yAxisLabel?: string;
+  labels: string[];
+  datasets: ChartDataset[];
+}
+
+export interface EpistemicGraphBlockData {
+  claimId: string;
+  claimText: string;
+  status: "verified" | "contested" | "unverified";
+  confidenceScore: number;
+  sources: Array<{ title: string; url: string; excerpt?: string }>;
+  counterEvidence?: Array<{ description: string; sourceUrl?: string }>;
+}
+
+export interface MapCompareBlockData {
+  historicalTileUrl?: string;
+  modernTileUrl?: string;
+  historicalImageSrc?: string;
+  modernImageSrc?: string;
+  centerLat?: number;
+  centerLng?: number;
+  zoom?: number;
+  historicalTitle?: string;
+  modernTitle?: string;
+  caption?: string;
+  source?: string;
+}
+
+export interface CalcVariable {
+  name: string;
+  label: string;
+  min: number;
+  max: number;
+  step?: number;
+  defaultVal: number;
+  unit?: string;
+}
+
+export interface InteractiveCalcBlockData {
+  title?: string;
+  formulaDisplay?: string;
+  caption?: string;
+  variables: CalcVariable[];
+  expression: string; // JS expression operating on variable names (e.g. "m * g * h")
 }
 
 // ── API Response Shapes ────────────────────────────────────────────────────

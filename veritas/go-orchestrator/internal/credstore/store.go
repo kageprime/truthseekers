@@ -8,8 +8,8 @@ import (
 // Store holds API tokens in memory with concurrent-safe hot-swap.
 // Keys are service identifiers (e.g. "do", "groq", "tavily").
 type Store struct {
-	mu  sync.RWMutex
-	m   map[string]string
+	mu sync.RWMutex
+	m  map[string]string
 }
 
 // New creates a Store pre-populated from the given env-to-service mapping.

@@ -25,8 +25,8 @@ type ChatMessage struct {
 }
 
 type ToolCallPayload struct {
-	ID       string             `json:"id,omitempty"`
-	Type     string             `json:"type,omitempty"`
+	ID       string              `json:"id,omitempty"`
+	Type     string              `json:"type,omitempty"`
 	Function ToolCallFuncPayload `json:"function,omitempty"`
 }
 
@@ -63,21 +63,21 @@ func toChatMessages(msgs []Message, systemPrompt string) []ChatMessage {
 }
 
 type streamChoice struct {
-	Index int              `json:"index"`
-	Delta streamDelta      `json:"delta"`
+	Index int         `json:"index"`
+	Delta streamDelta `json:"delta"`
 }
 
 type streamDelta struct {
-	Role      string             `json:"role,omitempty"`
-	Content   string             `json:"content,omitempty"`
-	ToolCalls []streamToolCall   `json:"tool_calls,omitempty"`
+	Role      string           `json:"role,omitempty"`
+	Content   string           `json:"content,omitempty"`
+	ToolCalls []streamToolCall `json:"tool_calls,omitempty"`
 }
 
 type streamToolCall struct {
-	Index    int                   `json:"index"`
-	ID       string                `json:"id,omitempty"`
-	Type     string                `json:"type,omitempty"`
-	Function streamToolCallFunc    `json:"function,omitempty"`
+	Index    int                `json:"index"`
+	ID       string             `json:"id,omitempty"`
+	Type     string             `json:"type,omitempty"`
+	Function streamToolCallFunc `json:"function,omitempty"`
 }
 
 type streamToolCallFunc struct {
@@ -152,10 +152,10 @@ const promptTimeout = 0 // disabled — context timeout is the sole deadline
 // retry policy for transient LLM failures. A single 429/5xx/transport error
 // no longer kills the whole agent run.
 const (
-	llmMaxAttempts     = 3
-	llmPerAttemptTo    = 300 * time.Second // per-attempt context; generous enough for complex tool-calling turns
-	llmBackoffInitial  = 1 * time.Second
-	llmBackoffMax      = 4 * time.Second
+	llmMaxAttempts    = 3
+	llmPerAttemptTo   = 300 * time.Second // per-attempt context; generous enough for complex tool-calling turns
+	llmBackoffInitial = 1 * time.Second
+	llmBackoffMax     = 4 * time.Second
 )
 
 func SendPromptStream(
@@ -272,8 +272,8 @@ func doLLMRequest(parent context.Context, route ModelRoute, payload []byte, onEv
 // generic 400 like "invalid parameters" can be bisected from Heroku logs.
 func logLLMReject(route ModelRoute, payload []byte, status int, body []byte) {
 	var dbg struct {
-		Model       string `json:"model"`
-		Messages    []struct {
+		Model    string `json:"model"`
+		Messages []struct {
 			Role string `json:"role"`
 		} `json:"messages"`
 		Temperature *float64          `json:"temperature"`

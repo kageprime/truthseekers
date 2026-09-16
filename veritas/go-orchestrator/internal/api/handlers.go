@@ -293,7 +293,8 @@ func exportFilename(slug string) string {
 	return name + ".md"
 }
 
-func (s *Server) handleExportArticle(w http.ResponseWriter, r *http.Request, slug string) {	reqLog(r, "export article slug=%s", slug)
+func (s *Server) handleExportArticle(w http.ResponseWriter, r *http.Request, slug string) {
+	reqLog(r, "export article slug=%s", slug)
 	article, err := s.db.GetArticle(slug)
 	if err != nil || article == nil {
 		http.Error(w, "Article not found", http.StatusNotFound)
@@ -359,14 +360,59 @@ func (s *Server) handleClaimEvidence(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/claims/")
 	path = strings.TrimSuffix(path, "/evidence")
 	claimID := strings.TrimSuffix(path, "/")
-	reqLog(r, "claim evidence id=%s", claimID)
+	reqLog(r, "claim evidence id=%s method=%s", claimID, r.Method)
+
+	if r.Method == "POST" {
+		var req struct {
+			URL           string `json:"url"`
+			Note          string `json:"note"`
+			Type          string `json:"type"`
+			SupportsClaim bool   `json:"supports_claim"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.URL) == "" {
+			http.Error(w, `{"error":"URL required"}`, http.StatusBadRequest)
+			return
+		}
+		evType := req.Type
+		if evType == "" {
+			evType = "primary_document"
+		}
+		ev := &storage.Evidence{
+			ID:                fmt.Sprintf("ev-comm-%d", time.Now().UnixNano()),
+			ClaimID:           claimID,
+			Type:              evType,
+			URL:               req.URL,
+			ChainOfCustody:    "unverified",
+			AcquisitionMethod: "community_submission",
+			Accessibility:     "public",
+			SupportsClaim:     req.SupportsClaim,
+			CreatedAt:         time.Now(),
+		}
+		if err := s.db.SaveEvidence(ev); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":   "submitted",
+			"claim_id": claimID,
+			"evidence": ev,
+			"message":  "Community evidence submitted for verification",
+		})
+		return
+	}
+
+	claim, _ := s.db.GetClaimByID(claimID)
 	evidence, err := s.db.GetEvidenceByClaim(claimID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"evidence": evidence})
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"claim":    claim,
+		"evidence": evidence,
+	})
 }
 
 func (s *Server) handleArticleFreshness(w http.ResponseWriter, r *http.Request, slug string) {
@@ -377,10 +423,10 @@ func (s *Server) handleArticleFreshness(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	type cf struct {
-		ClaimID         string  `json:"claim_id"`
-		Text            string  `json:"text"`
-		FreshnessScore  float64 `json:"freshness_score"`
-		EvidenceCount   int     `json:"evidence_count"`
+		ClaimID        string  `json:"claim_id"`
+		Text           string  `json:"text"`
+		FreshnessScore float64 `json:"freshness_score"`
+		EvidenceCount  int     `json:"evidence_count"`
 	}
 	var claimFreshness []cf
 	var totalScore float64
@@ -403,8 +449,8 @@ func (s *Server) handleArticleFreshness(w http.ResponseWriter, r *http.Request, 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"slug":           slug,
-		"overall_score":  overall,
+		"slug":            slug,
+		"overall_score":   overall,
 		"claim_freshness": claimFreshness,
 	})
 }
@@ -546,10 +592,10 @@ func (s *Server) handleArticleClaimGraph(w http.ResponseWriter, r *http.Request,
 			nodes = append(nodes, map[string]interface{}{
 				"id": c.ID, "type": "claim", "label": c.Text,
 				"short_label": shortLabel(c.Text),
-				"status": c.Status, "confidence": c.DerivedConfidence,
-				"confidence_vector": c.ConfidenceVector,
+				"status":      c.Status, "confidence": c.DerivedConfidence,
+				"confidence_vector":   c.ConfidenceVector,
 				"contradiction_level": contradictionLevel(c.ConfidenceVector),
-				"article_slug": slug, "article_title": artTitle,
+				"article_slug":        slug, "article_title": artTitle,
 			})
 			seen["claim|"+c.ID] = true
 		}
@@ -557,12 +603,12 @@ func (s *Server) handleArticleClaimGraph(w http.ResponseWriter, r *http.Request,
 		for _, e := range evs {
 			if !seen["evidence|"+e.ID] {
 				nodes = append(nodes, map[string]interface{}{
-					"id":    e.ID,
-					"type":  "evidence",
-					"label": e.URL,
-					"supports":           e.SupportsClaim,
-					"chain_of_custody":   e.ChainOfCustody,
-					"accessibility":      e.Accessibility,
+					"id":               e.ID,
+					"type":             "evidence",
+					"label":            e.URL,
+					"supports":         e.SupportsClaim,
+					"chain_of_custody": e.ChainOfCustody,
+					"accessibility":    e.Accessibility,
 				})
 				seen["evidence|"+e.ID] = true
 			}
@@ -654,10 +700,10 @@ func (s *Server) handleArticleEpistemic(w http.ResponseWriter, r *http.Request, 
 			nodes = append(nodes, map[string]interface{}{
 				"id": c.ID, "type": "claim", "label": c.Text,
 				"short_label": shortLabel(c.Text),
-				"status": c.Status, "confidence": c.DerivedConfidence,
-				"confidence_vector": c.ConfidenceVector,
+				"status":      c.Status, "confidence": c.DerivedConfidence,
+				"confidence_vector":   c.ConfidenceVector,
 				"contradiction_level": contradictionLevel(c.ConfidenceVector),
-				"article_slug": slug, "article_title": epArtTitle,
+				"article_slug":        slug, "article_title": epArtTitle,
 			})
 			seen["claim|"+c.ID] = true
 		}
@@ -693,13 +739,13 @@ func (s *Server) handleArticleEpistemic(w http.ResponseWriter, r *http.Request, 
 	cache60(w)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"slug":           slug,
-		"claims":         claims,
-		"gaps":           gaps,
-		"key_facts":      keyFacts(claims),
-		"freshness":      map[string]interface{}{"overall_score": overall, "claim_freshness": claimFresh},
-		"refresh_diff":   diff,
-		"claim_graph":    map[string]interface{}{"nodes": nodes, "edges": edges},
+		"slug":         slug,
+		"claims":       claims,
+		"gaps":         gaps,
+		"key_facts":    keyFacts(claims),
+		"freshness":    map[string]interface{}{"overall_score": overall, "claim_freshness": claimFresh},
+		"refresh_diff": diff,
+		"claim_graph":  map[string]interface{}{"nodes": nodes, "edges": edges},
 	})
 }
 
@@ -793,10 +839,10 @@ func (s *Server) handleGetGlobalClaimGraph(w http.ResponseWriter, r *http.Reques
 		nodes = append(nodes, map[string]interface{}{
 			"id": c.ID, "type": "claim", "label": c.Text,
 			"short_label": shortLabel(c.Text),
-			"status": c.Status, "confidence": c.DerivedConfidence,
-			"confidence_vector": c.ConfidenceVector,
+			"status":      c.Status, "confidence": c.DerivedConfidence,
+			"confidence_vector":   c.ConfidenceVector,
 			"contradiction_level": contradictionLevel(c.ConfidenceVector),
-			"article_slug": c.ArticleSlug, "article_title": titles[c.ArticleSlug],
+			"article_slug":        c.ArticleSlug, "article_title": titles[c.ArticleSlug],
 		})
 		seen["claim|"+c.ID] = true
 		for _, e := range evidenceByClaim[c.ID] {
@@ -1150,9 +1196,10 @@ func (s *Server) handleGetStaleArticles(w http.ResponseWriter, r *http.Request) 
 }
 
 // handleGapsDynamicRoute dispatches gap sub-routes:
-//   GET  /gaps              → list all gaps (enriched with claim text)
-//   POST /gaps/{id}/upvote  → upvote a gap
-//   POST /gaps/{id}/submit  → submit community evidence for a gap
+//
+//	GET  /gaps              → list all gaps (enriched with claim text)
+//	POST /gaps/{id}/upvote  → upvote a gap
+//	POST /gaps/{id}/submit  → submit community evidence for a gap
 func (s *Server) handleGapsDynamicRoute(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/gaps")
 	path = strings.TrimPrefix(path, "/")
@@ -1266,4 +1313,3 @@ func (s *Server) handleGetArticleProgress(w http.ResponseWriter, r *http.Request
 		}
 	}
 }
-

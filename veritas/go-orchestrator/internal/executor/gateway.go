@@ -122,12 +122,12 @@ func (g *Gateway) HandleCall(input CallInput) CallResult {
 	// 7. Generic HTTP execution.
 	auth := conn.AuthType
 	result := ExecuteCall(struct {
-		Binding  ActionBinding
-		BaseURL  string
-		Auth     ExecutorAuth
-		Secret   string
-		Args     map[string]interface{}
-		Fetch    FetchImpl
+		Binding ActionBinding
+		BaseURL string
+		Auth    ExecutorAuth
+		Secret  string
+		Args    map[string]interface{}
+		Fetch   FetchImpl
 	}{
 		Binding: binding,
 		BaseURL: conn.BaseURL,

@@ -8,8 +8,8 @@ import (
 type PolicyAction string
 
 const (
-	PolicyAllow          PolicyAction = "allow"
-	PolicyBlock          PolicyAction = "block"
+	PolicyAllow           PolicyAction = "allow"
+	PolicyBlock           PolicyAction = "block"
 	PolicyRequireApproval PolicyAction = "require_approval"
 )
 

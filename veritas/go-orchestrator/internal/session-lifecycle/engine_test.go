@@ -21,7 +21,7 @@ func TestValidTransitions(t *testing.T) {
 		{StatusRunning, StatusStopped, true},
 		{StatusRunning, StatusCreated, false},
 		{StatusCompleted, StatusRunning, false}, // terminal
-		{StatusFailed, StatusQueued, false},      // terminal
+		{StatusFailed, StatusQueued, false},     // terminal
 	}
 	for _, tc := range tests {
 		allowed := transitions[tc.from]

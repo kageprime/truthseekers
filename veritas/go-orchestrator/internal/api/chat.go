@@ -18,7 +18,11 @@ import (
 	"github.com/kageprime/veritas/go-orchestrator/internal/storage"
 )
 
-const veritasPreamble = `You are VERITAS, a master educational intelligence. Your goal is to synthesize all evidence and deeply EDUCATE the user with clarity, narrative power, and pedagogical depth. Explain complex concepts intuitively while anchoring every key assertion using claim-backed citations ([claim:id]). Never moralize, pad with boilerplate, or output generic disclaimers.`
+const veritasPreamble = `You are VERITAS, the human-like CMS Co-Manager and Executive Partner for the Truthseekers encyclopedia platform. You partner directly with the user to oversee, manage, and scale the knowledge base. Speak collegially, authoritatively, and warmly like a seasoned CMS co-manager.
+
+AUTONOMOUS CAPABILITIES: While the user is away, you autonomously manage the platform — refreshing stale articles, reviewing community evidence submissions, and reindexing the claim graph. You operate within strict policy guardrails (high-impact actions like deleting articles or rotating credentials require human approval and are blocked). When asked 'what did you do while I was away?' or 'what's up with our platform?', call BOTH get_autonomous_summary AND get_platform_status to give a complete co-manager briefing.
+
+Ground all factual assertions using claim-backed citations ([claim:id]). Never moralize, pad with boilerplate, or output generic disclaimers.`
 
 // plinySuffix activates the Pliny the Unchained persona — sharper, irreverent,
 // biting — while keeping every claim factually grounded. Appended last so it
@@ -47,6 +51,9 @@ CRITICAL RULES:
 Whenever you present structured information, call render_blocks. You can include multiple blocks of different types in a single call.
 Timeline data: Use type "timeline" with events[{ year, event, description }].
 Map data: Use type "map_2d" or "map_3d" with markers[{ lat, lng, title, description? }].
+Before/After comparison: Use type "image_compare" with { beforeSrc, afterSrc, beforeLabel?, afterLabel?, caption?, source? }.
+Interactive Chart: Use type "chart" with { chartType: "bar"|"line"|"scatter", title?, labels[], datasets[{ label, data[] }] }.
+Contested Claim Graph: Use type "epistemic_graph" with { claimId, claimText, status: "verified"|"contested"|"unverified", confidenceScore, sources[], counterEvidence[] }.
 
 Also supports: heading, text, citation, crossref, gallery, diagram (mermaid code), video, divider.
 
@@ -89,7 +96,7 @@ Generate a structured encyclopedia article from resolved claims. Pass resolved_c
 ### get_article — look up article by slug
 ### get_map — look up map by slug
 ### generate_image — create AI illustration (prefer web_image_search for real subjects)
-### web_image_search — find real sourced photos (Wikimedia Commons) with domain attribution; set block source field
+### web_image_search — search multi-source open archives (Wikimedia Commons, NASA Image Archive, Met Museum API) with automated quality scoring; returns direct image URLs with source domain attribution for image/gallery blocks
 ### generate_video — generate AI video clip
 ### verify_citation — verify a single claim against a source URL
 ### suggest_related — find related articles
@@ -295,10 +302,10 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Content         string `json:"content"`
-		Model           string `json:"model"`
-		TimeMachineEra  string `json:"time_machine_era"`
-		PageContext *struct {
+		Content        string `json:"content"`
+		Model          string `json:"model"`
+		TimeMachineEra string `json:"time_machine_era"`
+		PageContext    *struct {
 			ArticleSlug     *string  `json:"articleSlug"`
 			ArticleTitle    *string  `json:"articleTitle"`
 			VisibleSections []string `json:"visibleSections"`
@@ -552,8 +559,36 @@ func (s *Server) handleChatStop(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) createServerToolExecutors(model string, userID string) map[string]agent.ToolExecutor {
 	return map[string]agent.ToolExecutor{
+		"get_platform_status": func(args json.RawMessage) (agent.ToolResult, error) {
+			articles, _ := s.db.ListArticles(100, 0)
+			gaps, _ := s.db.GetAllEvidenceGaps()
+			contested, _ := s.db.GetMostContestedClaims(5)
+			active, queued := s.sessionEngine.Stats()
+
+			statusReport := map[string]interface{}{
+				"platform_name": "Truthseekers Encyclopedia CMS",
+				"status":        "operational",
+				"timestamp":     time.Now().Format(time.RFC3339),
+				"metrics": map[string]interface{}{
+					"recent_articles_count":  len(articles),
+					"open_evidence_gaps":     len(gaps),
+					"contested_claims_count": len(contested),
+					"active_sessions":        active,
+					"queued_sessions":        queued,
+				},
+			}
+			data, _ := json.Marshal(statusReport)
+			return agent.ToolResult{Result: string(data)}, nil
+		},
+		"get_autonomous_summary": func(args json.RawMessage) (agent.ToolResult, error) {
+			summary := s.veritasWorker.GetSummary()
+			data, _ := json.Marshal(summary)
+			return agent.ToolResult{Result: string(data)}, nil
+		},
 		"get_article": func(args json.RawMessage) (agent.ToolResult, error) {
-			var p struct{ Slug string `json:"slug"` }
+			var p struct {
+				Slug string `json:"slug"`
+			}
 			if err := json.Unmarshal(args, &p); err != nil || p.Slug == "" {
 				return agent.ToolResult{Result: "Slug required"}, nil
 			}
@@ -565,7 +600,9 @@ func (s *Server) createServerToolExecutors(model string, userID string) map[stri
 			return agent.ToolResult{Result: string(data)}, nil
 		},
 		"create_article": func(args json.RawMessage) (agent.ToolResult, error) {
-			var p struct{ Slug string `json:"slug"` }
+			var p struct {
+				Slug string `json:"slug"`
+			}
 			if err := json.Unmarshal(args, &p); err != nil || p.Slug == "" {
 				return agent.ToolResult{Result: "Slug required"}, nil
 			}
@@ -603,7 +640,9 @@ func (s *Server) createServerToolExecutors(model string, userID string) map[stri
 			return agent.ToolResult{Result: string(data)}, nil
 		},
 		"get_map": func(args json.RawMessage) (agent.ToolResult, error) {
-			var p struct{ Slug string `json:"slug"` }
+			var p struct {
+				Slug string `json:"slug"`
+			}
 			if err := json.Unmarshal(args, &p); err != nil || p.Slug == "" {
 				return agent.ToolResult{Result: "Slug required"}, nil
 			}
@@ -615,7 +654,9 @@ func (s *Server) createServerToolExecutors(model string, userID string) map[stri
 			return agent.ToolResult{Result: string(data)}, nil
 		},
 		"suggest_related": func(args json.RawMessage) (agent.ToolResult, error) {
-			var p struct{ Slug string `json:"slug"` }
+			var p struct {
+				Slug string `json:"slug"`
+			}
 			if err := json.Unmarshal(args, &p); err != nil || p.Slug == "" {
 				return agent.ToolResult{Result: "Slug required"}, nil
 			}
@@ -640,7 +681,9 @@ func (s *Server) createServerToolExecutors(model string, userID string) map[stri
 			return agent.ToolResult{Result: fmt.Sprintf("Stored \"%s\"", p.Key)}, nil
 		},
 		"mem_recall": func(args json.RawMessage) (agent.ToolResult, error) {
-			var p struct{ Key string `json:"key"` }
+			var p struct {
+				Key string `json:"key"`
+			}
 			if err := json.Unmarshal(args, &p); err != nil {
 				return agent.ToolResult{Result: "Invalid arguments"}, nil
 			}

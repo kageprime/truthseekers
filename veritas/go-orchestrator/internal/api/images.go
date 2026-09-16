@@ -289,4 +289,3 @@ func xmlEscape(s string) string {
 	s = strings.ReplaceAll(s, `"`, "&quot;")
 	return s
 }
-

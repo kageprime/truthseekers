@@ -4,48 +4,48 @@ import "testing"
 
 func TestResolveEffectiveAction(t *testing.T) {
 	tests := []struct {
-		name       string
-		connector  string
-		action     string
-		risk       Risk
-		policies   []Policy
+		name        string
+		connector   string
+		action      string
+		risk        Risk
+		policies    []Policy
 		defaultMode DefaultMode
-		wantAction PolicyAction
+		wantAction  PolicyAction
 	}{
 		{
-			name: "default risk read allows",
+			name:      "default risk read allows",
 			connector: "web_search", action: "search",
 			risk: RiskRead, policies: nil,
 			defaultMode: DefaultRisk,
 			wantAction:  PolicyAllow,
 		},
 		{
-			name: "default risk write requires approval",
+			name:      "default risk write requires approval",
 			connector: "stripe", action: "charges.create",
 			risk: RiskWrite, policies: nil,
 			defaultMode: DefaultRisk,
 			wantAction:  PolicyRequireApproval,
 		},
 		{
-			name: "block policy overrides",
+			name:      "block policy overrides",
 			connector: "stripe", action: "charges.create",
-			risk: RiskWrite,
-			policies: []Policy{{Match: "stripe.charges.*", Action: PolicyBlock}},
+			risk:        RiskWrite,
+			policies:    []Policy{{Match: "stripe.charges.*", Action: PolicyBlock}},
 			defaultMode: DefaultRisk,
 			wantAction:  PolicyBlock,
 		},
 		{
-			name: "allow all bypasses risk",
+			name:      "allow all bypasses risk",
 			connector: "stripe", action: "charges.delete",
 			risk: RiskDestructive, policies: nil,
 			defaultMode: DefaultAllowAll,
 			wantAction:  PolicyAllow,
 		},
 		{
-			name: "allow policy overrides risk",
+			name:      "allow policy overrides risk",
 			connector: "dangerous", action: "delete-all",
-			risk: RiskDestructive,
-			policies: []Policy{{Match: "dangerous.*", Action: PolicyAllow}},
+			risk:        RiskDestructive,
+			policies:    []Policy{{Match: "dangerous.*", Action: PolicyAllow}},
 			defaultMode: DefaultRisk,
 			wantAction:  PolicyAllow,
 		},

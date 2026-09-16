@@ -20,17 +20,17 @@ import (
 // product — list, search, single article, crossref graph, claims, gaps —
 // works with zero infrastructure.
 type fileStore struct {
-	articles    map[string]*Article
-	articleList []*Article // ordered by created_at desc
-	claims      map[string][]*Claim
-	claimsByID  map[string]*Claim
-	evidence    map[string][]*Evidence
-	gaps        map[string][]*EvidenceGap
-	edges       []*GraphEdge
-	backlinks   map[string][]*GraphEdge // target slug -> edges
-	relationships map[string][]*ClaimRelationship // slug -> claim relationships
-	views       map[string]int
-	gapUpvotes   map[string]int // gap_id -> upvote count
+	articles       map[string]*Article
+	articleList    []*Article // ordered by created_at desc
+	claims         map[string][]*Claim
+	claimsByID     map[string]*Claim
+	evidence       map[string][]*Evidence
+	gaps           map[string][]*EvidenceGap
+	edges          []*GraphEdge
+	backlinks      map[string][]*GraphEdge         // target slug -> edges
+	relationships  map[string][]*ClaimRelationship // slug -> claim relationships
+	views          map[string]int
+	gapUpvotes     map[string]int // gap_id -> upvote count
 	gapSubmissions []*GapSubmission
 }
 
@@ -347,7 +347,6 @@ func (fs *fileStore) relationshipExists(a, b, slug string) bool {
 	return false
 }
 
-
 // --- helpers ---
 
 func firstSentence(content string) string {
@@ -386,4 +385,3 @@ func deterministicViews(slug string) int {
 func round2(f float64) float64 {
 	return math.Round(f*100) / 100
 }
-

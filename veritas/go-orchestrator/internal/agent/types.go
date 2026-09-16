@@ -33,8 +33,8 @@ type ToolCallFunc struct {
 }
 
 type ToolDefinition struct {
-	Type     string           `json:"type"`
-	Function ToolFunctionDef  `json:"function"`
+	Type     string          `json:"type"`
+	Function ToolFunctionDef `json:"function"`
 }
 
 type ToolFunctionDef struct {
@@ -46,16 +46,16 @@ type ToolFunctionDef struct {
 type ToolExecutor func(args json.RawMessage) (ToolResult, error)
 
 type ToolResult struct {
-	Result string          `json:"result"`
-	Blocks []Block         `json:"blocks,omitempty"`
+	Result string  `json:"result"`
+	Blocks []Block `json:"blocks,omitempty"`
 }
 
 type Usage struct {
-	Input        int `json:"input"`
-	Output       int `json:"output"`
-	CacheRead    int `json:"cacheRead"`
-	CacheWrite   int `json:"cacheWrite"`
-	TotalTokens  int `json:"totalTokens"`
+	Input       int `json:"input"`
+	Output      int `json:"output"`
+	CacheRead   int `json:"cacheRead"`
+	CacheWrite  int `json:"cacheWrite"`
+	TotalTokens int `json:"totalTokens"`
 }
 
 type LLMResponse struct {

@@ -25,17 +25,17 @@ var ErrQueueFull = errors.New("session queue full, retry later")
 // Sessions write through to Store (DB) on every transition; boot reloads
 // non-terminal rows via Restore. Nil store = memory-only (tests, file mode).
 type Engine struct {
-	mu         sync.RWMutex
-	sessions   map[string]*Session        // sessionID → session
-	bySlug     map[string]string          // slug → most recent sessionID
-	byKey      map[string]string          // idempotencyKey → sessionID
-	queue      []*Session                 // FIFO queue for backpressured sessions
-	active     int                        // Current running count
-	processor  Processor
-	store      Store
-	done       chan struct{}
-	stopOnce   sync.Once
-	wg         sync.WaitGroup
+	mu        sync.RWMutex
+	sessions  map[string]*Session // sessionID → session
+	bySlug    map[string]string   // slug → most recent sessionID
+	byKey     map[string]string   // idempotencyKey → sessionID
+	queue     []*Session          // FIFO queue for backpressured sessions
+	active    int                 // Current running count
+	processor Processor
+	store     Store
+	done      chan struct{}
+	stopOnce  sync.Once
+	wg        sync.WaitGroup
 }
 
 // NewEngine creates a memory-only session lifecycle engine.

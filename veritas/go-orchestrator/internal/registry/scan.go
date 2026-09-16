@@ -139,5 +139,3 @@ func scanCommands(dir string) ([]CommandEntry, error) {
 	}
 	return entries, nil
 }
-
-

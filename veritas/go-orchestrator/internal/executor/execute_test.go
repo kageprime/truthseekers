@@ -15,12 +15,12 @@ func TestExecuteCall_Success(t *testing.T) {
 	defer ts.Close()
 
 	result := ExecuteCall(struct {
-		Binding  ActionBinding
-		BaseURL  string
-		Auth     ExecutorAuth
-		Secret   string
-		Args     map[string]interface{}
-		Fetch    FetchImpl
+		Binding ActionBinding
+		BaseURL string
+		Auth    ExecutorAuth
+		Secret  string
+		Args    map[string]interface{}
+		Fetch   FetchImpl
 	}{
 		Binding: ActionBinding{Method: "GET", Path: "/test"},
 		BaseURL: ts.URL,
@@ -45,12 +45,12 @@ func TestExecuteCall_AuthInjection(t *testing.T) {
 	defer ts.Close()
 
 	ExecuteCall(struct {
-		Binding  ActionBinding
-		BaseURL  string
-		Auth     ExecutorAuth
-		Secret   string
-		Args     map[string]interface{}
-		Fetch    FetchImpl
+		Binding ActionBinding
+		BaseURL string
+		Auth    ExecutorAuth
+		Secret  string
+		Args    map[string]interface{}
+		Fetch   FetchImpl
 	}{
 		Binding: ActionBinding{Method: "POST", Path: "/test"},
 		BaseURL: ts.URL,
@@ -71,12 +71,12 @@ func TestExecuteCall_HTTPError(t *testing.T) {
 	defer ts.Close()
 
 	result := ExecuteCall(struct {
-		Binding  ActionBinding
-		BaseURL  string
-		Auth     ExecutorAuth
-		Secret   string
-		Args     map[string]interface{}
-		Fetch    FetchImpl
+		Binding ActionBinding
+		BaseURL string
+		Auth    ExecutorAuth
+		Secret  string
+		Args    map[string]interface{}
+		Fetch   FetchImpl
 	}{
 		Binding: ActionBinding{Method: "GET", Path: "/fail"},
 		BaseURL: ts.URL,

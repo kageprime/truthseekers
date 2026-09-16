@@ -15,6 +15,12 @@ const InteractiveTimeline = dynamic(() => import("./InteractiveTimeline"), { ssr
 const MapViewer = dynamic(() => import("./MapViewer"), { ssr: false });
 const ThreeDMapViewer = dynamic(() => import("./ThreeDMapViewer"), { ssr: false });
 const PanoramaViewer = dynamic(() => import("./PanoramaViewer"), { ssr: false });
+const ImageCompareViewer = dynamic(() => import("./ImageCompareViewer"), { ssr: false });
+const MapCompareViewer = dynamic(() => import("./MapCompareViewer"), { ssr: false });
+const InteractiveChart = dynamic(() => import("./InteractiveChart"), { ssr: false });
+const EpistemicGraphWidget = dynamic(() => import("./EpistemicGraphWidget"), { ssr: false });
+const InteractiveCalcWidget = dynamic(() => import("./InteractiveCalcWidget"), { ssr: false });
+const PanoramicMapViewer = dynamic(() => import("./PanoramicMapViewer"), { ssr: false });
 // ponytail: mermaid is the heaviest renderer by far and only needed when a
 // diagram block exists — never in the initial bundle.
 const MermaidDiagram = dynamic(() => import("./MermaidDiagram"), {
@@ -242,6 +248,18 @@ function BlockCard({
       return <ListBlock data={block.data as unknown as ListBlockData} />;
     case "tool_call":
       return <ToolCallBlock data={block.data as any} />;
+    case "image_compare":
+      return <ImageCompareViewer {...(block.data as any)} />;
+    case "chart":
+      return <InteractiveChart {...(block.data as any)} />;
+    case "epistemic_graph":
+      return <EpistemicGraphWidget {...(block.data as any)} />;
+    case "map_compare":
+      return <MapCompareViewer {...(block.data as any)} />;
+    case "interactive_calc":
+      return <InteractiveCalcWidget {...(block.data as any)} />;
+    case "map_panoramic":
+      return <PanoramicMapViewer data={block.data as any} />;
     case "divider":
       return <DividerBlock />;
     default:

@@ -449,3 +449,14 @@ export function usePaystackVerify() {
   );
 }
 
+// ── Veritas Autonomous Summary ──
+
+export function usePlatformStatus() {
+  return useApiQuery(["platform", "status"], () => api.fetchPlatformStatus(), { staleTime: 30_000, refetchInterval: 60_000 });
+}
+
+export function useAutonomousSummary() {
+  return useApiQuery(["autonomous", "summary"], () => api.fetchAutonomousSummary(), { staleTime: 30_000 });
+}
+
+

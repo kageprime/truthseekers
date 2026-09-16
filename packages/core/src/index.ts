@@ -17,6 +17,8 @@ export type {
   GalleryBlockData, CitationBlockData, CrossrefBlockData,
   Panorama3DBlockData, Tour3DBlockData, PanoramaHotspot, TourWaypoint,
   TableBlockData, ListBlockData,
+  ImageCompareBlockData, ChartBlockData, ChartDataset, EpistemicGraphBlockData,
+  MapCompareBlockData, CalcVariable, InteractiveCalcBlockData,
   ArticleSummary, QuotaInfo, ConversationSummary, ConversationDetail,
   ModelId,
 } from "./types.js";

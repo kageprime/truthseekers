@@ -871,7 +871,7 @@ func ComputeFreshness(createdAt time.Time) float64 {
 
 // FreshnessInfo holds per-evidence freshness scores for a claim.
 type FreshnessInfo struct {
-	FreshnessScore float64 `json:"freshness_score"`
+	FreshnessScore  float64 `json:"freshness_score"`
 	EvidenceAgeDays float64 `json:"evidence_age_days"`
 	EvidenceCount   int     `json:"evidence_count"`
 }
@@ -900,7 +900,7 @@ func (d *DB) ComputeClaimFreshness(claimID string) (*FreshnessInfo, error) {
 		return &FreshnessInfo{FreshnessScore: 0.5, EvidenceCount: 0}, nil
 	}
 	return &FreshnessInfo{
-		FreshnessScore: totalScore / float64(count),
+		FreshnessScore:  totalScore / float64(count),
 		EvidenceAgeDays: time.Since(time.Now()).Hours() / 24, // used for averages
 		EvidenceCount:   count,
 	}, nil
@@ -1111,7 +1111,10 @@ func (d *DB) GetClaimVersionDiff(claimID string) (*ClaimVersionDiff, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	type v struct{ conf float64; status string }
+	type v struct {
+		conf   float64
+		status string
+	}
 	var vs []v
 	for rows.Next() {
 		var x v

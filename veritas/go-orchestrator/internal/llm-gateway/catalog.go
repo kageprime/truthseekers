@@ -14,8 +14,8 @@ type ModelSpec struct {
 	Temperature bool `json:"temperature"`
 
 	// Limits
-	ContextLimit int `json:"contextLimit,omitempty"`  // Max input context tokens
-	OutputLimit  int `json:"outputLimit,omitempty"`   // Max output tokens
+	ContextLimit int `json:"contextLimit,omitempty"` // Max input context tokens
+	OutputLimit  int `json:"outputLimit,omitempty"`  // Max output tokens
 
 	// Cost (per 1M tokens, USD)
 	InputCostPerM  float64 `json:"inputCostPerM"`

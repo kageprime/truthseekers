@@ -34,13 +34,13 @@ type Section struct {
 }
 
 type TimelineEvent struct {
-	ID          string   `json:"id,omitempty"`
+	ID          string      `json:"id,omitempty"`
 	Year        interface{} `json:"year"` // Mixed in TS (can be number or string, e.g. 1324 or "14th century")
-	Event       string   `json:"event"`
-	Description string   `json:"description,omitempty"`
-	Image       string   `json:"image,omitempty"`
-	Causes      []string `json:"causes,omitempty"`
-	Category    string   `json:"category,omitempty"`
+	Event       string      `json:"event"`
+	Description string      `json:"description,omitempty"`
+	Image       string      `json:"image,omitempty"`
+	Causes      []string    `json:"causes,omitempty"`
+	Category    string      `json:"category,omitempty"`
 }
 
 // UnmarshalJSON accepts both the canonical "event" key (used by generated
@@ -82,7 +82,7 @@ type Claim struct {
 	ID                string                 `json:"id"`
 	Text              string                 `json:"text"`
 	Signature         string                 `json:"signature,omitempty"`
-	Type              string                 `json:"type"` // factual | interpretive | predictive
+	Type              string                 `json:"type"`   // factual | interpretive | predictive
 	Status            string                 `json:"status"` // supported | disputed | weak | unknown
 	ConfidenceVector  map[string]interface{} `json:"confidence_vector,omitempty"`
 	DerivedConfidence float64                `json:"derived_confidence"`
@@ -91,31 +91,31 @@ type Claim struct {
 }
 
 type Source struct {
-	ID               string                 `json:"id"`
-	Name             string                 `json:"name"`
-	Type             string                 `json:"type"` // institutional | individual | anonymous | leaked_material
+	ID                string                 `json:"id"`
+	Name              string                 `json:"name"`
+	Type              string                 `json:"type"` // institutional | individual | anonymous | leaked_material
 	CredibilityVector map[string]interface{} `json:"credibility_vector,omitempty"`
-	CreatedAt        time.Time              `json:"created_at"`
+	CreatedAt         time.Time              `json:"created_at"`
 }
 
 type Evidence struct {
-	ID                string     `json:"id"`
-	ClaimID           string     `json:"claim_id"`
-	Type              string     `json:"type"` // primary_document | eyewitness | expert_analysis | leaked | patent | dataset | anonymous
-	URL               string     `json:"url,omitempty"`
-	ChainOfCustody    string     `json:"chain_of_custody"` // verified | partial | unverified
-	AcquisitionMethod string     `json:"acquisition_method,omitempty"`
-	Accessibility     string     `json:"accessibility"` // public | restricted | classified | destroyed
-	SupportsClaim     bool       `json:"supports_claim"`
-	SourceID          *string    `json:"source_id,omitempty"`
-	CreatedAt         time.Time  `json:"created_at"`
+	ID                string    `json:"id"`
+	ClaimID           string    `json:"claim_id"`
+	Type              string    `json:"type"` // primary_document | eyewitness | expert_analysis | leaked | patent | dataset | anonymous
+	URL               string    `json:"url,omitempty"`
+	ChainOfCustody    string    `json:"chain_of_custody"` // verified | partial | unverified
+	AcquisitionMethod string    `json:"acquisition_method,omitempty"`
+	Accessibility     string    `json:"accessibility"` // public | restricted | classified | destroyed
+	SupportsClaim     bool      `json:"supports_claim"`
+	SourceID          *string   `json:"source_id,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
 }
 
 type EvidenceGap struct {
 	ID                 string                 `json:"id"`
 	ClaimID            string                 `json:"claim_id"`
-	GapType            string                 `json:"gap_type"` // expected | unexpected | unknown_expectedness
-	ExpectedArtifact   string                 `json:"expected_artifact"` // patent | primary_source | dataset | eyewitness
+	GapType            string                 `json:"gap_type"`            // expected | unexpected | unknown_expectedness
+	ExpectedArtifact   string                 `json:"expected_artifact"`   // patent | primary_source | dataset | eyewitness
 	VerificationStatus string                 `json:"verification_status"` // verified_gap | unverified_gap | false_positive_risk
 	ExternalMetadata   map[string]interface{} `json:"external_metadata,omitempty"`
 	CauseLabel         string                 `json:"cause_label,omitempty"` // classified | destroyed | unlocatable | unknown
@@ -124,23 +124,23 @@ type EvidenceGap struct {
 }
 
 type LanguageFlag struct {
-	ID               string  `json:"id"`
-	ClaimID          string  `json:"claim_id"`
-	SourcePhrase     string  `json:"source_phrase"`
-	PrecisionUpgrade string  `json:"precision_upgrade"`
-	FramingOrigin    string  `json:"framing_origin"`
-	FramingFunction  string  `json:"framing_function"`
-	Confidence       float64 `json:"confidence"`
+	ID               string    `json:"id"`
+	ClaimID          string    `json:"claim_id"`
+	SourcePhrase     string    `json:"source_phrase"`
+	PrecisionUpgrade string    `json:"precision_upgrade"`
+	FramingOrigin    string    `json:"framing_origin"`
+	FramingFunction  string    `json:"framing_function"`
+	Confidence       float64   `json:"confidence"`
 	DetectedAt       time.Time `json:"detected_at"`
 }
 
 type ScrutinyAssessment struct {
-	ID              string                 `json:"id"`
-	ClaimID         string                 `json:"claim_id"`
-	RiskFactors     map[string]interface{} `json:"risk_factors,omitempty"`
-	RiskScore       float64                `json:"risk_score"`
-	ActionRequired  map[string]interface{} `json:"action_required,omitempty"`
-	AssessedAt      time.Time              `json:"assessed_at"`
+	ID             string                 `json:"id"`
+	ClaimID        string                 `json:"claim_id"`
+	RiskFactors    map[string]interface{} `json:"risk_factors,omitempty"`
+	RiskScore      float64                `json:"risk_score"`
+	ActionRequired map[string]interface{} `json:"action_required,omitempty"`
+	AssessedAt     time.Time              `json:"assessed_at"`
 }
 
 type ArticleClaim struct {
@@ -149,13 +149,13 @@ type ArticleClaim struct {
 }
 
 type EpistemicPipelineData struct {
-	Claims      []Claim            `json:"claims"`
-	Sources     []Source           `json:"sources"`
-	Evidence    []Evidence         `json:"evidence"`
-	Gaps        []EvidenceGap      `json:"gaps"`
-	LangFlags   []LanguageFlag     `json:"language_flags"`
-	Scrutinies  []ScrutinyAssessment `json:"scrutinies"`
-	ArticleClaims []ArticleClaim   `json:"article_claims"`
+	Claims        []Claim              `json:"claims"`
+	Sources       []Source             `json:"sources"`
+	Evidence      []Evidence           `json:"evidence"`
+	Gaps          []EvidenceGap        `json:"gaps"`
+	LangFlags     []LanguageFlag       `json:"language_flags"`
+	Scrutinies    []ScrutinyAssessment `json:"scrutinies"`
+	ArticleClaims []ArticleClaim       `json:"article_claims"`
 }
 
 type ArticleMetadata struct {
@@ -671,12 +671,22 @@ func (d *DB) GetMessages(conversationID string) ([]*StoredMessage, error) {
 			return nil, err
 		}
 		m.CreatedAt = createdAt.Format(time.RFC3339)
-		if toolCallID.Valid { m.ToolCallID = toolCallID.String }
-		if toolName.Valid { m.ToolName = toolName.String }
+		if toolCallID.Valid {
+			m.ToolCallID = toolCallID.String
+		}
+		if toolName.Valid {
+			m.ToolName = toolName.String
+		}
 
-		if len(blocksJson) > 0 { json.Unmarshal(blocksJson, &m.Blocks) }
-		if len(toolCallsJson) > 0 { json.Unmarshal(toolCallsJson, &m.ToolCalls) }
-		if len(agentEventsJson) > 0 { json.Unmarshal(agentEventsJson, &m.AgentEvents) }
+		if len(blocksJson) > 0 {
+			json.Unmarshal(blocksJson, &m.Blocks)
+		}
+		if len(toolCallsJson) > 0 {
+			json.Unmarshal(toolCallsJson, &m.ToolCalls)
+		}
+		if len(agentEventsJson) > 0 {
+			json.Unmarshal(agentEventsJson, &m.AgentEvents)
+		}
 
 		list = append(list, &m)
 	}
@@ -827,14 +837,30 @@ func (d *DB) GetArticle(slug string) (*Article, error) {
 		return nil, fmt.Errorf("querying article failed: %w", err)
 	}
 
-	if len(blocksJson) > 0 { json.Unmarshal(blocksJson, &a.Blocks) }
-	if len(cvJson) > 0 { json.Unmarshal(cvJson, &a.ConfidenceVector) }
-	if len(sectionsJson) > 0 { json.Unmarshal(sectionsJson, &a.Sections) }
-	if len(timelineJson) > 0 { json.Unmarshal(timelineJson, &a.Timeline) }
-	if len(categoriesJson) > 0 { json.Unmarshal(categoriesJson, &a.Categories) }
-	if len(crossrefsJson) > 0 { json.Unmarshal(crossrefsJson, &a.Crossrefs) }
-	if len(citationsJson) > 0 { json.Unmarshal(citationsJson, &a.Citations) }
-	if len(metadataJson) > 0 { json.Unmarshal(metadataJson, &a.Metadata) }
+	if len(blocksJson) > 0 {
+		json.Unmarshal(blocksJson, &a.Blocks)
+	}
+	if len(cvJson) > 0 {
+		json.Unmarshal(cvJson, &a.ConfidenceVector)
+	}
+	if len(sectionsJson) > 0 {
+		json.Unmarshal(sectionsJson, &a.Sections)
+	}
+	if len(timelineJson) > 0 {
+		json.Unmarshal(timelineJson, &a.Timeline)
+	}
+	if len(categoriesJson) > 0 {
+		json.Unmarshal(categoriesJson, &a.Categories)
+	}
+	if len(crossrefsJson) > 0 {
+		json.Unmarshal(crossrefsJson, &a.Crossrefs)
+	}
+	if len(citationsJson) > 0 {
+		json.Unmarshal(citationsJson, &a.Citations)
+	}
+	if len(metadataJson) > 0 {
+		json.Unmarshal(metadataJson, &a.Metadata)
+	}
 
 	return &a, nil
 }
@@ -880,7 +906,7 @@ func (d *DB) SaveArticle(art *Article) error {
 			sections = EXCLUDED.sections, timeline = EXCLUDED.timeline, categories = EXCLUDED.categories,
 			crossrefs = EXCLUDED.crossrefs, citations = EXCLUDED.citations, metadata = EXCLUDED.metadata, updated_at = EXCLUDED.updated_at
 	`, id, art.Slug, art.Title, art.Abstract, blocksJson, cvJson, art.DerivedConfidence,
-	sectionsJson, timelineJson, categoriesJson, crossrefsJson, citationsJson, metadataJson, art.CreatedAt, art.UpdatedAt)
+		sectionsJson, timelineJson, categoriesJson, crossrefsJson, citationsJson, metadataJson, art.CreatedAt, art.UpdatedAt)
 
 	if err != nil {
 		return fmt.Errorf("saving article failed: %w", err)
@@ -945,14 +971,30 @@ func (d *DB) ListArticles(limit, offset int) ([]*Article, error) {
 			return nil, err
 		}
 
-		if len(blocksJson) > 0 { json.Unmarshal(blocksJson, &a.Blocks) }
-		if len(cvJson) > 0 { json.Unmarshal(cvJson, &a.ConfidenceVector) }
-		if len(sectionsJson) > 0 { json.Unmarshal(sectionsJson, &a.Sections) }
-		if len(timelineJson) > 0 { json.Unmarshal(timelineJson, &a.Timeline) }
-		if len(categoriesJson) > 0 { json.Unmarshal(categoriesJson, &a.Categories) }
-		if len(crossrefsJson) > 0 { json.Unmarshal(crossrefsJson, &a.Crossrefs) }
-		if len(citationsJson) > 0 { json.Unmarshal(citationsJson, &a.Citations) }
-		if len(metadataJson) > 0 { json.Unmarshal(metadataJson, &a.Metadata) }
+		if len(blocksJson) > 0 {
+			json.Unmarshal(blocksJson, &a.Blocks)
+		}
+		if len(cvJson) > 0 {
+			json.Unmarshal(cvJson, &a.ConfidenceVector)
+		}
+		if len(sectionsJson) > 0 {
+			json.Unmarshal(sectionsJson, &a.Sections)
+		}
+		if len(timelineJson) > 0 {
+			json.Unmarshal(timelineJson, &a.Timeline)
+		}
+		if len(categoriesJson) > 0 {
+			json.Unmarshal(categoriesJson, &a.Categories)
+		}
+		if len(crossrefsJson) > 0 {
+			json.Unmarshal(crossrefsJson, &a.Crossrefs)
+		}
+		if len(citationsJson) > 0 {
+			json.Unmarshal(citationsJson, &a.Citations)
+		}
+		if len(metadataJson) > 0 {
+			json.Unmarshal(metadataJson, &a.Metadata)
+		}
 		list = append(list, &a)
 	}
 	return list, nil
@@ -966,7 +1008,8 @@ func escapeLIKE(s string) string {
 	return r.Replace(s)
 }
 
-func (d *DB) SearchArticles(searchQuery string, limit int) ([]*Article, error) {	if d.mockMode {
+func (d *DB) SearchArticles(searchQuery string, limit int) ([]*Article, error) {
+	if d.mockMode {
 		if d.fs == nil {
 			return []*Article{}, nil
 		}
@@ -1006,14 +1049,30 @@ func (d *DB) SearchArticles(searchQuery string, limit int) ([]*Article, error) {
 			return nil, err
 		}
 
-		if len(blocksJson) > 0 { json.Unmarshal(blocksJson, &a.Blocks) }
-		if len(cvJson) > 0 { json.Unmarshal(cvJson, &a.ConfidenceVector) }
-		if len(sectionsJson) > 0 { json.Unmarshal(sectionsJson, &a.Sections) }
-		if len(timelineJson) > 0 { json.Unmarshal(timelineJson, &a.Timeline) }
-		if len(categoriesJson) > 0 { json.Unmarshal(categoriesJson, &a.Categories) }
-		if len(crossrefsJson) > 0 { json.Unmarshal(crossrefsJson, &a.Crossrefs) }
-		if len(citationsJson) > 0 { json.Unmarshal(citationsJson, &a.Citations) }
-		if len(metadataJson) > 0 { json.Unmarshal(metadataJson, &a.Metadata) }
+		if len(blocksJson) > 0 {
+			json.Unmarshal(blocksJson, &a.Blocks)
+		}
+		if len(cvJson) > 0 {
+			json.Unmarshal(cvJson, &a.ConfidenceVector)
+		}
+		if len(sectionsJson) > 0 {
+			json.Unmarshal(sectionsJson, &a.Sections)
+		}
+		if len(timelineJson) > 0 {
+			json.Unmarshal(timelineJson, &a.Timeline)
+		}
+		if len(categoriesJson) > 0 {
+			json.Unmarshal(categoriesJson, &a.Categories)
+		}
+		if len(crossrefsJson) > 0 {
+			json.Unmarshal(crossrefsJson, &a.Crossrefs)
+		}
+		if len(citationsJson) > 0 {
+			json.Unmarshal(citationsJson, &a.Citations)
+		}
+		if len(metadataJson) > 0 {
+			json.Unmarshal(metadataJson, &a.Metadata)
+		}
 		list = append(list, &a)
 	}
 	return list, nil
@@ -1057,14 +1116,16 @@ func (d *DB) GetJob(slug string) (*Job, error) {
 
 	err := d.db.QueryRow("SELECT slug, title, status, phase, meta, created_at, updated_at FROM jobs WHERE slug = $1", slug).
 		Scan(&j.Slug, &j.Title, &j.Status, &j.Phase, &metaJson, &created, &updated)
-	
+
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("querying job failed: %w", err)
 	}
 
-	if len(metaJson) > 0 { json.Unmarshal(metaJson, &j.Meta) }
+	if len(metaJson) > 0 {
+		json.Unmarshal(metaJson, &j.Meta)
+	}
 	j.CreatedAt = created.Format(time.RFC3339)
 	j.UpdatedAt = updated.Format(time.RFC3339)
 	return &j, nil
@@ -1089,7 +1150,9 @@ func (d *DB) ListJobsByStatus(status string) ([]*Job, error) {
 		if err := rows.Scan(&j.Slug, &j.Title, &j.Status, &j.Phase, &metaJson, &created, &updated); err != nil {
 			return nil, err
 		}
-		if len(metaJson) > 0 { json.Unmarshal(metaJson, &j.Meta) }
+		if len(metaJson) > 0 {
+			json.Unmarshal(metaJson, &j.Meta)
+		}
 		j.CreatedAt = created.Format(time.RFC3339)
 		j.UpdatedAt = updated.Format(time.RFC3339)
 		list = append(list, &j)
@@ -1433,14 +1496,30 @@ func (d *DB) GetTopArticles(limit int) ([]*Article, error) {
 		); err != nil {
 			return nil, err
 		}
-		if len(blocksJson) > 0 { json.Unmarshal(blocksJson, &a.Blocks) }
-		if len(cvJson) > 0 { json.Unmarshal(cvJson, &a.ConfidenceVector) }
-		if len(sectionsJson) > 0 { json.Unmarshal(sectionsJson, &a.Sections) }
-		if len(timelineJson) > 0 { json.Unmarshal(timelineJson, &a.Timeline) }
-		if len(categoriesJson) > 0 { json.Unmarshal(categoriesJson, &a.Categories) }
-		if len(crossrefsJson) > 0 { json.Unmarshal(crossrefsJson, &a.Crossrefs) }
-		if len(citationsJson) > 0 { json.Unmarshal(citationsJson, &a.Citations) }
-		if len(metadataJson) > 0 { json.Unmarshal(metadataJson, &a.Metadata) }
+		if len(blocksJson) > 0 {
+			json.Unmarshal(blocksJson, &a.Blocks)
+		}
+		if len(cvJson) > 0 {
+			json.Unmarshal(cvJson, &a.ConfidenceVector)
+		}
+		if len(sectionsJson) > 0 {
+			json.Unmarshal(sectionsJson, &a.Sections)
+		}
+		if len(timelineJson) > 0 {
+			json.Unmarshal(timelineJson, &a.Timeline)
+		}
+		if len(categoriesJson) > 0 {
+			json.Unmarshal(categoriesJson, &a.Categories)
+		}
+		if len(crossrefsJson) > 0 {
+			json.Unmarshal(crossrefsJson, &a.Crossrefs)
+		}
+		if len(citationsJson) > 0 {
+			json.Unmarshal(citationsJson, &a.Citations)
+		}
+		if len(metadataJson) > 0 {
+			json.Unmarshal(metadataJson, &a.Metadata)
+		}
 		list = append(list, &a)
 	}
 	return list, nil
@@ -1523,10 +1602,18 @@ func (d *DB) GetMap(slug string) (*MapEntry, error) {
 		return nil, err
 	}
 
-	if clat.Valid { m.CenterLat = &clat.Float64 }
-	if clng.Valid { m.CenterLng = &clng.Float64 }
-	if len(geoJson) > 0 { json.Unmarshal(geoJson, &m.GeoJson) }
-	if len(markersJson) > 0 { json.Unmarshal(markersJson, &m.Markers) }
+	if clat.Valid {
+		m.CenterLat = &clat.Float64
+	}
+	if clng.Valid {
+		m.CenterLng = &clng.Float64
+	}
+	if len(geoJson) > 0 {
+		json.Unmarshal(geoJson, &m.GeoJson)
+	}
+	if len(markersJson) > 0 {
+		json.Unmarshal(markersJson, &m.Markers)
+	}
 
 	m.CreatedAt = created.Format(time.RFC3339)
 	m.UpdatedAt = updated.Format(time.RFC3339)
@@ -1563,10 +1650,18 @@ func (d *DB) GetMaps(limit, offset int) ([]*MapEntry, []*MapEntry, error) {
 			return nil, nil, err
 		}
 
-		if clat.Valid { m.CenterLat = &clat.Float64 }
-		if clng.Valid { m.CenterLng = &clng.Float64 }
-		if len(geoJson) > 0 { json.Unmarshal(geoJson, &m.GeoJson) }
-		if len(markersJson) > 0 { json.Unmarshal(markersJson, &m.Markers) }
+		if clat.Valid {
+			m.CenterLat = &clat.Float64
+		}
+		if clng.Valid {
+			m.CenterLng = &clng.Float64
+		}
+		if len(geoJson) > 0 {
+			json.Unmarshal(geoJson, &m.GeoJson)
+		}
+		if len(markersJson) > 0 {
+			json.Unmarshal(markersJson, &m.Markers)
+		}
 
 		m.CreatedAt = created.Format(time.RFC3339)
 		m.UpdatedAt = updated.Format(time.RFC3339)
@@ -1610,10 +1705,18 @@ func (d *DB) SearchMaps(searchQuery string, limit int) ([]*MapEntry, error) {
 			return nil, err
 		}
 
-		if clat.Valid { m.CenterLat = &clat.Float64 }
-		if clng.Valid { m.CenterLng = &clng.Float64 }
-		if len(geoJson) > 0 { json.Unmarshal(geoJson, &m.GeoJson) }
-		if len(markersJson) > 0 { json.Unmarshal(markersJson, &m.Markers) }
+		if clat.Valid {
+			m.CenterLat = &clat.Float64
+		}
+		if clng.Valid {
+			m.CenterLng = &clng.Float64
+		}
+		if len(geoJson) > 0 {
+			json.Unmarshal(geoJson, &m.GeoJson)
+		}
+		if len(markersJson) > 0 {
+			json.Unmarshal(markersJson, &m.Markers)
+		}
 
 		m.CreatedAt = created.Format(time.RFC3339)
 		m.UpdatedAt = updated.Format(time.RFC3339)
@@ -1793,7 +1896,9 @@ func (d *DB) fetchEpistemicChunk(data *EpistemicPipelineData, ids []string) erro
 		if err := rows.Scan(&c.ID, &c.Text, &c.Type, &c.Status, &cvJson, &c.DerivedConfidence, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return err
 		}
-		if len(cvJson) > 0 { json.Unmarshal(cvJson, &c.ConfidenceVector) }
+		if len(cvJson) > 0 {
+			json.Unmarshal(cvJson, &c.ConfidenceVector)
+		}
 		data.Claims = append(data.Claims, c)
 	}
 	rows.Close()
@@ -1809,7 +1914,9 @@ func (d *DB) fetchEpistemicChunk(data *EpistemicPipelineData, ids []string) erro
 		if err := rows.Scan(&e.ID, &e.ClaimID, &e.Type, &e.URL, &e.ChainOfCustody, &e.AcquisitionMethod, &e.Accessibility, &e.SupportsClaim, &sourceID, &e.CreatedAt); err != nil {
 			return err
 		}
-		if sourceID.Valid { e.SourceID = &sourceID.String }
+		if sourceID.Valid {
+			e.SourceID = &sourceID.String
+		}
 		data.Evidence = append(data.Evidence, e)
 	}
 	rows.Close()
@@ -1825,7 +1932,9 @@ func (d *DB) fetchEpistemicChunk(data *EpistemicPipelineData, ids []string) erro
 		if err := rows.Scan(&g.ID, &g.ClaimID, &g.GapType, &g.ExpectedArtifact, &g.VerificationStatus, &emJson, &g.CauseLabel, &g.CauseConfidence, &g.DetectedAt); err != nil {
 			return err
 		}
-		if len(emJson) > 0 { json.Unmarshal(emJson, &g.ExternalMetadata) }
+		if len(emJson) > 0 {
+			json.Unmarshal(emJson, &g.ExternalMetadata)
+		}
 		data.Gaps = append(data.Gaps, g)
 	}
 	rows.Close()
@@ -1855,8 +1964,12 @@ func (d *DB) fetchEpistemicChunk(data *EpistemicPipelineData, ids []string) erro
 		if err := rows.Scan(&s.ID, &s.ClaimID, &rfJson, &s.RiskScore, &arJson, &s.AssessedAt); err != nil {
 			return err
 		}
-		if len(rfJson) > 0 { json.Unmarshal(rfJson, &s.RiskFactors) }
-		if len(arJson) > 0 { json.Unmarshal(arJson, &s.ActionRequired) }
+		if len(rfJson) > 0 {
+			json.Unmarshal(rfJson, &s.RiskFactors)
+		}
+		if len(arJson) > 0 {
+			json.Unmarshal(arJson, &s.ActionRequired)
+		}
 		data.Scrutinies = append(data.Scrutinies, s)
 	}
 	return rows.Err()
@@ -1921,7 +2034,9 @@ func (d *DB) GetEpistemicPipelineForArticle(articleID string) (*EpistemicPipelin
 					srows.Close()
 					return nil, err
 				}
-				if len(cvJson) > 0 { json.Unmarshal(cvJson, &s.CredibilityVector) }
+				if len(cvJson) > 0 {
+					json.Unmarshal(cvJson, &s.CredibilityVector)
+				}
 				data.Sources = append(data.Sources, s)
 			}
 			srows.Close()
@@ -1934,4 +2049,3 @@ func (d *DB) GetEpistemicPipelineForArticle(articleID string) (*EpistemicPipelin
 func (d *DB) IsMockMode() bool {
 	return d.mockMode
 }
-

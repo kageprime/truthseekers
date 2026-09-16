@@ -2,6 +2,7 @@
 import { usePathname } from "next/navigation";
 import RetroWindow from "./RetroWindow";
 import RetroContentsNav from "./RetroContentsNav";
+import GlobalRightSidebar from "../GlobalRightSidebar";
 import { canSeeAdmin } from "@/lib/routes";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -17,6 +18,7 @@ export default function RetroShell({ children, wide }: { children: React.ReactNo
           <div className={`${wide ? "" : "max-w-[980px] "}mx-auto`}>{children}</div>
         </div>
       </div>
+      <GlobalRightSidebar />
     </RetroWindow>
   );
 }
