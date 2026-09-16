@@ -4,100 +4,114 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuota, useGenerateArticle } from "../../hooks";
-import PageLayout from "../../components/PageLayout";
-import { IconAlert, IconLightning } from "../../components/Icons";
+import { useUiMode } from "../../context/UiModeContext";
 
 export default function NewArticlePage() {
   const router = useRouter();
-  const [slug, setSlug] = useState("");
+  const [topic, setTopic] = useState("");
   const [status, setStatus] = useState("");
-  const { data: quota, loading: quotaLoading, error: quotaError } = useQuota();
+  const { data: quota, loading: quotaLoading } = useQuota();
   const { mutate: generateArticle } = useGenerateArticle();
+  const { widthMode } = useUiMode();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const clean = slug
+    const clean = topic
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
 
     if (!clean) return;
     setStatus("queued");
-    const result = await generateArticle({ slug: clean });
+    await generateArticle({ slug: clean });
     router.push(`/article/${clean}`);
   }
 
   const atLimit = !quotaLoading && quota && quota.remaining <= 0;
-
-  if (atLimit) {
-    return (
-      <PageLayout>
-        <main className="flex-1 flex items-center justify-center px-6 py-12">
-          <div className="w-full max-w-md text-center glass-card-static p-8" style={{ background: "var(--cream)" }}>
-            <div className="mb-4 flex justify-center"><IconAlert size={32} /></div>
-            <h1 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>Generation Limit Reached</h1>
-            <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
-              Your {quota.tier} plan allows {quota.limit} article generations. Upgrade to create more.
-            </p>
-            <Link href="/pricing" className="btn btn-primary btn-lg">Upgrade Plan</Link>
-            <div className="mt-4">
-              <Link href="/articles" className="text-sm hover:underline" style={{ color: "var(--muted)" }}>
-                ← Browse Articles
-              </Link>
-            </div>
-          </div>
-        </main>
-      </PageLayout>
-    );
-  }
+  const containerClass = widthMode === "expanded" ? "max-w-3xl" : "max-w-xl";
 
   return (
-    <PageLayout>
-      <main className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-xl">
-          <div className="text-center mb-10">
-            <h1 className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>Generate Article</h1>
-            <p className="text-sm" style={{ color: "var(--muted)" }}>Enter a topic. The AI will research, outline, and write a full article.</p>
-            {quota && (
-              <p className="text-xs mt-2" style={{ color: "var(--subtle)" }}>
-                {quota.remaining} of {quota.limit} generations remaining ({quota.tier})
-              </p>
-            )}
+    <div className="py-12 px-6 sm:px-12 w-full transition-all duration-300">
+      <div className={`${containerClass} mx-auto space-y-8 transition-all duration-300`}>
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-800 text-xs font-semibold border border-blue-200">
+            <span>⚡ Epistemic Pipeline</span>
           </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-zinc-900">
+            Synthesize New Article
+          </h1>
+          <p className="font-serif text-base text-zinc-600 italic">
+            Autonomous multi-agent research: literature discovery, claim extraction, evidence mapping, and formal epistemic synthesis.
+          </p>
+          {quota && (
+            <p className="text-xs font-mono text-zinc-400">
+              {quota.remaining} of {quota.limit} generations available
+            </p>
+          )}
+        </div>
 
+        {atLimit ? (
+          <div className="p-8 rounded-2xl border border-red-200 bg-red-50/50 text-center space-y-4">
+            <h2 className="text-base font-bold text-red-900">Generation Limit Reached</h2>
+            <p className="text-xs text-red-700">
+              Your {quota.tier} plan quota has been exhausted.
+            </p>
+            <Link
+              href="/pricing"
+              className="inline-block px-4 py-2 bg-red-600 text-white font-semibold text-xs rounded-xl no-underline"
+            >
+              Upgrade Plan
+            </Link>
+          </div>
+        ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "var(--ink)" }}>Topic Slug</label>
+            <div className="space-y-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600">
+                Research Topic or Hypothesis
+              </label>
               <input
                 type="text"
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                placeholder="quantum-computing"
-                className="w-full input"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="e.g. quantum-computing or CRISPR-gene-drives"
+                className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 shadow-xs transition-all"
                 autoFocus
+                required
               />
             </div>
 
             <button
               type="submit"
-              disabled={!slug.trim() || !!status}
-              className="btn btn-primary btn-lg w-full"
+              disabled={!topic.trim() || !!status}
+              className="w-full py-3.5 px-4 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
-              {status ? "Generating..." : <><IconLightning size={16} /> Generate Article</>}
+              <span>{status ? "Deploying Agents…" : "⚡ Synthesize Verified Article"}</span>
             </button>
           </form>
+        )}
 
-          <div className="glass-card-static p-5" style={{ background: "var(--cream)" }}>
-            <h3 className="text-xs font-medium mb-3" style={{ color: "var(--ink)" }}>TIPS</h3>
-            <ul className="space-y-2 text-sm" style={{ color: "var(--muted)" }}>
-              <li>• Use hyphens for multi-word: <code className="glass-card-static px-2 py-0.5 text-xs">machine-learning</code></li>
-              <li>• Be specific: prefer <code className="glass-card-static px-2 py-0.5 text-xs">quantum-entanglement</code> over <code className="glass-card-static px-2 py-0.5 text-xs">physics</code></li>
-              <li>• Research phase uses web search for primary sources</li>
-              <li>• Articles stored in SQLite + versioned in Git</li>
-            </ul>
-          </div>
+        {/* Epistemic Tips Card */}
+        <div className="rounded-2xl border border-zinc-200 p-6 bg-white shadow-xs space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+            Synthesis Guidelines
+          </h3>
+          <ul className="space-y-2 text-xs text-zinc-600">
+            <li className="flex items-start gap-2">
+              <span className="text-blue-600 font-bold">•</span>
+              <span><strong>Specificity</strong>: Prefer <code>transmon-qubit-coherence</code> over generic <code>physics</code>.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-600 font-bold">•</span>
+              <span><strong>Autonomous Citation</strong>: The DAG pipeline queries primary literature and cross-verifies arXiv/DOI citations.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-blue-600 font-bold">•</span>
+              <span><strong>Contestation Scrutiny</strong>: Contested assertions trigger automatic counter-evidence analysis nodes.</span>
+            </li>
+          </ul>
         </div>
-      </main>
-    </PageLayout>
+      </div>
+    </div>
   );
 }

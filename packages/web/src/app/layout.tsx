@@ -10,6 +10,7 @@ import { ArticleViewProvider } from "./ArticleViewContext";
 import { AuthProvider } from "./components/AuthProvider";
 import { TimeMachineProvider } from "./hooks/useTimeMachine";
 import { UiSettingsProvider } from "./context/UiSettingsContext";
+import { UiModeProvider } from "./context/UiModeContext";
 import TimeMachineBar from "./components/TimeMachineBar";
 import RegisterSw from "./components/RegisterSw";
 import ScrollReveal from "./components/ScrollReveal";
@@ -21,7 +22,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: "#f5efe0",
+  themeColor: "#FCFCF9",
 };
 
 export const metadata: Metadata = {
@@ -42,42 +43,43 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,wght@0,6..72,200..800;1,6..72,200..800&family=Playfair+Display:wght@400..900;1,400..900&family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Inter:wght@300;400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
       <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem("theme")||"light";document.documentElement.classList.toggle("dark",t==="dark")}catch(e){}})()` }} />
       </head>
-      <body className="antialiased" style={{ margin: 0 }}>
+      <body className="antialiased bg-[#FCFCF9] text-[#18181B]" style={{ margin: 0 }}>
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-white focus:rounded-lg focus:text-sm focus:shadow-lg" style={{ color: "var(--ink)", zIndex: "var(--z-skip-link)" }}>
           Skip to main content
         </a>
-                <ErrorBoundary>
-            <QueryProvider>
-              <ThemeProvider>
-                <AuthProvider>
+        <ErrorBoundary>
+          <QueryProvider>
+            <ThemeProvider>
+              <AuthProvider>
                 <FloatingChatProvider>
-                    <ChatProvider>
-                      <TimeMachineProvider>
-                       <HeaderSearchProvider>
-                         <ArticleViewProvider>
-                           <UiSettingsProvider>
-                           <ToastProvider>
-                            <ScrollReveal />
-                            <RegisterSw />
-                            {/* ponytail: fixed overlay — one instance covers retro + island nav shells. */}
-                            <TimeMachineBar />
-                            <AppShell>{children}</AppShell>
-                           </ToastProvider>
-                           </UiSettingsProvider>
-                         </ArticleViewProvider>
-                       </HeaderSearchProvider>
-                      </TimeMachineProvider>
-                    </ChatProvider>
+                  <ChatProvider>
+                    <TimeMachineProvider>
+                      <HeaderSearchProvider>
+                        <ArticleViewProvider>
+                          <UiSettingsProvider>
+                            <UiModeProvider>
+                              <ToastProvider>
+                                <ScrollReveal />
+                                <RegisterSw />
+                                <TimeMachineBar />
+                                <AppShell>{children}</AppShell>
+                              </ToastProvider>
+                            </UiModeProvider>
+                          </UiSettingsProvider>
+                        </ArticleViewProvider>
+                      </HeaderSearchProvider>
+                    </TimeMachineProvider>
+                  </ChatProvider>
                 </FloatingChatProvider>
-                </AuthProvider>
-              </ThemeProvider>
-            </QueryProvider>
-          </ErrorBoundary>
+              </AuthProvider>
+            </ThemeProvider>
+          </QueryProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

@@ -2,43 +2,21 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import TopNavigationBar from "./components/navigation/TopNavigationBar";
+import DockedSidebar from "./components/navigation/DockedSidebar";
 import FloatingChatWidget from "./components/FloatingChatWidget";
-import ExploreView from "./components/ExploreView";
-import PressView from "./components/PressView";
-import GraphView from "./components/GraphView";
-import ViewSwitcher from "./components/ViewSwitcher";
-import FloatIslandNav from "./components/FloatIslandNav";
-import LiveNowTicker from "./components/LiveNowTicker";
-import RetroShell from "./components/retro/RetroShell";
-import RetroPalette from "./components/retro/RetroPalette";
-import UiSettingsDrawer from "./components/retro/UiSettingsDrawer";
-import MobileTabBar from "./components/MobileTabBar";
-import "./components/retro/retro98.css";
 import { useFloatingChat } from "./FloatingChatContext";
-import { useArticleView } from "./ArticleViewContext";
 import { useAuth } from "./hooks/useAuth";
 
-const IS_MOCK = process.env.NEXT_PUBLIC_MOCK === "true";
-// ponytail: retro is the platform default — escape with NEXT_PUBLIC_RETRO=false.
-const IS_RETRO = process.env.NEXT_PUBLIC_RETRO !== "false";
-// Article + map slugs + claim-graph + chat draw their own RetroWindow; everything else uses the generic shell.
-const isSelfWrapped = (p: string) => p === "/claim-graph" || p.startsWith("/chat/") || p === "/chat" || (/^\/article\/[^/]+$/.test(p) && p !== "/article/new") || /^\/maps\/[^/]+$/.test(p);
-
 const HIDDEN_ROUTES = ["/login", "/onboarding"];
-const OVERLAY_ROUTES: string[] = [];
 const CHAT_ROUTES = ["/chat/"];
-
-const PROTECTED_ROUTES = ["/chat", "/admin", "/settings", "/onboarding", "/article/new", "/queue"];
+const PROTECTED_ROUTES = ["/admin", "/settings", "/onboarding", "/article/new", "/queue"];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { isOpen, toggle, close, isExpanded } = useFloatingChat();
-  const { user, logout, loading: authLoading, cookieOk } = useAuth();
-  const { article, mode } = useArticleView();
-  const [cookieWarnDismissed, setCookieWarnDismissed] = useState(() => {
-    try { return localStorage.getItem("truthseekers_cookie_warn") === "1"; } catch { return false; }
-  });
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
     if (authLoading) return;
@@ -48,21 +26,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
     }
   }, [authLoading, user, pathname, router]);
 
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 1024);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
-
   const isHidden = HIDDEN_ROUTES.some((r) => pathname.startsWith(r));
-  const isOverlayRoute = OVERLAY_ROUTES.some((r) => pathname.startsWith(r));
   const isChatRoute = CHAT_ROUTES.some((r) => pathname.startsWith(r));
   const showChat = isOpen && !isChatRoute && !isHidden;
-  const isOverlay = isMobile || isOverlayRoute;
 
+  // Keyboard shortcut Cmd+/ to toggle assistant chat
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "/") {
@@ -74,150 +42,58 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", handler);
   }, [toggle]);
 
-  // ponytail: global retro — every route gets TruthSeekers chrome; article/claim-graph draw their own.
-  if (IS_RETRO && !isSelfWrapped(pathname)) {
-    return (
-      <div className="retro98 pb-12 md:pb-0">
-        <RetroShell>{children}</RetroShell>
-        <RetroPalette />
-        <UiSettingsDrawer />
-        <MobileTabBar />
-        {showChat && (
-          <div className="fixed inset-0 z-50 flex flex-col justify-end pointer-events-none">
-            <div className="absolute inset-0 bg-black/30 pointer-events-auto" onClick={close} />
-            <div className="relative pointer-events-auto bg-[#efe9d5] border-[3px] max-h-[85dvh] overflow-hidden" style={{ borderStyle: "outset", borderColor: "#fff8e0 #8a7f68 #8a7f68 #fff8e0", paddingBottom: "max(0px, env(safe-area-inset-bottom))" }}>
-              <FloatingChatWidget />
-            </div>
-          </div>
-        )}
-        <ExploreView />
-        <PressView />
-        <GraphView />
-      </div>
-    );
+  if (isHidden) {
+    return <div className="min-h-screen bg-[#FCFCF9] text-[#18181B]">{children}</div>;
   }
 
   return (
-    <div className="h-dvh overflow-hidden flex flex-col pb-12 md:pb-0">
-      {/* B1: third-party-cookie warning — session lives on this tab only */}
-      {user && cookieOk === false && !cookieWarnDismissed && (
-        <div className="flex items-center justify-center gap-3 px-4 py-1.5 text-xs" style={{ background: "var(--gold-bg)", color: "var(--gold)" }}>
-          <span>Your browser is blocking third-party cookies — you&apos;ll stay logged in on this tab, but a reload will sign you out.</span>
-          <button
-            onClick={() => { try { localStorage.setItem("truthseekers_cookie_warn", "1"); } catch {} setCookieWarnDismissed(true); }}
-            className="font-medium hover:underline cursor-pointer"
-            style={{ background: "none", border: "none", padding: 0, color: "inherit" }}
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-      {!IS_RETRO && !isOverlayRoute && !isHidden && <FloatIslandNav />}
-      {!IS_RETRO && !isOverlayRoute && !isHidden && <LiveNowTicker />}
-      <div className="flex-1 flex min-h-0 min-w-0 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-[#FCFCF9] text-[#18181B] selection:bg-zinc-900 selection:text-white font-sans antialiased">
+      {/* Sticky Top Navigation */}
+      <TopNavigationBar />
+
+      {/* Main App Workspace */}
+      <div className="flex-1 flex w-full relative">
+        {/* Collapsible Fixed Docked Sidebar */}
+        <DockedSidebar />
+
+        {/* Dynamic Center Reading Canvas */}
         <main
-          className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col"
           id="main-content"
-          style={{ 
-            containerType: "inline-size", 
-            containerName: "page",
-          }}
+          className="flex-1 min-w-0 min-h-[calc(100vh-3.5rem)] flex flex-col"
         >
           {children}
         </main>
 
-        {showChat && !isOverlay && (
+        {/* Floating Chat Assistant Drawer (on-demand) */}
+        {showChat && (
           <>
-            <div className="fixed inset-0 bg-black/20 lg:hidden" onClick={close} style={{ zIndex: "var(--z-chat-backdrop)" }} />
-            <aside className="fixed right-0 top-0 bottom-0 w-[400px] overflow-hidden border-l border-border bg-surface shadow-elev-3 animate-slide-in-right" style={{ zIndex: "var(--z-chat-panel)" }}>
-              <FloatingChatWidget />
+            <div
+              className="fixed inset-0 bg-black/20 z-40 backdrop-blur-xs"
+              onClick={close}
+            />
+            <aside
+              className="fixed right-0 top-0 bottom-0 w-full sm:w-[420px] bg-white border-l border-zinc-200 z-50 shadow-2xl flex flex-col animate-slide-in-right"
+              aria-label="Veritas Assistant Drawer"
+            >
+              <div className="h-14 px-4 border-b border-zinc-200 flex items-center justify-between bg-[#FCFCF9]">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="font-bold text-sm text-zinc-900">Veritas Co-Manager</span>
+                </div>
+                <button
+                  onClick={close}
+                  className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <FloatingChatWidget />
+              </div>
             </aside>
           </>
         )}
       </div>
-
-      {/* Mobile/Overlay: bottom-sheet backdrop + panel */}
-      {showChat && isOverlay && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end pointer-events-none">
-          <div className="absolute inset-0 bg-black/30 pointer-events-auto animate-appear-blur" onClick={close} />
-          <div className="relative pointer-events-auto rounded-t-3xl shadow-elev-3 max-h-[85vh] overflow-hidden bg-surface border border-border chat-shell chat-message-enter">
-            <div className="flex justify-center pt-3 pb-2">
-              <div className="w-12 h-1.5 rounded-full bg-subtle/50" />
-            </div>
-            <FloatingChatWidget />
-          </div>
-        </div>
-      )}
-
-      {/* Expanded full-screen overlay */}
-      {isExpanded && (
-        <div className="fixed inset-0 flex flex-col items-center bg-surface glass-lg animate-appear-blur" style={{ zIndex: "var(--z-overlay)" }}>
-          <div className="w-full max-w-4xl h-full flex flex-col chat-message-enter chat-shell my-4">
-            <FloatingChatWidget />
-          </div>
-        </div>
-      )}
-
-      {/* Mobile Tab Bar on smartphone viewports */}
-      <MobileTabBar />
-
-      {/* Explore overlay */}
-      <ExploreView />
-
-      {/* ponytail: palette everywhere in retro — including self-wrapped article/graph/chat. */}
-      {IS_RETRO && <RetroPalette />}
-
-      {/* UI Scaffolding & Component Remodeling Drawer */}
-      <UiSettingsDrawer />
-
-      {/* Press overlay */}
-      <PressView />
-
-      {/* Graph overlay */}
-      <GraphView />
-
-      {/* Floating ViewSwitcher for stream mode — clear mobile nav */}
-      {article && mode === "stream" && (
-        <div className="fixed md:bottom-6 bottom-20 left-1/2 -translate-x-1/2 shadow-elev-2 rounded-full p-0.5 bg-surface-elevated border border-rule animate-appear-up" style={{ zIndex: "var(--z-view-switcher)" }}>
-          <ViewSwitcher />
-        </div>
-      )}
-
-      {/* Floating toggle button — desktop only (mobile uses bottom tab bar) */}
-      {!isOpen && !isHidden && !isChatRoute && (
-        <button
-          onClick={toggle}
-          className="hidden lg:flex fixed bottom-6 right-6 fab-chat" style={{ zIndex: "var(--z-chat-toggle)" }}
-          aria-label="Open chat"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-        </button>
-      )}
-
-      {/* Mock mode controls */}
-      {IS_MOCK && user && (
-        <div className="fixed bottom-2 left-2 z-50 flex items-center gap-2 px-2.5 py-1 rounded-full text-[10px] border"
-          style={{ background: "var(--surface-elevated)", borderColor: "var(--border)" }}>
-          <span className="w-1.5 h-1.5 rounded-full bg-forest" />
-          <span style={{ color: "var(--muted)" }}>Mock: {user.name}</span>
-          <button
-            onClick={() => router.push("/settings")}
-            className="font-medium hover:underline cursor-pointer"
-            style={{ color: "var(--gold)", background: "none", border: "none", padding: 0 }}
-          >
-            Settings
-          </button>
-          <button
-            onClick={() => { logout(); router.push("/login"); }}
-            className="font-medium hover:underline cursor-pointer"
-            style={{ color: "var(--gold)", background: "none", border: "none", padding: 0 }}
-          >
-            Logout
-          </button>
-        </div>
-      )}
     </div>
   );
 }

@@ -4,13 +4,9 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMap } from "../../hooks";
-import PageLayout from "../../components/PageLayout";
 import MarkdownRenderer from "../../components/MarkdownRenderer";
-import InteractiveTimeline from "../../components/InteractiveTimeline";
-import RetroWindow from "../../components/retro/RetroWindow";
-import RetroMarkdown from "../../components/retro/RetroMarkdown";
-import { IS_RETRO } from "@/lib/retro";
 import type { MapEntry } from "@encarta/core";
+import { useUiMode } from "../../context/UiModeContext";
 
 const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: false });
 
@@ -23,202 +19,125 @@ export default function MapClient({ slug, map: initialMap }: MapClientProps) {
   const router = useRouter();
   const { data: fetched } = useMap(slug);
   const map: MapEntry | null = initialMap ?? fetched ?? null;
+  const { widthMode } = useUiMode();
 
   if (!map) {
-    const body = (
-      <div className="px-6 py-12 sm:py-16 flex items-center justify-center">
-        <div className="max-w-lg mx-auto text-center">
-          <h1 className="font-display font-bold mb-3 capitalize" style={{ fontSize: "clamp(1.25rem, 2vw, 1.5rem)", color: "var(--ink)" }}>
-            {slug.replace(/-/g, " ")}
-          </h1>
-          <p className="text-sm mb-2" style={{ color: "var(--subtle)" }}>Map not found</p>
-          <p className="text-sm leading-relaxed mb-8 max-w-sm mx-auto" style={{ color: "var(--muted)" }}>
-            This atlas entry does not exist yet.
-          </p>
-          <Link href="/maps" className="btn btn-primary btn-lg no-underline">
-            Back to atlas
-          </Link>
+    return (
+      <div className="py-20 px-6 max-w-md mx-auto text-center space-y-4">
+        <div className="w-12 h-12 rounded-full bg-zinc-100 text-zinc-600 flex items-center justify-center mx-auto text-xl font-bold">
+          🗺
         </div>
+        <h1 className="text-xl font-bold text-zinc-900 capitalize">
+          {slug.replace(/-/g, " ")}
+        </h1>
+        <p className="text-xs text-zinc-500">
+          This atlas entry does not exist yet in the cartography records.
+        </p>
+        <Link
+          href="/maps"
+          className="inline-block px-4 py-2 rounded-xl bg-zinc-900 text-white font-semibold text-xs hover:bg-zinc-800 transition-colors no-underline"
+        >
+          Back to Atlas
+        </Link>
       </div>
     );
-    // ponytail: maps draw their own RetroWindow like articles — same data, retro chrome.
-    if (IS_RETRO) {
-      return (
-        <RetroWindow title={`TruthSeekers — ${slug}`} path={`/maps/${slug}`} crumb={slug} status={`TruthSeekers • ${slug}`}>
-          {body}
-        </RetroWindow>
-      );
-    }
-    return <PageLayout maxWidthClass="max-w-3xl">{body}</PageLayout>;
   }
 
-  // ponytail: single geoJson becomes one layer — MapViewer only speaks layers.
   const layers = map.layers ?? (map.geoJson ? [{ id: "main", label: map.title, geoJson: map.geoJson, visible: true }] : []);
   const markers = map.markers ?? [];
   const hasMap = markers.length > 0 || layers.length > 0 || map.centerLat != null;
   const title = map.title || slug.replace(/-/g, " ");
   const deck = map.subtitle || map.description;
 
-  if (IS_RETRO) {
-    return (
-      <RetroWindow title={`TruthSeekers — ${title}`} path={`/maps/${slug}`} crumb={title} status={`TruthSeekers • ${slug}`}>
-        <div className="p-3 sm:p-4">
-          <div className="text-[11px] font-bold text-[var(--r-muted)] uppercase tracking-wider">
-            Atlas{map.region ? ` • ${map.region}` : ""}{map.era ? ` • ${map.era}` : ""}
-          </div>
-          <h1 className="r-h1 text-[24px] sm:text-[30px] mt-1">{title}</h1>
-          {deck && <p className="text-[13px] text-[var(--r-ink-secondary)] mt-1 leading-relaxed">{deck}</p>}
-          {map.type === "interactive" && (
-            <span className="inline-block mt-2 text-[9px] px-1.5 py-0.5 bg-[var(--r-header-accent)] text-black font-bold rounded-sm border border-black/30">
-              INTERACTIVE
-            </span>
-          )}
-          {hasMap && (
-            <div className="mt-3 border border-[var(--r-border)] rounded-[var(--r-radius)] overflow-hidden" style={{ height: "clamp(280px, 55vh, 480px)" }}>
-              <MapViewer
-                markers={markers}
-                layers={layers}
-                centerLat={map.centerLat}
-                centerLng={map.centerLng}
-                zoom={map.zoom}
-                height="100%"
-              />
-            </div>
-          )}
-          {map.content && (
-            <div className="mt-3 bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-4">
-              <RetroMarkdown content={map.content} />
-            </div>
-          )}
-          {markers.length > 0 && (
-            <div className="mt-3 bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-3">
-              <div className="text-[11px] font-bold text-[var(--r-muted)] uppercase tracking-wider mb-2">Markers ({markers.length})</div>
-              <ul className="space-y-1.5">
-                {markers.map((m, i) => (
-                  <li key={i} className="text-[12px] text-[var(--r-ink)]">
-                    <span className="font-bold">{m.title}</span>
-                    {m.description && <span className="text-[var(--r-muted)]"> — {m.description}</span>}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {(map.timeline?.length ?? 0) > 0 && (
-            <div className="mt-3 bg-[var(--r-surface-elevated)] border border-[var(--r-border)] rounded-[var(--r-radius)] p-3">
-              <div className="text-[11px] font-bold text-[var(--r-muted)] uppercase tracking-wider mb-2">Timeline</div>
-              <ol className="space-y-1.5">
-                {map.timeline!.map((t, i) => (
-                  <li key={t.id ?? i} className="text-[12px] text-[var(--r-ink)]">
-                    <span className="font-bold tabular-nums">{t.year}</span> — {t.event}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-          <div className="mt-3 flex items-center gap-3 text-[11px] text-[var(--r-muted)]">
-            <Link href="/maps" className="hover:underline">← Back to atlas</Link>
-            {map.externalUrl && <a href={map.externalUrl} target="_blank" rel="noreferrer" className="hover:underline">External source ↗</a>}
-          </div>
-        </div>
-      </RetroWindow>
-    );
-  }
+  const containerClass = widthMode === "expanded" ? "max-w-6xl" : "max-w-4xl";
 
   return (
-    <PageLayout maxWidthClass="max-w-[88rem]">
-      <div className="w-full">
-        <article className="px-4 sm:px-6 lg:px-10 pt-3 sm:pt-4 pb-6 sm:pb-8 w-full animate-appear-up">
+    <div className="py-10 px-6 sm:px-12 w-full transition-all duration-300">
+      <div className={`${containerClass} mx-auto space-y-8 transition-all duration-300`}>
+        {/* Header */}
+        <div className="border-b border-zinc-200 pb-6 space-y-2">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 font-semibold text-[11px] uppercase tracking-wider border border-blue-200">
+              Spatial Cartography {map.region ? `• ${map.region}` : ""} {map.era ? `• ${map.era}` : ""}
+            </span>
+            <span className="text-zinc-300">•</span>
+            <span className="text-zinc-500 text-xs">Deep-Zoom Historical Atlas</span>
+          </div>
 
+          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-zinc-900 leading-[1.1]">
+            {title}
+          </h1>
 
-          {/* Masthead — natural-history plate: folio row, Didone headline,
-              italic deck, double rule. */}
-          <header className="plate-head">
-            <div className="plate-folio">
-              <span>/ maps{map.region ? ` / ${map.region}` : ""}</span>
-              {map.era && <span>/ {map.era}</span>}
-              {map.updatedAt && (
-                <span>/ {new Date(map.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-              )}
+          {deck && (
+            <p className="font-serif text-lg sm:text-xl text-zinc-700 italic leading-relaxed pt-1">
+              {deck}
+            </p>
+          )}
+        </div>
+
+        {/* Map Viewport */}
+        {hasMap && (
+          <div className="rounded-2xl border border-zinc-200 overflow-hidden shadow-xs bg-zinc-900 h-[480px] sm:h-[560px]">
+            <MapViewer
+              markers={markers}
+              layers={layers}
+              centerLat={map.centerLat}
+              centerLng={map.centerLng}
+              zoom={map.zoom}
+              height="100%"
+            />
+          </div>
+        )}
+
+        {/* Narrative & Markers */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {map.content && (
+            <div className="md:col-span-2 p-6 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-4">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                Cartographic History & Context
+              </h2>
+              <div className="font-serif text-zinc-800 leading-relaxed text-base">
+                <MarkdownRenderer content={map.content} />
+              </div>
             </div>
-            <h1 className="plate-title">
-              {title}
-            </h1>
+          )}
 
-            {deck && (
-              <p className="plate-deck">
-                {deck}
-              </p>
+          {/* Key Geographic Markers & Timeline */}
+          <div className="space-y-6">
+            {markers.length > 0 && (
+              <div className="p-5 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  Key Hotspot Markers ({markers.length})
+                </h3>
+                <ul className="space-y-2 text-xs">
+                  {markers.map((m, i) => (
+                    <li key={i} className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-100 space-y-0.5">
+                      <div className="font-bold text-zinc-900">{m.title}</div>
+                      {m.description && <div className="text-zinc-500 text-[11px]">{m.description}</div>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
-            <div className="plate-rule" aria-hidden="true" />
-
-            <div className="plate-controls">
-              {map.type === "interactive" ? (
-                <span className="plate-byline">◈ Interactive map</span>
-              ) : (
-                <span className="plate-byline">▤ Static plate</span>
-              )}
-              {map.externalUrl && (
-                <>
-                  <span className="plate-sep" aria-hidden="true">·</span>
-                  <a href={map.externalUrl} target="_blank" rel="noreferrer" className="plate-byline hover:underline">
-                    External source ↗
-                  </a>
-                </>
-              )}
-            </div>
-          </header>
-
-          {/* Hero map */}
-          {hasMap ? (
-            <div className="plate p-3 mb-4 overflow-hidden" style={{ height: "clamp(280px, 55vh, 480px)" }}>
-              <MapViewer
-                markers={markers}
-                layers={layers}
-                centerLat={map.centerLat}
-                centerLng={map.centerLng}
-                zoom={map.zoom}
-                height="100%"
-              />
-            </div>
-          ) : map.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={map.image} alt={title} className="plate mb-4 max-w-full" />
-          ) : null}
-
-          {/* Body — folio grid: text column plus margin rail */}
-          <div className="folio-grid">
-            <div className="stagger-children">
-              {map.content && (
-                <div style={{ fontSize: "0.9375rem", lineHeight: 1.75, color: "var(--ink)" }}>
-                  <MarkdownRenderer content={map.content} />
-                </div>
-              )}
-              {(map.timeline?.length ?? 0) > 0 && (
-                <div className="plate p-3 mb-4 overflow-hidden">
-                  <InteractiveTimeline events={map.timeline!.map((e) => ({ ...e, year: typeof e.year === "string" ? parseInt(e.year, 10) || 0 : e.year }))} />
-                </div>
-              )}
-            </div>
-            {/* Margin rail */}
-            <aside className="folio-rail" aria-label="Map markers">
-              {markers.length > 0 && (
-                <div className="plate p-4">
-                  <div className="dateline mb-2">Markers · {markers.length}</div>
-                  <ul className="space-y-2">
-                    {markers.map((m, i) => (
-                      <li key={i} className="text-sm leading-snug" style={{ color: "var(--ink-secondary)" }}>
-                        <span className="font-semibold" style={{ color: "var(--ink)" }}>{m.title}</span>
-                        {m.description && <span> — {m.description}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </aside>
+            {(map.timeline?.length ?? 0) > 0 && (
+              <div className="p-5 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  Chronological Era
+                </h3>
+                <ol className="space-y-2 text-xs">
+                  {map.timeline!.map((t, i) => (
+                    <li key={t.id ?? i} className="flex gap-2">
+                      <span className="font-mono font-bold text-zinc-900">{t.year}</span>
+                      <span className="text-zinc-600">{t.event}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
           </div>
-        </article>
+        </div>
       </div>
-    </PageLayout>
+    </div>
   );
 }
