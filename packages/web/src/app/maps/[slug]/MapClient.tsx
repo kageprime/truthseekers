@@ -24,20 +24,18 @@ export default function MapClient({ slug, map: initialMap }: MapClientProps) {
   if (!map) {
     return (
       <div className="py-20 px-6 max-w-md mx-auto text-center space-y-4">
-        <div className="w-12 h-12 rounded-full bg-zinc-100 text-zinc-600 flex items-center justify-center mx-auto text-xl font-bold">
-          🗺
-        </div>
-        <h1 className="text-xl font-bold text-zinc-900 capitalize">
+        <div className="font-display text-4xl text-gold">❦</div>
+        <h1 className="font-display text-2xl font-bold text-ink capitalize">
           {slug.replace(/-/g, " ")}
         </h1>
-        <p className="text-xs text-zinc-500">
+        <p className="font-serif italic text-muted">
           This atlas entry does not exist yet in the cartography records.
         </p>
         <Link
           href="/maps"
-          className="inline-block px-4 py-2 rounded-xl bg-zinc-900 text-white font-semibold text-xs hover:bg-zinc-800 transition-colors no-underline"
+          className="category-link no-underline text-sm font-semibold"
         >
-          Back to Atlas
+          Back to atlas →
         </Link>
       </div>
     );
@@ -52,32 +50,21 @@ export default function MapClient({ slug, map: initialMap }: MapClientProps) {
   const containerClass = widthMode === "expanded" ? "max-w-6xl" : "max-w-4xl";
 
   return (
-    <div className="py-10 px-6 sm:px-12 w-full transition-all duration-300">
-      <div className={`${containerClass} mx-auto space-y-8 transition-all duration-300`}>
-        {/* Header */}
-        <div className="border-b border-zinc-200 pb-6 space-y-2">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 font-semibold text-[11px] uppercase tracking-wider border border-blue-200">
-              Spatial Cartography {map.region ? `• ${map.region}` : ""} {map.era ? `• ${map.era}` : ""}
-            </span>
-            <span className="text-zinc-300">•</span>
-            <span className="text-zinc-500 text-xs">Deep-Zoom Historical Atlas</span>
+    <div className="py-10 px-6 sm:px-10 w-full">
+      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+        <div className="plate-head">
+          <div className="plate-folio">
+            <span>Spatial cartography{map.region ? ` · ${map.region}` : ""}{map.era ? ` · ${map.era}` : ""}</span>
+            <span>Historical atlas</span>
           </div>
-
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-zinc-900 leading-[1.1]">
-            {title}
-          </h1>
-
-          {deck && (
-            <p className="font-serif text-lg sm:text-xl text-zinc-700 italic leading-relaxed pt-1">
-              {deck}
-            </p>
-          )}
+          <h1 className="plate-title">{title}</h1>
+          {deck && <p className="plate-deck">{deck}</p>}
+          <div className="plate-rule" />
         </div>
 
         {/* Map Viewport */}
         {hasMap && (
-          <div className="rounded-2xl border border-zinc-200 overflow-hidden shadow-xs bg-zinc-900 h-[480px] sm:h-[560px]">
+          <div className="border border-rule rounded-sharp overflow-hidden bg-ink h-[480px] sm:h-[560px]">
             <MapViewer
               markers={markers}
               layers={layers}
@@ -90,13 +77,13 @@ export default function MapClient({ slug, map: initialMap }: MapClientProps) {
         )}
 
         {/* Narrative & Markers */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-8">
           {map.content && (
-            <div className="md:col-span-2 p-6 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-4">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                Cartographic History & Context
+            <div className="md:col-span-2 space-y-4">
+              <h2 className="font-display text-2xl font-bold text-ink">
+                History & context
               </h2>
-              <div className="font-serif text-zinc-800 leading-relaxed text-base">
+              <div className="t-body text-ink-secondary">
                 <MarkdownRenderer content={map.content} />
               </div>
             </div>
@@ -105,15 +92,18 @@ export default function MapClient({ slug, map: initialMap }: MapClientProps) {
           {/* Key Geographic Markers & Timeline */}
           <div className="space-y-6">
             {markers.length > 0 && (
-              <div className="p-5 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                  Key Hotspot Markers ({markers.length})
+              <div className="space-y-3">
+                <h3 className="text-[11px] font-mono uppercase tracking-[0.18em] text-subtle">
+                  Hotspots ({markers.length})
                 </h3>
-                <ul className="space-y-2 text-xs">
+                <ul className="ledger">
                   {markers.map((m, i) => (
-                    <li key={i} className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-100 space-y-0.5">
-                      <div className="font-bold text-zinc-900">{m.title}</div>
-                      {m.description && <div className="text-zinc-500 text-[11px]">{m.description}</div>}
+                    <li key={i} className="ledger-row">
+                      <span className="index-numeral">{String(i + 1).padStart(2, "0")}</span>
+                      <span className="min-w-0">
+                        <span className="block font-semibold text-ink text-sm">{m.title}</span>
+                        {m.description && <span className="block text-muted text-xs mt-0.5">{m.description}</span>}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -121,15 +111,15 @@ export default function MapClient({ slug, map: initialMap }: MapClientProps) {
             )}
 
             {(map.timeline?.length ?? 0) > 0 && (
-              <div className="p-5 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                  Chronological Era
+              <div className="space-y-3">
+                <h3 className="text-[11px] font-mono uppercase tracking-[0.18em] text-subtle">
+                  Chronology
                 </h3>
-                <ol className="space-y-2 text-xs">
+                <ol className="ledger">
                   {map.timeline!.map((t, i) => (
-                    <li key={t.id ?? i} className="flex gap-2">
-                      <span className="font-mono font-bold text-zinc-900">{t.year}</span>
-                      <span className="text-zinc-600">{t.event}</span>
+                    <li key={t.id ?? i} className="ledger-row">
+                      <span className="index-numeral">{t.year}</span>
+                      <span className="text-sm text-ink-secondary">{t.event}</span>
                     </li>
                   ))}
                 </ol>

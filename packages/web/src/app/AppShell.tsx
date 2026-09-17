@@ -43,11 +43,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }, [toggle]);
 
   if (isHidden) {
-    return <div className="min-h-screen bg-[#FCFCF9] text-[#18181B]">{children}</div>;
+    return <div className="min-h-screen bg-surface text-ink">{children}</div>;
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FCFCF9] text-[#18181B] selection:bg-zinc-900 selection:text-white font-sans antialiased">
+    <div className="min-h-screen flex flex-col bg-surface text-ink selection:bg-gold-bg selection:text-ink font-sans antialiased">
       {/* Sticky Top Navigation */}
       <TopNavigationBar />
 
@@ -71,18 +71,18 @@ export default function AppShell({ children }: { children: ReactNode }) {
               className="fixed inset-0 bg-black/20 z-40 backdrop-blur-xs"
               onClick={close}
             />
-            <aside
-              className="fixed right-0 top-0 bottom-0 w-full sm:w-[420px] bg-white border-l border-zinc-200 z-50 shadow-2xl flex flex-col animate-slide-in-right"
+              <aside
+              className="fixed right-0 top-0 bottom-0 w-full sm:w-[420px] bg-surface-elevated border-l border-rule z-50 shadow-elev-3 flex flex-col animate-slide-in-right"
               aria-label="Veritas Assistant Drawer"
             >
-              <div className="h-14 px-4 border-b border-zinc-200 flex items-center justify-between bg-[#FCFCF9]">
+              <div className="h-14 px-4 border-b border-rule flex items-center justify-between bg-surface">
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="font-bold text-sm text-zinc-900">Veritas Co-Manager</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-forest animate-pulse" />
+                  <span className="font-bold text-sm text-ink">Veritas Co-Manager</span>
                 </div>
                 <button
                   onClick={close}
-                  className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
+                  className="p-1 rounded-md text-muted hover:text-ink hover:bg-ink/5"
                 >
                   ✕
                 </button>

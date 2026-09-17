@@ -118,54 +118,47 @@ export default function ArticlesPage() {
   const containerClass = widthMode === "expanded" ? "max-w-6xl" : "max-w-4xl";
 
   return (
-    <div className="py-10 px-6 sm:px-12 w-full transition-all duration-300">
-      <div className={`${containerClass} mx-auto space-y-8 transition-all duration-300`}>
-        {/* Header */}
-        <div className="border-b border-zinc-200 pb-6 space-y-2">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-800 font-semibold text-[11px] uppercase tracking-wider border border-zinc-200">
-              Corpus Index
-            </span>
-            <span className="text-zinc-300">•</span>
-            <span className="text-zinc-500 text-xs">
-              {total} Verified Empirical Articles
-            </span>
+    <div className="py-10 px-6 sm:px-10 w-full">
+      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+        <div className="plate-head">
+          <div className="plate-folio">
+            <span>Corpus index</span>
+            <span>{total} entries</span>
           </div>
-
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-zinc-900">
-            Article Directory
-          </h1>
-
-          <p className="font-serif text-base sm:text-lg text-zinc-600 italic leading-relaxed">
-            Search, filter, and inspect peer-verified epistemic encyclopedic entries.
+          <h1 className="plate-title">Articles</h1>
+          <p className="plate-deck">
+            Peer-verified epistemic entries. Search, inspect, synthesize.
           </p>
+          <div className="plate-rule" />
         </div>
 
         {/* Search & Actions Bar */}
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 py-4">
+          <div className="flex items-center gap-3 flex-1 border-b-2 border-ink pb-2 focus-within:border-gold transition-colors">
+            <span className="text-subtle text-lg leading-none" aria-hidden>⌕</span>
             <input
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Filter by title, proposition, or category…"
-              className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all shadow-xs"
+              aria-label="Filter articles"
+              className="flex-1 bg-transparent border-none outline-none font-serif text-lg text-ink placeholder:text-subtle min-w-0"
             />
           </div>
 
           <Link
             href="/article/new"
-            className="w-full sm:w-auto px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 no-underline shrink-0"
+            className="category-link no-underline text-sm font-semibold shrink-0"
           >
-            <span>+ Synthesize New Article</span>
+            + Synthesize new article
           </Link>
         </div>
 
         {/* Active In-flight Generations */}
         {generatingList.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-blue-600">
-              In-Flight Autonomous Pipelines
+          <div className="space-y-3 py-4">
+            <h2 className="text-[11px] font-mono uppercase tracking-[0.18em] text-gold">
+              In-flight pipelines
             </h2>
             {generatingList.map((entry) => (
               <GeneratingCard
@@ -187,22 +180,22 @@ export default function ArticlesPage() {
         )}
 
         {/* Articles List */}
-        <div className="rounded-2xl border border-zinc-200 divide-y divide-zinc-100 overflow-hidden bg-white shadow-xs">
+        <div className="ledger">
           {listLoading || searchLoading ? (
-            <div className="py-12 text-center text-xs text-zinc-400">
+            <p className="font-serif italic text-muted py-12 text-center">
               Consulting the epistemic registry…
-            </div>
+            </p>
           ) : rawArticles.length === 0 ? (
             <div className="py-12 px-6 text-center space-y-3">
-              <p className="text-xs text-zinc-500">
+              <p className="font-serif italic text-muted">
                 No matching articles found for &ldquo;{debouncedQuery}&rdquo;.
               </p>
               {debouncedQuery && (
                 <button
                   onClick={() => handleCreateNew(debouncedQuery)}
-                  className="px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs font-semibold hover:bg-zinc-800 transition-colors cursor-pointer"
+                  className="px-4 py-2 bg-ink text-surface rounded-sharp text-xs font-semibold hover:bg-gold hover:text-ink transition-colors cursor-pointer"
                 >
-                  ⚡ Synthesize &ldquo;{debouncedQuery}&rdquo; now
+                  Synthesize &ldquo;{debouncedQuery}&rdquo; now
                 </button>
               )}
             </div>
@@ -211,31 +204,28 @@ export default function ArticlesPage() {
               <Link
                 key={article.slug || idx}
                 href={`/article/${article.slug}`}
-                className="p-5 flex items-center justify-between hover:bg-zinc-50/80 transition-colors no-underline group"
+                className="ledger-row group"
               >
-                <div className="flex items-start gap-4 min-w-0 pr-4">
-                  <span className="text-xs font-mono font-bold text-zinc-400 tabular-nums w-6 shrink-0 pt-0.5">
-                    {String(page * PAGE_SIZE + idx + 1).padStart(2, "0")}
+                <span className="index-numeral">
+                  {String(page * PAGE_SIZE + idx + 1).padStart(2, "0")}
+                </span>
+
+                <span className="flex-1 min-w-0">
+                  <span className="block font-display text-lg font-semibold text-ink group-hover:text-gold transition-colors truncate">
+                    {article.title || article.slug}
                   </span>
 
-                  <div className="space-y-1 min-w-0">
-                    <div className="text-sm font-semibold text-zinc-900 group-hover:text-blue-600 transition-colors truncate">
-                      {article.title || article.slug}
-                    </div>
+                  <span className="block text-[13px] text-muted truncate mt-0.5">
+                    {article.abstract || "Empirical knowledge base entry."}
+                  </span>
 
-                    <p className="text-xs text-zinc-500 line-clamp-1">
-                      {article.abstract || "Empirical knowledge base entry."}
-                    </p>
+                  <span className="block pt-0.5 text-[11px] font-mono uppercase tracking-[0.14em] text-subtle">
+                    {(article.categories?.[0] || "General")}
+                    {article.citations?.length ? `  ·  ${article.citations.length} sources` : ""}
+                  </span>
+                </span>
 
-                    <div className="flex items-center gap-2 pt-0.5 text-[11px] text-zinc-400">
-                      <span>{(article.categories?.[0] || "General").toUpperCase()}</span>
-                      <span>·</span>
-                      <span>{article.citations?.length || 20}+ Sources</span>
-                    </div>
-                  </div>
-                </div>
-
-                <span className="text-zinc-400 text-lg group-hover:text-zinc-700 transition-colors shrink-0">
+                <span className="text-subtle group-hover:text-gold transition-colors shrink-0" aria-hidden>
                   ›
                 </span>
               </Link>
@@ -245,24 +235,24 @@ export default function ArticlesPage() {
 
         {/* Pagination */}
         {totalPages > 1 && !isSearching && (
-          <div className="flex items-center justify-between text-xs text-zinc-600 pt-2">
-            <span>
+          <div className="flex items-center justify-between text-xs text-muted pt-6">
+            <span className="font-mono tabular-nums">
               Page {page + 1} of {totalPages}
             </span>
-            <div className="flex gap-2">
+            <div className="flex gap-4">
               <button
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 disabled:opacity-40 cursor-pointer"
+                className="category-link no-underline cursor-pointer disabled:opacity-40"
               >
-                Previous
+                ← Previous
               </button>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
-                className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 disabled:opacity-40 cursor-pointer"
+                className="category-link no-underline cursor-pointer disabled:opacity-40"
               >
-                Next
+                Next →
               </button>
             </div>
           </div>

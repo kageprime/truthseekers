@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useArticles, useFeaturedArticles, useHealth } from "./hooks";
-import DomainCard from "./components/portal/DomainCard";
 import { useUiMode } from "./context/UiModeContext";
 
 export default function HomePage() {
@@ -28,156 +27,134 @@ export default function HomePage() {
     }
   };
 
-  const containerClass = widthMode === "expanded" ? "max-w-6xl" : "max-w-4xl";
+  const containerClass = widthMode === "expanded" ? "max-w-5xl" : "max-w-3xl";
 
   return (
-    <div className="py-10 px-6 sm:px-12 w-full transition-all duration-300">
-      <div className={`${containerClass} mx-auto space-y-12 transition-all duration-300`}>
-        {/* Masthead Hero */}
-        <div className="text-center space-y-4 max-w-2xl mx-auto pt-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs font-medium border border-zinc-200">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Autonomous Epistemic Corpus{health?.article_count ? ` · ${health.article_count} Verified Entries` : ""}</span>
+    <div className="py-10 px-6 sm:px-10 w-full">
+      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+        {/* Masthead */}
+        <div className="plate-head">
+          <div className="plate-folio">
+            <span>The Living Encyclopedia</span>
+            <span>
+              {health?.article_count != null
+                ? `${health.article_count} verified entries`
+                : "Autonomous epistemic corpus"}
+            </span>
           </div>
-
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-zinc-900 leading-[1.1]">
-            The Living Encyclopedia
-          </h1>
-
-          <p className="font-serif text-lg sm:text-xl text-zinc-600 italic leading-relaxed">
-            Every claim sourced. Every proposition scrutinized. An autonomous AI agent-driven knowledge repository.
+          <h1 className="plate-title">Truthseekers</h1>
+          <p className="plate-deck">
+            Every claim sourced. Every proposition scrutinized. An autonomous
+            agent-driven knowledge repository.
           </p>
-
-          {/* Search Form */}
-          <form onSubmit={handleSearch} className="pt-2 max-w-xl mx-auto" role="search">
-            <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-zinc-200 shadow-sm focus-within:border-zinc-500 focus-within:ring-2 focus-within:ring-zinc-900/10 transition-all">
-              <span className="pl-3 text-zinc-400 text-base" aria-hidden>⌕</span>
+          <form onSubmit={handleSearch} role="search" className="mt-5">
+            <div className="flex items-center gap-3 border-b-2 border-ink pb-2 focus-within:border-gold transition-colors">
+              <span className="text-subtle text-lg leading-none" aria-hidden>⌕</span>
               <input
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search articles, claims, empirical topics…"
-                className="flex-1 bg-transparent border-none outline-none text-xs sm:text-sm text-zinc-900 placeholder:text-zinc-400 px-2 py-1.5 min-w-0"
+                aria-label="Search articles"
+                className="flex-1 bg-transparent border-none outline-none font-serif text-lg text-ink placeholder:text-subtle min-w-0"
               />
               <button
                 type="submit"
                 disabled={!query.trim()}
-                className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white font-semibold text-xs rounded-xl transition-colors cursor-pointer shrink-0 shadow-xs"
+                className="text-sm font-semibold text-ink underline decoration-gold decoration-2 underline-offset-4 hover:text-gold disabled:opacity-30 disabled:no-underline cursor-pointer shrink-0"
               >
                 Research →
               </button>
             </div>
           </form>
+          <div className="plate-rule" />
         </div>
 
-        {/* Curated Domain Portals */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                Featured Research Domains
-              </h2>
-              <p className="text-sm font-bold text-zinc-900 mt-0.5">Explore Verified Epistemic Spaces</p>
+        {/* Feature Essay */}
+        {feat && (
+          <section className="py-10">
+            <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-gold mb-3">
+              Editor&rsquo;s feature
             </div>
             <Link
-              href="/articles"
-              className="text-xs font-semibold text-zinc-900 hover:underline no-underline"
+              href={`/article/${(feat as any).slug}`}
+              className="font-display font-bold text-ink no-underline hover:text-gold transition-colors text-balance"
+              style={{ fontSize: "clamp(1.9rem, 1.2rem + 3vw, 3rem)", lineHeight: 1.05, letterSpacing: "-0.02em" }}
             >
-              View all articles →
+              {(feat as any).title}
             </Link>
-          </div>
-
-          {domains.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {domains.map((d: any) => (
-                <DomainCard
-                  key={d.slug}
-                  slug={d.slug}
-                  title={d.title || d.slug}
-                  category={(d.categories?.[0] || "Knowledge").toUpperCase()}
-                  abstract={d.abstract || "Autonomous empirical research entry."}
-                  sourcesCount={d.citations?.length ?? d.source_count}
-                  confidence={d.confidence}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500">
-              {latestLoading ? "Loading verified entries…" : "No verified entries yet — generate your first article to seed the corpus."}
-            </div>
-          )}
-        </section>
-
-        {/* Featured Editorial Spotlight */}
-        {feat && (
-          <section className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-xs">
-            <div className="bg-zinc-900 text-white px-5 py-2.5 flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-zinc-300">
-                Editor&apos;s Feature Choice
-              </span>
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
-                HIGH EVIDENCE CONSENSUS
-              </span>
-            </div>
-            <div className="p-6 sm:p-8 space-y-4">
-              <Link
-                href={`/article/${(feat as any).slug}`}
-                className="text-2xl sm:text-3xl font-bold text-zinc-900 hover:text-zinc-600 no-underline transition-colors block"
-              >
-                {(feat as any).title}
+            <p className="font-serif italic text-lg text-muted leading-relaxed mt-3 max-w-2xl line-clamp-3">
+              {(feat as any).abstract}
+            </p>
+            <div className="dateline mt-4">
+              {((feat as any).citations?.length ?? (feat as any).source_count) != null && (
+                <><span>{(feat as any).citations?.length ?? (feat as any).source_count} primary citations</span><span className="sep">·</span></>
+              )}
+              <Link href={`/article/${(feat as any).slug}`} className="category-link no-underline font-semibold">
+                Read the verified article →
               </Link>
-              <p className="font-serif text-base text-zinc-700 italic leading-relaxed line-clamp-3">
-                {(feat as any).abstract}
-              </p>
-              <div className="pt-3 border-t border-zinc-100 flex items-center justify-between">
-                <span className="text-xs text-zinc-500">
-                  {((feat as any).citations?.length ?? (feat as any).source_count) != null
-                    ? `${(feat as any).citations?.length ?? (feat as any).source_count} Primary Citations Verified`
-                    : "Verified Research Entry"}
-                </span>
-                <Link
-                  href={`/article/${(feat as any).slug}`}
-                  className="px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs font-semibold hover:bg-zinc-800 transition-colors no-underline"
-                >
-                  Read Verified Article →
-                </Link>
-              </div>
             </div>
           </section>
         )}
 
-        {/* Latest Articles Feed */}
-        {articles.length > 0 && (
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                Recently Synthesized Articles
-              </h2>
-              <span className="text-xs text-zinc-400 font-mono">Live Corpus</span>
-            </div>
-
-            <div className="rounded-2xl border border-zinc-200 divide-y divide-zinc-100 overflow-hidden bg-white shadow-xs">
-              {articles.map((a: any, idx: number) => (
-                <Link
-                  key={a.slug || idx}
-                  href={`/article/${a.slug}`}
-                  className="p-4 sm:p-5 flex items-center justify-between hover:bg-zinc-50/80 transition-colors no-underline group"
-                >
-                  <div className="space-y-1 min-w-0 pr-4">
-                    <div className="text-sm font-semibold text-zinc-900 group-hover:text-zinc-600 transition-colors truncate">
-                      {a.title || a.slug}
-                    </div>
-                    <div className="text-xs text-zinc-500 line-clamp-1">
-                      {a.abstract || "Autonomous empirical research entry."}
-                    </div>
-                  </div>
-                  <span className="text-zinc-400 text-lg group-hover:text-zinc-700 transition-colors shrink-0">
-                    ›
+        {/* Index */}
+        <section className="py-8">
+          <div className="flex items-baseline justify-between mb-4">
+            <h2 className="font-display text-2xl font-bold text-ink">Index of entries</h2>
+            <Link href="/articles" className="category-link no-underline text-sm font-medium">
+              View all →
+            </Link>
+          </div>
+          {domains.length > 0 ? (
+            <div className="ledger">
+              {domains.map((d: any, i: number) => (
+                <Link key={d.slug} href={`/article/${d.slug}`} className="ledger-row group">
+                  <span className="index-numeral">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block font-display text-lg font-semibold text-ink group-hover:text-gold transition-colors truncate">
+                      {d.title || d.slug}
+                    </span>
+                    <span className="block text-[13px] text-muted truncate mt-0.5">
+                      {(d.categories?.[0] || "Knowledge").toUpperCase()}
+                      {"  ·  "}
+                      {d.abstract || "Autonomous empirical research entry."}
+                    </span>
+                  </span>
+                  <span className="font-mono text-xs text-subtle tabular-nums shrink-0">
+                    {d.citations?.length ?? d.source_count ?? "—"}
                   </span>
                 </Link>
               ))}
             </div>
-          </section>
+          ) : (
+            <p className="font-serif italic text-muted">
+              {latestLoading ? "Loading verified entries…" : "No verified entries yet — generate your first article to seed the corpus."}
+            </p>
+          )}
+        </section>
+
+        {articles.length > 0 && (
+          <>
+            <div className="fleuron" aria-hidden>❦</div>
+            <section className="py-8">
+              <h2 className="font-display text-2xl font-bold text-ink mb-4">Recently synthesized</h2>
+              <div className="ledger">
+                {articles.map((a: any) => (
+                  <Link key={a.slug} href={`/article/${a.slug}`} className="ledger-row group">
+                    <span className="flex-1 min-w-0">
+                      <span className="block font-semibold text-[15px] text-ink group-hover:text-gold transition-colors truncate">
+                        {a.title || a.slug}
+                      </span>
+                      <span className="block text-[13px] text-muted truncate mt-0.5">
+                        {a.abstract || "Autonomous empirical research entry."}
+                      </span>
+                    </span>
+                    <span className="text-subtle group-hover:text-gold transition-colors shrink-0" aria-hidden>›</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          </>
         )}
       </div>
     </div>

@@ -31,51 +31,46 @@ export default function NewArticlePage() {
   const containerClass = widthMode === "expanded" ? "max-w-3xl" : "max-w-xl";
 
   return (
-    <div className="py-12 px-6 sm:px-12 w-full transition-all duration-300">
-      <div className={`${containerClass} mx-auto space-y-8 transition-all duration-300`}>
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-800 text-xs font-semibold border border-blue-200">
-            <span>⚡ Epistemic Pipeline</span>
+    <div className="py-12 px-6 sm:px-10 w-full">
+      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+        <div className="plate-head">
+          <div className="plate-folio">
+            <span>Epistemic pipeline</span>
+            {quota && <span className="tabular-nums">{quota.remaining} of {quota.limit} left</span>}
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-zinc-900">
-            Synthesize New Article
-          </h1>
-          <p className="font-serif text-base text-zinc-600 italic">
-            Autonomous multi-agent research: literature discovery, claim extraction, evidence mapping, and formal epistemic synthesis.
+          <h1 className="plate-title">New article</h1>
+          <p className="plate-deck">
+            Autonomous multi-agent research: literature discovery, claim
+            extraction, evidence mapping, formal synthesis.
           </p>
-          {quota && (
-            <p className="text-xs font-mono text-zinc-400">
-              {quota.remaining} of {quota.limit} generations available
-            </p>
-          )}
+          <div className="plate-rule" />
         </div>
 
         {atLimit ? (
-          <div className="p-8 rounded-2xl border border-red-200 bg-red-50/50 text-center space-y-4">
-            <h2 className="text-base font-bold text-red-900">Generation Limit Reached</h2>
-            <p className="text-xs text-red-700">
+          <div className="border border-oxblood rounded-sharp p-8 text-center space-y-4">
+            <h2 className="font-display text-xl font-bold text-oxblood">Generation limit reached</h2>
+            <p className="text-sm text-muted">
               Your {quota.tier} plan quota has been exhausted.
             </p>
             <Link
               href="/pricing"
-              className="inline-block px-4 py-2 bg-red-600 text-white font-semibold text-xs rounded-xl no-underline"
+              className="category-link no-underline text-sm font-semibold"
             >
-              Upgrade Plan
+              Upgrade plan →
             </Link>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="py-6 space-y-6">
             <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600">
-                Research Topic or Hypothesis
+              <label className="block text-[11px] font-mono uppercase tracking-[0.18em] text-subtle">
+                Research topic or hypothesis
               </label>
               <input
                 type="text"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                placeholder="e.g. quantum-computing or CRISPR-gene-drives"
-                className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 shadow-xs transition-all"
+                placeholder="e.g. transmon-qubit-coherence"
+                className="w-full bg-transparent border-b-2 border-ink pb-2 font-serif text-xl text-ink placeholder:text-subtle focus:outline-none focus:border-gold transition-colors"
                 autoFocus
                 required
               />
@@ -84,33 +79,34 @@ export default function NewArticlePage() {
             <button
               type="submit"
               disabled={!topic.trim() || !!status}
-              className="w-full py-3.5 px-4 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3.5 px-4 bg-ink hover:bg-gold hover:text-ink disabled:opacity-40 text-surface font-semibold text-sm rounded-sharp transition-colors cursor-pointer"
             >
-              <span>{status ? "Deploying Agents…" : "⚡ Synthesize Verified Article"}</span>
+              {status ? "Deploying agents…" : "Synthesize verified article"}
             </button>
           </form>
         )}
 
-        {/* Epistemic Tips Card */}
-        <div className="rounded-2xl border border-zinc-200 p-6 bg-white shadow-xs space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-            Synthesis Guidelines
+        <div className="fleuron" aria-hidden>❦</div>
+
+        <section className="py-4">
+          <h3 className="text-[11px] font-mono uppercase tracking-[0.18em] text-subtle mb-3">
+            Synthesis guidelines
           </h3>
-          <ul className="space-y-2 text-xs text-zinc-600">
-            <li className="flex items-start gap-2">
-              <span className="text-blue-600 font-bold">•</span>
-              <span><strong>Specificity</strong>: Prefer <code>transmon-qubit-coherence</code> over generic <code>physics</code>.</span>
+          <ul className="space-y-2.5 text-sm text-muted">
+            <li className="flex items-start gap-3">
+              <span className="text-gold font-bold">—</span>
+              <span><strong className="text-ink font-medium">Specificity</strong>: prefer <code className="font-mono text-[13px]">transmon-qubit-coherence</code> over generic <code className="font-mono text-[13px]">physics</code>.</span>
             </li>
-            <li className="flex items-start gap-2">
-              <span className="text-blue-600 font-bold">•</span>
-              <span><strong>Autonomous Citation</strong>: The DAG pipeline queries primary literature and cross-verifies arXiv/DOI citations.</span>
+            <li className="flex items-start gap-3">
+              <span className="text-gold font-bold">—</span>
+              <span><strong className="text-ink font-medium">Autonomous citation</strong>: the DAG pipeline queries primary literature and cross-verifies arXiv/DOI citations.</span>
             </li>
-            <li className="flex items-start gap-2">
-              <span className="text-blue-600 font-bold">•</span>
-              <span><strong>Contestation Scrutiny</strong>: Contested assertions trigger automatic counter-evidence analysis nodes.</span>
+            <li className="flex items-start gap-3">
+              <span className="text-gold font-bold">—</span>
+              <span><strong className="text-ink font-medium">Contestation scrutiny</strong>: contested assertions trigger automatic counter-evidence analysis nodes.</span>
             </li>
           </ul>
-        </div>
+        </section>
       </div>
     </div>
   );

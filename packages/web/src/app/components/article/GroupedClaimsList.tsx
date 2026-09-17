@@ -21,96 +21,60 @@ interface GroupedClaimsListProps {
 export default function GroupedClaimsList({
   claims,
   onSelectClaim,
-  title = "Empirical Propositions & Scrutiny",
-  subtitle = "Select a claim to view evidence and provenance",
+  title = "Empirical propositions",
+  subtitle = "Select a claim to inspect its evidence",
 }: GroupedClaimsListProps) {
   if (!claims || claims.length === 0) {
     return null;
   }
 
-  const getStatusBadge = (status?: string) => {
+  const statusOf = (status?: string) => {
     const s = (status || "verified").toLowerCase();
-    if (s === "contested") {
-      return {
-        badgeBg: "bg-amber-100 text-amber-900 border-amber-200",
-        avatarBg: "bg-amber-50 text-amber-700",
-        label: "Contested",
-      };
-    }
-    if (s === "debated" || s === "developing") {
-      return {
-        badgeBg: "bg-purple-100 text-purple-900 border-purple-200",
-        avatarBg: "bg-purple-50 text-purple-700",
-        label: "Developing",
-      };
-    }
-    return {
-      badgeBg: "bg-emerald-100 text-emerald-800 border-emerald-200",
-      avatarBg: "bg-blue-50 text-blue-600",
-      label: "Verified",
-    };
+    if (s === "contested") return { label: "Contested", className: "text-oxblood" };
+    if (s === "debated" || s === "developing") return { label: "Developing", className: "text-gold" };
+    return { label: "Verified", className: "text-forest" };
   };
 
   return (
-    <div className="space-y-3 my-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-          {title} ({claims.length})
+    <section className="my-10">
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 mb-4">
+        <h2 className="font-display text-2xl font-bold text-ink">
+          {title} <span className="font-mono text-sm font-normal text-subtle tabular-nums">({claims.length})</span>
         </h2>
-        {subtitle && <span className="text-xs text-zinc-400">{subtitle}</span>}
+        {subtitle && <span className="font-serif italic text-sm text-muted">{subtitle}</span>}
       </div>
 
-      <div className="rounded-2xl border border-zinc-200 divide-y divide-zinc-100 overflow-hidden bg-white shadow-xs">
+      <div className="ledger">
         {claims.map((claim, index) => {
-          const { badgeBg, avatarBg, label } = getStatusBadge(claim.status);
+          const st = statusOf(claim.status);
           const confidencePct = claim.derived_confidence
             ? Math.round(claim.derived_confidence * 100)
             : 95;
 
           return (
-            <div
+            <button
               key={claim.id || index}
               onClick={() => onSelectClaim(claim)}
-              className="p-4 sm:p-5 flex items-center justify-between cursor-pointer group hover:bg-zinc-50/80 transition-colors"
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onSelectClaim(claim);
-                }
-              }}
+              className="ledger-row group w-full text-left"
             >
-              <div className="flex items-center gap-3.5 min-w-0 pr-4">
-                <div
-                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full ${avatarBg} flex items-center justify-center font-bold text-xs sm:text-sm shrink-0`}
-                >
-                  {index + 1}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs sm:text-sm font-semibold text-zinc-900 group-hover:text-zinc-600 transition-colors line-clamp-1">
-                    {claim.text}
-                  </div>
-                  <div className="text-[11px] sm:text-xs text-zinc-500 truncate mt-0.5 flex items-center gap-1.5">
-                    <span>{claim.source_title || "Primary Literature Corpus"}</span>
-                    <span>·</span>
-                    <span className="font-mono text-zinc-600">{confidencePct}% Confidence</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2.5 shrink-0">
-                <span className={`text-[11px] sm:text-xs font-semibold px-2.5 py-0.5 rounded-full border ${badgeBg}`}>
-                  {label}
+              <span className="index-numeral">{String(index + 1).padStart(2, "0")}</span>
+              <span className="flex-1 min-w-0">
+                <span className="block font-serif text-[17px] leading-snug text-ink group-hover:text-gold transition-colors">
+                  {claim.text}
                 </span>
-                <span className="text-zinc-400 text-lg font-light group-hover:text-zinc-700 transition-colors">
-                  ›
+                <span className="block text-xs text-muted truncate mt-1">
+                  {claim.source_title || "Primary literature corpus"}
+                  {"  ·  "}
+                  <span className={`font-semibold ${st.className}`}>{st.label}</span>
                 </span>
-              </div>
-            </div>
+              </span>
+              <span className="font-mono text-xs text-subtle tabular-nums shrink-0">
+                {confidencePct}%
+              </span>
+            </button>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }

@@ -39,39 +39,33 @@ export default function GlobalClaimGraphPage() {
   const containerClass = widthMode === "expanded" ? "max-w-6xl" : "max-w-4xl";
 
   return (
-    <div className="py-10 px-6 sm:px-12 w-full transition-all duration-300">
-      <div className={`${containerClass} mx-auto space-y-8 transition-all duration-300`}>
-        {/* Header */}
-        <div className="border-b border-zinc-200 pb-6 space-y-2">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 font-semibold text-[11px] uppercase tracking-wider border border-blue-200">
-              Claim Graph · Live Topology
-            </span>
-            <span className="text-zinc-300">•</span>
-            <span className="text-zinc-500 text-xs">Global Epistemic Network</span>
+    <div className="py-10 px-6 sm:px-10 w-full">
+      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+        <div className="plate-head">
+          <div className="plate-folio">
+            <span>Live topology</span>
+            <span>Global epistemic network</span>
           </div>
-
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-zinc-900 leading-[1.1]">
-            Global Claim Graph
-          </h1>
-
-          <p className="font-serif text-base sm:text-lg text-zinc-600 italic leading-relaxed">
-            Every claim produced across the encyclopedia, connected to its underlying evidence and adjacent supporting or contradicting claims. Click any node to inspect its forensic provenance.
+          <h1 className="plate-title">Claim graph</h1>
+          <p className="plate-deck">
+            Every claim produced across the encyclopedia, joined to its evidence
+            and adjacent claims. Select a node to inspect its provenance.
           </p>
+          <div className="plate-rule" />
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-between gap-4 flex-wrap bg-white p-3.5 rounded-2xl border border-zinc-200 shadow-xs">
-          <div className="flex items-center gap-2 text-xs font-medium text-zinc-700 flex-wrap">
-            <span className="text-zinc-500">Claims:</span>
+        <div className="flex items-center gap-5 gap-y-2 flex-wrap py-4 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono uppercase tracking-[0.14em] text-subtle">Claims</span>
             {[50, 100, 150, 300].map((n) => (
               <button
                 key={n}
                 onClick={() => setLimit(n)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                className={`font-mono tabular-nums cursor-pointer transition-colors ${
                   limit === n
-                    ? "bg-zinc-900 text-white"
-                    : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                    ? "text-ink font-semibold underline decoration-gold decoration-2 underline-offset-4"
+                    : "text-subtle hover:text-ink"
                 }`}
                 aria-pressed={limit === n}
               >
@@ -80,16 +74,16 @@ export default function GlobalClaimGraphPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-medium text-zinc-700 flex-wrap">
-            <span className="text-zinc-500">Min Contradiction:</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono uppercase tracking-[0.14em] text-subtle">Min contradiction</span>
             {[0, 0.2, 0.4, 0.6].map((v) => (
               <button
                 key={v}
                 onClick={() => setMinContradiction(v)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                className={`font-mono tabular-nums cursor-pointer transition-colors ${
                   minContradiction === v
-                    ? "bg-zinc-900 text-white"
-                    : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                    ? "text-ink font-semibold underline decoration-gold decoration-2 underline-offset-4"
+                    : "text-subtle hover:text-ink"
                 }`}
                 aria-pressed={minContradiction === v}
               >
@@ -99,27 +93,27 @@ export default function GlobalClaimGraphPage() {
           </div>
 
           {data && (
-            <span className="text-xs font-mono text-zinc-500">
-              {data.claim_count} claims · {data.nodes.length - data.claim_count} evidence edges
+            <span className="ml-auto text-xs font-mono text-subtle tabular-nums">
+              {data.claim_count} claims · {data.nodes.length - data.claim_count} evidence
             </span>
           )}
         </div>
 
         {/* Graph Viewport */}
         {loading && (
-          <div className="py-24 text-center text-xs text-zinc-400">
+          <p className="font-serif italic text-muted py-24 text-center">
             Mapping global epistemic topology…
-          </div>
+          </p>
         )}
 
         {!loading && data && data.nodes.length === 0 && (
-          <div className="py-24 text-center text-xs text-zinc-500">
+          <p className="font-serif italic text-muted py-24 text-center">
             No claims recorded yet. Generate articles to populate the knowledge graph.
-          </div>
+          </p>
         )}
 
         {!loading && data && data.nodes.length > 0 && (
-          <div className="rounded-2xl border border-zinc-200 overflow-hidden shadow-xs bg-white p-2">
+          <div className="border border-rule rounded-sharp overflow-hidden bg-surface-elevated p-2">
             <ClaimGraphViewer
               data={data}
               loading={loading}
@@ -131,7 +125,7 @@ export default function GlobalClaimGraphPage() {
 
         {/* Selected Claim Genealogy */}
         {selectedClaim && data && (
-          <div className="rounded-2xl border border-zinc-200 overflow-hidden shadow-xs bg-white">
+          <div className="mt-6 border border-rule rounded-sharp overflow-hidden bg-surface-elevated">
             <ClaimGenealogyPanel
               claim={selectedClaim}
               nodes={data.nodes}

@@ -186,7 +186,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   return (
     <div className="py-6 px-4 sm:px-8 w-full max-w-5xl mx-auto">
       {/* ponytail: fixed shell → this fills the viewport; messages scroll, sessions + composer stay pinned. */}
-      <div className="flex-1 flex flex-col md:flex-row h-full min-h-0 min-w-0 bg-white rounded-2xl overflow-hidden border border-zinc-200">
+      <div className="flex-1 flex flex-col md:flex-row h-full min-h-0 min-w-0 bg-surface-elevated rounded-sharp overflow-hidden border border-rule">
         {/* Mobile Header Bar - Native App Style */}
         <div className="md:hidden shrink-0 flex items-center justify-between px-3 h-12 bg-[var(--r-nav-bg)] border-b border-[var(--r-border)] gap-2 shadow-xs">
           <div className="flex items-center gap-1.5">
@@ -217,7 +217,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
               {conv?.title ?? "TruthSeekers Chat"}
             </span>
             <span className="text-[9.5px] text-[var(--r-muted)] flex items-center gap-1">
-              <span className={`w-1.5 h-1.5 rounded-full ${sending ? "bg-[var(--r-accent)] animate-pulse" : "bg-emerald-500"}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${sending ? "bg-gold animate-pulse" : "bg-forest"}`} />
               <span>{sending ? "Agent working…" : "Ready"}</span>
             </span>
           </div>

@@ -140,14 +140,14 @@ export default function ArticleClient({
   // Loading state
   if (isLoading) {
     return (
-      <div className="py-16 px-6 max-w-3xl mx-auto space-y-6 animate-pulse">
-        <div className="h-6 w-36 bg-zinc-200 rounded-full" />
-        <div className="h-12 w-3/4 bg-zinc-200 rounded-xl" />
-        <div className="h-20 w-full bg-zinc-200 rounded-xl" />
+      <div className="py-16 px-6 max-w-3xl mx-auto space-y-6">
+        <div className="h-6 w-36 skeleton" />
+        <div className="h-12 w-3/4 skeleton" />
+        <div className="h-20 w-full skeleton" />
         <div className="space-y-3 pt-6">
-          <div className="h-4 w-full bg-zinc-200 rounded" />
-          <div className="h-4 w-5/6 bg-zinc-200 rounded" />
-          <div className="h-4 w-4/6 bg-zinc-200 rounded" />
+          <div className="h-4 w-full skeleton" />
+          <div className="h-4 w-5/6 skeleton" />
+          <div className="h-4 w-4/6 skeleton" />
         </div>
       </div>
     );
@@ -157,14 +157,14 @@ export default function ArticleClient({
   if (error && !article) {
     return (
       <div className="py-20 px-6 max-w-lg mx-auto text-center space-y-4">
-        <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto text-xl font-bold">
+        <div className="w-12 h-12 rounded-full bg-oxblood-subtle text-oxblood flex items-center justify-center mx-auto text-xl font-bold">
           ✕
         </div>
-        <h1 className="text-lg font-bold text-zinc-900">Error Loading Article</h1>
-        <p className="text-xs text-zinc-500">{error}</p>
+        <h1 className="font-display text-2xl font-bold text-ink">Error loading article</h1>
+        <p className="text-sm text-muted">{error}</p>
         <button
           onClick={() => { setError(null); window.location.reload(); }}
-          className="px-4 py-2 rounded-lg bg-zinc-900 text-white font-semibold text-xs hover:bg-zinc-800 transition-colors"
+          className="px-4 py-2 rounded-sharp bg-ink text-surface font-semibold text-xs hover:bg-gold hover:text-ink transition-colors"
         >
           Try Again
         </button>
@@ -176,23 +176,21 @@ export default function ArticleClient({
   if (!article && !generating) {
     return (
       <div className="py-20 px-6 max-w-md mx-auto text-center space-y-6">
-        <div className="w-14 h-14 rounded-2xl bg-zinc-100 border border-zinc-200 text-zinc-800 flex items-center justify-center mx-auto text-2xl font-bold">
-          ❖
-        </div>
+        <div className="font-display text-4xl text-gold">❖</div>
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-zinc-900 capitalize">
+          <h1 className="font-display text-3xl font-bold text-ink capitalize">
             {slug.replace(/-/g, " ")}
           </h1>
-          <p className="text-xs text-zinc-500 leading-relaxed">
+          <p className="font-serif italic text-muted leading-relaxed">
             This entry has not yet been composed. Our autonomous epistemic agents will research the literature, cross-validate citations, and build verified claim structures.
           </p>
         </div>
 
         <button
           onClick={handleGenerate}
-          className="w-full py-3 px-4 rounded-xl bg-zinc-900 text-white font-semibold text-xs hover:bg-zinc-800 transition-all shadow-xs flex items-center justify-center gap-2"
+          className="w-full py-3 px-4 rounded-sharp bg-ink text-surface font-semibold text-sm hover:bg-gold hover:text-ink transition-colors"
         >
-          <span>⚡ Generate Verified Article</span>
+          Generate verified article
         </button>
       </div>
     );
@@ -212,10 +210,10 @@ export default function ArticleClient({
     return (
       <div className="py-16 px-6 max-w-xl mx-auto space-y-6">
         <div className="text-center space-y-2">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-blue-600 font-bold">
-            Autonomous Pipeline Active
+          <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-gold font-medium">
+            Autonomous pipeline active
           </span>
-          <h1 className="text-2xl font-bold text-zinc-900 capitalize">
+          <h1 className="font-display text-3xl font-bold text-ink capitalize">
             {slug.replace(/-/g, " ")}
           </h1>
         </div>
@@ -242,102 +240,87 @@ export default function ArticleClient({
   const containerClass = widthMode === "expanded" ? "max-w-5xl" : "max-w-3xl";
 
   return (
-    <div className="py-10 px-6 sm:px-12 w-full transition-all duration-300">
-      <section className={`${containerClass} mx-auto space-y-10 transition-all duration-300`}>
-        {/* Header & Folio */}
-        <div className="space-y-4 border-b border-zinc-200/80 pb-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs flex-wrap">
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-semibold text-[11px] uppercase tracking-wider border border-emerald-200">
-                {category}
-              </span>
-              <span className="text-zinc-300">•</span>
-              <span className="text-zinc-500 text-xs">
-                {article.citations?.length
-                  ? `Verified Literature · ${article.citations.length} Sources`
-                  : "Research Entry"}
-              </span>
-            </div>
-
-            {/* Quick Actions (Regenerate, Export) */}
-            <div className="flex items-center gap-1.5 bg-zinc-100 p-1 rounded-lg border border-zinc-200 text-xs">
-              <button
-                onClick={handleRefresh}
-                disabled={generating}
-                className="px-2.5 py-1 rounded-md text-zinc-700 hover:text-zinc-900 hover:bg-white transition-colors cursor-pointer"
-                title="Refresh with live web search"
-              >
-                ↻ Refresh
-              </button>
-              <button
-                onClick={() => handleExport("markdown")}
-                className="px-2.5 py-1 rounded-md text-zinc-700 hover:text-zinc-900 hover:bg-white transition-colors cursor-pointer"
-                title="Export as Markdown"
-              >
-                Markdown
-              </button>
-              <button
-                onClick={() => handleExport("json")}
-                className="px-2.5 py-1 rounded-md text-zinc-700 hover:text-zinc-900 hover:bg-white transition-colors cursor-pointer"
-                title="Export JSON"
-              >
-                JSON
-              </button>
+    <div className="py-10 px-6 sm:px-10 w-full">
+      <section className={`${containerClass} mx-auto transition-all duration-300`}>
+        {/* Masthead */}
+        <div className="plate-head">
+          <div className="plate-folio">
+            <span>{category}</span>
+            <span>
+              {article.citations?.length
+                ? `${article.citations.length} sources`
+                : "Research entry"}
+            </span>
+          </div>
+          <h1 className="plate-title">{title}</h1>
+          {abstract && <p className="plate-deck">{abstract}</p>}
+          <div className="plate-controls">
+            <div className="plate-byline">
+              <span>Veritas pipeline</span>
+              <span className="plate-sep">·</span>
+              <span>Verified literature</span>
             </div>
           </div>
+          <div className="plate-rule" />
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-zinc-900 leading-[1.1]">
-            {title}
-          </h1>
-
-          {abstract && (
-            <p className="font-serif text-lg sm:text-xl text-zinc-700 italic leading-relaxed pt-1">
-              {abstract}
-            </p>
-          )}
+          {/* Quick Actions */}
+          <div className="flex items-center gap-4 pt-3 text-xs font-medium">
+            <button
+              onClick={handleRefresh}
+              disabled={generating}
+              className="text-muted hover:text-ink underline decoration-rule hover:decoration-gold underline-offset-4 transition-colors cursor-pointer disabled:opacity-40"
+              title="Refresh with live web search"
+            >
+              ↻ Refresh
+            </button>
+            <button
+              onClick={() => handleExport("markdown")}
+              className="text-muted hover:text-ink underline decoration-rule hover:decoration-gold underline-offset-4 transition-colors cursor-pointer"
+              title="Export as Markdown"
+            >
+              Markdown
+            </button>
+            <button
+              onClick={() => handleExport("json")}
+              className="text-muted hover:text-ink underline decoration-rule hover:decoration-gold underline-offset-4 transition-colors cursor-pointer"
+              title="Export JSON"
+            >
+              JSON
+            </button>
+          </div>
         </div>
 
         {/* Section 1: Introduction & Body Text */}
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-              Overview
-            </h2>
-            <div className="space-y-4 font-serif text-lg text-zinc-800 leading-[1.6]">
+        <div className="py-8">
+          <h2 className="font-display text-2xl font-bold text-ink mb-4">Overview</h2>
+            <div className="t-body text-ink-secondary">
               {article.sections && article.sections.length > 0 ? (
                 article.sections.map((sec, idx) => (
-                  <div key={idx} className="space-y-3">
+                  <div key={idx} className="mb-5">
                     {sec.title && idx > 0 && (
-                      <h3 className="font-sans font-bold text-base text-zinc-900 pt-3">
+                      <h3 className="font-display font-bold text-xl text-ink mt-8 mb-3">
                         {sec.title}
                       </h3>
                     )}
-                    <p>
-                      {idx === 0 && sec.content && (
-                        <span className="float-left text-5xl font-extrabold text-zinc-900 pr-3 leading-none font-sans">
-                          {sec.content.slice(0, 1)}
-                        </span>
-                      )}
-                      {idx === 0 ? sec.content?.slice(1) : sec.content}
+                    <p className={idx === 0 ? "drop-cap" : undefined}>
+                      {sec.content}
                     </p>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-zinc-500 font-sans">
+                <p className="font-sans text-sm text-muted">
                   Full article body is still being synthesized for this entry. Claims and citations below reflect verified pipeline output.
                 </p>
               )}
             </div>
-          </div>
 
-          {/* Infobox Plate — only when the article carries real metadata */}
+          {/* Infobox — only when the article carries real metadata */}
           {((article.citations?.length ?? 0) > 0 || (article.categories?.length ?? 0) > 0) && (
             <InfoboxCard
-              title={title.toUpperCase()}
-              subtitle="Corpus Infobox"
+              title="Key facts"
               facts={[
                 ...(article.citations?.length
-                  ? [{ label: "Citations", value: `${article.citations.length} Verified` }]
+                  ? [{ label: "Citations", value: `${article.citations.length} verified` }]
                   : []),
                 ...(article.categories?.length
                   ? [{ label: "Domain", value: article.categories[0] }]
@@ -350,6 +333,8 @@ export default function ArticleClient({
           )}
         </div>
 
+        <div className="fleuron" aria-hidden>❦</div>
+
         {/* Section 2: Empirical Propositions */}
         {epistemicClaims.length > 0 ? (
           <GroupedClaimsList
@@ -357,46 +342,51 @@ export default function ArticleClient({
             onSelectClaim={(c) => setSelectedClaim(c)}
           />
         ) : (
-          <div className="rounded-2xl border border-zinc-200 bg-white p-6 text-sm text-zinc-500">
+          <div className="border border-rule rounded-sharp bg-surface-elevated p-6 font-serif italic text-muted">
             No verified claims recorded for this entry yet.
           </div>
         )}
 
         {/* Section 3: Interactive Formula Simulator — only for quantitative topics */}
-        {showCalc && <InteractiveCalcCard />}
+        {showCalc && (
+          <>
+            <div className="fleuron" aria-hidden>❦</div>
+            <InteractiveCalcCard />
+          </>
+        )}
 
         {/* Section 4: Primary Literature Bibliography */}
-        <div className="space-y-4 pt-6 border-t border-zinc-200">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-            Primary Literature Citations{article.citations?.length ? ` (${article.citations.length})` : ""}
+        <div className="py-8">
+          <h2 className="font-display text-2xl font-bold text-ink mb-4">
+            Primary literature
+            {article.citations?.length ? (
+              <span className="font-mono text-sm font-normal text-subtle tabular-nums"> ({article.citations.length})</span>
+            ) : null}
           </h2>
-          <div className="space-y-2.5 text-xs text-zinc-600">
-            {article.citations && article.citations.length > 0 ? (
-              article.citations.map((cite, idx) => (
-                <div
-                  key={idx}
-                  className="p-3.5 rounded-xl bg-white border border-zinc-200 flex items-start gap-3 shadow-xs"
-                >
-                  <span className="font-mono text-zinc-400 font-bold shrink-0">[{idx + 1}]</span>
-                  <div className="min-w-0">
-                    <div className="font-semibold text-zinc-900">{cite.title || "Primary Source"}</div>
+          {article.citations && article.citations.length > 0 ? (
+            <ol className="ledger">
+              {article.citations.map((cite, idx) => (
+                <li key={idx} className="ledger-row">
+                  <span className="index-numeral">[{idx + 1}]</span>
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-[15px] text-ink">{cite.title || "Primary source"}</span>
                     {cite.url && (
                       <a
                         href={cite.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-zinc-900 underline decoration-zinc-300 hover:decoration-zinc-900 truncate block mt-0.5"
+                        className="block text-[13px] text-muted hover:text-gold truncate mt-0.5 transition-colors"
                       >
                         {cite.url}
                       </a>
                     )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-zinc-500">No citations recorded yet.</p>
-            )}
-          </div>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="font-serif italic text-muted">No citations recorded yet.</p>
+          )}
         </div>
       </section>
 

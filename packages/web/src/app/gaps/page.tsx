@@ -59,74 +59,68 @@ export default function GapsPage() {
   const containerClass = widthMode === "expanded" ? "max-w-5xl" : "max-w-3xl";
 
   return (
-    <div className="py-10 px-6 sm:px-12 w-full transition-all duration-300">
-      <div className={`${containerClass} mx-auto space-y-8 transition-all duration-300`}>
-        {/* Header */}
-        <div className="border-b border-zinc-200 pb-6 space-y-2">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 font-semibold text-[11px] uppercase tracking-wider border border-blue-200">
-              Community Scrutiny
-            </span>
-            <span className="text-zinc-300">•</span>
-            <span className="text-zinc-500 text-xs">Evidence Gap Registry</span>
+    <div className="py-10 px-6 sm:px-10 w-full">
+      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+        <div className="plate-head">
+          <div className="plate-folio">
+            <span>Community scrutiny</span>
+            <span>Evidence gap registry</span>
           </div>
-
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-zinc-900">
-            Open Evidence Gaps
-          </h1>
-
-          <p className="font-serif text-base sm:text-lg text-zinc-600 italic leading-relaxed">
-            Propositions lacking primary verification or independent replication. Upvote to prioritize agent research runs, or contribute counter-evidence.
+          <h1 className="plate-title">Open evidence gaps</h1>
+          <p className="plate-deck">
+            Propositions lacking primary verification or independent replication.
+            Upvote to prioritize agent research runs, or contribute evidence.
           </p>
+          <div className="plate-rule" />
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-2 flex-wrap bg-white p-3 rounded-2xl border border-zinc-200 shadow-xs">
-          <span className="text-xs font-semibold text-zinc-600 pl-1">Filter:</span>
+        <div className="flex items-center gap-3 flex-wrap py-4 text-xs">
+          <span className="font-mono uppercase tracking-[0.14em] text-subtle">Filter</span>
           {["all", "unverified_gap", "verified_gap", "false_positive_risk"].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+              className={`cursor-pointer transition-colors ${
                 filter === f
-                  ? "bg-zinc-900 text-white"
-                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                  ? "text-ink font-semibold underline decoration-gold decoration-2 underline-offset-4"
+                  : "text-subtle hover:text-ink"
               }`}
             >
-              {f === "all" ? "All Gaps" : f.replace(/_/g, " ")}
+              {f === "all" ? "All gaps" : f.replace(/_/g, " ")}
             </button>
           ))}
         </div>
 
         {/* Gaps List */}
         {loading ? (
-          <div className="py-16 text-center text-sm text-zinc-500">Loading evidence gaps…</div>
+          <p className="font-serif italic text-muted py-16 text-center">Loading evidence gaps…</p>
         ) : displayGaps.length === 0 ? (
-          <div className="rounded-2xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500">
+          <p className="font-serif italic text-muted py-16 text-center">
             No open evidence gaps. Generate articles to surface research needs.
-          </div>
+          </p>
         ) : (
-        <div className="space-y-4">
+        <div className="ledger">
           {displayGaps.map((g, idx) => (
             <div
               key={g.id || idx}
-              className="p-6 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-4"
+              className="p-6 space-y-4"
             >
               <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1.5 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap text-xs">
-                    <span className="font-mono text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200">
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="flex items-center gap-3 flex-wrap text-xs">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-gold font-medium">
                       {g.gap_type.replace(/_/g, " ")}
                     </span>
                     <Link
                       href={`/article/${g.article_slug}`}
-                      className="text-xs text-zinc-900 font-semibold underline decoration-zinc-300 hover:decoration-zinc-900"
+                      className="category-link no-underline text-xs font-medium"
                     >
-                      Article: {g.article_slug.replace(/-/g, " ")}
+                      {g.article_slug.replace(/-/g, " ")}
                     </Link>
                   </div>
 
-                  <p className="font-serif text-base sm:text-lg text-zinc-900 leading-snug pt-1 font-medium">
+                  <p className="font-serif text-xl text-ink leading-snug pt-1">
                     &ldquo;{g.claim_text}&rdquo;
                   </p>
                 </div>
@@ -134,31 +128,31 @@ export default function GapsPage() {
                 {/* Upvote Button */}
                 <button
                   onClick={() => handleUpvote(g.id)}
-                  className="px-3.5 py-2 rounded-xl bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-800 text-xs font-bold flex flex-col items-center gap-0.5 cursor-pointer shrink-0 transition-colors"
+                  className="px-3 py-2 border border-rule rounded-sharp text-ink flex flex-col items-center gap-0.5 cursor-pointer shrink-0 transition-colors hover:border-gold"
                   title="Upvote to prioritize investigation"
                 >
-                  <span className="text-zinc-700">▲</span>
-                  <span className="font-mono text-xs">{g.upvotes ?? 0}</span>
+                  <span className="text-gold text-xs">▲</span>
+                  <span className="font-mono text-xs tabular-nums">{g.upvotes ?? 0}</span>
                 </button>
               </div>
 
               {/* Submission Box */}
-              <div className="pt-3 border-t border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-zinc-500">
+              <div className="pt-3 border-t border-border-light flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-muted">
                 <span>
-                  Expected: <strong className="text-zinc-700">{g.expected_artifact}</strong>
+                  Expected: <strong className="text-ink font-medium">{g.expected_artifact}</strong>
                 </span>
                 <button
                   onClick={() => setSubmitting(submitting === g.id ? null : g.id)}
-                  className="text-xs font-semibold text-zinc-900 underline decoration-zinc-300 hover:decoration-zinc-900 cursor-pointer self-start sm:self-auto"
+                  className="category-link no-underline text-xs font-semibold self-start sm:self-auto cursor-pointer"
                 >
-                  {submitting === g.id ? "Close" : "+ Submit Evidence Source"}
+                  {submitting === g.id ? "Close" : "+ Submit evidence source"}
                 </button>
               </div>
 
               {submitting === g.id && (
-                <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-200 space-y-3">
-                  <div className="text-xs font-bold text-zinc-900">
-                    Submit Primary Artifact or Dataset URL
+                <div className="p-4 bg-surface border border-rule rounded-sharp space-y-3">
+                  <div className="text-[13px] font-semibold text-ink">
+                    Submit primary artifact or dataset URL
                   </div>
                   <input
                     type="url"
@@ -166,30 +160,30 @@ export default function GapsPage() {
                     placeholder="https://doi.org/... or https://arxiv.org/..."
                     value={submitUrl}
                     onChange={(e) => setSubmitUrl(e.target.value)}
-                    className="w-full text-xs p-2 rounded-lg border border-zinc-300 bg-white"
+                    className="w-full text-xs p-2 rounded-sharp border border-rule bg-surface-elevated text-ink"
                   />
                   <textarea
                     rows={2}
                     placeholder="Context / methodology note…"
                     value={submitNote}
                     onChange={(e) => setSubmitNote(e.target.value)}
-                    className="w-full text-xs p-2 rounded-lg border border-zinc-300 bg-white"
+                    className="w-full text-xs p-2 rounded-sharp border border-rule bg-surface-elevated text-ink"
                   />
-                  {submitMsg && <p className="text-xs text-emerald-700 font-semibold">{submitMsg}</p>}
+                  {submitMsg && <p className="text-xs text-forest font-medium">{submitMsg}</p>}
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
                       onClick={() => setSubmitting(null)}
-                      className="px-3 py-1 text-xs text-zinc-600 hover:text-zinc-900"
+                      className="px-3 py-1 text-xs text-muted hover:text-ink"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={() => handleSubmit(g.id)}
-                      className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold text-xs rounded-lg shadow-xs"
+                      className="px-3.5 py-1.5 bg-ink hover:bg-gold hover:text-ink text-surface font-semibold text-xs rounded-sharp transition-colors"
                     >
-                      Submit for Verification
+                      Submit for verification
                     </button>
                   </div>
                 </div>

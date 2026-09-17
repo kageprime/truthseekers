@@ -5,11 +5,11 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-ui)", "Inter", "system-ui", "sans-serif"],
-        serif: ["var(--font-serif)", "Lora", "Georgia", "serif"],
-        display: ["var(--font-display)", "'Playfair Display'", "Georgia", "serif"],
-        mono: ["var(--font-mono)", "'JetBrains Mono'", "monospace"],
-        typewriter: ["var(--font-typewriter)", "'IBM Plex Mono'", "monospace"],
+        sans: ["var(--font-ui)", "system-ui", "sans-serif"],
+        serif: ["var(--font-serif)", "Georgia", "serif"],
+        display: ["var(--font-display)", "Georgia", "serif"],
+        mono: ["var(--font-mono)", "monospace"],
+        typewriter: ["var(--font-typewriter)", "monospace"],
         pixel: ["'Press Start 2P'", "monospace"],
       },
       colors: {
