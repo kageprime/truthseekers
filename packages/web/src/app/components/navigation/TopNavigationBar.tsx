@@ -15,6 +15,8 @@ export default function TopNavigationBar() {
   if (pathname.startsWith("/article/")) {
     const slug = pathname.replace("/article/", "");
     breadcrumb = `Article: ${slug.replace(/-/g, " ")}`;
+  } else if (pathname === "/finder") {
+    breadcrumb = "Claim Finder";
   } else if (pathname === "/contested") {
     breadcrumb = "Contested Claims Registry";
   } else if (pathname.startsWith("/maps")) {
@@ -74,6 +76,7 @@ export default function TopNavigationBar() {
         {[
           { href: "/", label: "Portal", active: pathname === "/" },
           { href: "/articles", label: "Articles", active: pathname.startsWith("/article") || pathname.startsWith("/articles") },
+          { href: "/finder", label: "Finder", active: pathname.startsWith("/finder") },
           { href: "/contested", label: "Contested", active: isTabActive("/contested") },
           { href: "/maps", label: "Maps", active: isTabActive("/maps") },
           { href: "/chat/new", label: "Veritas Studio", active: isTabActive("/chat") },

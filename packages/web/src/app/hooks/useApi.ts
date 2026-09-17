@@ -59,6 +59,10 @@ export function useArticleSearch(query: string) {
   return useApiQuery(["articles", "search", query], () => api.searchArticles(query), { enabled: query.length > 0 });
 }
 
+export function useClaimSearch(query: string, limit = 20) {
+  return useApiQuery(["claims", "search", query, limit], () => api.searchClaims(query, limit), { enabled: query.trim().length > 1 });
+}
+
 export function useArticle(slug: string | undefined) {
   return useApiQuery(["article", slug], () => api.fetchArticle(slug!), { enabled: !!slug });
 }

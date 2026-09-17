@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -734,6 +735,86 @@ func (d *DB) GetMostContestedClaimsWithArticle(limit int, minContradiction float
 	`, limit, minContradiction)
 	if err != nil {
 		return nil, fmt.Errorf("get most contested claims with article: %w", err)
+	}
+	defer rows.Close()
+	var list []*ClaimWithArticle
+	for rows.Next() {
+		var c Claim
+		var cvJson []byte
+		var slug string
+		if err := rows.Scan(&c.ID, &c.Text, &c.Signature, &c.Type, &c.Status, &cvJson, &c.DerivedConfidence, &c.CreatedAt, &c.UpdatedAt, &slug); err != nil {
+			return nil, err
+		}
+		if len(cvJson) > 0 {
+			json.Unmarshal(cvJson, &c.ConfidenceVector)
+		}
+		list = append(list, &ClaimWithArticle{Claim: &c, ArticleSlug: slug})
+	}
+	return list, nil
+}
+
+// SearchClaims returns claims whose text matches the query substring, each
+// with one attached article slug. Prefix matches rank first, then higher
+// contradiction (disputes surface), then recency. Powers the Claim Finder
+// page. Mirrors SearchArticles (ILIKE + escapeLIKE); migration 018 indexes
+// claims(text) with pg_trgm so the leading-% match stays indexed.
+func (d *DB) SearchClaims(searchQuery string, limit int) ([]*ClaimWithArticle, error) {
+	if d.mockMode {
+		if d.fs == nil {
+			return nil, nil
+		}
+		q := strings.ToLower(searchQuery)
+		type ca struct {
+			c    *Claim
+			slug string
+		}
+		all := []ca{}
+		seen := map[string]bool{}
+		for slug, cs := range d.fs.claims {
+			for _, c := range cs {
+				if seen[c.ID] || !strings.Contains(strings.ToLower(c.Text), q) {
+					continue
+				}
+				seen[c.ID] = true
+				all = append(all, ca{c: c, slug: slug})
+			}
+		}
+		sort.Slice(all, func(i, j int) bool {
+			si, sj := statusRank(all[i].c.Status), statusRank(all[j].c.Status)
+			if si != sj {
+				return si < sj
+			}
+			return all[i].c.DerivedConfidence > all[j].c.DerivedConfidence
+		})
+		out := []*ClaimWithArticle{}
+		for i, c := range all {
+			if i >= limit {
+				break
+			}
+			out = append(out, &ClaimWithArticle{Claim: c.c, ArticleSlug: c.slug})
+		}
+		return out, nil
+	}
+	q := "%" + escapeLIKE(searchQuery) + "%"
+	prefix := escapeLIKE(searchQuery) + "%"
+	rows, err := d.db.Query(`
+		SELECT * FROM (
+			SELECT DISTINCT ON (c.id)
+				c.id, c.text, c.signature, c.type, c.status, c.confidence_vector,
+				c.derived_confidence, c.created_at, c.updated_at, a.slug
+			FROM claims c
+			JOIN article_claims ac ON c.id = ac.claim_id
+			JOIN articles a ON ac.article_id = a.id
+			WHERE c.text ILIKE $1 ESCAPE '\'
+			ORDER BY c.id
+		) s
+		ORDER BY s.text ILIKE $2 ESCAPE '\' DESC,
+			COALESCE((s.confidence_vector->>'contradiction_level')::float, 0) DESC NULLS LAST,
+			s.updated_at DESC
+		LIMIT $3
+	`, q, prefix, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search claims: %w", err)
 	}
 	defer rows.Close()
 	var list []*ClaimWithArticle

@@ -918,6 +918,33 @@ func (s *Server) handleGetContestedClaims(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(map[string]interface{}{"claims": claims})
 }
 
+// handleSearchClaims returns claims whose text matches the query substring
+// for the Claim Finder page (GET /claims/search?q=&limit=).
+func (s *Server) handleSearchClaims(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		http.Error(w, `{"error":"q required"}`, http.StatusBadRequest)
+		return
+	}
+	limit := 20
+	// ponytail: uncapped limit was a full-table scan on demand.
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 && l <= 50 {
+		limit = l
+	}
+	reqLog(r, "search claims q=%s limit=%d", q, limit)
+	claims, err := s.db.SearchClaims(q, limit)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if claims == nil {
+		claims = []*storage.ClaimWithArticle{}
+	}
+	cache60(w)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"claims": claims})
+}
+
 func (s *Server) handleGetQuota(w http.ResponseWriter, r *http.Request) {
 	reqLog(r, "quota")
 	// Tier-aware daily limits matching the pricing page, counted for real.

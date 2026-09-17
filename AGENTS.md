@@ -64,6 +64,7 @@ Routes are registered in `internal/api/server.go` (`setupRoutes`) and dispatched
 | `/articles/:slug` | GET | Fetch article |
 | `/articles/:slug/{status,progress,generate,refresh,export,resolve,views,graph,claim-graph,claims,gaps,freshness,refresh-diff,epistemic}` | various | Per-article sub-resources; `progress` is SSE; `claim-graph` returns the claim-level force-directed graph; `refresh-diff` summarizes claim version changes; `epistemic` is the composite |
 | `/claims/:id/evidence` | GET / POST | Fetch claim details + evidence; submit community counter-evidence to trigger mini-scrutiny |
+| `/claims/search` | GET | Claim Finder — substring search over claim text with article slugs (`?q=`, `?limit=`) |
 | `/contested` | GET | Public dashboard — most contested claims across the encyclopedia, ranked by contradiction level |
 | `/claim-graph` | GET | Global claim graph — top-N most-contested claims + evidence + claim→claim edges (`?limit=`, `?min_contradiction=`) |
 | `/api/revalidate` (Next.js) | POST | On-demand revalidation: clears ISR cache for `/article/{slug}` + global pages |

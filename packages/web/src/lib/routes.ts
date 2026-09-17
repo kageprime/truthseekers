@@ -19,6 +19,7 @@ export function canSeeAdmin(role?: string | null): boolean {
 export const RETRO_ROUTES: RetroRoute[] = [
   { href: "/", label: "Home", icon: "home", group: "Encyclopedia", keywords: "home landing start index" },
   { href: "/articles", label: "Articles", icon: "book", group: "Encyclopedia", keywords: "browse encyclopedia list all" },
+  { href: "/finder", label: "Claim Finder", icon: "search", group: "Encyclopedia", keywords: "verify claim lookup search evidence verdict" },
   { href: "/claim-graph", label: "Claim Map", icon: "graph", group: "Encyclopedia", keywords: "graph map atlas claims territories global" },
   { href: "/contested", label: "Contested", icon: "scale", group: "Encyclopedia", keywords: "disputed fault lines contradiction" },
   { href: "/gaps", label: "Open Questions", icon: "question", group: "Encyclopedia", keywords: "gaps missing evidence research wanted" },

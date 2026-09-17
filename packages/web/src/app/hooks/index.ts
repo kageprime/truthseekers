@@ -1,7 +1,7 @@
 export { useAuth } from "./useAuth";
 export { useChatStream } from "./useChatStream";
 export {
-  useArticles, useArticleSearch, useArticle, useArticleStatus,
+  useArticles, useArticleSearch, useClaimSearch, useArticle, useArticleStatus,
   useQuota, useGenerateArticle, useRefreshArticle,
   useMaps, useMapSearch, useMap,
   useChats, useChat, useCreateChat,

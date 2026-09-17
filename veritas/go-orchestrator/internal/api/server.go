@@ -1065,6 +1065,7 @@ func (s *Server) setupRoutes() {
 	s.mux.Handle("/maps/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleMapsDynamicRoute)))
 
 	// Claims - public read
+	s.mux.Handle("/claims/search", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleSearchClaims)))
 	s.mux.Handle("/claims/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleClaimEvidence)))
 
 	// Gaps - aggregate view + engagement (upvote, submit evidence)

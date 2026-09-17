@@ -79,6 +79,21 @@ export default function DockedSidebar() {
         </Link>
 
         <Link
+          href="/finder"
+          className={`w-full text-left px-2 py-2.5 border-b border-border-light flex items-center gap-2.5 no-underline transition-colors ${
+            isCurrent("/finder")
+              ? "text-ink font-semibold"
+              : "text-muted hover:text-ink"
+          }`}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="7" />
+            <line x1="21" y1="21" x2="16.5" y2="16.5" />
+          </svg>
+          <span>Claim Finder</span>
+        </Link>
+
+        <Link
           href="/contested"
           className={`w-full text-left px-2 py-2.5 border-b border-border-light flex items-center justify-between no-underline transition-colors ${
             isCurrent("/contested")

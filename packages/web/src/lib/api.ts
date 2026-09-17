@@ -426,6 +426,13 @@ export async function fetchArticleGaps(slug: string): Promise<{ gaps: any[] } | 
   return res.json();
 }
 
+export async function searchClaims(query: string, limit = 20): Promise<{ claims: any[] }> {
+  if (MOCK) return { claims: [] };
+  const res = await fetch(`${BASE}/claims/search?q=${encodeURIComponent(query)}&limit=${limit}`, { cache: "no-store", credentials: "include" });
+  if (!res.ok) return { claims: [] };
+  return res.json();
+}
+
 export async function fetchClaimEvidence(claimId: string): Promise<{ evidence: any[] } | null> {
   if (MOCK) return null;
   const res = await fetch(`${BASE}/claims/${claimId}/evidence`, { cache: "no-store", credentials: "include" });
