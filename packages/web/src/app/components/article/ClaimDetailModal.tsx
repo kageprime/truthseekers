@@ -1,16 +1,46 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useClaimEvidence, useSubmitClaimEvidence } from "../../hooks";
 import type { ClaimItem } from "./GroupedClaimsList";
+
+export interface ElsewhereHit {
+  id: string;
+  slug: string;
+  title: string;
+  text: string;
+  status: string;
+  confidence: number;
+}
 
 interface ClaimDetailModalProps {
   claim: ClaimItem | null;
   onClose: () => void;
   onContest?: (claimId: string) => void;
+  // Trail context (article page supplies these; finder/registry leave empty).
+  allClaims?: ClaimItem[];
+  edges?: Array<{ source: string; target: string; relationship?: string; type?: string }>;
+  gaps?: Array<{ id: string; claim_id: string; gap_type: string; expected_artifact: string }>;
+  versionDiffs?: Array<{ claim_id: string; old_status?: string; new_status?: string; status_changed?: boolean; confidence_delta?: number }>;
+  elsewhere?: ElsewhereHit[];
+  onNavigate?: (claim: ClaimItem) => void;
 }
 
-export default function ClaimDetailModal({ claim, onClose, onContest }: ClaimDetailModalProps) {
+const isDisputedStatus = (s?: string) =>
+  ["disputed", "weak", "contested"].includes((s || "").toLowerCase());
+
+export default function ClaimDetailModal({
+  claim,
+  onClose,
+  onContest,
+  allClaims = [],
+  edges = [],
+  gaps = [],
+  versionDiffs = [],
+  elsewhere = [],
+  onNavigate,
+}: ClaimDetailModalProps) {
   const [contestOpen, setContestOpen] = useState(false);
   const [contestUrl, setContestUrl] = useState("");
   const [contestNote, setContestNote] = useState("");
@@ -38,6 +68,28 @@ export default function ClaimDetailModal({ claim, onClose, onContest }: ClaimDet
   };
 
   const evidenceList = (evidenceRes as any)?.evidence ?? claim.evidence ?? [];
+
+  // Trail context for this claim.
+  const vector = claim.confidence_vector ?? {};
+  const vectorEntries = Object.entries(vector).filter(([, v]) => typeof v === "number");
+  const claimGaps = gaps.filter((g) => g.claim_id === claim.id);
+  const versionNote = versionDiffs.find((d) => d.claim_id === claim.id);
+  const disputed = allClaims.filter((c) => isDisputedStatus(c.status));
+  const disputeIdx = disputed.findIndex((c) => c.id === claim.id);
+  const prevDisputed = disputeIdx > 0 ? disputed[disputeIdx - 1] : null;
+  const nextDisputed = disputeIdx >= 0 && disputeIdx < disputed.length - 1 ? disputed[disputeIdx + 1] : null;
+  const related = edges
+    .filter((e) => e.source === claim.id || e.target === claim.id)
+    .map((e) => {
+      const otherId = e.source === claim.id ? e.target : e.source;
+      const other = allClaims.find((c) => c.id === otherId);
+      return other ? { claim: other, relationship: e.relationship || e.type || "related" } : null;
+    })
+    .filter((r): r is { claim: ClaimItem; relationship: string } => r !== null)
+    .slice(0, 5);
+  const go = (c: ClaimItem) => {
+    if (onNavigate) onNavigate(c);
+  };
 
   return (
     <div
@@ -78,6 +130,14 @@ export default function ClaimDetailModal({ claim, onClose, onContest }: ClaimDet
             &ldquo;{claim.text}&rdquo;
           </p>
 
+          {versionNote?.status_changed && (
+            <p className="text-xs text-gold font-medium">
+              Status changed {versionNote.old_status} → {versionNote.new_status}
+              {typeof versionNote.confidence_delta === "number" &&
+                ` (${versionNote.confidence_delta >= 0 ? "+" : ""}${Math.round(versionNote.confidence_delta * 100)} pts)`}
+            </p>
+          )}
+
           {/* Support Meter */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
@@ -91,6 +151,31 @@ export default function ClaimDetailModal({ claim, onClose, onContest }: ClaimDet
               />
             </div>
           </div>
+
+          {/* Confidence vector */}
+          {vectorEntries.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-subtle">
+                Confidence vector
+              </div>
+              {vectorEntries.slice(0, 6).map(([k, v]) => (
+                <div key={k} className="flex items-center gap-2">
+                  <span className="text-[11px] text-muted capitalize w-32 shrink-0 truncate">
+                    {(k as string).replace(/_/g, " ")}
+                  </span>
+                  <span className="flex-1 h-[3px] bg-ink/10 overflow-hidden" aria-hidden>
+                    <span
+                      className="block h-full bg-gold"
+                      style={{ width: `${Math.round((v as number) * 100)}%` }}
+                    />
+                  </span>
+                  <span className="font-mono text-[11px] text-subtle tabular-nums w-9 text-right">
+                    {(v as number).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Evidence Citations */}
           <div className="space-y-2">
@@ -124,6 +209,25 @@ export default function ClaimDetailModal({ claim, onClose, onContest }: ClaimDet
               )}
             </div>
           </div>
+
+          {/* Open gaps on this claim */}
+          {claimGaps.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-subtle">
+                Open gaps ({claimGaps.length})
+              </div>
+              <ul className="space-y-1.5">
+                {claimGaps.slice(0, 3).map((g) => (
+                  <li key={g.id} className="text-xs text-muted">
+                    <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-gold">
+                      {(g.gap_type || "").replace(/_/g, " ")}
+                    </span>
+                    {g.expected_artifact ? ` — needs ${g.expected_artifact}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Contest Drawer / Form */}
           {contestOpen && (
@@ -173,6 +277,56 @@ export default function ClaimDetailModal({ claim, onClose, onContest }: ClaimDet
             </div>
           )}
         </div>
+
+        {/* Trail: in-article disputes, related claims, disputed elsewhere */}
+        {(prevDisputed || nextDisputed || related.length > 0 || elsewhere.length > 0) && onNavigate && (
+          <div className="px-6 py-4 bg-surface border-t border-rule space-y-3 max-h-56 overflow-y-auto">
+            {(prevDisputed || nextDisputed) && (
+              <div className="flex items-center justify-between gap-2 text-xs font-medium">
+                {prevDisputed ? (
+                  <button onClick={() => go(prevDisputed)} className="category-link no-underline cursor-pointer">
+                    ← Prev dispute
+                  </button>
+                ) : <span />}
+                {nextDisputed ? (
+                  <button onClick={() => go(nextDisputed)} className="category-link no-underline cursor-pointer">
+                    Next dispute →
+                  </button>
+                ) : <span />}
+              </div>
+            )}
+            {related.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-subtle">Related claims</div>
+                {related.map(({ claim: c, relationship }) => (
+                  <button
+                    key={c.id}
+                    onClick={() => go(c)}
+                    className="block w-full text-left text-[13px] text-ink hover:text-gold truncate transition-colors cursor-pointer"
+                  >
+                    <span className="font-mono text-[11px] text-subtle uppercase tracking-[0.1em] mr-2">{relationship}</span>
+                    {c.text}
+                  </button>
+                ))}
+              </div>
+            )}
+            {elsewhere.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-subtle">Disputed elsewhere</div>
+                {elsewhere.map((h) => (
+                  <Link
+                    key={`${h.slug}-${h.id}`}
+                    href={`/article/${h.slug}`}
+                    className="block text-[13px] text-ink hover:text-gold truncate transition-colors no-underline"
+                  >
+                    {h.title}
+                    <span className="text-muted"> — {h.text.slice(0, 80)}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-4 bg-surface border-t border-rule flex justify-between items-center">

@@ -152,6 +152,17 @@ export default function ArticlesPage() {
           >
             + Synthesize new article
           </Link>
+          {rawArticles.length > 1 && (
+            <button
+              onClick={() => {
+                const pick = rawArticles[Math.floor(Math.random() * rawArticles.length)];
+                if (pick?.slug) router.push(`/article/${pick.slug}`);
+              }}
+              className="category-link no-underline text-sm font-medium shrink-0 cursor-pointer"
+            >
+              Surprise me →
+            </button>
+          )}
         </div>
 
         {/* Active In-flight Generations */}

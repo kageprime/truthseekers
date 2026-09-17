@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUiMode } from "../../context/UiModeContext";
@@ -7,7 +8,7 @@ import { useContestedClaims, useAllGaps, useHealth } from "../../hooks";
 
 export default function DockedSidebar() {
   const pathname = usePathname();
-  const { sidebarOpen, setSidebarOpen } = useUiMode();
+  const { sidebarOpen, setSidebarOpen, hoverSidebarOut, cancelSidebarClose } = useUiMode();
   const { data: health } = useHealth();
   const { data: contestedRes } = useContestedClaims(10);
   const { data: gapsRes } = useAllGaps();
@@ -21,9 +22,20 @@ export default function DockedSidebar() {
   const gapsCount = gapsList.length;
   const trendingGaps = gapsList.slice(0, 4);
 
-  if (!sidebarOpen) {
-    return null;
-  }
+  // Floating hover drawer: Escape or route change dismisses it.
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSidebarOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sidebarOpen, setSidebarOpen]);
+
+  useEffect(() => {
+    setSidebarOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   const isCurrent = (path: string) => {
     if (path === "/" && pathname === "/") return true;
@@ -34,15 +46,31 @@ export default function DockedSidebar() {
   return (
     <aside
       id="sidebar-drawer"
-      className="w-72 shrink-0 border-r border-rule bg-surface sticky top-14 h-[calc(100vh-3.5rem)] p-5 space-y-6 overflow-y-auto z-30 transition-all duration-200"
+      aria-hidden={!sidebarOpen}
+      inert={!sidebarOpen}
+      onMouseEnter={cancelSidebarClose}
+      onMouseLeave={hoverSidebarOut}
+      className={`fixed left-0 top-14 bottom-0 w-72 bg-surface border-r border-rule shadow-elev-3 p-5 space-y-6 overflow-y-auto z-40 transition-transform duration-200 ease-out ${
+        sidebarOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
+      }`}
       aria-label="Knowledge Centre Navigation"
     >
       <div className="flex items-center justify-between">
-        <div className="space-y-0.5">
-          <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-subtle">
-            Knowledge Centre
+        <div className="flex items-center gap-2.5">
+          <img
+            src="/logo-icon.png"
+            alt=""
+            aria-hidden
+            width={28}
+            height={28}
+            className="w-7 h-7 rounded-sharp object-contain shrink-0"
+          />
+          <div className="space-y-0.5">
+            <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-subtle">
+              Knowledge Centre
+            </div>
+            <h2 className="font-display text-xl font-bold text-ink leading-none">Explore</h2>
           </div>
-          <h2 className="font-display text-xl font-bold text-ink">Explore & Discover</h2>
         </div>
         <button
           onClick={() => setSidebarOpen(false)}

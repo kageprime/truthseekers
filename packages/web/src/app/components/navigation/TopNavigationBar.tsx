@@ -7,7 +7,7 @@ import { useAuth } from "../../hooks/useAuth";
 
 export default function TopNavigationBar() {
   const pathname = usePathname();
-  const { widthMode, setWidthMode, toggleSidebar, sidebarOpen } = useUiMode();
+  const { widthMode, setWidthMode, toggleSidebar, sidebarOpen, hoverSidebarIn, hoverSidebarOut } = useUiMode();
   const { user } = useAuth();
 
   // Determine dynamic breadcrumb
@@ -38,14 +38,19 @@ export default function TopNavigationBar() {
   return (
     <header className="sticky top-0 z-40 w-full h-14 bg-surface/90 backdrop-blur-md border-b border-rule px-4 sm:px-6 lg:px-8 flex items-center justify-between transition-colors">
       <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-        {/* Sidebar / Menu Drawer Toggle */}
+        {/* Sidebar / Menu Drawer Toggle — hover floats the drawer in */}
         <button
           onClick={toggleSidebar}
+          onMouseEnter={hoverSidebarIn}
+          onMouseLeave={hoverSidebarOut}
+          onFocus={hoverSidebarIn}
           className={`p-1.5 rounded-md text-muted hover:bg-ink/5 transition-colors cursor-pointer ${
             sidebarOpen ? "bg-ink/5 text-ink" : ""
           }`}
-          title="Toggle Navigation Menu"
-          aria-label="Toggle Navigation Menu"
+          title="Browse navigation"
+          aria-label="Browse navigation"
+          aria-expanded={sidebarOpen}
+          aria-controls="sidebar-drawer"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="4" x2="20" y1="12" y2="12" />
@@ -57,9 +62,13 @@ export default function TopNavigationBar() {
         {/* Brand Logo & Breadcrumb */}
         <div className="flex items-center gap-2.5 min-w-0">
           <Link href="/" className="flex items-center gap-2 no-underline group shrink-0">
-            <div className="w-6 h-6 rounded-sharp bg-ink text-surface flex items-center justify-center font-bold text-xs group-hover:bg-gold group-hover:text-ink transition-colors">
-              ❖
-            </div>
+            <img
+              src="/logo-icon.png"
+              alt="Truthseekers home"
+              width={24}
+              height={24}
+              className="w-6 h-6 rounded-sharp object-contain"
+            />
             <span className="font-display font-bold text-base tracking-tight text-ink hidden sm:inline">
               Truthseekers
             </span>

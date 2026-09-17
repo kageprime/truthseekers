@@ -9,6 +9,7 @@ export interface ClaimItem {
   contradiction_level?: number;
   confidence_vector?: Record<string, number>;
   evidence?: any[];
+  signature?: string;
 }
 
 interface GroupedClaimsListProps {
@@ -31,7 +32,8 @@ export default function GroupedClaimsList({
   const statusOf = (status?: string) => {
     const s = (status || "verified").toLowerCase();
     if (s === "contested") return { label: "Contested", className: "text-oxblood" };
-    if (s === "debated" || s === "developing") return { label: "Developing", className: "text-gold" };
+    if (s === "developing") return { label: "Developing", className: "text-gold" };
+    if (s === "unknown") return { label: "Unverified", className: "text-subtle" };
     return { label: "Verified", className: "text-forest" };
   };
 

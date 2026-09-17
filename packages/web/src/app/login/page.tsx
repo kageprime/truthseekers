@@ -164,6 +164,9 @@ export default function LoginPage() {
 
   return (
     <div className="max-w-[440px] mx-auto">
+      <div className="bg-ink rounded-sharp px-6 py-5 mb-4 flex justify-center">
+        <img src="/logo-text.png" alt="Truthseekers — follow the signal" className="h-12 w-auto object-contain" />
+      </div>
       <div className="border-b-[3px] border-[#0a2a5e] pb-3 mb-4">
         <div className="text-[10px] text-[#0a2a5e] font-bold tracking-widest uppercase">TruthSeekers • Access</div>
         <h1 className="r-h1 mt-1" style={{ fontSize: 28 }}>Sign in</h1>

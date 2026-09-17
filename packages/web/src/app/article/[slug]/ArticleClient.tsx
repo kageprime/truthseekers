@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -13,15 +13,20 @@ import {
   useArticleStatus,
   useArticleEpistemic,
 } from "../../hooks";
+import { fetchGlobalClaimGraph } from "@/lib/api";
 import GenerationBar from "../../components/GenerationBar";
 import EpisodeFeed from "../../components/EpisodeFeed";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import type { Article } from "@encarta/core";
 import { useUiMode } from "../../context/UiModeContext";
+import BlockRenderer, { articleToBlocks } from "../../components/BlockRenderer";
+import { MediaImage } from "../../components/MediaImage";
 import InfoboxCard from "../../components/article/InfoboxCard";
 import GroupedClaimsList, { type ClaimItem } from "../../components/article/GroupedClaimsList";
 import ClaimDetailModal from "../../components/article/ClaimDetailModal";
 import InteractiveCalcCard from "../../components/article/InteractiveCalcCard";
+import QuizCard from "../../components/article/QuizCard";
+import ArticleTour, { type TourStep } from "../../components/article/ArticleTour";
 
 interface ArticleClientProps {
   slug: string;
@@ -45,6 +50,8 @@ export default function ArticleClient({
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
   const [pausedError, setPausedError] = useState<string | undefined>(undefined);
   const [selectedClaim, setSelectedClaim] = useState<ClaimItem | null>(null);
+  const [tourOpen, setTourOpen] = useState(false);
+  const readingRef = useRef<HTMLElement | null>(null);
 
   const { widthMode } = useUiMode();
   const { data: epistemic } = useArticleEpistemic(generating ? undefined : slug);
@@ -52,25 +59,159 @@ export default function ArticleClient({
   const epistemicClaims = useMemo<ClaimItem[]>(() => {
     const list = (epistemic as any)?.claims;
     if (Array.isArray(list) && list.length > 0) {
+      // ponytail: DB speaks supported/disputed/weak/unknown; the reader
+      // speaks verified/contested/developing. Normalize once here.
+      const normalize = (s: string) => {
+        const v = (s || "").toLowerCase();
+        if (v === "supported" || v === "verified") return "verified";
+        if (v === "disputed" || v === "contested") return "contested";
+        if (v === "weak" || v === "debated" || v === "developing") return "developing";
+        return "unknown";
+      };
       return list.map((c: any) => ({
         id: c.id,
         text: c.text,
-        status: c.status || "verified",
+        status: normalize(c.status),
         derived_confidence: c.derived_confidence ?? 0.95,
         source_title: c.source_title || "Verified Primary Source",
         contradiction_level: c.confidence_vector?.contradiction_level,
         confidence_vector: c.confidence_vector,
         evidence: c.evidence,
+        signature: c.signature,
       }));
     }
     return [];
   }, [epistemic]);
 
+  // Status/confidence lookup so inline [claim:id] chips render with color
+  // and open previews without another round-trip.
+  const claimsIndex = useMemo(() => {
+    const idx: Record<string, { status?: string; derived_confidence?: number; text?: string }> = {};
+    for (const c of epistemicClaims) {
+      idx[c.id] = { status: c.status, derived_confidence: c.derived_confidence, text: c.text };
+    }
+    return idx;
+  }, [epistemicClaims]);
+
+  const graphEdges = useMemo(() => {
+    const edges = (epistemic as any)?.claim_graph?.edges;
+    return Array.isArray(edges) ? edges : [];
+  }, [epistemic]);
+
+  const articleGaps = useMemo(() => {
+    const gaps = (epistemic as any)?.gaps;
+    return Array.isArray(gaps) ? gaps : [];
+  }, [epistemic]);
+
+  const versionDiffs = useMemo(() => {
+    const diffs = (epistemic as any)?.refresh_diff?.claim_diffs;
+    return Array.isArray(diffs) ? diffs : [];
+  }, [epistemic]);
+
+  // Hero figure: first section image with a source. Rendered as the plate
+  // figure; the matching block is dropped below so it never shows twice.
+  const heroMedia = useMemo(() => {
+    for (const sec of article?.sections ?? []) {
+      const m = (sec.media ?? []).find((mm: any) => mm.type === "image" && mm.src);
+      if (m) return m;
+    }
+    return null;
+  }, [article]);
+
+  // Reading flow through the shared block pipeline (figures, diagrams,
+  // charts, maps, timeline) with inline claim chips. Server blocks win when
+  // present; citations + related-articles stay custom below (journal ledger).
+  const contentBlocks = useMemo(() => {
+    if (!article) return [];
+    const dropHeading = (text: string) => /^(citations|related articles)$/i.test((text ?? "").trim());
+    if (article.blocks && article.blocks.length > 0) {
+      return article.blocks.filter((b: any) => {
+        if (b.type === "citation" || b.type === "crossref") return false;
+        if (b.type === "heading" && dropHeading(b.data?.text)) return false;
+        if (b.type === "image" && heroMedia && b.data?.src === (heroMedia as any).src) return false;
+        return true;
+      });
+    }
+    const all = articleToBlocks(
+      slug,
+      article.title || "",
+      "",
+      (article.sections ?? []) as any,
+      (article.timeline ?? []) as any,
+      [],
+      [],
+    );
+    return all.filter((b: any) => {
+      if (b.type === "heading" && b.data?.level === 1) return false;
+      if (b.type === "image" && heroMedia && b.data?.src === (heroMedia as any).src) return false;
+      return true;
+    });
+  }, [article, slug, heroMedia]);
+
+  const handleChipSelect = useCallback(
+    (id: string) => {
+      const found = epistemicClaims.find((c) => c.id === id);
+      if (found) setSelectedClaim(found);
+    },
+    [epistemicClaims],
+  );
+
+  const tourSteps = useMemo<TourStep[]>(() => {
+    const sections = article?.sections ?? [];
+    if (sections.length < 2) return [];
+    return sections.slice(0, 8).map((sec: any) => ({
+      title: sec.title || "Untitled section",
+      excerpt: String(sec.content || "").slice(0, 140) || "Continue reading…",
+    }));
+  }, [article]);
+
+  // Cross-article traversal: same assertion disputed in other articles.
+  // Matched by claim signature, falling back to normalized text (global graph
+  // nodes carry no signature). Fetched lazily — only while the drawer is open.
+  const [elsewhere, setElsewhere] = useState<
+    Array<{ id: string; slug: string; title: string; text: string; status: string; confidence: number }>
+  >([]);
+  useEffect(() => {
+    let cancelled = false;
+    setElsewhere([]);
+    if (!selectedClaim) return;
+    const norm = (t: string) => (t || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const wantSig = (selectedClaim as any).signature || "";
+    const wantText = norm(selectedClaim.text);
+    fetchGlobalClaimGraph(150, 0)
+      .then((g) => {
+        if (cancelled || !g) return;
+        const out: typeof elsewhere = [];
+        for (const n of (g.nodes as any[]) ?? []) {
+          if (n?.type !== "claim" || n.article_slug === slug) continue;
+          const st = String(n.status || "").toLowerCase();
+          if (!["disputed", "weak", "contested"].includes(st)) continue;
+          const match =
+            (wantSig && (n as any).signature && (n as any).signature === wantSig) ||
+            (wantText && norm(n.label || "") === wantText);
+          if (!match) continue;
+          out.push({
+            id: n.id,
+            slug: n.article_slug,
+            title: n.article_title || n.article_slug,
+            text: n.label || "",
+            status: n.status,
+            confidence: n.confidence ?? 0,
+          });
+          if (out.length >= 5) break;
+        }
+        setElsewhere(out);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedClaim, slug]);
+
   const { data: quota } = useQuota();
   const { mutate: generateArticle } = useGenerateArticle();
   const { mutate: refreshArticle } = useRefreshArticle();
-  const { data: status } = useArticleStatus(generating ? slug : undefined);
-  const trackedRef = useRef(false);
+  const { data: status } = useArticleStatus(generating ? slug : undefined);  const trackedRef = useRef(false);
   const trackView = useTrackView();
 
   if (slug && !trackedRef.current) {
@@ -176,7 +317,7 @@ export default function ArticleClient({
   if (!article && !generating) {
     return (
       <div className="py-20 px-6 max-w-md mx-auto text-center space-y-6">
-        <div className="font-display text-4xl text-gold">❖</div>
+        <img src="/logo-icon.png" alt="" aria-hidden width={56} height={56} className="w-14 h-14 rounded-sharp object-contain mx-auto" />
         <div className="space-y-2">
           <h1 className="font-display text-3xl font-bold text-ink capitalize">
             {slug.replace(/-/g, " ")}
@@ -241,7 +382,7 @@ export default function ArticleClient({
 
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <section className={`${containerClass} mx-auto transition-all duration-300`}>
+      <section ref={readingRef} className={`${containerClass} mx-auto transition-all duration-300`}>
         {/* Masthead */}
         <div className="plate-head">
           <div className="plate-folio">
@@ -264,7 +405,16 @@ export default function ArticleClient({
           <div className="plate-rule" />
 
           {/* Quick Actions */}
-          <div className="flex items-center gap-4 pt-3 text-xs font-medium">
+          <div className="flex items-center gap-4 pt-3 text-xs font-medium flex-wrap">
+            {tourSteps.length > 0 && (
+              <button
+                onClick={() => setTourOpen(true)}
+                className="text-ink font-semibold underline decoration-gold decoration-2 underline-offset-4 hover:text-gold transition-colors cursor-pointer"
+                title="Guided reading tour"
+              >
+                Take the tour
+              </button>
+            )}
             <button
               onClick={handleRefresh}
               disabled={generating}
@@ -290,29 +440,32 @@ export default function ArticleClient({
           </div>
         </div>
 
-        {/* Section 1: Introduction & Body Text */}
+        {/* Hero figure */}
+        {heroMedia && (
+          <div className="mt-8">
+            <MediaImage
+              src={(heroMedia as any).src}
+              caption={(heroMedia as any).caption}
+              source={(heroMedia as any).source}
+              prompt={(heroMedia as any).prompt}
+            />
+          </div>
+        )}
+
+        {/* Reading flow: sections, figures, diagrams, chronology */}
         <div className="py-8">
-          <h2 className="font-display text-2xl font-bold text-ink mb-4">Overview</h2>
-            <div className="t-body text-ink-secondary">
-              {article.sections && article.sections.length > 0 ? (
-                article.sections.map((sec, idx) => (
-                  <div key={idx} className="mb-5">
-                    {sec.title && idx > 0 && (
-                      <h3 className="font-display font-bold text-xl text-ink mt-8 mb-3">
-                        {sec.title}
-                      </h3>
-                    )}
-                    <p className={idx === 0 ? "drop-cap" : undefined}>
-                      {sec.content}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <p className="font-sans text-sm text-muted">
-                  Full article body is still being synthesized for this entry. Claims and citations below reflect verified pipeline output.
-                </p>
-              )}
-            </div>
+          {contentBlocks.length > 0 ? (
+            <BlockRenderer
+              blocks={contentBlocks as any}
+              claimsIndex={claimsIndex}
+              activeClaimId={selectedClaim?.id ?? null}
+              onClaimSelect={handleChipSelect}
+            />
+          ) : (
+            <p className="font-sans text-sm text-muted">
+              Full article body is still being synthesized for this entry. Claims and citations below reflect verified pipeline output.
+            </p>
+          )}
 
           {/* Infobox — only when the article carries real metadata */}
           {((article.citations?.length ?? 0) > 0 || (article.categories?.length ?? 0) > 0) && (
@@ -355,6 +508,9 @@ export default function ArticleClient({
           </>
         )}
 
+        {/* Check yourself — auto-quiz drawn from this article's claims */}
+        <QuizCard claims={epistemicClaims} />
+
         {/* Section 4: Primary Literature Bibliography */}
         <div className="py-8">
           <h2 className="font-display text-2xl font-bold text-ink mb-4">
@@ -388,13 +544,46 @@ export default function ArticleClient({
             <p className="font-serif italic text-muted">No citations recorded yet.</p>
           )}
         </div>
+
+        {/* Related entries */}
+        {article.crossrefs && article.crossrefs.length > 0 && (
+          <div className="py-8">
+            <h2 className="font-display text-2xl font-bold text-ink mb-4">Related entries</h2>
+            <div className="ledger">
+              {article.crossrefs.map((cr: any, idx: number) => (
+                <Link key={cr.id || idx} href={`/article/${cr.id}`} className="ledger-row group">
+                  <span className="index-numeral">{String(idx + 1).padStart(2, "0")}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block font-display text-lg font-semibold text-ink group-hover:text-gold transition-colors truncate">
+                      {cr.title || cr.id}
+                    </span>
+                    {cr.relationship && (
+                      <span className="block text-xs text-muted truncate mt-0.5">{cr.relationship}</span>
+                    )}
+                  </span>
+                  <span className="text-subtle group-hover:text-gold transition-colors shrink-0" aria-hidden>›</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
-      {/* Claim Detail Modal */}
+      {/* Claim trail drawer */}
       <ClaimDetailModal
         claim={selectedClaim}
+        allClaims={epistemicClaims}
+        edges={graphEdges}
+        gaps={articleGaps}
+        versionDiffs={versionDiffs}
+        elsewhere={elsewhere}
+        onNavigate={(c) => setSelectedClaim(c)}
         onClose={() => setSelectedClaim(null)}
       />
+
+      {tourOpen && tourSteps.length > 0 && (
+        <ArticleTour steps={tourSteps} scrollRoot={readingRef} onClose={() => setTourOpen(false)} />
+      )}
     </div>
   );
 }

@@ -16,6 +16,10 @@ const CHIP_COLORS: Record<string, { dot: string; bg: string; border: string }> =
 export function ProvenanceChipInline({ claimId, status, active, onSelect, n, titleText }: { claimId: string; status?: string; active?: boolean; onSelect?: (id: string) => void; n?: number | null; titleText?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
+  // Hover previews the popover; click pins it open (hover-leave then won't
+  // close it) and selects the claim for the full trail drawer.
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openedByHover = useRef(false);
 
   const s = status || "unknown";
   const colors = CHIP_COLORS[s] || CHIP_COLORS.unknown;
@@ -47,24 +51,52 @@ export function ProvenanceChipInline({ claimId, status, active, onSelect, n, tit
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        openedByHover.current = false;
+        setOpen(false);
+      }
     }
     if (open) {
       document.addEventListener("mousedown", handleClick);
       return () => document.removeEventListener("mousedown", handleClick);
     }
-  }, [open]);
+  }, [open ]);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    };
+  }, []);
 
   const freshnessColor = freshness === null ? "#888" : freshness > 0.7 ? "#2b7a4b" : freshness > 0.4 ? "#b87a2e" : "#b33c3c";
 
   const handleChipClick = () => {
+    if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null; }
+    openedByHover.current = false;
     setOpen(!open);
     onSelect?.(claimId);
     articleBus.emit({ type: "CLAIM_CLICKED", payload: { claimId, text: titleText } });
   };
 
+  const handleMouseEnter = () => {
+    if (open || hoverTimer.current) return;
+    hoverTimer.current = setTimeout(() => {
+      hoverTimer.current = null;
+      openedByHover.current = true;
+      setOpen(true);
+    }, 450);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null; }
+    if (openedByHover.current) {
+      openedByHover.current = false;
+      setOpen(false);
+    }
+  };
+
   return (
-    <span ref={ref} className="cite-wrap">
+    <span ref={ref} className="cite-wrap" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
       <button
         onClick={handleChipClick}
         className={"cite-mark" + (active ? " cite-active" : "")}

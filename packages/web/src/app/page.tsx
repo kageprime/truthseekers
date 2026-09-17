@@ -101,9 +101,22 @@ export default function HomePage() {
         <section className="py-8">
           <div className="flex items-baseline justify-between mb-4">
             <h2 className="font-display text-2xl font-bold text-ink">Index of entries</h2>
+          <div className="flex items-baseline gap-4">
+            {articles.length > 1 && (
+              <button
+                onClick={() => {
+                  const pick = articles[Math.floor(Math.random() * articles.length)];
+                  if (pick?.slug) router.push(`/article/${pick.slug}`);
+                }}
+                className="category-link no-underline text-sm font-medium cursor-pointer"
+              >
+                Surprise me →
+              </button>
+            )}
             <Link href="/articles" className="category-link no-underline text-sm font-medium">
               View all →
             </Link>
+          </div>
           </div>
           {domains.length > 0 ? (
             <div className="ledger">

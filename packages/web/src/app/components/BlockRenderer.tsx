@@ -101,12 +101,16 @@ export default function BlockRenderer({
   claimsIndex,
   dissentMode = false,
   citeNumbers,
+  activeClaimId,
+  onClaimSelect,
 }: {
   blocks: Block[];
   compact?: boolean;
   claimsIndex?: Record<string, { status?: string; derived_confidence?: number; text?: string }>;
   dissentMode?: boolean;
   citeNumbers?: Record<string, number> | null;
+  activeClaimId?: string | null;
+  onClaimSelect?: (id: string) => void;
 }) {
   // Citation numbers across this list when the caller didn't supply an
   // article-level map (chat messages number their own scope).
@@ -152,6 +156,8 @@ export default function BlockRenderer({
           figureNum={figureNums[i]}
           claimsIndex={claimsIndex}
           dissentMode={dissentMode}
+          activeClaimId={activeClaimId}
+          onClaimSelect={onClaimSelect}
           citeNumbers={numbers}
         />
       ))}
