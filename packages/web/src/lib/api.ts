@@ -433,6 +433,16 @@ export async function fetchClaimEvidence(claimId: string): Promise<{ evidence: a
   return res.json();
 }
 
+export async function submitClaimEvidence(claimId: string, url: string, note: string): Promise<any | null> {
+  if (MOCK) return null;
+  const res = await authed(`/claims/${claimId}/evidence`, {
+    method: "POST",
+    body: JSON.stringify({ url, note, supports_claim: false, type: "primary_document" }),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export interface FreshnessInfo {
   slug: string;
   overall_score: number;

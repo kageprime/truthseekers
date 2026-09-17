@@ -10,7 +10,6 @@ import type { AgentEvent } from "../../components/ProcessViewer";
 import ChatMessage from "../../components/ChatMessage";
 import EmptyChatState from "../../components/EmptyChatState";
 import TruthConsole from "../../components/TruthConsole";
-import RetroWindow from "../../components/retro/RetroWindow";
 import { canSeeAdmin } from "@/lib/routes";
 import { useAuth } from "../../hooks/useAuth";
 import { useTraceSegments } from "../../components/truth-console/useTraceSegments";
@@ -185,9 +184,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const showEmpty = !convLoading && messages.length === 0 && !hasStreaming;
 
   return (
-    <RetroWindow title={`TruthSeekers — Chat`} status={sending ? "Agent thinking…" : "Ready"} fixed>
+    <div className="py-6 px-4 sm:px-8 w-full max-w-5xl mx-auto">
       {/* ponytail: fixed shell → this fills the viewport; messages scroll, sessions + composer stay pinned. */}
-      <div className="flex-1 flex flex-col md:flex-row h-full min-h-0 min-w-0 bg-[var(--r-surface)] rounded-[var(--r-radius)] overflow-hidden transition-colors duration-200 border border-[var(--r-border)]">
+      <div className="flex-1 flex flex-col md:flex-row h-full min-h-0 min-w-0 bg-white rounded-2xl overflow-hidden border border-zinc-200">
         {/* Mobile Header Bar - Native App Style */}
         <div className="md:hidden shrink-0 flex items-center justify-between px-3 h-12 bg-[var(--r-nav-bg)] border-b border-[var(--r-border)] gap-2 shadow-xs">
           <div className="flex items-center gap-1.5">
@@ -521,6 +520,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           </div>
         )}
       </div>
-    </RetroWindow>
+    </div>
   );
 }

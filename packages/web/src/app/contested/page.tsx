@@ -22,41 +22,7 @@ export default function ContestedPage() {
     confidence_vector?: Record<string, number>;
   }> | undefined) ?? [];
 
-  // Fallback demo claims if DB has no contested entries yet
-  const displayClaims = claims.length > 0 ? claims : [
-    {
-      id: "contested-1",
-      text: "Classical Summit supercomputer 2.5-day simulation assertion for 53-qubit array.",
-      status: "contested",
-      derived_confidence: 0.68,
-      article_slug: "quantum-computing",
-      confidence_vector: { contradiction_level: 0.84 },
-    },
-    {
-      id: "contested-2",
-      text: "Spinosaurus obligate aquatic diving locomotion and subaqueous pursuit predation.",
-      status: "contested",
-      derived_confidence: 0.55,
-      article_slug: "spinosaurus-anatomy",
-      confidence_vector: { contradiction_level: 0.79 },
-    },
-    {
-      id: "contested-3",
-      text: "Younger Dryas impact hypothesis platinum anomaly as evidence of extraterrestrial bolide.",
-      status: "contested",
-      derived_confidence: 0.61,
-      article_slug: "younger-dryas-boundary",
-      confidence_vector: { contradiction_level: 0.76 },
-    },
-    {
-      id: "contested-4",
-      text: "Muon g-2 anomaly standard model deviation confirming fifth fundamental force.",
-      status: "contested",
-      derived_confidence: 0.74,
-      article_slug: "muon-g2-experiment",
-      confidence_vector: { contradiction_level: 0.65 },
-    },
-  ];
+  const displayClaims = claims;
 
   const containerClass = widthMode === "expanded" ? "max-w-5xl" : "max-w-3xl";
 
@@ -108,6 +74,13 @@ export default function ContestedPage() {
         </div>
 
         {/* List of Contested Claims */}
+        {loading ? (
+          <div className="py-16 text-center text-sm text-zinc-500">Loading contested claims…</div>
+        ) : displayClaims.length === 0 ? (
+          <div className="rounded-2xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500">
+            No contested claims recorded yet. Generate articles to populate the registry.
+          </div>
+        ) : (
         <div className="rounded-2xl border border-zinc-200 divide-y divide-zinc-100 overflow-hidden bg-white shadow-xs">
           {displayClaims.map((claim, idx) => {
             const contraLevel = claim.confidence_vector?.contradiction_level ?? 0.75;
@@ -135,7 +108,7 @@ export default function ContestedPage() {
                   </div>
 
                   <div className="space-y-1.5 min-w-0 flex-1">
-                    <div className="text-sm font-semibold text-zinc-900 group-hover:text-amber-800 transition-colors">
+                    <div className="text-sm font-semibold text-zinc-900 group-hover:text-zinc-600 transition-colors">
                       {claim.text}
                     </div>
 
@@ -144,7 +117,7 @@ export default function ContestedPage() {
                         <Link
                           href={`/article/${claim.article_slug}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-blue-600 hover:underline font-medium"
+                          className="text-zinc-900 underline decoration-zinc-300 hover:decoration-zinc-900 font-medium"
                         >
                           Topic: {claim.article_slug.replace(/-/g, " ")}
                         </Link>
@@ -185,6 +158,7 @@ export default function ContestedPage() {
             );
           })}
         </div>
+        )}
       </div>
 
       {/* Claim Modal */}

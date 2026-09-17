@@ -4,8 +4,6 @@ import { useEffect, useRef, useCallback } from "react";
 import { progressUrl } from "@/lib/api";
 import type { AgentEvent } from "../components/ProcessViewer";
 
-import { retroAudio } from "@/lib/retroAudio";
-
 export interface ProgressState {
   phase: string;
   error?: string;
@@ -67,7 +65,6 @@ export function useArticleProgress(
     });
 
     es.addEventListener("article_complete", () => {
-      retroAudio.playChime();
       cbRef.current.onPhase?.("done");
       cbRef.current.onDone?.();
       es.close();

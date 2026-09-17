@@ -13,16 +13,12 @@ interface InfoboxCardProps {
 }
 
 export default function InfoboxCard({
-  title = "QUBIT ARRAY / IBM CONDOR ARCHITECTURE",
-  subtitle = "Hardware Infobox",
+  title = "Infobox",
+  subtitle = "Corpus Infobox",
   gradient = "from-zinc-900 via-zinc-800 to-zinc-900",
-  facts = [
-    { label: "Qubits", value: "1,121 Transmons" },
-    { label: "Coherence", value: "~100 μs" },
-    { label: "Sub-Kelvin Temp", value: "15 mK (Dilution)" },
-    { label: "First Theory", value: "1980 (Benioff)" },
-  ],
+  facts = [],
 }: InfoboxCardProps) {
+  if (!facts || facts.length === 0) return null;
   return (
     <div className="rounded-2xl overflow-hidden border border-zinc-200 bg-white shadow-xs my-6">
       {/* Header Plate */}

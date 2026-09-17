@@ -12,17 +12,14 @@ export default function DockedSidebar() {
   const { data: contestedRes } = useContestedClaims(10);
   const { data: gapsRes } = useAllGaps();
 
-  const contestedCount = Array.isArray((contestedRes as any)?.claims)
-    ? (contestedRes as any).claims.length
-    : Array.isArray(contestedRes)
-    ? (contestedRes as any).length
-    : 42;
+  const contestedClaims = Array.isArray((contestedRes as any)?.claims)
+    ? (contestedRes as any).claims
+    : [];
+  const contestedCount = contestedClaims.length;
 
-  const gapsCount = Array.isArray((gapsRes as any)?.gaps)
-    ? (gapsRes as any).gaps.length
-    : Array.isArray(gapsRes)
-    ? (gapsRes as any).length
-    : 18;
+  const gapsList = Array.isArray((gapsRes as any)?.gaps) ? (gapsRes as any).gaps : [];
+  const gapsCount = gapsList.length;
+  const trendingGaps = gapsList.slice(0, 4);
 
   if (!sidebarOpen) {
     return null;
@@ -77,7 +74,7 @@ export default function DockedSidebar() {
             <span>Living Portal</span>
           </div>
           <span className={`text-[11px] font-mono ${isCurrent("/") && pathname === "/" ? "text-zinc-300" : "text-zinc-400"}`}>
-            {health?.article_count ?? "1.4k"}
+            {health?.article_count ?? "—"}
           </span>
         </Link>
 
@@ -124,7 +121,7 @@ export default function DockedSidebar() {
         </Link>
 
         <Link
-          href="/maps/ancient-trade-routes"
+          href="/maps"
           className={`w-full text-left px-3 py-2 rounded-xl flex items-center gap-2.5 no-underline transition-colors ${
             isCurrent("/maps")
               ? "bg-zinc-900 text-white font-semibold shadow-xs"
@@ -158,38 +155,36 @@ export default function DockedSidebar() {
       {/* Trending Epistemic Searches */}
       <div className="pt-4 border-t border-zinc-100 space-y-2">
         <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-          Live Epistemic Search
+          Open Gaps Needing Evidence
         </div>
-        <div className="space-y-1.5 text-xs text-zinc-600 font-medium">
-          <Link
-            href="/article/crispr-gene-drives"
-            className="flex items-center justify-between p-1.5 rounded-lg hover:bg-zinc-50 cursor-pointer no-underline text-zinc-700 hover:text-zinc-900"
-          >
-            <span className="truncate">CRISPR gene drives</span>
-            <span className="text-emerald-600 font-mono text-[10px] shrink-0">+142%</span>
-          </Link>
-          <Link
-            href="/article/kingdom-of-benin"
-            className="flex items-center justify-between p-1.5 rounded-lg hover:bg-zinc-50 cursor-pointer no-underline text-zinc-700 hover:text-zinc-900"
-          >
-            <span className="truncate">Kingdom of Benin walls</span>
-            <span className="text-emerald-600 font-mono text-[10px] shrink-0">+98%</span>
-          </Link>
-          <Link
-            href="/article/quantum-computing"
-            className="flex items-center justify-between p-1.5 rounded-lg hover:bg-zinc-50 cursor-pointer no-underline text-zinc-700 hover:text-zinc-900"
-          >
-            <span className="truncate">Quantum Computing</span>
-            <span className="text-emerald-600 font-mono text-[10px] shrink-0">+76%</span>
-          </Link>
-          <Link
-            href="/article/photosynthesis"
-            className="flex items-center justify-between p-1.5 rounded-lg hover:bg-zinc-50 cursor-pointer no-underline text-zinc-700 hover:text-zinc-900"
-          >
-            <span className="truncate">Photosynthesis Z-scheme</span>
-            <span className="text-emerald-600 font-mono text-[10px] shrink-0">+54%</span>
-          </Link>
-        </div>
+        {trendingGaps.length > 0 ? (
+          <div className="space-y-1.5 text-xs text-zinc-600 font-medium">
+            {trendingGaps.map((g: any) => (
+              <Link
+                key={g.id}
+                href={`/article/${g.article_slug}`}
+                className="flex items-center justify-between p-1.5 rounded-lg hover:bg-zinc-50 cursor-pointer no-underline text-zinc-700 hover:text-zinc-900"
+              >
+                <span className="truncate">{g.claim_text?.slice(0, 48) ?? g.gap_type}</span>
+                <span className="text-zinc-700 font-mono text-[10px] shrink-0">{g.upvotes ?? 0}▲</span>
+              </Link>
+            ))}
+          </div>
+        ) : contestedClaims.length > 0 ? (
+          <div className="space-y-1.5 text-xs text-zinc-600 font-medium">
+            {contestedClaims.slice(0, 4).map((c: any) => (
+              <Link
+                key={c.id}
+                href={c.article_slug ? `/article/${c.article_slug}` : "/contested"}
+                className="block p-1.5 rounded-lg hover:bg-zinc-50 cursor-pointer no-underline text-zinc-700 hover:text-zinc-900 truncate"
+              >
+                {c.text?.slice(0, 60)}
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[11px] text-zinc-400 leading-snug">No open gaps yet — new evidence needs will appear here.</p>
+        )}
       </div>
 
       {/* Veritas Autonomous CMS Banner */}
@@ -205,7 +200,7 @@ export default function DockedSidebar() {
         </p>
         <Link
           href="/chat/new"
-          className="inline-block text-[11px] font-bold text-zinc-900 hover:text-blue-600 hover:underline pt-1 no-underline"
+          className="inline-block text-[11px] font-bold text-zinc-900 underline decoration-zinc-300 hover:decoration-zinc-900 pt-1 no-underline"
         >
           Consult Veritas Co-Manager →
         </Link>

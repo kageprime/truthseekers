@@ -33,17 +33,17 @@
   /* Typewriter voice — plate labels, folios, file rows. Loaded in layout. */
   --font-typewriter: 'IBM Plex Mono', ui-monospace, monospace;
 
-  /* Surface — aged paper */
-  --surface: #f5efe0;
-  --surface-rgb: 245, 239, 224;
-  --surface-elevated: #fbf6e9;
-  --surface-elevated-rgb: 251, 246, 233;
-  --paper-edge: #e8dcc0;
+  /* Surface — luxury editorial canvas (#FCFCF9) */
+  --surface: #FCFCF9;
+  --surface-rgb: 252, 252, 249;
+  --surface-elevated: #ffffff;
+  --surface-elevated-rgb: 255, 255, 255;
+  --paper-edge: #e7e5e0;
 
   /* Ink */
-  --ink: #1a1612;
-  --ink-rgb: 26, 22, 18;
-  --ink-secondary: #3d3528;
+  --ink: #18181B;
+  --ink-rgb: 24, 24, 27;
+  --ink-secondary: #3f3f46;
   --muted: #6b6048;
   --subtle: #a99c7a;
   --subtle-rgb: 169, 156, 122;

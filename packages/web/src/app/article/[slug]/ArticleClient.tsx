@@ -63,31 +63,7 @@ export default function ArticleClient({
         evidence: c.evidence,
       }));
     }
-
-    // Default fallback claims for foundational articles
-    return [
-      {
-        id: "claim-1",
-        text: "Computational advantage demonstrated across 53-qubit superconducting transmon array.",
-        status: "verified",
-        derived_confidence: 0.96,
-        source_title: "Nature 574, 505–510 · Quantum Supremacy Team",
-      },
-      {
-        id: "claim-2",
-        text: "Classical Summit supercomputer 2.5-day simulation counter-assertion.",
-        status: "contested",
-        derived_confidence: 0.72,
-        source_title: "IBM Research counter-assertion · Secondary tensor contraction",
-      },
-      {
-        id: "claim-3",
-        text: "Coherence times achieved exceeding 100 microseconds under 15mK dilution refrigeration.",
-        status: "verified",
-        derived_confidence: 0.98,
-        source_title: "Physical Review Letters · Qubit Coherence Metrics",
-      },
-    ];
+    return [];
   }, [epistemic]);
 
   const { data: quota } = useQuota();
@@ -256,9 +232,12 @@ export default function ArticleClient({
 
   if (!article) return null;
 
-  const category = article.categories?.[0] || "Foundational Science";
+  const category = article.categories?.[0] || "Research Entry";
   const title = article.title || slug.replace(/-/g, " ");
-  const abstract = article.abstract || "Comprehensive multi-agent verified research entry with empirical citations and confidence vectors.";
+  const abstract = article.abstract || "";
+  const showCalc = /quantum|qubit|hilbert|comput|physic|relativ|transformer|crispr/i.test(
+    `${slug} ${category} ${title}`
+  );
 
   const containerClass = widthMode === "expanded" ? "max-w-5xl" : "max-w-3xl";
 
@@ -274,7 +253,9 @@ export default function ArticleClient({
               </span>
               <span className="text-zinc-300">•</span>
               <span className="text-zinc-500 text-xs">
-                Verified Literature · {article.citations?.length || 31} Sources
+                {article.citations?.length
+                  ? `Verified Literature · ${article.citations.length} Sources`
+                  : "Research Entry"}
               </span>
             </div>
 
@@ -309,16 +290,18 @@ export default function ArticleClient({
             {title}
           </h1>
 
-          <p className="font-serif text-lg sm:text-xl text-zinc-700 italic leading-relaxed pt-1">
-            {abstract}
-          </p>
+          {abstract && (
+            <p className="font-serif text-lg sm:text-xl text-zinc-700 italic leading-relaxed pt-1">
+              {abstract}
+            </p>
+          )}
         </div>
 
         {/* Section 1: Introduction & Body Text */}
         <div className="space-y-6">
           <div className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-              1. Overview & Theoretical Framework
+              Overview
             </h2>
             <div className="space-y-4 font-serif text-lg text-zinc-800 leading-[1.6]">
               {article.sections && article.sections.length > 0 ? (
@@ -340,47 +323,52 @@ export default function ArticleClient({
                   </div>
                 ))
               ) : (
-                <>
-                  <p>
-                    <span className="float-left text-5xl font-extrabold text-zinc-900 pr-3 leading-none font-sans">
-                      {title.slice(0, 1)}
-                    </span>
-                    {title.slice(1)} represents a foundational domain of empirical research and formal epistemological inquiry. The exploration of this subject bridges fundamental physical mechanics, computational theory, and rigorous observational data.
-                  </p>
-                  <p>
-                    Through multi-agent synthesis and continuous counter-evidence evaluation, empirical models are mapped to primary literature citations, establishing confidence intervals and isolating open evidentiary fault lines.
-                  </p>
-                </>
+                <p className="text-sm text-zinc-500 font-sans">
+                  Full article body is still being synthesized for this entry. Claims and citations below reflect verified pipeline output.
+                </p>
               )}
             </div>
           </div>
 
-          {/* Infobox Plate */}
-          <InfoboxCard
-            title={`${title.toUpperCase()} SPECIFICATION`}
-            subtitle="Corpus Infobox"
-            facts={[
-              { label: "Corpus Citations", value: `${article.citations?.length || 31} Verified` },
-              { label: "Empirical Status", value: "Verified & Active" },
-              { label: "Domain Class", value: category },
-              { label: "Confidence Index", value: "96.4% Empirical" },
-            ]}
-          />
+          {/* Infobox Plate — only when the article carries real metadata */}
+          {((article.citations?.length ?? 0) > 0 || (article.categories?.length ?? 0) > 0) && (
+            <InfoboxCard
+              title={title.toUpperCase()}
+              subtitle="Corpus Infobox"
+              facts={[
+                ...(article.citations?.length
+                  ? [{ label: "Citations", value: `${article.citations.length} Verified` }]
+                  : []),
+                ...(article.categories?.length
+                  ? [{ label: "Domain", value: article.categories[0] }]
+                  : []),
+                ...((article as any).updated_at
+                  ? [{ label: "Updated", value: new Date((article as any).updated_at).toLocaleDateString() }]
+                  : []),
+              ]}
+            />
+          )}
         </div>
 
-        {/* Section 2: Grouped Empirical Propositions (Meta Style) */}
-        <GroupedClaimsList
-          claims={epistemicClaims}
-          onSelectClaim={(c) => setSelectedClaim(c)}
-        />
+        {/* Section 2: Empirical Propositions */}
+        {epistemicClaims.length > 0 ? (
+          <GroupedClaimsList
+            claims={epistemicClaims}
+            onSelectClaim={(c) => setSelectedClaim(c)}
+          />
+        ) : (
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 text-sm text-zinc-500">
+            No verified claims recorded for this entry yet.
+          </div>
+        )}
 
-        {/* Section 3: Interactive Formula Simulator */}
-        <InteractiveCalcCard />
+        {/* Section 3: Interactive Formula Simulator — only for quantitative topics */}
+        {showCalc && <InteractiveCalcCard />}
 
         {/* Section 4: Primary Literature Bibliography */}
         <div className="space-y-4 pt-6 border-t border-zinc-200">
           <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-            4. Primary Literature Citations ({article.citations?.length || 2})
+            Primary Literature Citations{article.citations?.length ? ` (${article.citations.length})` : ""}
           </h2>
           <div className="space-y-2.5 text-xs text-zinc-600">
             {article.citations && article.citations.length > 0 ? (
@@ -397,7 +385,7 @@ export default function ArticleClient({
                         href={cite.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-blue-600 hover:underline truncate block mt-0.5"
+                        className="text-zinc-900 underline decoration-zinc-300 hover:decoration-zinc-900 truncate block mt-0.5"
                       >
                         {cite.url}
                       </a>
@@ -406,22 +394,7 @@ export default function ArticleClient({
                 </div>
               ))
             ) : (
-              <>
-                <div className="p-3.5 rounded-xl bg-white border border-zinc-200 flex items-start gap-3 shadow-xs">
-                  <span className="font-mono text-zinc-400 font-bold shrink-0">[1]</span>
-                  <div>
-                    <div className="font-semibold text-zinc-900">Nielsen & Chuang (2010)</div>
-                    <div className="text-zinc-500">Quantum Computation and Quantum Information, Cambridge University Press.</div>
-                  </div>
-                </div>
-                <div className="p-3.5 rounded-xl bg-white border border-zinc-200 flex items-start gap-3 shadow-xs">
-                  <span className="font-mono text-zinc-400 font-bold shrink-0">[2]</span>
-                  <div>
-                    <div className="font-semibold text-zinc-900">Preskill (2021)</div>
-                    <div className="text-zinc-500">Quantum Computing 40 years later, arXiv:2106.10561.</div>
-                  </div>
-                </div>
-              </>
+              <p className="text-sm text-zinc-500">No citations recorded yet.</p>
             )}
           </div>
         </div>

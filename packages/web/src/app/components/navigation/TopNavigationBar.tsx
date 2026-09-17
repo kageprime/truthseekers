@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/navigation";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-import NextLink from "next/link";
 import { useUiMode } from "../../context/UiModeContext";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -55,14 +54,14 @@ export default function TopNavigationBar() {
 
         {/* Brand Logo & Breadcrumb */}
         <div className="flex items-center gap-2.5 min-w-0">
-          <NextLink href="/" className="flex items-center gap-2 no-underline group shrink-0">
-            <div className="w-6 h-6 rounded bg-zinc-900 text-white flex items-center justify-center font-bold text-xs group-hover:bg-blue-600 transition-colors">
+          <Link href="/" className="flex items-center gap-2 no-underline group shrink-0">
+            <div className="w-6 h-6 rounded bg-zinc-900 text-white flex items-center justify-center font-bold text-xs group-hover:bg-zinc-700 transition-colors">
               ❖
             </div>
             <span className="font-bold text-sm tracking-tight text-zinc-900 hidden sm:inline">
               Truthseekers
             </span>
-          </NextLink>
+          </Link>
           <span className="text-zinc-300 font-light hidden sm:inline">/</span>
           <span className="text-xs font-medium text-zinc-600 truncate max-w-[140px] sm:max-w-[220px] md:max-w-xs capitalize">
             {breadcrumb}
@@ -72,7 +71,7 @@ export default function TopNavigationBar() {
 
       {/* Main View Tabs */}
       <nav className="hidden md:flex items-center gap-1 bg-zinc-100/80 p-1 rounded-xl text-xs font-medium border border-zinc-200/60" aria-label="Main Views">
-        <NextLink
+        <Link
           href="/"
           className={`px-3 py-1 rounded-lg transition-all no-underline ${
             isTabActive("/") && pathname === "/"
@@ -80,21 +79,21 @@ export default function TopNavigationBar() {
               : "text-zinc-600 hover:text-zinc-900"
           }`}
         >
-          🏛 Living Portal
-        </NextLink>
+          Portal
+        </Link>
 
-        <NextLink
-          href="/article/quantum-computing"
+        <Link
+          href="/articles"
           className={`px-3 py-1 rounded-lg transition-all no-underline ${
-            pathname.startsWith("/article/")
+            pathname.startsWith("/article") || pathname.startsWith("/articles")
               ? "bg-white text-zinc-900 shadow-xs font-semibold"
               : "text-zinc-600 hover:text-zinc-900"
           }`}
         >
-          📖 Article Reader
-        </NextLink>
+          Articles
+        </Link>
 
-        <NextLink
+        <Link
           href="/contested"
           className={`px-3 py-1 rounded-lg transition-all no-underline ${
             isTabActive("/contested")
@@ -102,21 +101,21 @@ export default function TopNavigationBar() {
               : "text-zinc-600 hover:text-zinc-900"
           }`}
         >
-          ⚖ Contested Ledger
-        </NextLink>
+          Contested
+        </Link>
 
-        <NextLink
-          href="/maps/ancient-trade-routes"
+        <Link
+          href="/maps"
           className={`px-3 py-1 rounded-lg transition-all no-underline ${
             isTabActive("/maps")
               ? "bg-white text-zinc-900 shadow-xs font-semibold"
               : "text-zinc-600 hover:text-zinc-900"
           }`}
         >
-          🗺 Spatial Maps
-        </NextLink>
+          Maps
+        </Link>
 
-        <NextLink
+        <Link
           href="/chat/new"
           className={`px-3 py-1 rounded-lg transition-all no-underline ${
             isTabActive("/chat")
@@ -124,8 +123,8 @@ export default function TopNavigationBar() {
               : "text-zinc-600 hover:text-zinc-900"
           }`}
         >
-          💬 Veritas Studio
-        </NextLink>
+          Veritas Studio
+        </Link>
       </nav>
 
       {/* Controls: 2-Mode Layout Toggle + User Profile */}
@@ -169,20 +168,20 @@ export default function TopNavigationBar() {
 
         {/* User Orb / Profile */}
         {user ? (
-          <NextLink
+          <Link
             href="/settings"
             className="w-8 h-8 rounded-full bg-zinc-900 text-white font-bold flex items-center justify-center text-xs shadow-xs no-underline hover:bg-zinc-800 transition-colors"
             title={user.name || user.email || "Account"}
           >
             {(user.name || user.email || "U").slice(0, 2).toUpperCase()}
-          </NextLink>
+          </Link>
         ) : (
-          <NextLink
+          <Link
             href="/login"
             className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-zinc-900 text-white hover:bg-zinc-800 transition-colors no-underline"
           >
             Sign in
-          </NextLink>
+          </Link>
         )}
       </div>
     </header>

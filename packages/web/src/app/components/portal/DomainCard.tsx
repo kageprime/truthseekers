@@ -16,9 +16,9 @@ export default function DomainCard({
   slug,
   title,
   category = "KNOWLEDGE",
-  abstract = "Comprehensive multi-agent verified research entry with empirical citations and confidence vectors.",
-  sourcesCount = 28,
-  confidence = 0.95,
+  abstract = "Autonomous empirical research entry.",
+  sourcesCount,
+  confidence,
   gradient,
 }: DomainCardProps) {
   // Derive gradient based on category if not explicitly provided
@@ -40,7 +40,7 @@ export default function DomainCard({
     return "from-zinc-900 via-zinc-800 to-zinc-900";
   };
 
-  const confidencePct = Math.round(confidence * 100);
+  const confidencePct = confidence != null ? Math.round(confidence * 100) : null;
 
   return (
     <Link
@@ -57,7 +57,7 @@ export default function DomainCard({
       {/* Body Content */}
       <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
         <div>
-          <h3 className="font-bold text-base text-zinc-900 group-hover:text-blue-600 transition-colors line-clamp-1">
+          <h3 className="font-bold text-base text-zinc-900 group-hover:text-zinc-600 transition-colors line-clamp-1">
             {title}
           </h3>
           <p className="text-xs text-zinc-500 mt-1 line-clamp-2 leading-relaxed">
@@ -69,11 +69,13 @@ export default function DomainCard({
         <div className="pt-3 border-t border-zinc-100 flex justify-between items-center text-xs text-zinc-500 font-medium">
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
-            <span>{sourcesCount} Sources</span>
+            <span>{sourcesCount != null ? `${sourcesCount} Sources` : "Research Entry"}</span>
           </span>
-          <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 font-mono text-[11px]">
-            {confidencePct}% Conf
-          </span>
+          {confidencePct != null && (
+            <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 font-mono text-[11px]">
+              {confidencePct}% Conf
+            </span>
+          )}
         </div>
       </div>
     </Link>

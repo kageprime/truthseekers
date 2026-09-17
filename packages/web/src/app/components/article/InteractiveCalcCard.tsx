@@ -38,14 +38,14 @@ export default function InteractiveCalcCard({
     <div className="rounded-2xl border border-zinc-200 p-6 sm:p-8 space-y-6 bg-white shadow-xs my-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
         <div>
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-600 mb-0.5">
+          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 mb-0.5">
             Interactive Epistemic Tool
           </div>
           <h3 className="text-base font-bold text-zinc-900">{title}</h3>
           <p className="text-xs text-zinc-500 mt-0.5">{formulaDescription}</p>
         </div>
-        <div className="sm:text-right bg-blue-50/50 sm:bg-transparent p-2.5 sm:p-0 rounded-xl">
-          <div className="text-xl sm:text-2xl font-mono font-bold text-blue-600">
+        <div className="sm:text-right bg-zinc-100/70 sm:bg-transparent p-2.5 sm:p-0 rounded-xl">
+          <div className="text-xl sm:text-2xl font-mono font-bold text-zinc-900">
             {calculateStates(qubits)}
           </div>
           <div className="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">
@@ -58,7 +58,7 @@ export default function InteractiveCalcCard({
       <div className="space-y-3">
         <div className="flex justify-between text-xs font-semibold text-zinc-700">
           <span>Transmon Qubits (N):</span>
-          <span className="font-mono text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded">
+          <span className="font-mono text-zinc-900 font-bold bg-zinc-100 px-2 py-0.5 rounded">
             {qubits} Qubits
           </span>
         </div>

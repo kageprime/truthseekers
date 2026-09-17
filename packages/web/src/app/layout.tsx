@@ -9,7 +9,6 @@ import { HeaderSearchProvider } from "./HeaderSearchContext";
 import { ArticleViewProvider } from "./ArticleViewContext";
 import { AuthProvider } from "./components/AuthProvider";
 import { TimeMachineProvider } from "./hooks/useTimeMachine";
-import { UiSettingsProvider } from "./context/UiSettingsContext";
 import { UiModeProvider } from "./context/UiModeContext";
 import TimeMachineBar from "./components/TimeMachineBar";
 import RegisterSw from "./components/RegisterSw";
@@ -61,16 +60,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <TimeMachineProvider>
                       <HeaderSearchProvider>
                         <ArticleViewProvider>
-                          <UiSettingsProvider>
-                            <UiModeProvider>
-                              <ToastProvider>
-                                <ScrollReveal />
-                                <RegisterSw />
-                                <TimeMachineBar />
-                                <AppShell>{children}</AppShell>
-                              </ToastProvider>
-                            </UiModeProvider>
-                          </UiSettingsProvider>
+                          <UiModeProvider>
+                            <ToastProvider>
+                              <ScrollReveal />
+                              <RegisterSw />
+                              <TimeMachineBar />
+                              <AppShell>{children}</AppShell>
+                            </ToastProvider>
+                          </UiModeProvider>
                         </ArticleViewProvider>
                       </HeaderSearchProvider>
                     </TimeMachineProvider>

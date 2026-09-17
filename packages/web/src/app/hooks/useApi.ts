@@ -311,6 +311,14 @@ export function useClaimEvidence(claimId: string | undefined) {
   return useApiQuery(["claim", claimId, "evidence"], () => api.fetchClaimEvidence(claimId!), { enabled: !!claimId });
 }
 
+export function useSubmitClaimEvidence() {
+  const queryClient = useQueryClient();
+  return useApiMutation(
+    ({ claimId, url, note }: { claimId: string; url: string; note: string }) => api.submitClaimEvidence(claimId, url, note),
+    { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["claim"] }) },
+  );
+}
+
 // ── Gap mutations ──
 
 export function useUpvoteGap() {

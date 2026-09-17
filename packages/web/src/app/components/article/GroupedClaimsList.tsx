@@ -21,8 +21,8 @@ interface GroupedClaimsListProps {
 export default function GroupedClaimsList({
   claims,
   onSelectClaim,
-  title = "2. Empirical Propositions & Scrutiny",
-  subtitle = "Click to view evidence citations and provenance",
+  title = "Empirical Propositions & Scrutiny",
+  subtitle = "Select a claim to view evidence and provenance",
 }: GroupedClaimsListProps) {
   if (!claims || claims.length === 0) {
     return null;
@@ -88,7 +88,7 @@ export default function GroupedClaimsList({
                   {index + 1}
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs sm:text-sm font-semibold text-zinc-900 group-hover:text-blue-600 transition-colors line-clamp-1">
+                  <div className="text-xs sm:text-sm font-semibold text-zinc-900 group-hover:text-zinc-600 transition-colors line-clamp-1">
                     {claim.text}
                   </div>
                   <div className="text-[11px] sm:text-xs text-zinc-500 truncate mt-0.5 flex items-center gap-1.5">

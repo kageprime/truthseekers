@@ -54,38 +54,7 @@ export default function GapsPage() {
   const filteredGaps =
     filter === "all" ? gaps : gaps.filter((g) => g.verification_status === filter);
 
-  // Fallback demo gaps if DB is empty
-  const displayGaps =
-    filteredGaps.length > 0
-      ? filteredGaps
-      : [
-          {
-            id: "gap-1",
-            claim_id: "c-101",
-            claim_text:
-              "Original alloy ratios in 13th-century Benin bronzes derived from local smelting rather than European manillas.",
-            gap_type: "missing_metallurgical_assay",
-            expected_artifact: "Lead isotope spectroscopy publication",
-            verification_status: "unverified_gap",
-            cause_label: "Scarce archival data",
-            article_slug: "kingdom-of-benin",
-            detected_at: new Date().toISOString(),
-            upvotes: 14,
-          },
-          {
-            id: "gap-2",
-            claim_id: "c-102",
-            claim_text:
-              "Fluxonium qubit coherence time scaling at sub-10mK temperatures in high-vacuum cryostats.",
-            gap_type: "unreplicated_experimental_run",
-            expected_artifact: "Independent lab replication dataset",
-            verification_status: "unverified_gap",
-            cause_label: "Recent preprint",
-            article_slug: "quantum-computing",
-            detected_at: new Date().toISOString(),
-            upvotes: 27,
-          },
-        ];
+  const displayGaps = filteredGaps;
 
   const containerClass = widthMode === "expanded" ? "max-w-5xl" : "max-w-3xl";
 
@@ -130,6 +99,13 @@ export default function GapsPage() {
         </div>
 
         {/* Gaps List */}
+        {loading ? (
+          <div className="py-16 text-center text-sm text-zinc-500">Loading evidence gaps…</div>
+        ) : displayGaps.length === 0 ? (
+          <div className="rounded-2xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500">
+            No open evidence gaps. Generate articles to surface research needs.
+          </div>
+        ) : (
         <div className="space-y-4">
           {displayGaps.map((g, idx) => (
             <div
@@ -144,7 +120,7 @@ export default function GapsPage() {
                     </span>
                     <Link
                       href={`/article/${g.article_slug}`}
-                      className="text-xs text-blue-600 font-semibold hover:underline"
+                      className="text-xs text-zinc-900 font-semibold underline decoration-zinc-300 hover:decoration-zinc-900"
                     >
                       Article: {g.article_slug.replace(/-/g, " ")}
                     </Link>
@@ -161,7 +137,7 @@ export default function GapsPage() {
                   className="px-3.5 py-2 rounded-xl bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-800 text-xs font-bold flex flex-col items-center gap-0.5 cursor-pointer shrink-0 transition-colors"
                   title="Upvote to prioritize investigation"
                 >
-                  <span className="text-blue-600">▲</span>
+                  <span className="text-zinc-700">▲</span>
                   <span className="font-mono text-xs">{g.upvotes ?? 0}</span>
                 </button>
               </div>
@@ -173,7 +149,7 @@ export default function GapsPage() {
                 </span>
                 <button
                   onClick={() => setSubmitting(submitting === g.id ? null : g.id)}
-                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer self-start sm:self-auto"
+                  className="text-xs font-semibold text-zinc-900 underline decoration-zinc-300 hover:decoration-zinc-900 cursor-pointer self-start sm:self-auto"
                 >
                   {submitting === g.id ? "Close" : "+ Submit Evidence Source"}
                 </button>
@@ -221,6 +197,7 @@ export default function GapsPage() {
             </div>
           ))}
         </div>
+        )}
       </div>
     </div>
   );

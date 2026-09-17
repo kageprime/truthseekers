@@ -10,7 +10,7 @@ export {
   useModels, useConnectors, useUpdateCredential, useUsageStats,
   useContestedClaims, useAllGaps, useStaleArticles,
   useArticleFreshness, useRefreshDiff, useArticleGraph, useArticleClaimGraph,
-  useArticleClaims, useArticleGaps, useClaimEvidence,
+  useArticleClaims, useArticleGaps, useClaimEvidence, useSubmitClaimEvidence,
   useArticleEpistemic, useGlobalClaimGraph,
   useUpvoteGap, useSubmitGapEvidence,
   useQueue, useCancelQueueJob, useResolveArticle, useCheckArticleStatus,

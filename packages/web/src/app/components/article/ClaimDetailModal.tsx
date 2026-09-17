@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useClaimEvidence, useSubmitClaimEvidence } from "../../hooks";
 import type { ClaimItem } from "./GroupedClaimsList";
 
 interface ClaimDetailModalProps {
@@ -14,6 +15,9 @@ export default function ClaimDetailModal({ claim, onClose, onContest }: ClaimDet
   const [contestUrl, setContestUrl] = useState("");
   const [contestNote, setContestNote] = useState("");
   const [contestSubmitted, setContestSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { data: evidenceRes } = useClaimEvidence(claim?.id);
+  const { mutate: submitEvidence } = useSubmitClaimEvidence();
 
   if (!claim) return null;
 
@@ -21,13 +25,19 @@ export default function ClaimDetailModal({ claim, onClose, onContest }: ClaimDet
   const confidence = claim.derived_confidence != null ? claim.derived_confidence : 0.96;
   const confidencePct = Math.round(confidence * 100);
 
-  const handleSubmitContest = (e: React.FormEvent) => {
+  const handleSubmitContest = async (e: React.FormEvent) => {
     e.preventDefault();
-    setContestSubmitted(true);
-    if (onContest) {
-      onContest(claim.id);
+    setSubmitError(null);
+    const result = await submitEvidence({ claimId: claim.id, url: contestUrl, note: contestNote });
+    if (result) {
+      setContestSubmitted(true);
+      if (onContest) onContest(claim.id);
+    } else {
+      setSubmitError("Submission failed. Please try again.");
     }
   };
+
+  const evidenceList = (evidenceRes as any)?.evidence ?? claim.evidence ?? [];
 
   return (
     <div
@@ -100,10 +110,25 @@ export default function ClaimDetailModal({ claim, onClose, onContest }: ClaimDet
                   <span>{claim.source_title || "Peer-Reviewed Literature Corpus"}</span>
                   <span className="text-[10px] text-emerald-700 font-mono font-bold">Primary</span>
                 </div>
-                <p className="text-zinc-500 text-[11px] leading-relaxed">
-                  Verified by multi-agent epistemic pipeline with citation cross-matching.
-                </p>
               </div>
+              {evidenceList.length > 0 ? (
+                evidenceList.slice(0, 5).map((ev: any, i: number) => (
+                  <a
+                    key={ev.id || i}
+                    href={ev.url || ev.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block p-3 rounded-xl bg-white border border-zinc-200 hover:border-zinc-400 transition-colors no-underline"
+                  >
+                    <div className="font-semibold text-zinc-900 truncate">{ev.title || ev.url || "Evidence record"}</div>
+                    {(ev.url || ev.source_url) && (
+                      <div className="text-zinc-500 truncate mt-0.5">{ev.url || ev.source_url}</div>
+                    )}
+                  </a>
+                ))
+              ) : (
+                <p className="text-[11px] text-zinc-400">No linked evidence records yet.</p>
+              )}
             </div>
           </div>
 
@@ -115,7 +140,7 @@ export default function ClaimDetailModal({ claim, onClose, onContest }: ClaimDet
               </div>
               {contestSubmitted ? (
                 <p className="text-xs text-emerald-800 font-medium">
-                  ✓ Counter-evidence received! VeritasWorker queued for mini-scrutiny pass.
+                  Counter-evidence received and queued for verification.
                 </p>
               ) : (
                 <form onSubmit={handleSubmitContest} className="space-y-2.5">
@@ -134,6 +159,7 @@ export default function ClaimDetailModal({ claim, onClose, onContest }: ClaimDet
                     onChange={(e) => setContestNote(e.target.value)}
                     className="w-full text-xs p-2 rounded-lg border border-amber-300 bg-white"
                   />
+                  {submitError && <p className="text-xs text-red-700 font-medium">{submitError}</p>}
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"

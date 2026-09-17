@@ -30,7 +30,6 @@ export const RETRO_ROUTES: RetroRoute[] = [
   { href: "/pricing", label: "Pricing", icon: "tag", group: "Account", keywords: "pricing plans billing pay pro enterprise" },
   { href: "/admin", label: "Admin", icon: "wrench", group: "Account", keywords: "admin settings seed ops", adminOnly: true },
   { href: "/settings", label: "Settings", icon: "gear", group: "Account", keywords: "settings preferences profile theme" },
-  { href: "/style-guide", label: "Style Guide", icon: "book", group: "Account", keywords: "style guide design system" },
   { href: "/login", label: "Sign in", icon: "chat", group: "Account", keywords: "login signin sign in auth", hideInNav: true },
   { href: "/onboarding", label: "Onboarding", icon: "chat", group: "Account", keywords: "onboarding welcome setup", hideInNav: true },
 ];

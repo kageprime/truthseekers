@@ -17,8 +17,6 @@ const STATUS_COLOR: Record<string, string> = {
   unknown: "#8a8a8a",
 };
 
-import { retroAudio } from "@/lib/retroAudio";
-
 export default function ClaimGraphViewer({
   slug,
   data: externalData,
@@ -43,7 +41,6 @@ export default function ClaimGraphViewer({
   const handleSelect = useCallback(
     (n: ClaimGraphNode | null) => {
       setSelected(n);
-      if (n) retroAudio.playBlip();
       if (n && onNodeClick) onNodeClick(n);
     },
     [onNodeClick]
