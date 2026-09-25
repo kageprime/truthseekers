@@ -50,8 +50,8 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: packages/web/Dockerfile
+      context: ./2000s-retro-web-page
+      dockerfile: Dockerfile
     container_name: veritas-frontend
     ports:
       - "3000:3000"

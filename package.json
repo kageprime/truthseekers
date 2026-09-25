@@ -9,10 +9,14 @@
     "build:core": "tsc --build packages/core",
     "build": "tsc --build packages/core",
     "build:web": "cd packages/web && npm run build",
+    "build:new": "cd 2000s-retro-web-page && pnpm build",
+    "dev:new": "cd 2000s-retro-web-page && pnpm dev",
     "build:go": "cd veritas/go-orchestrator && \"C:\\Program Files\\Go\\bin\\go.exe\" build -o server.exe ./cmd/server",
     "typecheck": "tsc --build packages/core && cd packages/web && tsc --noEmit",
     "dev:go": "cd veritas/go-orchestrator && \"C:\\Program Files\\Go\\bin\\go.exe\" run cmd/server/main.go",
     "dev:go:web": "concurrently -k \"cd veritas/go-orchestrator && \\\"C:\\Program Files\\Go\\bin\\go.exe\\\" run cmd/server/main.go\" \"cd packages/web && npm run dev\"",
+    "dev:go:new": "concurrently -k \"cd veritas/go-orchestrator && \\\"C:\\Program Files\\Go\\bin\\go.exe\\\" run cmd/server/main.go\" \"cd 2000s-retro-web-page && pnpm dev\"",
+    "typecheck:new": "cd 2000s-retro-web-page && npx tsc --noEmit",
     "clean": "npx rimraf packages/*/dist packages/*/.next node_modules"
   },
   "devDependencies": {

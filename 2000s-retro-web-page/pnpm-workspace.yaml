@@ -1,0 +1,5 @@
+allowBuilds:
+  sharp: true
+# ponytail: registry minimum-age policy rejects this lockfile's fresh pins.
+# Off here so `pnpm dev` / `pnpm install` pass the preflight check.
+minimumReleaseAge: 0

@@ -62,3 +62,7 @@ temp_article.json
 *.tmp
 *.bak
 *.orig
+
+# Local captured secrets (never commit)
+.database-url.local
+env.env
