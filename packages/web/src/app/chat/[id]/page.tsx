@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, use, useMemo } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChat, useChats, useCreateChat } from "../../hooks";
 import { useChatStream } from "../../hooks/useChatStream";
@@ -10,22 +10,16 @@ import type { AgentEvent } from "../../components/ProcessViewer";
 import ChatMessage from "../../components/ChatMessage";
 import EmptyChatState from "../../components/EmptyChatState";
 import TruthConsole from "../../components/TruthConsole";
-import { canSeeAdmin } from "@/lib/routes";
-import { useAuth } from "../../hooks/useAuth";
 import { useTraceSegments } from "../../components/truth-console/useTraceSegments";
 import { useChatContext } from "../ChatContext";
-import { useTheme } from "../../components/ThemeProvider";
 import Spinner from "../../components/Spinner";
 import { IconPlus } from "../../components/Icons";
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const pathname = usePathname();
   const queryClient = useQueryClient();
   const { send: streamSend, stop: streamStop } = useChatStream();
-  const { user } = useAuth();
-  const showAdmin = canSeeAdmin(user?.role);
 
   const {
     consoleOpen, setConsoleOpen,
@@ -43,7 +37,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sessionFilter, setSessionFilter] = useState("");
   const { mutate: createChat } = useCreateChat();
-  const { resolved: theme } = useTheme();
   const { activeEra, isActive: timeTravelActive } = useTimeMachine();
 
   const seg = useTraceSegments(convId ?? id ?? null);
@@ -171,6 +164,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     }
   };
 
+  const [sessionsOpen, setSessionsOpen] = useState(true);
+
   const handleNewChat = () => {
     setConvId(null);
     setInput("");
@@ -184,295 +179,328 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const showEmpty = !convLoading && messages.length === 0 && !hasStreaming;
 
   return (
-    <div className="py-6 px-4 sm:px-8 w-full max-w-5xl mx-auto">
-      {/* ponytail: fixed shell → this fills the viewport; messages scroll, sessions + composer stay pinned. */}
-      <div className="flex-1 flex flex-col md:flex-row h-full min-h-0 min-w-0 bg-surface-elevated rounded-sharp overflow-hidden border border-rule">
-        {/* Mobile Header Bar */}
-        <div className="md:hidden shrink-0 flex items-center justify-between px-3 h-12 bg-surface border-b border-rule gap-2">
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setMobileSidebarOpen(true)}
-              className="flex items-center justify-center w-8 h-8 rounded-sharp bg-surface-elevated border border-rule text-ink active:scale-95"
-              aria-label="Open sessions list"
-              title="Sessions"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
-            </button>
-            <button
-              onClick={handleNewChat}
-              className="flex items-center justify-center w-8 h-8 rounded-sharp bg-surface-elevated border border-rule text-ink active:scale-95"
-              aria-label="New chat"
-              title="New Chat"
-            >
-              <IconPlus size={14} />
-            </button>
-          </div>
+    <div className="studio-shell bg-surface select-text">
+      {/* ── Studio Masthead ────────────────────────────────────────── */}
+      <header className="h-11 shrink-0 border-b border-rule bg-surface/95 backdrop-blur-xs px-3 sm:px-5 flex items-center justify-between text-xs gap-3 z-20">
+        {/* Left: Sessions toggle + Title / Status */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <button
+            onClick={() => setSessionsOpen((v) => !v)}
+            aria-label={sessionsOpen ? "Collapse research inquiries" : "Expand research inquiries"}
+            title={sessionsOpen ? "Collapse inquiries" : "Expand inquiries"}
+            className="hidden md:flex items-center justify-center w-7 h-7 rounded-sharp border border-rule bg-surface-elevated text-muted hover:text-ink hover:border-gold transition-colors cursor-pointer"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <line x1="9" y1="3" x2="9" y2="21" />
+            </svg>
+          </button>
 
-          <div className="flex flex-col items-center min-w-0 flex-1 px-1">
-            <span className="text-[12.5px] font-bold truncate max-w-[170px] text-ink">
-              {conv?.title ?? "TruthSeekers Chat"}
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            aria-label="Open inquiries list"
+            title="Inquiries"
+            className="md:hidden flex items-center justify-center w-7 h-7 rounded-sharp border border-rule bg-surface-elevated text-muted hover:text-ink cursor-pointer"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+
+          <button
+            onClick={handleNewChat}
+            aria-label="New research inquiry"
+            title="Start new inquiry"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-sharp bg-ink text-surface hover:bg-gold hover:text-ink text-[11px] font-medium transition-colors cursor-pointer"
+          >
+            <IconPlus size={11} />
+            <span className="hidden sm:inline">New Inquiry</span>
+          </button>
+
+          <span className="text-rule hidden sm:inline">|</span>
+
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-display font-semibold text-sm sm:text-base text-ink truncate max-w-[200px] sm:max-w-md">
+              {conv?.title ?? "New Epistemic Inquiry"}
             </span>
-            <span className="text-[9.5px] text-muted flex items-center gap-1">
+            <span className="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sharp border border-rule bg-surface-elevated text-[9.5px] font-mono uppercase tracking-wider text-muted">
               <span className={`w-1.5 h-1.5 rounded-full ${sending ? "bg-gold animate-pulse" : "bg-forest"}`} />
-              <span>{sending ? "Agent working…" : "Ready"}</span>
+              <span>{sending ? "Agent Live" : "Verified Corpus"}</span>
             </span>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setConsoleOpen((o) => !o)}
-              aria-label="Toggle agent trace"
-              className="flex items-center gap-1 px-2 h-8 text-[11px] font-medium bg-surface-elevated border border-rule text-ink rounded-sharp active:scale-95"
-            >
-              <span>Trace</span>
-              {seg.unreadCount > 0 && (
-                <span className="bg-oxblood text-surface text-[8px] px-1 py-0.2 rounded-full font-bold">
-                  {seg.unreadCount}
-                </span>
-              )}
-            </button>
           </div>
         </div>
 
-        {/* Mobile Sidebar Drawer — Dedicated Research Sessions List */}
+        {/* Right: Agent Console Toggle */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setConsoleOpen((o) => !o)}
+            aria-pressed={consoleOpen}
+            aria-label="Toggle Agent Telemetry Console"
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded-sharp border transition-colors cursor-pointer ${
+              consoleOpen
+                ? "bg-gold-bg text-accent-dark border-gold/60 font-semibold"
+                : "bg-surface-elevated text-muted border-rule hover:text-ink hover:border-gold"
+            }`}
+          >
+            <span className="relative flex h-2 w-2">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${sending ? "bg-gold" : "bg-forest/60"}`} />
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${sending ? "bg-gold" : "bg-forest"}`} />
+            </span>
+            <span className="text-[11px] uppercase tracking-wider">Console</span>
+            {seg.unreadCount > 0 && (
+              <span className="bg-oxblood text-surface text-[9px] px-1 py-0.2 rounded-sharp font-bold">
+                {seg.unreadCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </header>
+
+      {/* ── Main Studio Grid ────────────────────────────────────────── */}
+      <div className="flex-1 flex min-h-0 min-w-0 relative">
+
+        {/* Mobile Sidebar Drawer — Dedicated Research Inquiries List */}
         {mobileSidebarOpen && (
-          <div className="md:hidden fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Research Sessions">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={() => setMobileSidebarOpen(false)} />
-            <aside className="absolute left-0 top-0 bottom-0 w-80 max-w-[85vw] flex flex-col bg-surface border-r border-rule shadow-elev-3 overflow-hidden animate-slide-in-left">
-              <div className="shrink-0 flex items-center justify-between px-4 h-12 bg-surface border-b border-rule text-ink font-bold text-xs">
-                <span>Research Sessions</span>
+          <div className="md:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Research Inquiries">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={() => setMobileSidebarOpen(false)} />
+            <aside className="absolute left-0 top-0 bottom-0 w-72 max-w-[85vw] flex flex-col bg-surface border-r border-rule shadow-elev-3 overflow-hidden animate-slide-in-left">
+              <div className="shrink-0 flex items-center justify-between px-3.5 h-12 border-b border-rule text-ink font-display font-bold text-sm">
+                <span>Research Inquiries</span>
                 <button
                   onClick={() => setMobileSidebarOpen(false)}
-                  className="flex items-center justify-center w-7 h-7 text-muted hover:text-ink"
-                  aria-label="Close sessions"
+                  className="p-1 text-muted hover:text-ink cursor-pointer"
+                  aria-label="Close inquiries list"
                 >
                   ✕
                 </button>
               </div>
 
-              {/* New Session Action */}
-              <div className="p-3 border-b border-rule bg-surface">
+              {/* New Inquiry Action */}
+              <div className="p-2.5 border-b border-rule bg-surface-elevated">
                 <button
                   onClick={() => { handleNewChat(); setMobileSidebarOpen(false); }}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-sharp bg-ink text-surface font-semibold text-xs hover:bg-gold hover:text-ink transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-sharp bg-ink text-surface font-semibold text-xs hover:bg-gold hover:text-ink transition-colors cursor-pointer"
                 >
-                  <IconPlus size={14} />
-                  <span>New Research Session</span>
+                  <IconPlus size={13} />
+                  <span>Start New Inquiry</span>
                 </button>
               </div>
 
-              {/* Sessions List */}
-              <div className="px-3 pt-2 shrink-0">
+              {/* Inquiries List Filter */}
+              <div className="p-2.5 border-b border-rule/60">
                 <input
                   value={sessionFilter}
                   onChange={(e) => setSessionFilter(e.target.value)}
-                  placeholder="Filter sessions…"
-                  aria-label="Filter research sessions"
-                  className="w-full bg-surface-elevated border border-rule rounded-lg px-3 py-2 text-xs text-ink placeholder:text-subtle outline-none focus:border-gold"
+                  placeholder="Filter inquiries…"
+                  aria-label="Filter research inquiries"
+                  className="w-full bg-surface-elevated border border-rule rounded-sharp px-2.5 py-1.5 text-xs text-ink placeholder:text-subtle outline-none focus:border-gold font-sans"
                 />
               </div>
+
               <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1 r-scroll">
                 {chatsLoading ? (
-                  <div className="flex items-center justify-center py-8"><Spinner size={18} /></div>
+                  <div className="flex items-center justify-center py-8"><Spinner size={16} /></div>
                 ) : conversations.length === 0 ? (
-                  <div className="px-3 py-8 text-xs text-center text-muted">No research sessions yet</div>
+                  <div className="px-3 py-8 text-xs text-center text-muted font-serif italic">No research inquiries yet</div>
                 ) : (
                   conversations
                     .filter((c: any) => !sessionFilter.trim() || (c.title ?? "").toLowerCase().includes(sessionFilter.trim().toLowerCase()))
                     .map((c: any) => (
-                    <button
-                      key={c.id}
-                      onClick={() => { router.push(`/chat/${c.id}`); setMobileSidebarOpen(false); }}
-                      className={`w-full text-left px-3 py-2.5 rounded-sharp border transition-colors text-xs ${
-                        c.id === convId
-                          ? "bg-ink text-surface border-ink font-semibold"
-                          : "bg-surface-elevated border-rule text-ink active:bg-ink/5"
-                      }`}
-                    >
-                      <div className="truncate font-medium">{c.title}</div>
-                    </button>
-                  ))
+                      <button
+                        key={c.id}
+                        onClick={() => { router.push(`/chat/${c.id}`); setMobileSidebarOpen(false); }}
+                        className={`w-full text-left px-3 py-2 rounded-sharp border transition-colors text-xs cursor-pointer block truncate ${
+                          c.id === convId
+                            ? "bg-gold-bg/40 text-ink border-gold/70 font-semibold"
+                            : "bg-surface-elevated border-rule/70 text-ink hover:border-rule active:bg-ink/5"
+                        }`}
+                      >
+                        <div className="truncate font-serif">{c.title || "Untitled inquiry"}</div>
+                      </button>
+                    ))
                 )}
               </div>
             </aside>
           </div>
         )}
 
-        {/* Desktop Sidebar */}
-        <aside className="hidden md:flex flex-col shrink-0 w-64 bg-surface border-r border-rule">
-          <div className="shrink-0 flex items-center justify-between px-3 h-11 border-b border-rule text-ink font-bold text-[11px] font-mono uppercase tracking-[0.14em]">
-            <span>Sessions</span>
-            <button
-              onClick={handleNewChat}
-              className="flex items-center justify-center w-6 h-6 bg-ink text-surface rounded-sharp hover:bg-gold hover:text-ink transition-colors"
-              aria-label="New chat"
-            >
-              <IconPlus size={12} />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto min-h-0 p-2 space-y-1 r-scroll">
-            {chatsLoading ? (
-              <div className="flex items-center justify-center py-6"><Spinner size={14} /></div>
-            ) : conversations.length === 0 ? (
-              <div className="px-2 py-6 text-[11px] text-center text-muted">No conversations yet</div>
-            ) : (
-              conversations.map((c: any) => (
-                <button
-                  key={c.id}
-                  onClick={() => router.push(`/chat/${c.id}`)}
-                  className={`w-full text-left px-2.5 py-1.5 text-[12px] rounded-sharp border transition-colors ${
-                    c.id === convId ? "bg-ink/[0.06] text-ink border-transparent font-semibold" : "bg-transparent border-transparent text-ink hover:bg-ink/5"
-                  }`}
-                >
-                  <div className="truncate">{c.title}</div>
-                </button>
-              ))
-            )}
-          </div>
-        </aside>
+        {/* Desktop Left Rail — Research Inquiries Navigator */}
+        {sessionsOpen && (
+          <aside className="hidden md:flex flex-col shrink-0 w-64 lg:w-72 bg-surface border-r border-rule h-full">
+            <div className="shrink-0 flex items-center justify-between px-3 h-10 border-b border-rule text-muted text-[10px] font-mono uppercase tracking-[0.16em]">
+              <span>Inquiry Corpus</span>
+              <span className="tabular-nums font-mono">{conversations.length}</span>
+            </div>
 
-        {/* Main Chat Workarea */}
-        <div className="flex-1 flex flex-col min-w-0 bg-surface relative">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 r-scroll">
-            {loading || convLoading ? (
-              <div className="p-4 sm:p-6 space-y-5 max-w-[960px] mx-auto">
-                <div className="flex justify-end">
-                  <div className="rounded-md p-4 max-w-[70%] bg-surface-elevated border border-rule">
-                    <div className="h-3 skeleton rounded w-40" />
-                  </div>
-                </div>
-                <div className="flex justify-start">
-                  <div className="rounded-md p-4 max-w-[80%] bg-surface-elevated border border-rule space-y-2">
-                    <div className="h-3 skeleton rounded w-56" />
-                    <div className="h-3 skeleton rounded w-44" />
-                  </div>
-                </div>
-              </div>
-            ) : showEmpty ? (
-              <EmptyChatState onSetInput={doSend} />
-            ) : (
-              <div className="max-w-[960px] mx-auto w-full py-2">
-                {messages.map((msg: any, i: number) => (
-                  <ChatMessage
-                    key={msg.id}
-                    role={msg.role}
-                    content={msg.content}
-                    blocks={msg.blocks}
-                    agentEvents={msg.agentEvents}
-                    createdAt={msg.createdAt}
-                    isLastAssistant={i === lastAssistantIndex}
-                    onRegenerate={i === lastAssistantIndex && lastUserMsg ? () => doSend(lastUserMsg) : undefined}
-                  />
-                ))}
+            <div className="p-2 border-b border-rule/60 bg-surface/50">
+              <input
+                value={sessionFilter}
+                onChange={(e) => setSessionFilter(e.target.value)}
+                placeholder="Search inquiries…"
+                aria-label="Filter inquiries"
+                className="w-full bg-surface-elevated border border-rule rounded-sharp px-2.5 py-1 text-xs text-ink placeholder:text-subtle outline-none focus:border-gold font-sans"
+              />
+            </div>
 
-                {error && (
-                  <div className="mx-4 my-4 p-3 rounded-sharp border border-oxblood/40 bg-oxblood-subtle text-oxblood text-xs flex items-center justify-between gap-3">
-                    <span>{error}</span>
-                    <button
-                      onClick={() => {
-                        setError(null);
-                        if (lastUserMsgRef.current) doSend(lastUserMsgRef.current);
-                      }}
-                      className="text-xs font-bold underline cursor-pointer"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                )}
-
-                {hasStreaming && (
-                  <div className="border-t border-rule bg-surface-elevated/60">
-                    <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} agentEvents={liveEvents} streaming />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Footer & Composer — ponytail: always pinned outside scroll, empty state is display-only. */}
-          <div className="shrink-0 sticky bottom-0 bg-surface/95 backdrop-blur-md border-t border-rule p-2 sm:p-3" style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
-            <div className="max-w-[960px] mx-auto space-y-1.5">
-              {error && (
-                <div className="p-2.5 rounded-sharp border border-oxblood/40 bg-oxblood-subtle text-oxblood text-xs flex items-center justify-between gap-3">
-                  <span>{error}</span>
-                  <button
-                    onClick={() => {
-                      setError(null);
-                      if (lastUserMsgRef.current) doSend(lastUserMsgRef.current);
-                    }}
-                    className="text-xs font-bold underline cursor-pointer"
-                  >
-                    Retry
-                  </button>
-                </div>
+            <div className="flex-1 overflow-y-auto min-h-0 p-2 space-y-1 r-scroll">
+              {chatsLoading ? (
+                <div className="flex items-center justify-center py-8"><Spinner size={14} /></div>
+              ) : conversations.length === 0 ? (
+                <div className="px-3 py-8 text-xs text-center text-muted font-serif italic">No inquiries recorded yet</div>
+              ) : (
+                conversations
+                  .filter((c: any) => !sessionFilter.trim() || (c.title ?? "").toLowerCase().includes(sessionFilter.trim().toLowerCase()))
+                  .map((c: any) => {
+                    const active = c.id === convId;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => router.push(`/chat/${c.id}`)}
+                        className={`w-full text-left px-2.5 py-2 text-xs rounded-sharp border transition-all cursor-pointer ${
+                          active
+                            ? "bg-gold-bg/30 text-ink border-gold/60 font-medium shadow-elev-1"
+                            : "bg-transparent border-transparent text-muted hover:text-ink hover:bg-surface-elevated"
+                        }`}
+                      >
+                        <div className="truncate font-serif">{c.title || "Untitled inquiry"}</div>
+                      </button>
+                    );
+                  })
               )}
-                <div className="hidden sm:flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted px-1">
-                  <span>{sending ? "Agent working…" : conv?.title ?? "Conversation"}</span>
-                  <button
-                    onClick={() => setConsoleOpen((o) => !o)}
-                    aria-pressed={consoleOpen}
-                    aria-label="Toggle agent trace panel"
-                    className="r-btn inline-flex items-center gap-1.5 px-2 py-0.5"
-                  >
-                    <span>Trace</span>
-                    {seg.unreadCount > 0 && !consoleOpen && (
-                      <span className="bg-oxblood text-surface text-[9px] px-1 font-bold rounded-sharp">
-                        {seg.unreadCount}
-                      </span>
-                    )}
-                  </button>
-                </div>
+            </div>
+          </aside>
+        )}
 
-                {/* Sleek Mobile-Friendly Composer Input Container */}
-                <div className="bg-surface-elevated border border-rule rounded-sharp p-1.5 sm:p-2 flex items-end gap-1.5 sm:gap-2">
-                  <textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={sending ? "Agent is researching & writing..." : "Ask a research question or request an article..."}
-                    disabled={sending}
-                    rows={1}
-                    className="flex-1 bg-transparent border-none outline-none text-[15px] sm:text-[13.5px] min-h-[36px] max-h-[160px] text-ink placeholder:text-subtle px-3 py-1.5 resize-none"
-                    aria-label="Chat message input"
-                    style={{ lineHeight: "1.5" }}
-                  />
-                  {sending ? (
-                    <button
-                      onClick={() => streamStop(convId ?? undefined)}
-                      aria-label="Stop generating"
-                      className="bg-oxblood text-surface font-bold px-3 py-1.5 rounded-sharp hover:brightness-110 transition-colors text-xs shrink-0 h-[36px] flex items-center justify-center active:scale-95"
-                    >
-                      Stop
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => doSend(input)}
-                      disabled={!input.trim()}
-                      aria-label="Send message"
-                      className="bg-ink text-surface font-bold w-9 h-9 rounded-sharp hover:bg-gold hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs shrink-0 flex items-center justify-center active:scale-95"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="22" y1="2" x2="11" y2="13" />
-                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                      </svg>
-                    </button>
+        {/* Center Pane — Reading & Investigation Canvas */}
+        <main className="flex-1 flex flex-col min-w-0 bg-surface relative h-full">
+          {/* Scrollable Conversation Canvas */}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 r-scroll">
+            <div className="max-w-4xl mx-auto w-full px-4 sm:px-8 py-6">
+              {loading || convLoading ? (
+                <div className="space-y-6 py-8">
+                  <div className="flex justify-end">
+                    <div className="rounded-sharp p-4 max-w-[70%] bg-surface-elevated border border-rule">
+                      <div className="h-3 skeleton rounded-sharp w-40" />
+                    </div>
+                  </div>
+                  <div className="flex justify-start">
+                    <div className="rounded-sharp p-4 max-w-[80%] bg-surface-elevated border border-rule space-y-2">
+                      <div className="h-3 skeleton rounded-sharp w-56" />
+                      <div className="h-3 skeleton rounded-sharp w-44" />
+                    </div>
+                  </div>
+                </div>
+              ) : showEmpty ? (
+                <EmptyChatState onSetInput={doSend} />
+              ) : (
+                <div className="space-y-4">
+                  {messages.map((msg: any, i: number) => (
+                    <ChatMessage
+                      key={msg.id}
+                      role={msg.role}
+                      content={msg.content}
+                      blocks={msg.blocks}
+                      agentEvents={msg.agentEvents}
+                      createdAt={msg.createdAt}
+                      isLastAssistant={i === lastAssistantIndex}
+                      onRegenerate={i === lastAssistantIndex && lastUserMsg ? () => doSend(lastUserMsg) : undefined}
+                    />
+                  ))}
+
+                  {error && (
+                    <div className="p-3.5 rounded-sharp border border-oxblood/40 bg-oxblood-subtle/50 text-oxblood text-xs flex items-center justify-between gap-3 shadow-elev-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold font-mono">ERROR:</span>
+                        <span>{error}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setError(null);
+                          if (lastUserMsgRef.current) doSend(lastUserMsgRef.current);
+                        }}
+                        className="text-xs font-bold underline cursor-pointer"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+
+                  {hasStreaming && (
+                    <div className="border border-rule rounded-sharp bg-surface-elevated/80 shadow-elev-1 p-2">
+                      <ChatMessage role="assistant" content={streamContent} blocks={streamBlocks} agentEvents={liveEvents} streaming />
+                    </div>
                   )}
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* Pinned Bottom Studio Composer */}
+          <div
+            className="shrink-0 border-t border-rule bg-surface/90 backdrop-blur-md p-3 sm:p-4 z-10"
+            style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
+          >
+            <div className="max-w-4xl mx-auto w-full space-y-2">
+              <div className="bg-surface-elevated border border-rule rounded-sharp p-2 flex items-end gap-2 shadow-elev-1 focus-within:border-gold focus-within:shadow-elev-2 transition-all">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={sending ? "Veritas is analyzing sources & writing evidence…" : "Inquire into any subject, claim, or request verified article synthesis…"}
+                  disabled={sending}
+                  rows={1}
+                  className="flex-1 bg-transparent border-none outline-none text-[15px] sm:text-[14px] min-h-[38px] max-h-[180px] text-ink placeholder:text-subtle px-3 py-1.5 resize-none font-sans"
+                  aria-label="Research inquiry input"
+                  style={{ lineHeight: "1.5" }}
+                />
+
+                {sending ? (
+                  <button
+                    onClick={() => streamStop(convId ?? undefined)}
+                    aria-label="Stop generating"
+                    className="bg-oxblood text-surface font-semibold px-3.5 py-1.5 rounded-sharp hover:brightness-110 transition-colors text-xs shrink-0 h-[38px] flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    <span>Stop</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => doSend(input)}
+                    disabled={!input.trim()}
+                    aria-label="Send message"
+                    className="bg-ink text-surface font-bold w-10 h-[38px] rounded-sharp hover:bg-gold hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0 flex items-center justify-center cursor-pointer active:scale-95"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="22" y1="2" x2="11" y2="13" />
+                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-subtle px-1">
+                <span>Enter to submit · Shift+Enter for newline</span>
+                <span>{sending ? "Autonomous Agent Running" : "Veritas Pipeline Ready"}</span>
               </div>
             </div>
-        </div>
+          </div>
+        </main>
 
-        {/* Desktop Trace Sidebar */}
+        {/* Desktop Right Rail — Veritas Agent Console / TruthConsole */}
         {consoleOpen && (
-          <div className="hidden md:flex shrink-0 w-80 flex-col bg-surface border-l border-rule">
-            <div className="bg-surface border-b border-rule text-ink text-[11px] font-mono uppercase tracking-[0.14em] px-3 py-2 flex items-center justify-between shrink-0">
-              <span>Agent trace</span>
-              <button onClick={() => setConsoleOpen(false)} aria-label="Close trace panel" className="text-muted hover:text-ink">
+          <aside className="hidden md:flex shrink-0 w-80 lg:w-96 flex-col bg-surface border-l border-rule h-full">
+            <div className="bg-surface border-b border-rule text-ink text-[10px] font-mono uppercase tracking-[0.16em] px-3 py-2 flex items-center justify-between shrink-0">
+              <span className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-forest animate-pulse" />
+                <span>Agent Telemetry</span>
+              </span>
+              <button
+                onClick={() => setConsoleOpen(false)}
+                aria-label="Close telemetry console"
+                className="text-subtle hover:text-ink cursor-pointer p-0.5"
+              >
                 ✕
               </button>
             </div>
@@ -489,17 +517,24 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                 loading={sending && seg.activeEvents.length === 0}
               />
             </div>
-          </div>
+          </aside>
         )}
 
         {/* Mobile Trace Bottom Sheet */}
         {consoleOpen && (
-          <div className="md:hidden fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Agent trace">
-            <div className="absolute inset-0 bg-black/50" onClick={() => setConsoleOpen(false)} />
+          <div className="md:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Agent trace">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={() => setConsoleOpen(false)} />
             <div className="absolute inset-x-0 bottom-0 top-[15vh] bg-surface border-t border-rule flex flex-col rounded-t-lg overflow-hidden shadow-elev-3">
-              <div className="bg-surface border-b border-rule text-ink text-[11px] font-mono uppercase tracking-[0.14em] px-3 py-2 flex items-center justify-between shrink-0">
-                <span>Agent trace</span>
-                <button onClick={() => setConsoleOpen(false)} aria-label="Close trace panel" className="text-muted hover:text-ink">
+              <div className="bg-surface border-b border-rule text-ink text-[11px] font-mono uppercase tracking-[0.14em] px-3.5 py-2.5 flex items-center justify-between shrink-0">
+                <span className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-forest animate-pulse" />
+                  <span>Agent Telemetry</span>
+                </span>
+                <button
+                  onClick={() => setConsoleOpen(false)}
+                  aria-label="Close telemetry console"
+                  className="p-1 text-muted hover:text-ink cursor-pointer"
+                >
                   ✕
                 </button>
               </div>

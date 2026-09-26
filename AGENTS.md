@@ -12,7 +12,7 @@ An LLM-powered interactive encyclopedia — an AI agent-driven knowledge base th
 - **Multi-Source Real Photo Scoring:** `MultiSourceImageSearch` (`internal/agent/image_scorer.go`) queries Wikimedia Commons, NASA API, and Met Museum API, evaluating candidates against a 3-tier mathematical rubric ($S_{\text{total}} = 0.40 S_{\text{auth}} + 0.40 S_{\text{rel}} + 0.20 S_{\text{qual}}$). Only items with $S_{\text{total}} \ge 50$ are auto-attached; fallbacks carry `"✦ AI Visual Reconstruction"` badges.
 - **Storage:** PostgreSQL with automated migrations on boot (`internal/storage/migrate.go`). Falls back to file-backed mock mode when `DATABASE_URL` is unset.
 - **Frontend:** Next.js 15 (`packages/web/`) — deployed to Vercel, calls the Go API via `NEXT_PUBLIC_API_URL`.
-- **Layout Architecture:** Global 3-column dual-sidebar grid layout across all pages (`[Left Contents Index] | [Centered Main Reading Canvas] | [Right Epistemic & Veritas Rail]`).
+- **Layout Architecture:** Header-led navigation — `TopNavigationBar` owns the desktop nav (text rail ≥lg, icon strip md–lg) and the single hamburger toggles the `DockedSidebar`, which is a context drawer: full navigation <lg, slim `w-16` icon rail ≥lg. Reading pages use the centered/left canvas with a contents rail; the Research Studio (`/chat`) is a separate full-width workbench.
 - **State (client):** TanStack React Query 5 for server-state queries/mutations (`hooks/useApi.ts`) + local component state for ephemeral UI state.
 - **Real-time:** SSE streaming parser (`app/hooks/useChatStream.ts`) + shared `useArticleProgress` hook for `/articles/:slug/progress`.
 - **Containerization:** `docker-compose.yml` — Postgres 15 + Go backend (:4097) + Next.js frontend (:3000).
@@ -154,9 +154,19 @@ Next.js 15 App Router under `packages/web/src/app/`.
 
 ### Centered Canvas + Contents Rail/Bar (`AppShell`)
 - **Canvas**: `UiModeContext` exposes `alignMode` (`center` default) vs `left`, and `widthMode` (`expanded` default) vs `focus`, toggled from the top nav and persisted to localStorage (v2 keys invalidate legacy left/focus pins). Content pages use `containerClass(variant)` (`narrow`/`prose`/`standard`/`wide`) which bundles alignment + measure with xl rail-aware caps.
+- **Navigation ownership**: `TopNavigationBar` renders the section nav at both desktop sizes — the full text tab rail at ≥lg and a compact icon tab strip at md–lg (`TabIcon`, title tooltips, `aria-current`) — while below md only the hamburger remains. The hamburger toggles the `DockedSidebar`, which is a **context drawer everywhere it appears**: full labeled navigation at <lg, and a slim `w-16` icon rail (nav icons only, everything else `lg:hidden`) at ≥lg. Route-change dismissal lives once in `UiModeProvider` (Escape lives in the drawer). Nav exists in exactly one place per breakpoint, with zero duplicate link-pairs anywhere.
 - **Contents**: `ArticleContents` (`article/ArticleContents.tsx`) — `variant="rail"` (sticky ≥xl, `12rem` gutter) + `variant="bar"` (sticky chip strip <xl), driven by `useTocItems` + `useActiveHeading`; anchors via `lib/heading-id.ts`.
 - **Inline figures**: `MagazineFlow.tsx` hoists image/video/pullquote after section headings for newspaper/Wikipedia wrap (`.mag-float`, `shape-outside`); data-viz (diagram, chart, table, timeline, maps, compares, epistemic_graph, gallery) stays full-measure uncropped. Drag + S/M/L + localStorage persistence + keyboard (Enter lift/drop, arrows, Esc) with aria-live.
-- **Chrome/page dedupe**: one brand mark per screen via `TruthseekersLogo` (sidebar owns lg+, top-bar icon below lg only, suppressed on `/`); no breadcrumb ladder; `PlateHead.tsx` is the single folio/title/deck/rule masthead (folio slots carry counts/dates/method only).
+- **Chrome/page dedupe**: one brand mark per screen via `TruthseekersLogo` (icon in the top bar, suppressed on `/` where the PlateHead carries the masthead); no breadcrumb ladder; `PlateHead.tsx` is the single folio/title/deck/rule masthead (folio slots carry counts/dates/method only).
+
+### Research Studio — full-width workbench (`/chat/[id]`)
+The chat surface is an epistemic research workspace, **not** a centered chatbot card. It deliberately leaves the reading-canvas measure.
+- **Shell**: root uses `.studio-shell` (`globals.css`) — `calc(100dvh - 3.5rem)` tall (vh fallback first), `w-full`, `overflow-hidden`. Three panes inside a `flex-1 flex min-h-0` row.
+- **Studio masthead** (`h-11`): inquiries toggle, New Inquiry, active inquiry title + agent status chip (`Agent Live` / `Verified Corpus`), and the Agent Telemetry toggle with unread badge.
+- **Left rail — Inquiry Corpus** (`w-64 lg:w-72`, `hidden md:flex`): session search filter + list. Active inquiry is gold-keyed (`bg-gold-bg/30 border-gold/60`); collapsing is a masthead button. `<md` uses a slide-in drawer instead.
+- **Center canvas**: scroll region holds messages in a `max-w-4xl mx-auto` reading column (the workbench is full-width; the prose measure is not). User turns are `bg-ink text-surface`; assistant turns are editorial (`font-serif`, `bg-surface-elevated border-rule`). Composer is pinned below the scroll region, `max-w-4xl` aligned with the column, `focus-within:border-gold`, safe-area padded for iOS.
+- **Right rail — Agent Telemetry** (`w-80 lg:w-96`, `hidden md:flex`): `TruthConsole` (segment pills, tool feed, jump-to-live). Opens automatically on the first live segment ≥md; `<md` gets a bottom sheet.
+- **Sub-components**: `ChatMessage.tsx` (ThinkingBox → "Agent Telemetry" expander; action bar on `⋯`), `EmptyChatState.tsx` (folio kicker + `font-display` headline + three inquiry-category cards), both on Antique Gold & Ink tokens — no `--r-*` legacy vars and no retro bevels.
 
 ### Epistemic Workbench & Interactivity Components
 - **EpistemicInspectorDrawer** — sentence-level claim provenance, confidence rating, language precision upgrades, and community evidence submission.

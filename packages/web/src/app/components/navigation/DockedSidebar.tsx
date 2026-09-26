@@ -87,7 +87,7 @@ const GROUP_RULES: Array<{ group: (typeof NAV_GROUPS)[number]; match: (href: str
 
 export default function DockedSidebar() {
   const pathname = usePathname();
-  const { sidebarOpen, setSidebarOpen, hoverSidebarOut, cancelSidebarClose } = useUiMode();
+  const { sidebarOpen, setSidebarOpen } = useUiMode();
   const { data: health } = useHealth();
   const { data: contestedRes } = useContestedClaims(10);
   const { data: gapsRes } = useAllGaps();
@@ -102,7 +102,8 @@ export default function DockedSidebar() {
   const gapsCount = gapsList.length;
   const trendingGaps = gapsList.slice(0, 4);
 
-  // Floating hover drawer: Escape or route change dismisses it.
+  // Escape dismisses the mobile drawer. Route-change dismissal lives in
+  // UiModeProvider (one owner, no duplicate effects).
   useEffect(() => {
     if (!sidebarOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -111,11 +112,6 @@ export default function DockedSidebar() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [sidebarOpen, setSidebarOpen]);
-
-  useEffect(() => {
-    setSidebarOpen(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
 
   const isCurrent = (path: string) => {
     if (path === "/" && pathname === "/") return true;
@@ -129,21 +125,29 @@ export default function DockedSidebar() {
   const visibleRoutes = RETRO_ROUTES.filter((r) => !r.hideInNav && (!r.adminOnly || showAdmin));
 
   return (
-    <aside
-      id="sidebar-drawer"
-      aria-hidden={!sidebarOpen}
-      inert={!sidebarOpen}
-      onMouseEnter={cancelSidebarClose}
-      onMouseLeave={hoverSidebarOut}
-      className={`fixed left-0 top-14 bottom-0 w-72 bg-surface border-r border-rule shadow-elev-3 p-5 space-y-6 overflow-y-auto z-40 transition-transform duration-200 ease-out ${
-        sidebarOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
-      }`}
-      aria-label="Knowledge Centre Navigation"
-    >
-      <div className="flex items-center justify-between">
+    <>
+      {/* Backdrop — taps dismiss the drawer (<lg slide-over / ≥lg icon rail) */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 top-14 bg-black/40 backdrop-blur-xs z-30"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        id="sidebar-drawer"
+        aria-hidden={!sidebarOpen}
+        inert={!sidebarOpen}
+        className={`fixed left-0 top-14 bottom-0 bg-surface border-r border-rule shadow-elev-3 p-5 space-y-6 overflow-y-auto z-40 transition-all duration-200 ease-out ${
+          sidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0 pointer-events-none"
+        } w-72 lg:w-16 lg:p-3 lg:space-y-3`}
+        aria-label="Knowledge Centre Navigation"
+      >
+      <div className="flex items-center justify-between lg:justify-center">
         <div className="flex items-center gap-2.5">
           <TruthseekersLogo variant="icon" size={28} />
-          <div className="space-y-0.5">
+          {/* Brand text only on the <lg slide-over; the icon rail is self-explanatory */}
+          <div className="space-y-0.5 lg:hidden">
             <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-subtle">
               Knowledge Centre
             </div>
@@ -164,46 +168,57 @@ export default function DockedSidebar() {
       </div>
 
       {/* Navigation Links — registry-driven, grouped. Claim Graph, Stale Watch
-          and the rest can never drift out of the nav again. */}
-      <nav aria-label="Site sections" className="space-y-4 text-xs font-medium">
+          and the rest can never drift out of the nav again.
+          ≥lg icon rail: icon buttons only (title tooltips); <lg drawer: full labels. */}
+      <nav aria-label="Site sections" className="space-y-4 lg:space-y-5 text-xs font-medium">
         {NAV_GROUPS.map((group) => {
           const rule = GROUP_RULES.find((g) => g.group === group)!;
           const items = visibleRoutes.filter((r: RetroRoute) => r.group === group && rule.match(r.href));
           if (items.length === 0) return null;
           return (
-            <div key={group} className="space-y-1">
-              <div className="px-2 text-[10px] font-mono uppercase tracking-[0.18em] text-subtle">
+            <div key={group} className="space-y-1 lg:space-y-1.5">
+              {/* Group labels only in the <lg drawer — the icon rail needs no text */}
+              <div className="px-2 text-[10px] font-mono uppercase tracking-[0.18em] text-subtle lg:hidden">
                 {group}
               </div>
               {items.map((r: RetroRoute) => {
                 const active = r.href === "/" ? pathname === "/" : pathname.startsWith(r.href);
+                const badge =
+                  r.href === "/" ? (
+                    <span className="text-[11px] font-mono tabular-nums text-subtle">
+                      {health?.article_count ?? "—"}
+                    </span>
+                  ) : r.href === "/contested" ? (
+                    <span className="text-[10px] px-2 py-0.5 rounded-sharp bg-oxblood-subtle text-oxblood font-semibold font-mono">
+                      {contestedCount}
+                    </span>
+                  ) : r.href === "/gaps" ? (
+                    <span className="text-[10px] px-2 py-0.5 rounded-sharp bg-gold-bg text-accent-dark font-semibold font-mono">
+                      {gapsCount}
+                    </span>
+                  ) : null;
                 return (
                   <Link
                     key={r.href}
                     href={r.href}
-                    className={`w-full text-left px-2 py-2.5 border-b border-border-light flex items-center justify-between no-underline transition-colors ${
+                    title={r.label}
+                    aria-current={active ? "page" : undefined}
+                    className={`no-underline transition-colors ${
                       active ? "text-ink font-semibold" : "text-muted hover:text-ink"
-                    }`}
+                    } ${
+                      /* ≥lg icon rail */
+                      "lg:flex lg:items-center lg:justify-center lg:w-10 lg:h-10 lg:rounded-sharp lg:border lg:border-transparent lg:hover:border-rule lg:hover:bg-surface-elevated"
+                    } ${/* <lg drawer row */ "w-full text-left px-2 py-2.5 border-b border-border-light flex items-center justify-between"}`}
                   >
                     <div className="flex items-center gap-2.5">
                       <RouteIcon icon={r.icon} />
-                      <span>{r.label}</span>
+                      {/* Label only in the <lg drawer */}
+                      <span className="lg:hidden">{r.label}</span>
                     </div>
-                    {r.href === "/" && (
-                      <span className="text-[11px] font-mono tabular-nums text-subtle">
-                        {health?.article_count ?? "—"}
-                      </span>
-                    )}
-                    {r.href === "/contested" && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-sharp bg-oxblood-subtle text-oxblood font-semibold font-mono">
-                        {contestedCount}
-                      </span>
-                    )}
-                    {r.href === "/gaps" && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-sharp bg-gold-bg text-accent-dark font-semibold font-mono">
-                        {gapsCount}
-                      </span>
-                    )}
+                    {/* Badges only in the <lg drawer */}
+                    <span className="lg:hidden flex items-center">
+                      {badge}
+                    </span>
                   </Link>
                 );
               })}
@@ -212,8 +227,9 @@ export default function DockedSidebar() {
         })}
       </nav>
 
-      {/* Trending Epistemic Searches */}
-      <div className="pt-4 border-t border-rule space-y-2">
+      {/* Discovery sections stay <lg only — the icon rail is pure nav.
+          Counts/badges also live in the drawer rows above, hence hidden ≥lg. */}
+      <div className="lg:hidden pt-4 border-t border-rule space-y-2">
         <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-subtle">
           Open Gaps Needing Evidence
         </div>
@@ -247,8 +263,8 @@ export default function DockedSidebar() {
         )}
       </div>
 
-      {/* Veritas Autonomous CMS Banner */}
-      <div className="p-4 bg-surface-elevated rounded-sharp border border-rule text-xs space-y-1.5">
+      {/* Veritas Autonomous CMS Banner — <lg only (rail is pure nav) */}
+      <div className="lg:hidden p-4 bg-surface-elevated rounded-sharp border border-rule text-xs space-y-1.5">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted font-medium">
             Veritas Engine
@@ -260,5 +276,6 @@ export default function DockedSidebar() {
         </p>
       </div>
     </aside>
+    </>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
 export type WidthMode = "focus" | "expanded";
 export type TypeScale = "s" | "m" | "l";
@@ -9,9 +10,6 @@ export type TypeScale = "s" | "m" | "l";
 // left so content is never force-centered.
 export type AlignMode = "left" | "center";
 export type ContainerVariant = "narrow" | "prose" | "standard" | "wide";
-
-const OPEN_DELAY = 160;
-const CLOSE_DELAY = 260;
 
 interface UiModeContextType {
   widthMode: WidthMode;
@@ -25,14 +23,10 @@ interface UiModeContextType {
   containerClass: (variant?: ContainerVariant) => string;
   typeScale: TypeScale;
   setTypeScale: (s: TypeScale) => void;
+  // Mobile navigation drawer (<lg only — the header nav owns lg+).
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
-  // Hover-intent drawer: hovering the nav button floats the sidebar in as an
-  // overlay; leaving both closes it. Click/focus toggles for touch + keyboard.
-  hoverSidebarIn: () => void;
-  hoverSidebarOut: () => void;
-  cancelSidebarClose: () => void;
 }
 
 const UiModeContext = createContext<UiModeContextType | undefined>(undefined);
@@ -42,8 +36,6 @@ export function UiModeProvider({ children }: { children: ReactNode }) {
   const [alignMode, setAlignModeState] = useState<AlignMode>("center");
   const [typeScale, setTypeScaleState] = useState<TypeScale>("m");
   const [sidebarOpen, setSidebarOpenState] = useState<boolean>(false);
-  const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     try {
@@ -71,13 +63,6 @@ export function UiModeProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore storage errors
     }
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (openTimer.current) clearTimeout(openTimer.current);
-      if (closeTimer.current) clearTimeout(closeTimer.current);
-    };
   }, []);
 
   const setWidthMode = (mode: WidthMode) => {
@@ -126,13 +111,7 @@ export function UiModeProvider({ children }: { children: ReactNode }) {
     } catch {}
   };
 
-  const clearTimers = () => {
-    if (openTimer.current) { clearTimeout(openTimer.current); openTimer.current = null; }
-    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
-  };
-
   const setSidebarOpen = useCallback((open: boolean) => {
-    clearTimers();
     setSidebarOpenState(open);
   }, []);
 
@@ -140,28 +119,12 @@ export function UiModeProvider({ children }: { children: ReactNode }) {
     setSidebarOpen(!sidebarOpen);
   };
 
-  const cancelSidebarClose = useCallback(() => {
-    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
-    if (openTimer.current) { clearTimeout(openTimer.current); openTimer.current = null; }
-  }, []);
-
-  const hoverSidebarIn = useCallback(() => {
-    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
-    if (openTimer.current) return;
-    openTimer.current = setTimeout(() => {
-      openTimer.current = null;
-      setSidebarOpenState(true);
-    }, OPEN_DELAY);
-  }, []);
-
-  const hoverSidebarOut = useCallback(() => {
-    if (openTimer.current) { clearTimeout(openTimer.current); openTimer.current = null; }
-    if (closeTimer.current) return;
-    closeTimer.current = setTimeout(() => {
-      closeTimer.current = null;
-      setSidebarOpenState(false);
-    }, CLOSE_DELAY);
-  }, []);
+  // Close the mobile drawer whenever the route changes — the new page is the
+  // content, the drawer is not.
+  const pathname = usePathname();
+  useEffect(() => {
+    setSidebarOpenState(false);
+  }, [pathname]);
 
   return (
     <UiModeContext.Provider
@@ -178,9 +141,6 @@ export function UiModeProvider({ children }: { children: ReactNode }) {
         sidebarOpen,
         setSidebarOpen,
         toggleSidebar,
-        hoverSidebarIn,
-        hoverSidebarOut,
-        cancelSidebarClose,
       }}
     >
       {children}

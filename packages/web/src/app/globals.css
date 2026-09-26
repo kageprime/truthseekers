@@ -1063,6 +1063,19 @@ article.prose pre, article.prose code { font-family: var(--font-mono); }
 
 /* ── Generate Page ──────────────────────────────────────────── */
 .generate-page { min-height: 100dvh; display: flex; flex-direction: column; }
+
+/* ── Research Studio shell — full-width, app-height workbench ──
+   vh fallback first, then dvh so mobile browser chrome (iOS
+   address bar) can't clip the composer. Top bar is 3.5rem. */
+.studio-shell {
+  height: calc(100vh - 3.5rem);
+  height: calc(100dvh - 3.5rem);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+}
+
 .generate-viewer {
   flex: 1; display: flex; flex-direction: column;
   max-width: 960px; width: 100%; margin: 0 auto; padding: 1rem;

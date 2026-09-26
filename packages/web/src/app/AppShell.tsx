@@ -53,7 +53,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       {/* Main App Workspace */}
       <div className="flex-1 flex w-full relative">
-        {/* Collapsible Fixed Docked Sidebar */}
+        {/* Mobile-only navigation drawer (<lg); header owns desktop nav */}
         <DockedSidebar />
 
         {/* Dynamic Center Reading Canvas */}
