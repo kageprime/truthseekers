@@ -169,7 +169,7 @@ The chat surface is an epistemic research workspace, **not** a centered chatbot 
 - **Sub-components**: `ChatMessage.tsx` (ThinkingBox → "Agent Telemetry" expander; action bar on `⋯`), `EmptyChatState.tsx` (folio kicker + `font-display` headline + three inquiry-category cards), both on Antique Gold & Ink tokens — no `--r-*` legacy vars and no retro bevels.
 
 ### Epistemic Workbench & Interactivity Components
-- **EpistemicInspectorDrawer** — sentence-level claim provenance, confidence rating, language precision upgrades, and community evidence submission.
+- **ClaimDetailRail** (`components/article/ClaimDetailRail.tsx`) — the single claim-detail surface: a right-docked rail (`.trail-*` tokens) with sticky folio header, support meter, confidence vector, evidence (live fetch + skeleton), open gaps, counter-evidence contest form, and trail navigation (prev/next dispute, related, elsewhere). Click-through backdrop ≥xl (read beside it), dimmed overlay <xl, bottom sheet <640px. Used by the article, contested, and finder pages; the source row stays gold-keyed via `aria-current`.
 - **PanoramicMapViewer** — ultra-wide historical cartography & topographical map viewer with drag-pan, zoom, hotspot pins, and time-comparison slider.
 - **MapCompareViewer** — before/after split slider for Leaflet 2D / Three Fiber 3D maps.
 - **InteractiveCalcWidget** — live formula playground with parameter sliders for math, physics, and economics.

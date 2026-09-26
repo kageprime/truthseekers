@@ -36,9 +36,9 @@ This document outlines the complete implementation specification and status for 
 ## Phase 1: Interactive Epistemic Workbench & Reader Fact-Checking (COMPLETED)
 
 ### 1.1 Sentence-Level Evidence Inspector
-- **Implementation**: [EpistemicInspectorDrawer.tsx](file:///c:/Users/kage/agent/encarta-ng/packages/web/src/app/components/EpistemicInspectorDrawer.tsx)
+- **Implementation**: now [ClaimDetailRail.tsx](file:///c:/Users/kage/agent/encarta-ng/packages/web/src/app/components/article/ClaimDetailRail.tsx) — the original `EpistemicInspectorDrawer.tsx` was retired (dead code) when claim details converged on the right-rail surface.
 - **Features**:
-  - Clicking any anchored sentence (`[claim:id]`) opens a side drawer displaying:
+  - Clicking any anchored sentence (`[claim:id]`) opens the right rail displaying:
     - Claim ID & text.
     - Derived Confidence Rating & vector breakdown.
     - Raw Source Passages from Layer 1 `retrieve`.

@@ -17,6 +17,8 @@ interface GroupedClaimsListProps {
   onSelectClaim: (claim: ClaimItem) => void;
   title?: string;
   subtitle?: string;
+  /** Row key of the claim currently open in the rail — keeps the source row gold-keyed. */
+  activeClaimId?: string | null;
 }
 
 export default function GroupedClaimsList({
@@ -24,6 +26,7 @@ export default function GroupedClaimsList({
   onSelectClaim,
   title = "Empirical propositions",
   subtitle = "Select a claim to inspect its evidence",
+  activeClaimId,
 }: GroupedClaimsListProps) {
   if (!claims || claims.length === 0) {
     return null;
@@ -57,7 +60,10 @@ export default function GroupedClaimsList({
             <button
               key={claim.id || index}
               onClick={() => onSelectClaim(claim)}
-              className="ledger-row group w-full text-left"
+              aria-current={activeClaimId && claim.id === activeClaimId ? "true" : undefined}
+              className={`ledger-row group w-full text-left ${
+                activeClaimId && claim.id === activeClaimId ? "ledger-row-active" : ""
+              }`}
             >
               <span className="index-numeral">{String(index + 1).padStart(2, "0")}</span>
               <span className="flex-1 min-w-0">

@@ -26,7 +26,7 @@ import ArticleContents from "../../components/article/ArticleContents";
 import { MediaImage } from "../../components/MediaImage";
 import InfoboxCard from "../../components/article/InfoboxCard";
 import GroupedClaimsList, { type ClaimItem } from "../../components/article/GroupedClaimsList";
-import ClaimDetailModal from "../../components/article/ClaimDetailModal";
+import ClaimDetailRail from "../../components/article/ClaimDetailRail";
 import InteractiveCalcCard from "../../components/article/InteractiveCalcCard";
 import QuizCard from "../../components/article/QuizCard";
 import ArticleTour, { type TourStep } from "../../components/article/ArticleTour";
@@ -475,6 +475,7 @@ export default function ArticleClient({
           <GroupedClaimsList
             claims={epistemicClaims}
             onSelectClaim={(c) => setSelectedClaim(c)}
+            activeClaimId={selectedClaim?.id ?? null}
           />
         ) : (
           <div className="border border-rule rounded-sharp bg-surface-elevated p-6 font-serif italic text-muted">
@@ -553,8 +554,8 @@ export default function ArticleClient({
         </div>
       </div>
 
-      {/* Claim trail drawer */}
-      <ClaimDetailModal
+      {/* Claim detail rail — docks right, article stays visible beside it */}
+      <ClaimDetailRail
         claim={selectedClaim}
         allClaims={epistemicClaims}
         edges={graphEdges}

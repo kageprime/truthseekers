@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useClaimSearch, useClaimEvidence, useVerifyClaim, useRecentDossiers } from "../hooks";
 import { useUiMode } from "../context/UiModeContext";
 import PlateHead from "../components/PlateHead";
-import ClaimDetailModal from "../components/article/ClaimDetailModal";
+import ClaimDetailRail from "../components/article/ClaimDetailRail";
 import type { ClaimItem } from "../components/article/GroupedClaimsList";
 import type { ClaimDossier, ClaimDossierSource, ClaimVerifyResult } from "@/lib/api";
 
@@ -404,7 +404,12 @@ export default function FinderPage() {
                       {rest.map((c, i) => {
                         const v = verdictOf(c.status);
                         return (
-                          <button key={c.id || i} onClick={() => setSelected(toItem(c))} className="ledger-row group w-full text-left">
+                          <button
+                            key={c.id || i}
+                            onClick={() => setSelected(toItem(c))}
+                            aria-current={selected?.id === c.id ? "true" : undefined}
+                            className="ledger-row group w-full text-left"
+                          >
                             <span className="index-numeral">{String(i + 2).padStart(2, "0")}</span>
                             <span className="flex-1 min-w-0">
                               <span className="block font-serif text-[16px] leading-snug text-ink group-hover:text-gold transition-colors">
@@ -470,7 +475,7 @@ export default function FinderPage() {
         )}
       </div>
 
-      <ClaimDetailModal claim={selected} onClose={() => setSelected(null)} />
+      <ClaimDetailRail claim={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

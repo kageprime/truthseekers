@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useContestedClaims } from "../hooks";
 import { useUiMode } from "../context/UiModeContext";
 import PlateHead from "../components/PlateHead";
-import ClaimDetailModal from "../components/article/ClaimDetailModal";
+import ClaimDetailRail from "../components/article/ClaimDetailRail";
 import type { ClaimItem } from "../components/article/GroupedClaimsList";
 
 export default function ContestedPage() {
@@ -83,6 +83,7 @@ export default function ContestedPage() {
                       contradiction_level: contraLevel,
                     })
                   }
+                  aria-current={selectedClaim?.id === claim.id ? "true" : undefined}
                   className="ledger-row group w-full text-left"
                 >
                   <span className="index-numeral">{String(idx + 1).padStart(2, "0")}</span>
@@ -121,7 +122,7 @@ export default function ContestedPage() {
         )}
       </div>
 
-      <ClaimDetailModal claim={selectedClaim} onClose={() => setSelectedClaim(null)} />
+      <ClaimDetailRail claim={selectedClaim} onClose={() => setSelectedClaim(null)} />
     </div>
   );
 }
