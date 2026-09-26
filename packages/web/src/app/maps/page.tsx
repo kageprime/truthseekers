@@ -6,6 +6,7 @@ import { useMaps, useMapSearch } from "../hooks";
 import type { MapEntry } from "@encarta/core";
 import { usePageSearch } from "../HeaderSearchContext";
 import { useUiMode } from "../context/UiModeContext";
+import PlateHead from "../components/PlateHead";
 import { IconSearch, IconGrid, IconList } from "../components/Icons";
 
 const PAGE_SIZE = 20;
@@ -58,7 +59,7 @@ export default function MapsPage() {
   const [typeFilter, setTypeFilter] = useState<"" | "static" | "interactive">("");
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { widthMode, alignClass } = useUiMode();
+  const { containerClass } = useUiMode();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const showSearch = debouncedQuery.trim().length > 0;
@@ -110,20 +111,15 @@ export default function MapsPage() {
 
   if (!mounted) return null;
 
-  const containerClass = widthMode === "expanded" ? "max-w-5xl" : "max-w-3xl";
-
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
-      <div className="plate-head">
-        <div className="plate-folio">
-          <span>Historical atlas</span>
-          <span>{!loading ? `${filtered.length} charted` : "Surveying"}</span>
-        </div>
-        <h1 className="plate-title">Atlas</h1>
-        <p className="plate-deck">Every mapped article, plotted and explorable.</p>
-        <div className="plate-rule" />
-      </div>
+      <div className={`${containerClass("wide")} transition-all duration-300`}>
+      <PlateHead
+        folioLeft="Mapped articles"
+        folioRight={!loading ? `${filtered.length} charted` : "Surveying"}
+        title="Atlas"
+        deck="Every mapped article, plotted and explorable."
+      />
 
       {/* Filters bar */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3 py-4">

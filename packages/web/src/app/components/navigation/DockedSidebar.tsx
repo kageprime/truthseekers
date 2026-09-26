@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import TruthseekersLogo from "../TruthseekersLogo";
 import { useUiMode } from "../../context/UiModeContext";
 import { useContestedClaims, useAllGaps, useHealth } from "../../hooks";
 import { useAuth } from "../AuthProvider";
@@ -141,14 +142,7 @@ export default function DockedSidebar() {
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <img
-            src="/logo-icon.png"
-            alt=""
-            aria-hidden
-            width={28}
-            height={28}
-            className="w-7 h-7 rounded-sharp object-contain shrink-0"
-          />
+          <TruthseekersLogo variant="icon" size={28} />
           <div className="space-y-0.5">
             <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-subtle">
               Knowledge Centre
@@ -264,12 +258,6 @@ export default function DockedSidebar() {
         <p className="text-[11px] text-muted leading-snug">
           Watchdog monitoring stale articles and validating community evidence submissions.
         </p>
-        <Link
-          href="/chat/new"
-          className="category-link inline-block text-[11px] font-semibold text-ink pt-1 no-underline"
-        >
-          Consult Veritas Co-Manager →
-        </Link>
       </div>
     </aside>
   );

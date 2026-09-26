@@ -19,7 +19,10 @@ import EpisodeFeed from "../../components/EpisodeFeed";
 import type { AgentEvent } from "../../components/ProcessViewer";
 import type { Article } from "@encarta/core";
 import { useUiMode } from "../../context/UiModeContext";
-import BlockRenderer, { articleToBlocks } from "../../components/BlockRenderer";
+import { articleToBlocks } from "../../components/BlockRenderer";
+import PlateHead from "../../components/PlateHead";
+import MagazineFlow from "../../components/MagazineFlow";
+import ArticleContents from "../../components/article/ArticleContents";
 import { MediaImage } from "../../components/MediaImage";
 import InfoboxCard from "../../components/article/InfoboxCard";
 import GroupedClaimsList, { type ClaimItem } from "../../components/article/GroupedClaimsList";
@@ -53,7 +56,7 @@ export default function ArticleClient({
   const [tourOpen, setTourOpen] = useState(false);
   const readingRef = useRef<HTMLElement | null>(null);
 
-  const { widthMode, alignClass } = useUiMode();
+  const { containerClass } = useUiMode();
   const { data: epistemic } = useArticleEpistemic(generating ? undefined : slug);
 
   const epistemicClaims = useMemo<ClaimItem[]>(() => {
@@ -306,7 +309,8 @@ export default function ArticleClient({
   if (!article && !generating) {
     return (
       <div className="py-20 px-6 max-w-md mx-auto text-center space-y-6">
-        <img src="/logo-icon.png" alt="" aria-hidden width={56} height={56} className="w-14 h-14 rounded-sharp object-contain mx-auto" />
+        <p className="dateline">Setting type…</p>
+        <div className="plate-rule" />
         <div className="space-y-2">
           <h1 className="font-display text-3xl font-bold text-ink capitalize">
             {slug.replace(/-/g, " ")}
@@ -367,32 +371,20 @@ export default function ArticleClient({
     `${slug} ${category} ${title}`
   );
 
-  const containerClass = widthMode === "expanded" ? "max-w-5xl" : "max-w-3xl";
-
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <section ref={readingRef} className={`${containerClass} ${alignClass} transition-all duration-300`}>
+      <div className={`${containerClass("prose")} xl:grid xl:grid-cols-[12rem_minmax(0,1fr)] xl:gap-8 transition-all duration-300`}>
+        <ArticleContents variant="rail" blocks={contentBlocks as any} />
+        <div className="min-w-0">
+          <ArticleContents variant="bar" blocks={contentBlocks as any} />
+          <section ref={readingRef}>
         {/* Masthead */}
-        <div className="plate-head">
-          <div className="plate-folio">
-            <span>{category}</span>
-            <span>
-              {article.citations?.length
-                ? `${article.citations.length} sources`
-                : "Research entry"}
-            </span>
-          </div>
-          <h1 className="plate-title">{title}</h1>
-          {abstract && <p className="plate-deck">{abstract}</p>}
-          <div className="plate-controls">
-            <div className="plate-byline">
-              <span>Veritas pipeline</span>
-              <span className="plate-sep">·</span>
-              <span>Verified literature</span>
-            </div>
-          </div>
-          <div className="plate-rule" />
-
+        <PlateHead
+          folioLeft={category}
+          folioRight={article.citations?.length ? `${article.citations.length} sources` : "Research entry"}
+          title={title}
+          deck={abstract || undefined}
+        >
           {/* Quick Actions */}
           <div className="flex items-center gap-4 pt-3 text-xs font-medium flex-wrap">
             {tourSteps.length > 0 && (
@@ -427,7 +419,7 @@ export default function ArticleClient({
               JSON
             </button>
           </div>
-        </div>
+        </PlateHead>
 
         {/* Hero figure */}
         {heroMedia && (
@@ -444,8 +436,9 @@ export default function ArticleClient({
         {/* Reading flow: sections, figures, diagrams, chronology */}
         <div className="py-8">
           {contentBlocks.length > 0 ? (
-            <BlockRenderer
+            <MagazineFlow
               blocks={contentBlocks as any}
+              slug={slug}
               claimsIndex={claimsIndex}
               activeClaimId={selectedClaim?.id ?? null}
               onClaimSelect={handleChipSelect}
@@ -557,6 +550,8 @@ export default function ArticleClient({
           </div>
         )}
       </section>
+        </div>
+      </div>
 
       {/* Claim trail drawer */}
       <ClaimDetailModal

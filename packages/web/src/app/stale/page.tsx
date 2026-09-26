@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useStaleArticles } from "../hooks";
 import { useUiMode } from "../context/UiModeContext";
+import PlateHead from "../components/PlateHead";
 
 interface StaleArticle {
   slug: string;
@@ -14,7 +15,7 @@ interface StaleArticle {
 
 export default function StalePage() {
   const { data: res, loading } = useStaleArticles(50);
-  const { widthMode, alignClass } = useUiMode();
+  const { containerClass } = useUiMode();
   const articles = (res?.articles as StaleArticle[] | undefined) ?? [];
 
   const freshTone = (score: number) =>
@@ -22,23 +23,15 @@ export default function StalePage() {
   const freshText = (score: number) =>
     score > 0.66 ? "text-forest" : score > 0.33 ? "text-gold" : "text-oxblood";
 
-  const containerClass = widthMode === "expanded" ? "max-w-5xl" : "max-w-3xl";
-
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
-        <div className="plate-head">
-          <div className="plate-folio">
-            <span>Maintenance</span>
-            <span>Stalest first</span>
-          </div>
-          <h1 className="plate-title">Stale watch</h1>
-          <p className="plate-deck">
-            100% means verified today; evidence decays over roughly six months.
-            Select an article to read or refresh it.
-          </p>
-          <div className="plate-rule" />
-        </div>
+      <div className={`${containerClass("standard")} transition-all duration-300`}>
+        <PlateHead
+          folioLeft={`${articles.length} tracked`}
+          folioRight="Stalest first · 180d decay"
+          title="Stale watch"
+          deck="100% means verified today; evidence decays over roughly six months. Select an article to read or refresh it."
+        />
 
         <div className="py-6">
           {loading && (

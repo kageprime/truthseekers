@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuota, useGenerateArticle } from "../../hooks";
 import { useUiMode } from "../../context/UiModeContext";
+import PlateHead from "../../components/PlateHead";
 
 export default function NewArticlePage() {
   const router = useRouter();
@@ -12,7 +13,7 @@ export default function NewArticlePage() {
   const [status, setStatus] = useState("");
   const { data: quota, loading: quotaLoading } = useQuota();
   const { mutate: generateArticle } = useGenerateArticle();
-  const { widthMode, alignClass } = useUiMode();
+  const { containerClass } = useUiMode();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,23 +29,15 @@ export default function NewArticlePage() {
   }
 
   const atLimit = !quotaLoading && quota && quota.remaining <= 0;
-  const containerClass = widthMode === "expanded" ? "max-w-3xl" : "max-w-xl";
-
   return (
     <div className="py-12 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
-        <div className="plate-head">
-          <div className="plate-folio">
-            <span>Epistemic pipeline</span>
-            {quota && <span className="tabular-nums">{quota.remaining} of {quota.limit} left</span>}
-          </div>
-          <h1 className="plate-title">New article</h1>
-          <p className="plate-deck">
-            Autonomous multi-agent research: literature discovery, claim
-            extraction, evidence mapping, formal synthesis.
-          </p>
-          <div className="plate-rule" />
-        </div>
+      <div className={`${containerClass("narrow")} transition-all duration-300`}>
+        <PlateHead
+          folioLeft="Epistemic pipeline"
+          folioRight={quota ? `${quota.remaining} of ${quota.limit} left` : undefined}
+          title="New article"
+          deck="Autonomous multi-agent research: literature discovery, claim extraction, evidence mapping, formal synthesis."
+        />
 
         {atLimit ? (
           <div className="border border-oxblood rounded-sharp p-8 text-center space-y-4">

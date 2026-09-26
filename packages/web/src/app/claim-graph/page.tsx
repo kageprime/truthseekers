@@ -10,6 +10,7 @@ import ClaimGenealogyPanel from "../components/ClaimGenealogyPanel";
 import EyebrowTag from "../components/EyebrowTag";
 import type { ClaimGraphNode } from "@/lib/api";
 import { useUiMode } from "../context/UiModeContext";
+import PlateHead from "../components/PlateHead";
 
 export default function GlobalClaimGraphPage() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function GlobalClaimGraphPage() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [viewMode, setViewMode] = useState<"3d" | "2d">("3d");
   const { data, loading } = useGlobalClaimGraph(limit, minContradiction);
-  const { widthMode, alignClass } = useUiMode();
+  const { containerClass } = useUiMode();
 
   // Prefer 2D if user has reduced-motion enabled
   useEffect(() => {
@@ -65,23 +66,15 @@ export default function GlobalClaimGraphPage() {
     }
   };
 
-  const containerClass = widthMode === "expanded" ? "max-w-6xl" : "max-w-4xl";
-
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
-        <div className="plate-head">
-          <div className="plate-folio">
-            <span>Live topology</span>
-            <span>Global epistemic network</span>
-          </div>
-          <h1 className="plate-title">Claim graph</h1>
-          <p className="plate-deck">
-            Every claim produced across the encyclopedia, joined to its evidence
-            and adjacent claims. Select a node to inspect its provenance.
-          </p>
-          <div className="plate-rule" />
-        </div>
+      <div className={`${containerClass("wide")} transition-all duration-300`}>
+        <PlateHead
+          folioLeft={`Top ${limit}`}
+          folioRight={`${data?.nodes?.length ?? "…"} nodes · ≥${minContradiction.toFixed(1)} contradiction`}
+          title="Claim graph"
+          deck="Every claim produced across the encyclopedia, joined to its evidence and adjacent claims. Select a node to inspect its provenance."
+        />
 
         {/* Search Bar + Controls */}
         <div className="flex flex-col gap-3 py-3">

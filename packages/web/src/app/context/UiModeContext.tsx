@@ -8,6 +8,7 @@ export type TypeScale = "s" | "m" | "l";
 // (editorial/gutter-aligned); "center" floats it in the viewport. Defaults to
 // left so content is never force-centered.
 export type AlignMode = "left" | "center";
+export type ContainerVariant = "narrow" | "prose" | "standard" | "wide";
 
 const OPEN_DELAY = 160;
 const CLOSE_DELAY = 260;
@@ -21,6 +22,7 @@ interface UiModeContextType {
   // Ready-made margin utility for page containers: "mr-auto" hangs the column
   // off the left edge, "mx-auto" centers it.
   alignClass: string;
+  containerClass: (variant?: ContainerVariant) => string;
   typeScale: TypeScale;
   setTypeScale: (s: TypeScale) => void;
   sidebarOpen: boolean;
@@ -36,8 +38,8 @@ interface UiModeContextType {
 const UiModeContext = createContext<UiModeContextType | undefined>(undefined);
 
 export function UiModeProvider({ children }: { children: ReactNode }) {
-  const [widthMode, setWidthModeState] = useState<WidthMode>("focus");
-  const [alignMode, setAlignModeState] = useState<AlignMode>("left");
+  const [widthMode, setWidthModeState] = useState<WidthMode>("expanded");
+  const [alignMode, setAlignModeState] = useState<AlignMode>("center");
   const [typeScale, setTypeScaleState] = useState<TypeScale>("m");
   const [sidebarOpen, setSidebarOpenState] = useState<boolean>(false);
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -45,6 +47,12 @@ export function UiModeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
+      // ponytail: v2 defaults are centered+expanded — drop legacy pins once.
+      if (!localStorage.getItem("truthseekers_layout_v2")) {
+        localStorage.removeItem("truthseekers_align_mode");
+        localStorage.removeItem("truthseekers_width_mode");
+        localStorage.setItem("truthseekers_layout_v2", "1");
+      }
       const savedWidth = localStorage.getItem("truthseekers_width_mode");
       if (savedWidth === "focus" || savedWidth === "expanded") {
         setWidthModeState(savedWidth);
@@ -93,6 +101,21 @@ export function UiModeProvider({ children }: { children: ReactNode }) {
   // Nothing about the grid should force a centered column: pages append this
   // to their max-width container instead of hardcoding mx-auto.
   const alignClass = alignMode === "left" ? "mr-auto" : "mx-auto";
+
+  // ponytail: one helper replaces 11 ternaries — alignment + measure.
+  // xl caps reserve 12rem rail + 2rem gap so prose never squeezes at 1280-1440px.
+  const containerClass = useCallback((variant: ContainerVariant = "standard"): string => {
+    const align = alignMode === "left" ? "mr-auto" : "mx-auto";
+    const wide = widthMode === "expanded";
+    switch (variant) {
+      case "narrow": return `${align} ${wide ? "max-w-3xl" : "max-w-xl"}`;
+      case "prose": return wide
+        ? `${align} max-w-5xl xl:max-w-[78rem] 2xl:max-w-[84rem]`
+        : `${align} max-w-3xl xl:max-w-[64rem]`;
+      case "wide": return `${align} ${wide ? "max-w-7xl" : "max-w-5xl"}`;
+      default: return `${align} ${wide ? "max-w-6xl" : "max-w-4xl"}`;
+    }
+  }, [alignMode, widthMode]);
 
   // ponytail: rem knob only — full fluid-type scale if readers ask.
   const setTypeScale = (s: TypeScale) => {
@@ -149,6 +172,7 @@ export function UiModeProvider({ children }: { children: ReactNode }) {
         alignMode,
         setAlignMode,
         alignClass,
+        containerClass,
         typeScale,
         setTypeScale,
         sidebarOpen,

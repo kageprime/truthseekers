@@ -10,6 +10,7 @@ import { IconLink, IconLightning } from "./Icons";
 import { parseClaimAnchors, collectAnchorNumbers } from "@/lib/claim-parser";
 import { MarkdownInline } from "./MarkdownRenderer";
 import { ProvenanceChipInline } from "./ProvenanceChip";
+import { headingSlug } from "@/lib/heading-id";
 
 const InteractiveTimeline = dynamic(() => import("./InteractiveTimeline"), { ssr: false });
 const MapViewer = dynamic(() => import("./MapViewer"), { ssr: false });
@@ -319,12 +320,12 @@ function HeadingBlock({ data }: { data: HeadingBlockData }) {
   if (!data || !data.text) return null;
   const level = data.level ?? 3;
   const Tag = level === 1 ? "h1" : level === 2 ? "h2" : "h3";
-  const id = data.text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const id = headingSlug(data.text);
   const style: React.CSSProperties = level === 1
-    ? { fontFamily: "var(--font-display)", fontSize: "1.85rem", fontWeight: 700, margin: "2.25rem 0 0.75rem", letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.25, scrollMarginTop: "5rem" }
+    ? { fontFamily: "var(--font-display)", fontSize: "1.85rem", fontWeight: 700, margin: "2.25rem 0 0.75rem", letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.25, scrollMarginTop: "6.5rem" }
     : level === 2
-    ? { fontFamily: "var(--font-display)", fontSize: "1.4rem", fontWeight: 700, margin: "1.75rem 0 0.5rem", paddingBottom: "0.4rem", borderBottom: "1px solid var(--gold)", color: "var(--ink)", letterSpacing: "-0.01em", scrollMarginTop: "5rem" }
-    : { fontFamily: "var(--font-display)", fontSize: "1.15rem", fontWeight: 600, margin: "1.4rem 0 0.5rem", color: "var(--ink)", fontStyle: "italic", scrollMarginTop: "5rem" };
+    ? { fontFamily: "var(--font-display)", fontSize: "1.4rem", fontWeight: 700, margin: "1.75rem 0 0.5rem", paddingBottom: "0.4rem", borderBottom: "1px solid var(--gold)", color: "var(--ink)", letterSpacing: "-0.01em", scrollMarginTop: "6.5rem" }
+    : { fontFamily: "var(--font-display)", fontSize: "1.15rem", fontWeight: 600, margin: "1.4rem 0 0.5rem", color: "var(--ink)", fontStyle: "italic", scrollMarginTop: "6.5rem" };
   return <Tag id={id} data-section-id={id} style={style}>{data.text}</Tag>;
 }
 
@@ -468,17 +469,8 @@ function DiagramBlock({ data, figureNum }: { data: DiagramBlockData; figureNum?:
 
 function ImageBlock({ data, figureNum }: { data: ImageBlockData; figureNum?: number }) {
   if (!data) return null;
-  const num = figureNum;
   return (
-    <figure className="figure-plate mb-4">
-      <MediaImage src={data.src} caption={undefined} prompt={data.prompt} source={data.source} />
-      {(num != null || data.caption) && (
-        <figcaption className="figure-caption">
-          {num != null && <span className="figure-num">Fig. {num}</span>}
-          {data.caption}
-        </figcaption>
-      )}
-    </figure>
+    <MediaImage src={data.src} caption={data.caption} prompt={data.prompt} source={data.source} crop="cover" figNum={figureNum} />
   );
 }
 

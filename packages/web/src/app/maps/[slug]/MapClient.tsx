@@ -7,6 +7,7 @@ import { useMap } from "../../hooks";
 import MarkdownRenderer from "../../components/MarkdownRenderer";
 import type { MapEntry } from "@encarta/core";
 import { useUiMode } from "../../context/UiModeContext";
+import PlateHead from "../../components/PlateHead";
 
 const MapViewer = dynamic(() => import("../../components/MapViewer"), { ssr: false });
 
@@ -19,7 +20,7 @@ export default function MapClient({ slug, map: initialMap }: MapClientProps) {
   const router = useRouter();
   const { data: fetched } = useMap(slug);
   const map: MapEntry | null = initialMap ?? fetched ?? null;
-  const { widthMode, alignClass } = useUiMode();
+  const { containerClass } = useUiMode();
 
   if (!map) {
     return (
@@ -47,20 +48,15 @@ export default function MapClient({ slug, map: initialMap }: MapClientProps) {
   const title = map.title || slug.replace(/-/g, " ");
   const deck = map.subtitle || map.description;
 
-  const containerClass = widthMode === "expanded" ? "max-w-6xl" : "max-w-4xl";
-
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
-        <div className="plate-head">
-          <div className="plate-folio">
-            <span>Spatial cartography{map.region ? ` · ${map.region}` : ""}{map.era ? ` · ${map.era}` : ""}</span>
-            <span>Historical atlas</span>
-          </div>
-          <h1 className="plate-title">{title}</h1>
-          {deck && <p className="plate-deck">{deck}</p>}
-          <div className="plate-rule" />
-        </div>
+      <div className={`${containerClass("standard")} transition-all duration-300`}>
+        <PlateHead
+          folioLeft={`Spatial cartography${map.region ? ` · ${map.region}` : ""}${map.era ? ` · ${map.era}` : ""}`}
+          folioRight={hasMap ? `${markers.length} markers · ${layers.length} layers` : "No geometry"}
+          title={title}
+          deck={deck}
+        />
 
         {/* Map Viewport */}
         {hasMap && (

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAllGaps, useUpvoteGap, useSubmitGapEvidence } from "../hooks";
 import { useUiMode } from "../context/UiModeContext";
+import PlateHead from "../components/PlateHead";
 
 interface Gap {
   id: string;
@@ -22,7 +23,7 @@ export default function GapsPage() {
   const { data: res, loading } = useAllGaps();
   const { mutate: upvoteGap } = useUpvoteGap();
   const { mutate: submitGapEvidence } = useSubmitGapEvidence();
-  const { widthMode, alignClass } = useUiMode();
+  const { containerClass } = useUiMode();
 
   const gaps = ((res as any)?.gaps as Gap[] | undefined) ?? [];
   const [submitting, setSubmitting] = useState<string | null>(null);
@@ -56,23 +57,15 @@ export default function GapsPage() {
 
   const displayGaps = filteredGaps;
 
-  const containerClass = widthMode === "expanded" ? "max-w-5xl" : "max-w-3xl";
-
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
-        <div className="plate-head">
-          <div className="plate-folio">
-            <span>Community scrutiny</span>
-            <span>Evidence gap registry</span>
-          </div>
-          <h1 className="plate-title">Open evidence gaps</h1>
-          <p className="plate-deck">
-            Propositions lacking primary verification or independent replication.
-            Upvote to prioritize agent research runs, or contribute evidence.
-          </p>
-          <div className="plate-rule" />
-        </div>
+      <div className={`${containerClass("standard")} transition-all duration-300`}>
+        <PlateHead
+          folioLeft={`${gaps.length} open`}
+          folioRight={`Filter · ${filter}`}
+          title="Open evidence gaps"
+          deck="Propositions lacking primary verification or independent replication. Upvote to prioritize agent research runs, or contribute evidence."
+        />
 
         {/* Filters */}
         <div className="flex items-center gap-3 flex-wrap py-4 text-xs">

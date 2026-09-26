@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import TruthseekersLogo from "../TruthseekersLogo";
 import { useUiMode } from "../../context/UiModeContext";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -9,29 +10,6 @@ export default function TopNavigationBar() {
   const pathname = usePathname();
   const { widthMode, setWidthMode, alignMode, setAlignMode, toggleSidebar, sidebarOpen, hoverSidebarIn, hoverSidebarOut, typeScale, setTypeScale } = useUiMode();
   const { user } = useAuth();
-
-  // Determine dynamic breadcrumb
-  let breadcrumb = "Living Portal";
-  if (pathname.startsWith("/article/")) {
-    const slug = pathname.replace("/article/", "");
-    breadcrumb = `Article: ${slug.replace(/-/g, " ")}`;
-  } else if (pathname === "/finder") {
-    breadcrumb = "Claim Finder";
-  } else if (pathname === "/contested") {
-    breadcrumb = "Contested Claims Registry";
-  } else if (pathname.startsWith("/maps")) {
-    breadcrumb = "Spatial Cartography";
-  } else if (pathname === "/gaps") {
-    breadcrumb = "Open Evidence Gaps";
-  } else if (pathname.startsWith("/chat")) {
-    breadcrumb = "Veritas Studio";
-  } else if (pathname === "/articles") {
-    breadcrumb = "Article Corpus Directory";
-  } else if (pathname === "/claim-graph") {
-    breadcrumb = "Global Claim Map";
-  } else if (pathname === "/stale") {
-    breadcrumb = "Stale Article Watch";
-  }
 
   const isTabActive = (path: string) => {
     if (path === "/" && pathname === "/") return true;
@@ -63,25 +41,14 @@ export default function TopNavigationBar() {
           </svg>
         </button>
 
-        {/* Brand Logo & Breadcrumb */}
-        <div className="flex items-center gap-2.5 min-w-0">
+        {/* Brand mark — mobile only (sidebar owns lg+), hidden on home */}
+        {pathname !== "/" && (
+        <div className="flex items-center gap-2.5 min-w-0 lg:hidden">
           <Link href="/" className="flex items-center gap-2 no-underline group shrink-0">
-            <img
-              src="/logo-icon.png"
-              alt="Truthseekers home"
-              width={24}
-              height={24}
-              className="w-6 h-6 rounded-sharp object-contain"
-            />
-            <span className="font-display font-bold text-base tracking-tight text-ink hidden sm:inline">
-              Truthseekers
-            </span>
+            <TruthseekersLogo variant="icon" size={24} />
           </Link>
-          <span className="text-subtle font-light hidden sm:inline">/</span>
-          <span className="text-xs font-medium text-muted truncate max-w-[140px] sm:max-w-[220px] md:max-w-xs capitalize">
-            {breadcrumb}
-          </span>
         </div>
+        )}
       </div>
 
       {/* Main View Tabs — one entry per encyclopedia surface */}

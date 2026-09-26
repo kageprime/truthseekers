@@ -81,8 +81,8 @@ export default function HamburgerMenu({ children }: { children: React.ReactNode 
                   ))
                 : <div className="mask-link-in">{children}</div>}
             </nav>
-            <div className="px-5 py-4 text-xs text-center" style={{ borderTop: "1px solid var(--border-light)", color: "var(--subtle)" }}>
-              <img src="/logo-text.png" alt="Truthseekers" style={{ height: 14, width: "auto", objectFit: "contain", opacity: 0.5, margin: "0 auto" }} />
+            <div className="px-5 py-4 text-xs text-center font-mono" style={{ borderTop: "1px solid var(--border-light)", color: "var(--subtle)" }}>
+              Veritas · Living Edition
             </div>
           </div>
         </div>

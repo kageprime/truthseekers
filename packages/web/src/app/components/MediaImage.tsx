@@ -136,12 +136,12 @@ export function MediaLightbox({ src, caption, source, onClose }: { src: string; 
   );
 }
 
-export function MediaImage({ src, caption, prompt, source }: { src?: string; caption?: string; prompt?: string; source?: string }) {
+export function MediaImage({ src, caption, prompt, source, crop, figNum }: { src?: string; caption?: string; prompt?: string; source?: string; crop?: "cover" | "contain"; figNum?: number }) {
   const [open, setOpen] = useState(false);
   if (src) {
     return (
       <>
-        <FigureImage src={src} caption={caption || "Image"} source={source} onClick={() => setOpen(true)} />
+        <FigureImage src={src} caption={caption || "Image"} source={source} crop={crop} figNum={figNum} onClick={() => setOpen(true)} />
         {open && <MediaLightbox src={src} caption={caption} source={source} onClose={() => setOpen(false)} />}
       </>
     );
@@ -152,36 +152,22 @@ export function MediaImage({ src, caption, prompt, source }: { src?: string; cap
   return <BlankSlateImage caption={caption} prompt={prompt} />;
 }
 
-export function FigureImage({ src, caption, source, onClick }: { src: string; caption: string; source?: string; onClick?: () => void }) {
+export function FigureImage({ src, caption, source, onClick, crop = "cover", figNum }: { src: string; caption: string; source?: string; onClick?: () => void; crop?: "cover" | "contain"; figNum?: number }) {
   const safe = safeSrc(src);
   const resolvedSrc = safe ? (safe.startsWith("/") ? `${BASE}${safe}` : safe) : undefined;
+  const isAI = source === "AI Visual Reconstruction" || (src && src.includes("chat-"));
   return (
-    <figure className="glass-card-static p-3 my-2 cursor-pointer group" onClick={onClick}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium" style={{ color: "var(--subtle)" }}>IMAGE</span>
-        {source === "AI Visual Reconstruction" || (src && src.includes("chat-")) ? (
-          <span
-            className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-400 tracking-wider"
-            title="Synthetic AI Generated Image"
-          >
-            ✦ AI Visual Reconstruction
-          </span>
-        ) : source ? (
-          <span
-            className="text-[10px] font-mono font-medium px-2 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 tracking-wider flex items-center gap-1"
-            title={`Verified Real Source: ${source}`}
-          >
-            ✓ Sourced: {source}
-          </span>
+    <figure className="mag-figure my-2" onClick={onClick}>
+      <div className="overflow-hidden" style={{ borderRadius: "var(--radius-sharp)" }}>
+        <img src={resolvedSrc} alt={caption} className={`w-full h-auto ${crop === "cover" ? "object-cover aspect-[16/9]" : "object-contain"}`} loading="lazy" />
+      </div>
+      <figcaption className="figure-credit">
+        {figNum != null && <span className="figure-num">Fig. {figNum}</span>}
+        {caption}
+        {source || isAI ? (
+          <span> · {isAI ? "✦ AI reconstruction" : `⌁ Sourced: ${source}`} </span>
         ) : null}
-      </div>
-      <div className="bg-[var(--surface-elevated)]/50 rounded overflow-hidden relative">
-        <img src={resolvedSrc} alt={caption} className="w-full h-auto max-h-96 object-contain transition-transform duration-300 group-hover:scale-[1.02]" loading="lazy" />
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <span className="bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">Click to expand</span>
-        </div>
-      </div>
-      <figcaption className="text-sm mt-2" style={{ color: "var(--muted)" }}>{caption}</figcaption>
+      </figcaption>
     </figure>
   );
 }

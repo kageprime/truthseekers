@@ -14,6 +14,7 @@ import type { ArticleSummary } from "@encarta/core";
 import GenerationBar from "../components/GenerationBar";
 import type { AgentEvent } from "../components/ProcessViewer";
 import { useUiMode } from "../context/UiModeContext";
+import PlateHead from "../components/PlateHead";
 
 interface GeneratingEntry {
   slug: string;
@@ -77,7 +78,7 @@ export default function ArticlesPage() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [page, setPage] = useState(0);
   const [generatingList, setGeneratingList] = useState<GeneratingEntry[]>([]);
-  const { widthMode, alignClass } = useUiMode();
+  const { containerClass } = useUiMode();
 
   const { mutate: generateArticle } = useGenerateArticle();
 
@@ -115,22 +116,15 @@ export default function ArticlesPage() {
     } catch {}
   };
 
-  const containerClass = widthMode === "expanded" ? "max-w-6xl" : "max-w-4xl";
-
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
-        <div className="plate-head">
-          <div className="plate-folio">
-            <span>Corpus index</span>
-            <span>{total} entries</span>
-          </div>
-          <h1 className="plate-title">Articles</h1>
-          <p className="plate-deck">
-            Peer-verified epistemic entries. Search, inspect, synthesize.
-          </p>
-          <div className="plate-rule" />
-        </div>
+      <div className={`${containerClass("wide")} transition-all duration-300`}>
+        <PlateHead
+          folioLeft="Corpus index"
+          folioRight={`${total} entries`}
+          title="Articles"
+          deck="Peer-verified epistemic entries. Search, inspect, synthesize."
+        />
 
         {/* Search & Actions Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 py-4">

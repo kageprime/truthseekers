@@ -152,10 +152,11 @@ retrieve ──► extract_claims ──► map_evidence ──► scrutinize* �
 
 Next.js 15 App Router under `packages/web/src/app/`.
 
-### Unified 3-Column Layout (`RetroShell.tsx`)
-- **Column 1 (Left Sidebar)**: `RetroContentsNav` (Spine, Living Encyclopedia, Create, Account, Time Machine, Word of the Day). Full-width LFEI link styling.
-- **Column 2 (Center Canvas)**: The reading column is **not** force-centered: `UiModeContext` exposes `alignMode` (`left` default — anchored to the contents gutter, editorial style) vs `center` (floated viewport column), toggled from the top nav and persisted to localStorage. Content pages append `alignClass` (`mr-auto`/`mx-auto`) to their max-width container.
-- **Column 3 (Right Sidebar)**: `GlobalRightSidebar` (Veritas status, active job ticker, top contested claims, open gaps, "Ask Veritas" chat link).
+### Centered Canvas + Contents Rail/Bar (`AppShell`)
+- **Canvas**: `UiModeContext` exposes `alignMode` (`center` default) vs `left`, and `widthMode` (`expanded` default) vs `focus`, toggled from the top nav and persisted to localStorage (v2 keys invalidate legacy left/focus pins). Content pages use `containerClass(variant)` (`narrow`/`prose`/`standard`/`wide`) which bundles alignment + measure with xl rail-aware caps.
+- **Contents**: `ArticleContents` (`article/ArticleContents.tsx`) — `variant="rail"` (sticky ≥xl, `12rem` gutter) + `variant="bar"` (sticky chip strip <xl), driven by `useTocItems` + `useActiveHeading`; anchors via `lib/heading-id.ts`.
+- **Inline figures**: `MagazineFlow.tsx` hoists image/video/pullquote after section headings for newspaper/Wikipedia wrap (`.mag-float`, `shape-outside`); data-viz (diagram, chart, table, timeline, maps, compares, epistemic_graph, gallery) stays full-measure uncropped. Drag + S/M/L + localStorage persistence + keyboard (Enter lift/drop, arrows, Esc) with aria-live.
+- **Chrome/page dedupe**: one brand mark per screen via `TruthseekersLogo` (sidebar owns lg+, top-bar icon below lg only, suppressed on `/`); no breadcrumb ladder; `PlateHead.tsx` is the single folio/title/deck/rule masthead (folio slots carry counts/dates/method only).
 
 ### Epistemic Workbench & Interactivity Components
 - **EpistemicInspectorDrawer** — sentence-level claim provenance, confidence rating, language precision upgrades, and community evidence submission.

@@ -4,13 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useContestedClaims } from "../hooks";
 import { useUiMode } from "../context/UiModeContext";
+import PlateHead from "../components/PlateHead";
 import ClaimDetailModal from "../components/article/ClaimDetailModal";
 import type { ClaimItem } from "../components/article/GroupedClaimsList";
 
 export default function ContestedPage() {
   const [limit, setLimit] = useState(50);
   const { data: res, loading } = useContestedClaims(limit);
-  const { widthMode, alignClass } = useUiMode();
+  const { containerClass } = useUiMode();
   const [selectedClaim, setSelectedClaim] = useState<ClaimItem | null>(null);
 
   const claims = ((res as any)?.claims as Array<{
@@ -24,23 +25,15 @@ export default function ContestedPage() {
 
   const displayClaims = claims;
 
-  const containerClass = widthMode === "expanded" ? "max-w-5xl" : "max-w-3xl";
-
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
-        <div className="plate-head">
-          <div className="plate-folio">
-            <span>Epistemic fault lines</span>
-            <span>Active dispute registry</span>
-          </div>
-          <h1 className="plate-title">Contested claims</h1>
-          <p className="plate-deck">
-            Contradictory assertions across the encyclopedia, ranked by
-            contradiction severity and counter-evidence volume.
-          </p>
-          <div className="plate-rule" />
-        </div>
+      <div className={`${containerClass("standard")} transition-all duration-300`}>
+        <PlateHead
+          folioLeft="Ranked by contradiction"
+          folioRight={`${displayClaims.length} listed`}
+          title="Contested claims"
+          deck="Contradictory assertions across the encyclopedia, ranked by contradiction severity and counter-evidence volume."
+        />
 
         <div className="flex items-center justify-between gap-4 flex-wrap py-4">
           <div className="flex items-center gap-2 text-xs font-medium text-muted">

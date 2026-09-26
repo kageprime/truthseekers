@@ -36,11 +36,3 @@ export const RETRO_ROUTES: RetroRoute[] = [
 ];
 
 export const NAV_GROUPS = ["Encyclopedia", "Create", "Account"] as const;
-
-// ponytail: humanized crumbs — registry label wins, slugs de-slugified, ids shortened.
-export function crumbLabel(seg: string): string {
-  const found = RETRO_ROUTES.find((r) => r.href === `/${seg}`);
-  if (found) return found.label;
-  if (/^[0-9a-f-]{8,}$/i.test(seg)) return seg.slice(0, 8) + "…";
-  return seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}

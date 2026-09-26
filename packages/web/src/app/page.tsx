@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useArticles, useFeaturedArticles, useHealth } from "./hooks";
 import { useUiMode } from "./context/UiModeContext";
+import PlateHead from "./components/PlateHead";
 
 export default function HomePage() {
   const router = useRouter();
@@ -12,7 +13,7 @@ export default function HomePage() {
   const { data: health } = useHealth();
   const { data: featured } = useFeaturedArticles();
   const { data: latestRes, loading: latestLoading } = useArticles(0, 9);
-  const { widthMode, alignClass } = useUiMode();
+  const { containerClass } = useUiMode();
 
   const feat = (featured ?? [])[0] ?? null;
   const latestList = (latestRes as any)?.data ?? [];
@@ -43,26 +44,16 @@ export default function HomePage() {
     }
   };
 
-  const containerClass = widthMode === "expanded" ? "max-w-5xl" : "max-w-3xl";
-
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
+      <div className={`${containerClass("standard")} transition-all duration-300`}>
         {/* Masthead */}
-        <div className="plate-head">
-          <div className="plate-folio">
-            <span>The Living Encyclopedia</span>
-            <span>
-              {health?.article_count != null
-                ? `${health.article_count} verified entries`
-                : "Autonomous epistemic corpus"}
-            </span>
-          </div>
-          <h1 className="plate-title">Truthseekers</h1>
-          <p className="plate-deck">
-            Every claim sourced. Every proposition scrutinized. An autonomous
-            agent-driven knowledge repository.
-          </p>
+        <PlateHead
+          folioLeft="The Living Encyclopedia"
+          folioRight={health?.article_count != null ? `${health.article_count} verified entries` : "Autonomous epistemic corpus"}
+          title="Truthseekers"
+          deck="Every claim sourced. Every proposition scrutinized. An autonomous agent-driven knowledge repository."
+        >
           <form onSubmit={handleSearch} role="search" className="mt-5">
             <div className="flex items-center gap-3 border-b-2 border-ink pb-2 focus-within:border-gold transition-colors">
               <span className="text-subtle text-lg leading-none" aria-hidden>⌕</span>
@@ -83,8 +74,7 @@ export default function HomePage() {
               </button>
             </div>
           </form>
-          <div className="plate-rule" />
-        </div>
+        </PlateHead>
 
         {/* Feature Essay */}
         {feat && (

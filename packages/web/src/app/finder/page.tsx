@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useClaimSearch, useClaimEvidence, useVerifyClaim, useRecentDossiers } from "../hooks";
 import { useUiMode } from "../context/UiModeContext";
+import PlateHead from "../components/PlateHead";
 import ClaimDetailModal from "../components/article/ClaimDetailModal";
 import type { ClaimItem } from "../components/article/GroupedClaimsList";
 import type { ClaimDossier, ClaimDossierSource, ClaimVerifyResult } from "@/lib/api";
@@ -86,7 +87,7 @@ function EvidenceColumn({
 export default function FinderPage() {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
-  const { widthMode, alignClass } = useUiMode();
+  const { containerClass } = useUiMode();
   const [selected, setSelected] = useState<ClaimItem | null>(null);
 
   useEffect(() => {
@@ -139,7 +140,6 @@ export default function FinderPage() {
     confidence_vector: c.confidence_vector,
   });
 
-  const containerClass = widthMode === "expanded" ? "max-w-5xl" : "max-w-3xl";
   const verdict = top ? verdictOf(top.status) : null;
   const confPct = top ? Math.round((top.derived_confidence ?? 0) * 100) : 0;
   const dossierV = dossier ? dossierVerdict(dossier.verdict) : null;
@@ -148,18 +148,13 @@ export default function FinderPage() {
 
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
-        <div className="plate-head">
-          <div className="plate-folio">
-            <span>Corpus + open web</span>
-            <span>Search any claim</span>
-          </div>
-          <h1 className="plate-title">Claim finder</h1>
-          <p className="plate-deck">
-            Search every claim the encyclopedia has published — or paste any
-            statement and Veritas will retrieve live sources, adjudicate it, and
-            return a dossier with evidence on both sides.
-          </p>
+      <div className={`${containerClass("standard")} transition-all duration-300`}>
+        <PlateHead
+          folioLeft="Corpus + open web"
+          folioRight={searched ? `${claims.length} corpus hits` : "24h dossier cache"}
+          title="Claim finder"
+          deck="Search every claim the encyclopedia has published — or paste any statement and Veritas will retrieve live sources, adjudicate it, and return a dossier with evidence on both sides."
+        >
           <form onSubmit={handleSubmit} role="search" className="mt-5">
             <div className="flex items-center gap-3 border-b-2 border-ink pb-2 focus-within:border-gold transition-colors">
               <span className="text-subtle text-lg leading-none" aria-hidden>⌕</span>
@@ -185,8 +180,7 @@ export default function FinderPage() {
               Give the finder at least eight characters to work with.
             </p>
           )}
-          <div className="plate-rule" />
-        </div>
+        </PlateHead>
 
         {/* ── Open-web verification ─────────────────────────────── */}
         {verifying && (
