@@ -1064,8 +1064,12 @@ func (s *Server) setupRoutes() {
 	s.mux.Handle("/maps", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleMapsRoot)))
 	s.mux.Handle("/maps/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleMapsDynamicRoute)))
 
-	// Claims - public read
+	// Claims - public read. The Claim Finder's internet mode burns retrieval +
+	// LLM spend, so /claims/verify rides the tighter chat limiter while the
+	// corpus search and dossier feed stay on the general API limiter.
 	s.mux.Handle("/claims/search", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleSearchClaims)))
+	s.mux.Handle("/claims/verify", chain(chatLimiter.middleware, s.optionalAuthMiddleware)(http.HandlerFunc(s.handleVerifyClaim)))
+	s.mux.Handle("/claims/recent", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleRecentClaimDossiers)))
 	s.mux.Handle("/claims/", chain(apiLimiter.middleware)(http.HandlerFunc(s.handleClaimEvidence)))
 
 	// Gaps - aggregate view + engagement (upvote, submit evidence)

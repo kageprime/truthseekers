@@ -323,6 +323,19 @@ export function useSubmitClaimEvidence() {
   );
 }
 
+// Claim Finder internet mode: search + verify any statement on the open web.
+export function useVerifyClaim() {
+  const queryClient = useQueryClient();
+  return useApiMutation(
+    ({ statement, refresh }: { statement: string; refresh?: boolean }) => api.verifyClaim(statement, refresh ?? false),
+    { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["claim-dossiers"] }) },
+  );
+}
+
+export function useRecentDossiers(limit = 8) {
+  return useApiQuery(["claim-dossiers", "recent", limit], () => api.fetchRecentDossiers(limit), { staleTime: 60_000 });
+}
+
 // ── Gap mutations ──
 
 export function useUpvoteGap() {

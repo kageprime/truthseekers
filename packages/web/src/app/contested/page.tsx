@@ -10,7 +10,7 @@ import type { ClaimItem } from "../components/article/GroupedClaimsList";
 export default function ContestedPage() {
   const [limit, setLimit] = useState(50);
   const { data: res, loading } = useContestedClaims(limit);
-  const { widthMode } = useUiMode();
+  const { widthMode, alignClass } = useUiMode();
   const [selectedClaim, setSelectedClaim] = useState<ClaimItem | null>(null);
 
   const claims = ((res as any)?.claims as Array<{
@@ -28,7 +28,7 @@ export default function ContestedPage() {
 
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
         <div className="plate-head">
           <div className="plate-folio">
             <span>Epistemic fault lines</span>

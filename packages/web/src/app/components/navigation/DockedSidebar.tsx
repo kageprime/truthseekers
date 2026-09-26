@@ -5,6 +5,84 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUiMode } from "../../context/UiModeContext";
 import { useContestedClaims, useAllGaps, useHealth } from "../../hooks";
+import { useAuth } from "../AuthProvider";
+import { RETRO_ROUTES, NAV_GROUPS, canSeeAdmin, type RetroRoute } from "@/lib/routes";
+
+// ponytail: icons keyed by registry `icon` string — one map, no drift when a
+// route is added. Unknown icons fall back to the plus glyph.
+function RouteIcon({ icon }: { icon: string }) {
+  const common = { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2 } as const;
+  switch (icon) {
+    case "home":
+      return (
+        <svg {...common}><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1Z" /></svg>
+      );
+    case "book":
+      return (
+        <svg {...common}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15Z" /><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5" /></svg>
+      );
+    case "search":
+      return (
+        <svg {...common}><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></svg>
+      );
+    case "graph":
+      return (
+        <svg {...common}><circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="8" r="2.5" /><circle cx="12" cy="18" r="2.5" /><line x1="8" y1="7" x2="15.5" y2="7.6" /><line x1="7" y1="8.2" x2="10.8" y2="16" /><line x1="17" y1="10.2" x2="13.2" y2="16" /></svg>
+      );
+    case "scale":
+      return (
+        <svg {...common}><line x1="12" y1="3" x2="12" y2="21" /><line x1="5" y1="7" x2="19" y2="7" /><path d="M5 7l-2.5 6a3.5 3.5 0 0 0 7 0L7 7" /><path d="M19 7l-2.5 6a3.5 3.5 0 0 0 7 0L21 7" /></svg>
+      );
+    case "question":
+      return (
+        <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 0 1 5 .2c0 1.8-2.5 2.3-2.5 3.8" /><line x1="12" y1="17" x2="12" y2="17.2" /></svg>
+      );
+    case "clock":
+      return (
+        <svg {...common}><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></svg>
+      );
+    case "map":
+      return (
+        <svg {...common}><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" /><line x1="9" y1="3" x2="9" y2="18" /><line x1="15" y1="6" x2="15" y2="21" /></svg>
+      );
+    case "pencil":
+      return (
+        <svg {...common}><path d="M17 3l4 4L8 20l-5 1 1-5L17 3Z" /></svg>
+      );
+    case "chat":
+      return (
+        <svg {...common}><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-3-.4-4.2-1L3 20l1.1-5.1A8.5 8.5 0 1 1 21 11.5Z" /></svg>
+      );
+    case "list":
+      return (
+        <svg {...common}><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3.5" y1="6" x2="3.5" y2="6.2" /><line x1="3.5" y1="12" x2="3.5" y2="12.2" /><line x1="3.5" y1="18" x2="3.5" y2="18.2" /></svg>
+      );
+    case "tag":
+      return (
+        <svg {...common}><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8Z" /><circle cx="7.5" cy="7.5" r="1" /></svg>
+      );
+    case "wrench":
+      return (
+        <svg {...common}><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.7-3.7Z" /></svg>
+      );
+    case "gear":
+      return (
+        <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg>
+      );
+    default:
+      return (
+        <svg {...common}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+      );
+  }
+}
+
+// ponytail: divider placement — "/" keeps Library together, "/article/new"
+// opens Create, "/pricing" opens Account.
+const GROUP_RULES: Array<{ group: (typeof NAV_GROUPS)[number]; match: (href: string) => boolean }> = [
+  { group: "Encyclopedia", match: (href) => href === "/" || href.startsWith("/articles") || href === "/finder" || href === "/claim-graph" || href === "/contested" || href === "/gaps" || href === "/stale" || href === "/maps" },
+  { group: "Create", match: (href) => href === "/article/new" || href.startsWith("/chat") || href === "/queue" },
+  { group: "Account", match: () => true },
+];
 
 export default function DockedSidebar() {
   const pathname = usePathname();
@@ -12,6 +90,7 @@ export default function DockedSidebar() {
   const { data: health } = useHealth();
   const { data: contestedRes } = useContestedClaims(10);
   const { data: gapsRes } = useAllGaps();
+  const { user } = useAuth();
 
   const contestedClaims = Array.isArray((contestedRes as any)?.claims)
     ? (contestedRes as any).claims
@@ -42,6 +121,11 @@ export default function DockedSidebar() {
     if (path !== "/" && pathname.startsWith(path)) return true;
     return false;
   };
+
+  // ponytail: sidebar reads the same route registry as palette/breadcrumbs —
+  // a page can't exist without a nav slot. Non-admins never see admin routes.
+  const showAdmin = canSeeAdmin(user?.role);
+  const visibleRoutes = RETRO_ROUTES.filter((r) => !r.hideInNav && (!r.adminOnly || showAdmin));
 
   return (
     <aside
@@ -85,115 +169,54 @@ export default function DockedSidebar() {
         </button>
       </div>
 
-      {/* Navigation Links */}
-      <div className="space-y-1 text-xs font-medium">
-        <Link
-          href="/"
-          className={`w-full text-left px-2 py-2.5 border-b border-border-light flex items-center justify-between no-underline transition-colors ${
-            isCurrent("/") && pathname === "/"
-              ? "text-ink font-semibold"
-              : "text-muted hover:text-ink"
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
-            </svg>
-            <span>Living Portal</span>
-          </div>
-          <span className="text-[11px] font-mono tabular-nums text-subtle">
-            {health?.article_count ?? "—"}
-          </span>
-        </Link>
-
-        <Link
-          href="/finder"
-          className={`w-full text-left px-2 py-2.5 border-b border-border-light flex items-center gap-2.5 no-underline transition-colors ${
-            isCurrent("/finder")
-              ? "text-ink font-semibold"
-              : "text-muted hover:text-ink"
-          }`}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="7" />
-            <line x1="21" y1="21" x2="16.5" y2="16.5" />
-          </svg>
-          <span>Claim Finder</span>
-        </Link>
-
-        <Link
-          href="/contested"
-          className={`w-full text-left px-2 py-2.5 border-b border-border-light flex items-center justify-between no-underline transition-colors ${
-            isCurrent("/contested")
-              ? "text-ink font-semibold"
-              : "text-muted hover:text-ink"
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
-              <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
-              <path d="M7 21h10M12 3v18" />
-            </svg>
-            <span>Contested Claims</span>
-          </div>
-          <span className="text-[10px] px-2 py-0.5 rounded-sharp bg-oxblood-subtle text-oxblood font-semibold font-mono">
-            {contestedCount}
-          </span>
-        </Link>
-
-        <Link
-          href="/gaps"
-          className={`w-full text-left px-2 py-2.5 border-b border-border-light flex items-center justify-between no-underline transition-colors ${
-            isCurrent("/gaps")
-              ? "text-ink font-semibold"
-              : "text-muted hover:text-ink"
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            <span>Open Evidence Gaps</span>
-          </div>
-          <span className="text-[10px] px-2 py-0.5 rounded-sharp bg-gold-bg text-accent-dark font-semibold font-mono">
-            {gapsCount}
-          </span>
-        </Link>
-
-        <Link
-          href="/maps"
-          className={`w-full text-left px-2 py-2.5 border-b border-border-light flex items-center gap-2.5 no-underline transition-colors ${
-            isCurrent("/maps")
-              ? "text-ink font-semibold"
-              : "text-muted hover:text-ink"
-          }`}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
-            <line x1="9" y1="3" x2="9" y2="18" />
-            <line x1="15" y1="6" x2="15" y2="21" />
-          </svg>
-          <span>Spatial Cartography</span>
-        </Link>
-
-        <Link
-          href="/article/new"
-          className={`w-full text-left px-2 py-2.5 flex items-center gap-2.5 no-underline transition-colors ${
-            pathname === "/article/new"
-              ? "text-ink font-semibold"
-              : "text-muted hover:text-ink"
-          }`}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          <span>Create Article</span>
-        </Link>
-      </div>
+      {/* Navigation Links — registry-driven, grouped. Claim Graph, Stale Watch
+          and the rest can never drift out of the nav again. */}
+      <nav aria-label="Site sections" className="space-y-4 text-xs font-medium">
+        {NAV_GROUPS.map((group) => {
+          const rule = GROUP_RULES.find((g) => g.group === group)!;
+          const items = visibleRoutes.filter((r: RetroRoute) => r.group === group && rule.match(r.href));
+          if (items.length === 0) return null;
+          return (
+            <div key={group} className="space-y-1">
+              <div className="px-2 text-[10px] font-mono uppercase tracking-[0.18em] text-subtle">
+                {group}
+              </div>
+              {items.map((r: RetroRoute) => {
+                const active = r.href === "/" ? pathname === "/" : pathname.startsWith(r.href);
+                return (
+                  <Link
+                    key={r.href}
+                    href={r.href}
+                    className={`w-full text-left px-2 py-2.5 border-b border-border-light flex items-center justify-between no-underline transition-colors ${
+                      active ? "text-ink font-semibold" : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <RouteIcon icon={r.icon} />
+                      <span>{r.label}</span>
+                    </div>
+                    {r.href === "/" && (
+                      <span className="text-[11px] font-mono tabular-nums text-subtle">
+                        {health?.article_count ?? "—"}
+                      </span>
+                    )}
+                    {r.href === "/contested" && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-sharp bg-oxblood-subtle text-oxblood font-semibold font-mono">
+                        {contestedCount}
+                      </span>
+                    )}
+                    {r.href === "/gaps" && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-sharp bg-gold-bg text-accent-dark font-semibold font-mono">
+                        {gapsCount}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          );
+        })}
+      </nav>
 
       {/* Trending Epistemic Searches */}
       <div className="pt-4 border-t border-rule space-y-2">

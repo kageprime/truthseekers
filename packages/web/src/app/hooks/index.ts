@@ -11,6 +11,7 @@ export {
   useContestedClaims, useAllGaps, useStaleArticles,
   useArticleFreshness, useRefreshDiff, useArticleGraph, useArticleClaimGraph,
   useArticleClaims, useArticleGaps, useClaimEvidence, useSubmitClaimEvidence,
+  useVerifyClaim, useRecentDossiers,
   useArticleEpistemic, useGlobalClaimGraph,
   useUpvoteGap, useSubmitGapEvidence,
   useQueue, useCancelQueueJob, useResolveArticle, useCheckArticleStatus,

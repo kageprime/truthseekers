@@ -12,8 +12,8 @@ import {
   useArticleProgress,
   useArticleStatus,
   useArticleEpistemic,
+  useGlobalClaimGraph,
 } from "../../hooks";
-import { fetchGlobalClaimGraph } from "@/lib/api";
 import GenerationBar from "../../components/GenerationBar";
 import EpisodeFeed from "../../components/EpisodeFeed";
 import type { AgentEvent } from "../../components/ProcessViewer";
@@ -53,7 +53,7 @@ export default function ArticleClient({
   const [tourOpen, setTourOpen] = useState(false);
   const readingRef = useRef<HTMLElement | null>(null);
 
-  const { widthMode } = useUiMode();
+  const { widthMode, alignClass } = useUiMode();
   const { data: epistemic } = useArticleEpistemic(generating ? undefined : slug);
 
   const epistemicClaims = useMemo<ClaimItem[]>(() => {
@@ -167,46 +167,35 @@ export default function ArticleClient({
 
   // Cross-article traversal: same assertion disputed in other articles.
   // Matched by claim signature, falling back to normalized text (global graph
-  // nodes carry no signature). Fetched lazily — only while the drawer is open.
-  const [elsewhere, setElsewhere] = useState<
-    Array<{ id: string; slug: string; title: string; text: string; status: string; confidence: number }>
-  >([]);
-  useEffect(() => {
-    let cancelled = false;
-    setElsewhere([]);
-    if (!selectedClaim) return;
+  // nodes carry no signature). Fetched lazily via React Query hook.
+  const { data: globalGraphData } = useGlobalClaimGraph(selectedClaim ? 150 : 0, 0);
+
+  const elsewhere = useMemo(() => {
+    if (!selectedClaim || !globalGraphData) return [];
     const norm = (t: string) => (t || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     const wantSig = (selectedClaim as any).signature || "";
     const wantText = norm(selectedClaim.text);
-    fetchGlobalClaimGraph(150, 0)
-      .then((g) => {
-        if (cancelled || !g) return;
-        const out: typeof elsewhere = [];
-        for (const n of (g.nodes as any[]) ?? []) {
-          if (n?.type !== "claim" || n.article_slug === slug) continue;
-          const st = String(n.status || "").toLowerCase();
-          if (!["disputed", "weak", "contested"].includes(st)) continue;
-          const match =
-            (wantSig && (n as any).signature && (n as any).signature === wantSig) ||
-            (wantText && norm(n.label || "") === wantText);
-          if (!match) continue;
-          out.push({
-            id: n.id,
-            slug: n.article_slug,
-            title: n.article_title || n.article_slug,
-            text: n.label || "",
-            status: n.status,
-            confidence: n.confidence ?? 0,
-          });
-          if (out.length >= 5) break;
-        }
-        setElsewhere(out);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedClaim, slug]);
+    const out: Array<{ id: string; slug: string; title: string; text: string; status: string; confidence: number }> = [];
+    for (const n of (globalGraphData.nodes as any[]) ?? []) {
+      if (n?.type !== "claim" || n.article_slug === slug) continue;
+      const st = String(n.status || "").toLowerCase();
+      if (!["disputed", "weak", "contested"].includes(st)) continue;
+      const match =
+        (wantSig && (n as any).signature && (n as any).signature === wantSig) ||
+        (wantText && norm(n.label || "") === wantText);
+      if (!match) continue;
+      out.push({
+        id: n.id,
+        slug: n.article_slug,
+        title: n.article_title || n.article_slug,
+        text: n.label || "",
+        status: n.status,
+        confidence: n.confidence ?? 0,
+      });
+      if (out.length >= 5) break;
+    }
+    return out;
+  }, [selectedClaim, globalGraphData, slug]);
 
   const { data: quota } = useQuota();
   const { mutate: generateArticle } = useGenerateArticle();
@@ -382,7 +371,7 @@ export default function ArticleClient({
 
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <section ref={readingRef} className={`${containerClass} mx-auto transition-all duration-300`}>
+      <section ref={readingRef} className={`${containerClass} ${alignClass} transition-all duration-300`}>
         {/* Masthead */}
         <div className="plate-head">
           <div className="plate-folio">

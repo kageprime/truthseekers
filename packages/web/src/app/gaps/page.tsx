@@ -22,7 +22,7 @@ export default function GapsPage() {
   const { data: res, loading } = useAllGaps();
   const { mutate: upvoteGap } = useUpvoteGap();
   const { mutate: submitGapEvidence } = useSubmitGapEvidence();
-  const { widthMode } = useUiMode();
+  const { widthMode, alignClass } = useUiMode();
 
   const gaps = ((res as any)?.gaps as Gap[] | undefined) ?? [];
   const [submitting, setSubmitting] = useState<string | null>(null);
@@ -60,7 +60,7 @@ export default function GapsPage() {
 
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
         <div className="plate-head">
           <div className="plate-folio">
             <span>Community scrutiny</span>

@@ -12,13 +12,29 @@ export default function HomePage() {
   const { data: health } = useHealth();
   const { data: featured } = useFeaturedArticles();
   const { data: latestRes, loading: latestLoading } = useArticles(0, 9);
-  const { widthMode } = useUiMode();
+  const { widthMode, alignClass } = useUiMode();
 
   const feat = (featured ?? [])[0] ?? null;
   const latestList = (latestRes as any)?.data ?? [];
   const articles = Array.isArray(latestList) ? latestList : [];
 
-  const domains = (featured?.length ? featured : articles).slice(0, 6);
+  // ponytail: keyword desks over the live pool; slice fallback keeps
+  // sections populated until the corpus covers finance/law/work.
+  const pool = (featured?.length ? [...featured, ...articles] : articles).filter(
+    (a: any, i: number, arr: any[]) => a?.slug && arr.findIndex((b: any) => b.slug === a.slug) === i
+  );
+  const DESKS = [
+    { key: "finance", label: "Markets & Finance", hint: "Capital, prices, risk", match: ["financ", "market", "econom", "bank", "money", "trade", "invest"] },
+    { key: "law", label: "Law & Policy", hint: "Statutes, courts, reform", match: ["law", "legal", "court", "policy", "regulat", "rights", "govern"] },
+    { key: "work", label: "Work & Recruitment", hint: "Labour, hiring, skills", match: ["work", "job", "career", "hiring", "recruit", "labour", "labor", "employ"] },
+  ];
+  const deskItems = (match: string[]) => {
+    const hit = pool.filter((a: any) =>
+      `${a.categories?.join(" ") ?? ""} ${a.title ?? ""}`.toLowerCase().includes(match[0]) ||
+      match.some((k) => `${a.categories?.join(" ") ?? ""} ${a.title ?? ""} ${a.abstract ?? ""}`.toLowerCase().includes(k))
+    );
+    return (hit.length ? hit : pool).slice(0, 3);
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +47,7 @@ export default function HomePage() {
 
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
         {/* Masthead */}
         <div className="plate-head">
           <div className="plate-folio">
@@ -97,46 +113,43 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* Index */}
+        {/* Digest desks — compact multi-story editorial grid, 1-col mobile */}
         <section className="py-8">
           <div className="flex items-baseline justify-between mb-4">
-            <h2 className="font-display text-2xl font-bold text-ink">Index of entries</h2>
-          <div className="flex items-baseline gap-4">
-            {articles.length > 1 && (
-              <button
-                onClick={() => {
-                  const pick = articles[Math.floor(Math.random() * articles.length)];
-                  if (pick?.slug) router.push(`/article/${pick.slug}`);
-                }}
-                className="category-link no-underline text-sm font-medium cursor-pointer"
-              >
-                Surprise me →
-              </button>
-            )}
+            <h2 className="font-display text-2xl font-bold text-ink">The digest</h2>
             <Link href="/articles" className="category-link no-underline text-sm font-medium">
               View all →
             </Link>
           </div>
-          </div>
-          {domains.length > 0 ? (
-            <div className="ledger">
-              {domains.map((d: any, i: number) => (
-                <Link key={d.slug} href={`/article/${d.slug}`} className="ledger-row group">
-                  <span className="index-numeral">{String(i + 1).padStart(2, "0")}</span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block font-display text-lg font-semibold text-ink group-hover:text-gold transition-colors truncate">
-                      {d.title || d.slug}
-                    </span>
-                    <span className="block text-[13px] text-muted truncate mt-0.5">
-                      {(d.categories?.[0] || "Knowledge").toUpperCase()}
-                      {"  ·  "}
-                      {d.abstract || "Autonomous empirical research entry."}
-                    </span>
-                  </span>
-                  <span className="font-mono text-xs text-subtle tabular-nums shrink-0">
-                    {d.citations?.length ?? d.source_count ?? "—"}
-                  </span>
-                </Link>
+          {pool.length > 0 ? (
+            <div className="space-y-8">
+              {DESKS.map((desk) => (
+                <section key={desk.key} aria-label={desk.label}>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <h3 className="text-[11px] font-mono uppercase tracking-[0.18em] text-gold">
+                      {desk.label}
+                    </h3>
+                    <span className="text-[11px] font-mono text-subtle hidden sm:inline">{desk.hint}</span>
+                  </div>
+                  <div className="digest-grid">
+                    {deskItems(desk.match).map((d: any) => (
+                      <Link key={`${desk.key}-${d.slug}`} href={`/article/${d.slug}`} className="digest-card group">
+                        <span className="digest-kicker">{(d.categories?.[0] || desk.label).toUpperCase()}</span>
+                        <span className="block font-display text-[17px] font-semibold leading-snug text-ink group-hover:text-gold transition-colors text-balance">
+                          {d.title || d.slug}
+                        </span>
+                        <span className="block font-serif italic text-[13px] text-muted leading-relaxed line-clamp-2">
+                          {d.abstract || "Autonomous empirical research entry."}
+                        </span>
+                        <span className="dateline mt-auto pt-1">
+                          <span>{d.citations?.length ?? d.source_count ?? "—"} sources</span>
+                          <span className="sep">·</span>
+                          <span className="underline decoration-gold decoration-2 underline-offset-4">Read →</span>
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
               ))}
             </div>
           ) : (
@@ -144,6 +157,9 @@ export default function HomePage() {
               {latestLoading ? "Loading verified entries…" : "No verified entries yet — generate your first article to seed the corpus."}
             </p>
           )}
+          <p className="digest-disclosure mt-6">
+            Unofficial edited digest — AI-synthesized summaries. Verify claims against the linked primary sources before citing.
+          </p>
         </section>
 
         {articles.length > 0 && (

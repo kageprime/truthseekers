@@ -2050,3 +2050,77 @@ code[class*="language-"] {
     gap: 0.35rem;
   }
 }
+
+/* ── Vintage digest theme (global, mobile-first) ───────────────
+   ponytail: one grid + rem type knob + print. Extend only on demand. */
+html[data-type="s"] { font-size: 15px; }
+html[data-type="m"] { font-size: 16px; }
+html[data-type="l"] { font-size: 18px; }
+
+.digest-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  border: 1px solid var(--rule);
+  background: var(--surface-elevated);
+  border-radius: var(--radius-sharp);
+  overflow: hidden;
+}
+@media (min-width: 640px) {
+  .digest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .digest-card:nth-child(odd) { border-right: 1px solid var(--border-light); }
+}
+@media (min-width: 1024px) {
+  .digest-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .digest-card:nth-child(odd) { border-right: none; }
+  .digest-card:not(:nth-child(3n)) { border-right: 1px solid var(--border-light); }
+}
+.digest-grid > * + * { border-top: 1px solid var(--border-light); }
+@media (min-width: 640px) {
+  .digest-grid > * + * { border-top: none; }
+  .digest-grid > *:nth-child(n+3) { border-top: 1px solid var(--border-light); }
+}
+@media (min-width: 1024px) {
+  .digest-grid > *:nth-child(n+3) { border-top: none; }
+  .digest-grid > *:nth-child(n+4) { border-top: 1px solid var(--border-light); }
+}
+.digest-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem 1.1rem;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+.digest-card:hover { background: color-mix(in srgb, var(--gold) 6%, transparent); }
+.digest-kicker {
+  font-family: var(--font-typewriter);
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.digest-disclosure {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--subtle);
+  border-top: 1px solid var(--border-light);
+  padding-top: 0.75rem;
+}
+
+@media print {
+  header, nav, aside, footer nav, .fab-chat, .chat-shell,
+  #sidebar-drawer, .trail-backdrop, .no-print { display: none !important; }
+  body::before { display: none !important; }
+  body { background: #fff !important; color: #000 !important; }
+  main { display: block !important; width: 100% !important; }
+  a { color: #000 !important; text-decoration: underline !important; }
+  .block-renderer a[href]::after, article.prose a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.75em;
+    word-break: break-all;
+  }
+  .plate, .ledger, .digest-grid, .factfile { box-shadow: none !important; break-inside: avoid; }
+}

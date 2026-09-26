@@ -77,7 +77,7 @@ export default function ArticlesPage() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [page, setPage] = useState(0);
   const [generatingList, setGeneratingList] = useState<GeneratingEntry[]>([]);
-  const { widthMode } = useUiMode();
+  const { widthMode, alignClass } = useUiMode();
 
   const { mutate: generateArticle } = useGenerateArticle();
 
@@ -119,7 +119,7 @@ export default function ArticlesPage() {
 
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
         <div className="plate-head">
           <div className="plate-folio">
             <span>Corpus index</span>

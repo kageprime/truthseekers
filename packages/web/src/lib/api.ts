@@ -450,6 +450,63 @@ export async function submitClaimEvidence(claimId: string, url: string, note: st
   return res.json();
 }
 
+// ── Claim Finder: internet mode ───────────────────────
+// One cited document in an open-web dossier. Citations are allow-listed
+// server-side against the documents retrieval actually fetched, so a URL here
+// always resolves to a source VERITAS read.
+
+export interface ClaimDossierSource {
+  title: string;
+  url: string;
+  quote?: string;
+  stance?: string;
+  source?: string;
+}
+
+export interface ClaimDossier {
+  statement: string;
+  verdict: string; // supported | contested | weak | unverified
+  confidence: number;
+  rationale: string;
+  supporting: ClaimDossierSource[];
+  contradicting: ClaimDossierSource[];
+  context?: ClaimDossierSource[];
+  caveats: string[];
+  grounded: boolean;
+  sources_reviewed: number;
+  model?: string;
+  checked_at?: string;
+}
+
+export interface ClaimVerifyResult {
+  statement: string;
+  corpus: { claims: any[] };
+  dossier: ClaimDossier | null;
+  cached: boolean;
+  note?: string;
+}
+
+// verifyClaim runs the full internet mode: corpus lookup + live retrieval +
+// adjudicated verdict. `refresh` bypasses the 24h dossier cache.
+export async function verifyClaim(statement: string, refresh = false): Promise<ClaimVerifyResult | null> {
+  if (MOCK) return null;
+  const res = await fetch(`${BASE}/claims/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ statement, refresh }),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function fetchRecentDossiers(limit = 8): Promise<{ dossiers: any[] } | null> {
+  if (MOCK) return { dossiers: [] };
+  const res = await fetch(`${BASE}/claims/recent?limit=${limit}`, { cache: "no-store", credentials: "include" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export interface FreshnessInfo {
   slug: string;
   overall_score: number;

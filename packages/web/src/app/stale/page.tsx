@@ -14,7 +14,7 @@ interface StaleArticle {
 
 export default function StalePage() {
   const { data: res, loading } = useStaleArticles(50);
-  const { widthMode } = useUiMode();
+  const { widthMode, alignClass } = useUiMode();
   const articles = (res?.articles as StaleArticle[] | undefined) ?? [];
 
   const freshTone = (score: number) =>
@@ -26,7 +26,7 @@ export default function StalePage() {
 
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
         <div className="plate-head">
           <div className="plate-folio">
             <span>Maintenance</span>

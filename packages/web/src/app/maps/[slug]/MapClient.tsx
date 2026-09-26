@@ -19,7 +19,7 @@ export default function MapClient({ slug, map: initialMap }: MapClientProps) {
   const router = useRouter();
   const { data: fetched } = useMap(slug);
   const map: MapEntry | null = initialMap ?? fetched ?? null;
-  const { widthMode } = useUiMode();
+  const { widthMode, alignClass } = useUiMode();
 
   if (!map) {
     return (
@@ -51,7 +51,7 @@ export default function MapClient({ slug, map: initialMap }: MapClientProps) {
 
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
         <div className="plate-head">
           <div className="plate-folio">
             <span>Spatial cartography{map.region ? ` · ${map.region}` : ""}{map.era ? ` · ${map.era}` : ""}</span>

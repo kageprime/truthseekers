@@ -13,15 +13,20 @@ const COLUMNS: Array<{ title: string; links: Array<{ label: string; href: string
     title: "Encyclopedia",
     links: [
       { label: "Articles", href: "/articles" },
+      { label: "Claim Finder", href: "/finder" },
+      { label: "Claim Map", href: "/claim-graph" },
       { label: "Maps", href: "/maps" },
       { label: "Contested claims", href: "/contested" },
       { label: "Open questions", href: "/gaps" },
+      { label: "Stale watch", href: "/stale" },
     ],
   },
   {
     title: "Product",
     links: [
       { label: "Chat", href: "/chat/new" },
+      { label: "New article", href: "/article/new" },
+      { label: "Queue", href: "/queue" },
       { label: "Pricing", href: "/pricing" },
       { label: "Settings", href: "/settings" },
       { label: "Admin", href: "/admin" },
@@ -93,6 +98,10 @@ export default function AppFooter() {
             Evidence-grounded encyclopedia
           </p>
         </div>
+        <p className="digest-disclosure mt-6">
+          Unofficial edited digest — entries are AI-synthesized and scrutinized against cited evidence.
+          Verify via primary sources before citing. Not legal, financial, or hiring advice.
+        </p>
       </div>
     </footer>
   );

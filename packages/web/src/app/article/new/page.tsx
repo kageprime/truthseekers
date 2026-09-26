@@ -12,7 +12,7 @@ export default function NewArticlePage() {
   const [status, setStatus] = useState("");
   const { data: quota, loading: quotaLoading } = useQuota();
   const { mutate: generateArticle } = useGenerateArticle();
-  const { widthMode } = useUiMode();
+  const { widthMode, alignClass } = useUiMode();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,7 +32,7 @@ export default function NewArticlePage() {
 
   return (
     <div className="py-12 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
         <div className="plate-head">
           <div className="plate-folio">
             <span>Epistemic pipeline</span>

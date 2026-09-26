@@ -58,7 +58,7 @@ export default function MapsPage() {
   const [typeFilter, setTypeFilter] = useState<"" | "static" | "interactive">("");
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { widthMode } = useUiMode();
+  const { widthMode, alignClass } = useUiMode();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const showSearch = debouncedQuery.trim().length > 0;
@@ -114,7 +114,7 @@ export default function MapsPage() {
 
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass} mx-auto transition-all duration-300`}>
+      <div className={`${containerClass} ${alignClass} transition-all duration-300`}>
       <div className="plate-head">
         <div className="plate-folio">
           <span>Historical atlas</span>

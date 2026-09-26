@@ -7,7 +7,7 @@ An LLM-powered interactive encyclopedia — an AI agent-driven knowledge base th
 ## Architecture
 
 - **Backend:** Go orchestrator (`veritas/go-orchestrator/`) — std-library `net/http` API gateway on port **4097**, native Go agent loop, and an optimized DAG engine. Zero web frameworks. PostgreSQL via `database/sql` + `lib/pq`.
-- **Epistemic Pipeline:** Native Go LLM calls (`internal/agent/pipeline.go`) — 10 nodes (including parallel `generate_media` and conditional `scrutinize` skipping for consensus topics). Epistemic data (claims, evidence, gaps, language flags, scrutiny) is persisted to PostgreSQL and served through the API. No Python dependency.
+- **Epistemic Pipeline:** Native Go LLM calls (`internal/agent/pipeline.go`) — 10 nodes (including parallel `generate_media` and conditional `scrutinize` skipping for consensus topics). Epistemic data (claims, evidence, gaps, language flags, scrutiny) is persisted to PostgreSQL and served through the API. No Python dependency. The same machinery backs the Claim Finder's internet mode (`internal/agent/claimcheck.go`): any statement — not just corpus claims — is retrieved live and adjudicated into a cached verdict dossier, with citations allow-listed to fetched documents.
 - **Autonomous CMS Engine:** `VeritasWorker` (`internal/api/autonomous.go`) runs background watchdog tasks (stale article refresh, gap mini-scrutiny, claim graph re-indexing) on a 60-minute cycle with rate limiting (max 5 jobs/hour) and `requireApproval` IAM policy guardrails.
 - **Multi-Source Real Photo Scoring:** `MultiSourceImageSearch` (`internal/agent/image_scorer.go`) queries Wikimedia Commons, NASA API, and Met Museum API, evaluating candidates against a 3-tier mathematical rubric ($S_{\text{total}} = 0.40 S_{\text{auth}} + 0.40 S_{\text{rel}} + 0.20 S_{\text{qual}}$). Only items with $S_{\text{total}} \ge 50$ are auto-attached; fallbacks carry `"✦ AI Visual Reconstruction"` badges.
 - **Storage:** PostgreSQL with automated migrations on boot (`internal/storage/migrate.go`). Falls back to file-backed mock mode when `DATABASE_URL` is unset.
@@ -64,7 +64,9 @@ Routes are registered in `internal/api/server.go` (`setupRoutes`) and dispatched
 | `/articles/:slug` | GET | Fetch article |
 | `/articles/:slug/{status,progress,generate,refresh,export,resolve,views,graph,claim-graph,claims,gaps,freshness,refresh-diff,epistemic}` | various | Per-article sub-resources; `progress` is SSE; `claim-graph` returns the claim-level force-directed graph; `refresh-diff` summarizes claim version changes; `epistemic` is the composite |
 | `/claims/:id/evidence` | GET / POST | Fetch claim details + evidence; submit community counter-evidence to trigger mini-scrutiny |
-| `/claims/search` | GET | Claim Finder — substring search over claim text with article slugs (`?q=`, `?limit=`) |
+| `/claims/search` | GET | Claim Finder (corpus mode) — substring search over claim text with article slugs (`?q=`, `?limit=`) |
+| `/claims/verify` | POST | Claim Finder (internet mode) — verify **any** statement: corpus lookup + live retrieval + adjudicated dossier (`{"statement","refresh?"}` → `{"statement","corpus","dossier","cached","note?"}`); dossiers cached 24h |
+| `/claims/recent` | GET | Recent open-web verdicts for the finder idle state (`?limit=`) |
 | `/contested` | GET | Public dashboard — most contested claims across the encyclopedia, ranked by contradiction level |
 | `/claim-graph` | GET | Global claim graph — top-N most-contested claims + evidence + claim→claim edges (`?limit=`, `?min_contradiction=`) |
 | `/api/revalidate` (Next.js) | POST | On-demand revalidation: clears ISR cache for `/article/{slug}` + global pages |
@@ -152,7 +154,7 @@ Next.js 15 App Router under `packages/web/src/app/`.
 
 ### Unified 3-Column Layout (`RetroShell.tsx`)
 - **Column 1 (Left Sidebar)**: `RetroContentsNav` (Spine, Living Encyclopedia, Create, Account, Time Machine, Word of the Day). Full-width LFEI link styling.
-- **Column 2 (Center Canvas)**: Centered single main reading canvas (flat editorial style, no cards-inside-cards).
+- **Column 2 (Center Canvas)**: The reading column is **not** force-centered: `UiModeContext` exposes `alignMode` (`left` default — anchored to the contents gutter, editorial style) vs `center` (floated viewport column), toggled from the top nav and persisted to localStorage. Content pages append `alignClass` (`mr-auto`/`mx-auto`) to their max-width container.
 - **Column 3 (Right Sidebar)**: `GlobalRightSidebar` (Veritas status, active job ticker, top contested claims, open gaps, "Ask Veritas" chat link).
 
 ### Epistemic Workbench & Interactivity Components

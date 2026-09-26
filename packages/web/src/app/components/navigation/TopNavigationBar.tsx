@@ -7,7 +7,7 @@ import { useAuth } from "../../hooks/useAuth";
 
 export default function TopNavigationBar() {
   const pathname = usePathname();
-  const { widthMode, setWidthMode, toggleSidebar, sidebarOpen, hoverSidebarIn, hoverSidebarOut } = useUiMode();
+  const { widthMode, setWidthMode, alignMode, setAlignMode, toggleSidebar, sidebarOpen, hoverSidebarIn, hoverSidebarOut, typeScale, setTypeScale } = useUiMode();
   const { user } = useAuth();
 
   // Determine dynamic breadcrumb
@@ -27,6 +27,10 @@ export default function TopNavigationBar() {
     breadcrumb = "Veritas Studio";
   } else if (pathname === "/articles") {
     breadcrumb = "Article Corpus Directory";
+  } else if (pathname === "/claim-graph") {
+    breadcrumb = "Global Claim Map";
+  } else if (pathname === "/stale") {
+    breadcrumb = "Stale Article Watch";
   }
 
   const isTabActive = (path: string) => {
@@ -80,13 +84,16 @@ export default function TopNavigationBar() {
         </div>
       </div>
 
-      {/* Main View Tabs */}
+      {/* Main View Tabs — one entry per encyclopedia surface */}
       <nav className="hidden md:flex items-center gap-5 text-[13px] font-medium" aria-label="Main Views">
         {[
           { href: "/", label: "Portal", active: pathname === "/" },
           { href: "/articles", label: "Articles", active: pathname.startsWith("/article") || pathname.startsWith("/articles") },
           { href: "/finder", label: "Finder", active: pathname.startsWith("/finder") },
+          { href: "/claim-graph", label: "Claim Map", active: isTabActive("/claim-graph") },
           { href: "/contested", label: "Contested", active: isTabActive("/contested") },
+          { href: "/gaps", label: "Open Gaps", active: isTabActive("/gaps") },
+          { href: "/stale", label: "Stale", active: isTabActive("/stale") },
           { href: "/maps", label: "Maps", active: isTabActive("/maps") },
           { href: "/chat/new", label: "Veritas Studio", active: isTabActive("/chat") },
         ].map((t) => (
@@ -105,7 +112,7 @@ export default function TopNavigationBar() {
 
       {/* Controls: 2-Mode Layout Toggle + User Profile */}
       <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-        {/* 2-MODE WIDTH TOGGLE */}
+        {/* 2-MODE WIDTH TOGGLE + TYPE SCALE */}
         <div className="flex items-center gap-3 text-xs font-mono uppercase tracking-wider" role="group" aria-label="Layout width mode">
           <button
             type="button"
@@ -134,6 +141,57 @@ export default function TopNavigationBar() {
           >
             Expanded
           </button>
+        </div>
+        <span className="text-rule text-xs" aria-hidden>|</span>
+        {/* COLUMN ALIGNMENT — left hangs content off the gutter, center floats it */}
+        <div className="hidden sm:flex items-center gap-3 text-xs font-mono uppercase tracking-wider" role="group" aria-label="Reading column alignment">
+          <button
+            type="button"
+            onClick={() => setAlignMode("left")}
+            className={`cursor-pointer transition-colors tracking-wider ${
+              alignMode === "left"
+                ? "text-ink font-semibold underline decoration-gold decoration-2 underline-offset-4"
+                : "text-subtle hover:text-ink"
+            }`}
+            title="Left-aligned column — anchored to the contents index"
+            aria-pressed={alignMode === "left"}
+          >
+            Left
+          </button>
+          <span className="text-rule">/</span>
+          <button
+            type="button"
+            onClick={() => setAlignMode("center")}
+            className={`cursor-pointer transition-colors tracking-wider ${
+              alignMode === "center"
+                ? "text-ink font-semibold underline decoration-gold decoration-2 underline-offset-4"
+                : "text-subtle hover:text-ink"
+            }`}
+            title="Centered column — floats in the viewport"
+            aria-pressed={alignMode === "center"}
+          >
+            Center
+          </button>
+        </div>
+        <span className="text-rule text-xs" aria-hidden>|</span>
+        <div className="hidden sm:flex items-center gap-1.5 text-xs font-mono" role="group" aria-label="Adjustable type size">
+          {(["s", "m", "l"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setTypeScale(s)}
+              aria-pressed={typeScale === s}
+              title={s === "s" ? "Compact type" : s === "m" ? "Standard type" : "Large type"}
+              className={`cursor-pointer px-1 uppercase transition-colors ${
+                typeScale === s
+                  ? "text-ink font-bold underline decoration-gold decoration-2 underline-offset-4"
+                  : "text-subtle hover:text-ink"
+              }`}
+              style={{ fontSize: s === "s" ? "0.65rem" : s === "m" ? "0.75rem" : "0.85rem" }}
+            >
+              {s === "s" ? "A" : s === "m" ? "A+" : "A++"}
+            </button>
+          ))}
         </div>
 
         {/* User Orb / Profile */}

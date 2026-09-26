@@ -54,7 +54,9 @@ Single source for adopting the new design. Old UI (`packages/web/`) is frozen; d
 ### Epistemic (claims / gaps / graphs)
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/claims/search?q=&limit=` (≤50) | Claim Finder → `{claims: ClaimWithArticle[]}` |
+| GET | `/claims/search?q=&limit=` (≤50) | Claim Finder (corpus mode) → `{claims: ClaimWithArticle[]}` |
+| POST | `/claims/verify` | Claim Finder (internet mode) — `{statement, refresh?}` → `{statement, corpus:{claims}, dossier:{verdict: supported\|contested\|weak\|unverified, confidence, rationale, supporting[], contradicting[], context[], caveats[], grounded, sources_reviewed, model, checked_at}, cached, note?}`; dossiers cached 24h keyed by normalized statement |
+| GET | `/claims/recent?limit=` (≤25) | Recent open-web dossiers (finder idle state) |
 | GET/POST | `/claims/:id/evidence` | GET `{claim,evidence[]}`; POST `{url,note,type?,supports_claim?}` → community evidence |
 | GET | `/contested?limit=` (≤100) | dashboard, ranked by contradiction |
 | GET | `/claim-graph?limit=&min_contradiction=` | global graph `{nodes,edges,claim_count}` (limit ≤500) |
@@ -103,6 +105,6 @@ Single source for adopting the new design. Old UI (`packages/web/`) is frozen; d
 | `/` search | `GET /articles/search?q=` + `GET /featured` | static 3 entries |
 | `/articles` | `GET /articles?limit=&offset=` + client filter | static 6 cards |
 | `/articles/[slug]` | `GET /articles/:slug` + `GET .../epistemic` + `POST .../track` | static press article |
-| `/claims?q=` | `GET /claims/search` + `GET /contested` | static 3 claims |
+| `/claims?q=` | `GET /claims/search` + `POST /claims/verify` + `GET /claims/recent` | static 3 claims |
 | `/maps` | `GET /maps` | static 4 places |
 | `/chat` | `POST /chat` + `POST /chat/:id/messages` (SSE) | canned Veritas reply + login CTA when 401 |
