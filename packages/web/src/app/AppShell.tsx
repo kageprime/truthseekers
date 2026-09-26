@@ -2,8 +2,9 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import TopNavigationBar from "./components/navigation/TopNavigationBar";
+import Masthead from "./components/navigation/Masthead";
 import DockedSidebar from "./components/navigation/DockedSidebar";
+import ReadingDesk from "./components/layout/ReadingDesk";
 import FloatingChatWidget from "./components/FloatingChatWidget";
 import { useFloatingChat } from "./FloatingChatContext";
 import { useAuth } from "./hooks/useAuth";
@@ -48,21 +49,24 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-surface text-ink selection:bg-gold-bg selection:text-ink font-sans antialiased">
-      {/* Sticky Top Navigation */}
-      <TopNavigationBar />
+      {/* Newspaper masthead — nameplate, date, edition */}
+      <Masthead />
 
-      {/* Main App Workspace */}
+      {/* Main App Workspace — dual rails: sidebar left (persistent ≥lg),
+          canvas center, reading desk right (≥xl) */}
       <div className="flex-1 flex w-full relative">
-        {/* Mobile-only navigation drawer (<lg); header owns desktop nav */}
         <DockedSidebar />
 
         {/* Dynamic Center Reading Canvas */}
         <main
           id="main-content"
-          className="flex-1 min-w-0 min-h-[calc(100vh-3.5rem)] flex flex-col"
+          className="flex-1 min-w-0 min-h-[calc(100vh_-_var(--masthead-h))] flex flex-col"
         >
           {children}
         </main>
+
+        {/* Reading desk — view controls, page-context slot */}
+        <ReadingDesk />
 
         {/* Floating Chat Assistant Drawer (on-demand) */}
         {showChat && (

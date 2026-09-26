@@ -372,19 +372,21 @@ export default function ArticleClient({
   );
 
   return (
-    <div className="py-10 px-6 sm:px-10 w-full">
-      <div className={`${containerClass("prose")} xl:grid xl:grid-cols-[12rem_minmax(0,1fr)] xl:gap-8 transition-all duration-300`}>
-        <ArticleContents variant="rail" blocks={contentBlocks as any} />
-        <div className="min-w-0">
-          <ArticleContents variant="bar" blocks={contentBlocks as any} />
+    <div className="py-10 px-6 sm:px-10 w-full xl:grid xl:grid-cols-[13rem_minmax(0,1fr)] xl:gap-10 xl:items-start transition-all duration-300">
+      {/* TOC rail anchored to the outer left on desktop xl+ */}
+      <ArticleContents variant="rail" blocks={contentBlocks as any} />
+
+      <div className="min-w-0 w-full">
+        <ArticleContents variant="bar" blocks={contentBlocks as any} />
+        <div className={`${containerClass("prose")} transition-all duration-300`}>
           <section ref={readingRef}>
-        {/* Masthead */}
-        <PlateHead
-          folioLeft={category}
-          folioRight={article.citations?.length ? `${article.citations.length} sources` : "Research entry"}
-          title={title}
-          deck={abstract || undefined}
-        >
+            {/* Masthead */}
+            <PlateHead
+              folioLeft={category}
+              folioRight={article.citations?.length ? `${article.citations.length} sources` : "Research entry"}
+              title={title}
+              deck={abstract || undefined}
+            >
           {/* Quick Actions */}
           <div className="flex items-center gap-4 pt-3 text-xs font-medium flex-wrap">
             {tourSteps.length > 0 && (
@@ -550,7 +552,7 @@ export default function ArticleClient({
             </div>
           </div>
         )}
-      </section>
+          </section>
         </div>
       </div>
 

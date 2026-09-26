@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import TruthseekersLogo from "../TruthseekersLogo";
@@ -87,12 +87,23 @@ const GROUP_RULES: Array<{ group: (typeof NAV_GROUPS)[number]; match: (href: str
 
 export default function DockedSidebar() {
   const pathname = usePathname();
-  const { sidebarOpen, setSidebarOpen } = useUiMode();
+  const { sidebarOpen, setSidebarOpen, toggleSidebar } = useUiMode();
   const { data: health } = useHealth();
   const { data: contestedRes } = useContestedClaims(10);
   const { data: gapsRes } = useAllGaps();
   const { user } = useAuth();
 
+  // ≥lg the rail is persistent (sidebarOpen = expanded vs icon rail);
+  // <lg it is a slide-over drawer (sidebarOpen = open vs closed).
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const apply = () => setIsDesktop(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  const drawerHidden = !sidebarOpen && !isDesktop;
   const contestedClaims = Array.isArray((contestedRes as any)?.claims)
     ? (contestedRes as any).claims
     : [];
@@ -102,16 +113,16 @@ export default function DockedSidebar() {
   const gapsCount = gapsList.length;
   const trendingGaps = gapsList.slice(0, 4);
 
-  // Escape dismisses the mobile drawer. Route-change dismissal lives in
-  // UiModeProvider (one owner, no duplicate effects).
+  // Escape dismisses the <lg drawer only — never the persistent rail.
+  // Route-change dismissal lives in UiModeProvider (also <lg only).
   useEffect(() => {
-    if (!sidebarOpen) return;
+    if (!sidebarOpen || isDesktop) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setSidebarOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [sidebarOpen, setSidebarOpen]);
+  }, [sidebarOpen, isDesktop, setSidebarOpen]);
 
   const isCurrent = (path: string) => {
     if (path === "/" && pathname === "/") return true;
@@ -126,50 +137,66 @@ export default function DockedSidebar() {
 
   return (
     <>
-      {/* Backdrop — taps dismiss the drawer (<lg slide-over / ≥lg icon rail) */}
+      {/* Backdrop — <lg slide-over only (lg:hidden); the persistent rail
+          needs none. All layout decisions here are CSS-driven off
+          sidebarOpen so SSR and first paint always agree. */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 top-14 bg-black/40 backdrop-blur-xs z-30"
+          className="fixed inset-0 top-[var(--masthead-h)] bg-black/40 backdrop-blur-xs z-30 lg:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
       )}
       <aside
         id="sidebar-drawer"
-        aria-hidden={!sidebarOpen}
-        inert={!sidebarOpen}
-        className={`fixed left-0 top-14 bottom-0 bg-surface border-r border-rule shadow-elev-3 p-5 space-y-6 overflow-y-auto z-40 transition-all duration-200 ease-out ${
+        aria-hidden={drawerHidden}
+        inert={drawerHidden}
+        className={`fixed lg:static left-0 top-[var(--masthead-h)] bottom-0 bg-surface border-r border-rule shadow-elev-3 lg:shadow-none p-5 space-y-6 overflow-y-auto z-40 transition-all duration-200 ease-out ${
           sidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0 pointer-events-none"
-        } w-72 lg:w-16 lg:p-3 lg:space-y-3`}
+        } lg:translate-x-0 lg:opacity-100 lg:pointer-events-auto ${
+          sidebarOpen ? "w-72 lg:w-60" : "w-72 lg:w-16 lg:p-1.5 lg:space-y-3"
+        }`}
         aria-label="Knowledge Centre Navigation"
       >
-      <div className="flex items-center justify-between lg:justify-center">
-        <div className="flex items-center gap-2.5">
-          <TruthseekersLogo variant="icon" size={28} />
-          {/* Brand text only on the <lg slide-over; the icon rail is self-explanatory */}
-          <div className="space-y-0.5 lg:hidden">
-            <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-subtle">
-              Knowledge Centre
+      <div className={`flex items-center gap-1 ${sidebarOpen ? "justify-between" : "justify-between lg:justify-center"}`}>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <TruthseekersLogo variant="icon" size={sidebarOpen ? 28 : 24} />
+          {sidebarOpen && (
+            <div className="space-y-0.5">
+              <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-subtle">
+                Knowledge Centre
+              </div>
+              <h2 className="font-display text-xl font-bold text-ink leading-none">Explore</h2>
             </div>
-            <h2 className="font-display text-xl font-bold text-ink leading-none">Explore</h2>
-          </div>
+          )}
         </div>
         <button
-          onClick={() => setSidebarOpen(false)}
-          className="p-1 rounded-md text-subtle hover:text-ink hover:bg-ink/5 cursor-pointer"
-          title="Close Sidebar"
-          aria-label="Close Sidebar"
+          onClick={toggleSidebar}
+          className="p-1 rounded-md text-subtle hover:text-ink hover:bg-ink/5 cursor-pointer shrink-0"
+          title={sidebarOpen ? "Hide navigation" : "Show navigation"}
+          aria-label={sidebarOpen ? "Hide navigation" : "Show navigation"}
+          aria-expanded={sidebarOpen}
+          aria-controls="sidebar-drawer"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          {/* <lg drawer: close ✕ — ≥lg persistent rail: collapse ‹ / expand › */}
+          <svg className="lg:hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          <svg className="hidden lg:block" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {sidebarOpen ? (
+              <polyline points="14 6 8 12 14 18" />
+            ) : (
+              <polyline points="10 6 16 12 10 18" />
+            )}
           </svg>
         </button>
       </div>
 
       {/* Navigation Links — registry-driven, grouped. Claim Graph, Stale Watch
           and the rest can never drift out of the nav again.
-          ≥lg icon rail: icon buttons only (title tooltips); <lg drawer: full labels. */}
+          ≥lg collapsed: icon buttons only (title tooltips); expanded rail
+          (sidebarOpen) and <lg drawer: full labels. */}
       <nav aria-label="Site sections" className="space-y-4 lg:space-y-5 text-xs font-medium">
         {NAV_GROUPS.map((group) => {
           const rule = GROUP_RULES.find((g) => g.group === group)!;
@@ -177,8 +204,9 @@ export default function DockedSidebar() {
           if (items.length === 0) return null;
           return (
             <div key={group} className="space-y-1 lg:space-y-1.5">
-              {/* Group labels only in the <lg drawer — the icon rail needs no text */}
-              <div className="px-2 text-[10px] font-mono uppercase tracking-[0.18em] text-subtle lg:hidden">
+              {/* Group labels only when expanded (drawer or wide rail) —
+                  the icon rail needs no text */}
+              <div className={`px-2 text-[10px] font-mono uppercase tracking-[0.18em] text-subtle ${sidebarOpen ? "" : "lg:hidden"}`}>
                 {group}
               </div>
               {items.map((r: RetroRoute) => {
@@ -206,17 +234,19 @@ export default function DockedSidebar() {
                     className={`no-underline transition-colors ${
                       active ? "text-ink font-semibold" : "text-muted hover:text-ink"
                     } ${
-                      /* ≥lg icon rail */
-                      "lg:flex lg:items-center lg:justify-center lg:w-10 lg:h-10 lg:rounded-sharp lg:border lg:border-transparent lg:hover:border-rule lg:hover:bg-surface-elevated"
-                    } ${/* <lg drawer row */ "w-full text-left px-2 py-2.5 border-b border-border-light flex items-center justify-between"}`}
+                      /* ≥lg collapsed rail: centered icon button */
+                      sidebarOpen
+                        ? ""
+                        : "lg:flex lg:items-center lg:justify-center lg:w-10 lg:h-10 lg:rounded-sharp lg:border lg:border-transparent lg:hover:border-rule lg:hover:bg-surface-elevated"
+                    } ${/* drawer / expanded rail row */ "w-full text-left px-2 py-2.5 border-b border-border-light flex items-center justify-between"}`}
                   >
                     <div className="flex items-center gap-2.5">
                       <RouteIcon icon={r.icon} />
-                      {/* Label only in the <lg drawer */}
-                      <span className="lg:hidden">{r.label}</span>
+                      {/* Label when expanded (drawer or wide rail) */}
+                      <span className={sidebarOpen ? "" : "lg:hidden"}>{r.label}</span>
                     </div>
-                    {/* Badges only in the <lg drawer */}
-                    <span className="lg:hidden flex items-center">
+                    {/* Badges only when expanded — counts also live in the folio */}
+                    <span className={`${sidebarOpen ? "" : "lg:hidden"} flex items-center`}>
                       {badge}
                     </span>
                   </Link>
@@ -227,9 +257,9 @@ export default function DockedSidebar() {
         })}
       </nav>
 
-      {/* Discovery sections stay <lg only — the icon rail is pure nav.
-          Counts/badges also live in the drawer rows above, hence hidden ≥lg. */}
-      <div className="lg:hidden pt-4 border-t border-rule space-y-2">
+      {/* Discovery sections — drawer / expanded rail only; the icon rail
+          is pure nav. Counts/badges also live in the folio above. */}
+      <div className={`${sidebarOpen ? "" : "lg:hidden"} pt-4 border-t border-rule space-y-2`}>
         <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-subtle">
           Open Gaps Needing Evidence
         </div>
@@ -263,8 +293,8 @@ export default function DockedSidebar() {
         )}
       </div>
 
-      {/* Veritas Autonomous CMS Banner — <lg only (rail is pure nav) */}
-      <div className="lg:hidden p-4 bg-surface-elevated rounded-sharp border border-rule text-xs space-y-1.5">
+      {/* Veritas Autonomous CMS Banner — drawer / expanded rail only */}
+      <div className={`${sidebarOpen ? "" : "lg:hidden"} p-4 bg-surface-elevated rounded-sharp border border-rule text-xs space-y-1.5`}>
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted font-medium">
             Veritas Engine

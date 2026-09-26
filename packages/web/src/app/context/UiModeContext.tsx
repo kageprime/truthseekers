@@ -119,10 +119,12 @@ export function UiModeProvider({ children }: { children: ReactNode }) {
     setSidebarOpen(!sidebarOpen);
   };
 
-  // Close the mobile drawer whenever the route changes — the new page is the
-  // content, the drawer is not.
+  // Close the <lg slide-over whenever the route changes — the new page is the
+  // content, the drawer is not. ≥lg the sidebar is a persistent rail, so the
+  // route never collapses or expands it.
   const pathname = usePathname();
   useEffect(() => {
+    if (window.matchMedia("(min-width: 1024px)").matches) return;
     setSidebarOpenState(false);
   }, [pathname]);
 

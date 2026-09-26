@@ -26,7 +26,7 @@ export default function TimeMachineBar() {
   };
 
   return (
-    <div className="fixed top-14 inset-x-0 z-[60] flex justify-center px-4 animate-appear-down pointer-events-none">
+    <div className="fixed top-[var(--masthead-h)] inset-x-0 z-[60] flex justify-center px-4 animate-appear-down pointer-events-none">
       <div
         className="pointer-events-auto max-w-2xl w-full p-4 rounded-2xl shadow-2xl border backdrop-blur-md transition-all flex flex-col gap-3"
         style={{
