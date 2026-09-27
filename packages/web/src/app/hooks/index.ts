@@ -1,5 +1,6 @@
 export { useAuth } from "./useAuth";
 export { useChatStream } from "./useChatStream";
+export { useMediaQuery } from "./useMediaQuery";
 export {
   useArticles, useArticleSearch, useClaimSearch, useArticle, useArticleStatus,
   useQuota, useGenerateArticle, useRefreshArticle,

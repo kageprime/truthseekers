@@ -29,6 +29,13 @@ interface ClaimDetailRailProps {
   versionDiffs?: Array<{ claim_id: string; old_status?: string; new_status?: string; status_changed?: boolean; confidence_delta?: number }>;
   elsewhere?: ElsewhereHit[];
   onNavigate?: (claim: ClaimItem) => void;
+  /**
+   * "docked" renders into the existing right rail (ReadingDesk) — the rail is
+   * already the third column of the layout, so no second overlay is stacked
+   * beside it. "floating" (default) is the standalone slide-over used below
+   * xl, where no right rail exists.
+   */
+  mode?: "floating" | "docked";
 }
 
 const isDisputedStatus = (s?: string) =>
@@ -53,7 +60,9 @@ export default function ClaimDetailRail({
   versionDiffs = [],
   elsewhere = [],
   onNavigate,
+  mode = "floating",
 }: ClaimDetailRailProps) {
+  const docked = mode === "docked";
   const [contestOpen, setContestOpen] = useState(false);
   const [contestUrl, setContestUrl] = useState("");
   const [contestNote, setContestNote] = useState("");
@@ -72,20 +81,22 @@ export default function ClaimDetailRail({
     setSubmitError(null);
   }, [claim?.id]);
 
-  // Escape closes; focus lands on ✕ so keyboard users start inside the rail.
+  // Escape closes everywhere. Floating also grabs focus (keyboard users are
+  // entering a dialog); docked leaves the reader's place in the article.
   useEffect(() => {
     if (!claim) return;
-    closeRef.current?.focus();
+    if (!docked) closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [claim, onClose]);
+  }, [claim, onClose, docked]);
 
-  // Mobile sheet traps page scroll; desktop rail leaves the article scrollable.
+  // Only the floating sheet traps page scroll — docked lives in a rail that
+  // scrolls independently.
   useEffect(() => {
-    if (!claim) return;
+    if (!claim || docked) return;
     const mq = window.matchMedia("(max-width: 640px)");
     const apply = () => {
       document.body.style.overflow = mq.matches ? "hidden" : "";
@@ -96,7 +107,7 @@ export default function ClaimDetailRail({
       document.body.style.overflow = "";
       mq.removeEventListener("change", apply);
     };
-  }, [claim]);
+  }, [claim, docked]);
 
   if (!claim) return null;
 
@@ -141,10 +152,9 @@ export default function ClaimDetailRail({
     if (onNavigate) onNavigate(c);
   };
 
-  return (
-    <div className="trail-backdrop" role="presentation" onClick={onClose}>
+  const rail = (
       <aside
-        className="trail-drawer"
+        className={docked ? "trail-drawer trail-docked" : "trail-drawer"}
         role="dialog"
         aria-modal="false"
         aria-label={`Claim details: ${(claim.text || "").slice(0, 80)}`}

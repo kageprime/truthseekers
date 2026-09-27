@@ -151,9 +151,9 @@ export default function DockedSidebar() {
         id="sidebar-drawer"
         aria-hidden={drawerHidden}
         inert={drawerHidden}
-        className={`fixed lg:static left-0 top-[var(--masthead-h)] bottom-0 bg-surface border-r border-rule shadow-elev-3 lg:shadow-none p-5 space-y-6 overflow-y-auto z-40 transition-all duration-200 ease-out ${
+        className={`fixed lg:sticky left-0 top-[var(--masthead-h)] bottom-0 bg-surface border-r border-rule shadow-elev-3 lg:shadow-none p-5 space-y-6 overflow-y-auto z-40 transition-all duration-200 ease-out ${
           sidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0 pointer-events-none"
-        } lg:translate-x-0 lg:opacity-100 lg:pointer-events-auto ${
+        } lg:translate-x-0 lg:opacity-100 lg:pointer-events-auto lg:bottom-auto lg:self-start lg:h-[calc(100dvh_-_var(--masthead-h))] ${
           sidebarOpen ? "w-72 lg:w-60" : "w-72 lg:w-16 lg:p-1.5 lg:space-y-3"
         }`}
         aria-label="Knowledge Centre Navigation"
