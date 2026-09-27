@@ -152,7 +152,7 @@ export default function ClaimDetailRail({
     if (onNavigate) onNavigate(c);
   };
 
-  const rail = (
+  const asideEl = (
       <aside
         className={docked ? "trail-drawer trail-docked" : "trail-drawer"}
         role="dialog"
@@ -388,6 +388,16 @@ export default function ClaimDetailRail({
           </div>
         )}
       </aside>
+  );
+
+  return docked ? asideEl : (
+    <div
+      className="trail-backdrop"
+      onClick={onClose}
+      role="presentation"
+      aria-label="Claim details overlay"
+    >
+      {asideEl}
     </div>
   );
 }
