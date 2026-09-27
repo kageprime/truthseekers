@@ -113,11 +113,25 @@ export function UiModeProvider({ children }: { children: ReactNode }) {
 
   const setSidebarOpen = useCallback((open: boolean) => {
     setSidebarOpenState(open);
+    // Only an explicit desktop choice is remembered — the <lg drawer's
+    // open/close churn must never rewrite the desktop preference.
+    if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
+      try { localStorage.setItem("truthseekers_sidebar_open", open ? "1" : "0"); } catch {}
+    }
   }, []);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
+
+  // Desktop rail defaults to expanded; a remembered choice wins. The <lg
+  // drawer always starts closed.
+  useEffect(() => {
+    if (!window.matchMedia("(min-width: 1024px)").matches) return;
+    let pref: string | null = null;
+    try { pref = localStorage.getItem("truthseekers_sidebar_open"); } catch {}
+    setSidebarOpenState(pref === null ? true : pref === "1");
+  }, []);
 
   // Close the <lg slide-over whenever the route changes — the new page is the
   // content, the drawer is not. ≥lg the sidebar is a persistent rail, so the

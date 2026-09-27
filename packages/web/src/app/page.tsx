@@ -3,14 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useArticles, useFeaturedArticles, useHealth } from "./hooks";
+import { useArticles, useFeaturedArticles } from "./hooks";
 import { useUiMode } from "./context/UiModeContext";
-import PlateHead from "./components/PlateHead";
 
 export default function HomePage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const { data: health } = useHealth();
   const { data: featured } = useFeaturedArticles();
   const { data: latestRes, loading: latestLoading } = useArticles(0, 9);
   const { containerClass } = useUiMode();
@@ -47,34 +45,29 @@ export default function HomePage() {
   return (
     <div className="py-10 px-6 sm:px-10 w-full">
       <div className={`${containerClass("standard")} transition-all duration-300`}>
-        {/* Masthead */}
-        <PlateHead
-          folioLeft="The Living Encyclopedia"
-          folioRight={health?.article_count != null ? `${health.article_count} verified entries` : "Autonomous epistemic corpus"}
-          title="Truthseekers"
-          deck="Every claim sourced. Every proposition scrutinized. An autonomous agent-driven knowledge repository."
-        >
-          <form onSubmit={handleSearch} role="search" className="mt-5">
-            <div className="flex items-center gap-3 border-b-2 border-ink pb-2 focus-within:border-gold transition-colors">
-              <span className="text-subtle text-lg leading-none" aria-hidden>⌕</span>
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search articles, claims, empirical topics…"
-                aria-label="Search articles"
-                className="flex-1 bg-transparent border-none outline-none font-serif text-lg text-ink placeholder:text-subtle min-w-0"
-              />
-              <button
-                type="submit"
-                disabled={!query.trim()}
-                className="text-sm font-semibold text-ink underline decoration-gold decoration-2 underline-offset-4 hover:text-gold disabled:opacity-30 disabled:no-underline cursor-pointer shrink-0"
-              >
-                Research →
-              </button>
-            </div>
-          </form>
-        </PlateHead>
+        {/* Front desk — the archive search sits directly under the nameplate.
+            The masthead already carries the brand, date and edition, so the
+            front page opens with the lead story instead of a second title. */}
+        <form onSubmit={handleSearch} role="search" className="pb-8">
+          <div className="flex items-center gap-3 border-b-2 border-ink pb-2 focus-within:border-gold transition-colors">
+            <span className="text-subtle text-lg leading-none" aria-hidden>⌕</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search articles, claims, empirical topics…"
+              aria-label="Search articles"
+              className="flex-1 bg-transparent border-none outline-none font-serif text-lg text-ink placeholder:text-subtle min-w-0"
+            />
+            <button
+              type="submit"
+              disabled={!query.trim()}
+              className="text-sm font-semibold text-ink underline decoration-gold decoration-2 underline-offset-4 hover:text-gold disabled:opacity-30 disabled:no-underline cursor-pointer shrink-0"
+            >
+              Research →
+            </button>
+          </div>
+        </form>
 
         {/* Feature Essay */}
         {feat && (
