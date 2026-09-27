@@ -10,6 +10,8 @@ import { ArticleViewProvider } from "./ArticleViewContext";
 import { AuthProvider } from "./components/AuthProvider";
 import { TimeMachineProvider } from "./hooks/useTimeMachine";
 import { UiModeProvider } from "./context/UiModeContext";
+import { ReadingDeskProvider } from "./context/ReadingDeskContext";
+
 import TimeMachineBar from "./components/TimeMachineBar";
 import RegisterSw from "./components/RegisterSw";
 import ScrollReveal from "./components/ScrollReveal";
@@ -61,12 +63,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       <HeaderSearchProvider>
                         <ArticleViewProvider>
                           <UiModeProvider>
-                            <ToastProvider>
-                              <ScrollReveal />
-                              <RegisterSw />
-                              <TimeMachineBar />
-                              <AppShell>{children}</AppShell>
-                            </ToastProvider>
+                            <ReadingDeskProvider>
+                              <ToastProvider>
+                                <ScrollReveal />
+                                <RegisterSw />
+                                <TimeMachineBar />
+                                <AppShell>{children}</AppShell>
+                              </ToastProvider>
+                            </ReadingDeskProvider>
                           </UiModeProvider>
                         </ArticleViewProvider>
                       </HeaderSearchProvider>

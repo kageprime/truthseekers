@@ -26,8 +26,13 @@ export function ReadingDeskProvider({ children }: { children: ReactNode }) {
   );
 }
 
+const fallbackDeskValue: ReadingDeskValue = {
+  panel: null,
+  setPanel: () => {},
+  hasPanel: false,
+};
+
 export function useReadingDesk(): ReadingDeskValue {
   const ctx = useContext(ReadingDeskContext);
-  if (!ctx) throw new Error("useReadingDesk must be used within ReadingDeskProvider");
-  return ctx;
+  return ctx ?? fallbackDeskValue;
 }
